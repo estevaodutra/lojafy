@@ -7,6 +7,7 @@ import { Plus, Package, AlertTriangle, TrendingUp, Download, Upload } from 'luci
 import ProductTable from '@/components/admin/ProductTable';
 import ProductForm from '@/components/admin/ProductForm';
 import StockAlert from '@/components/admin/StockAlert';
+import CategoryManagement from '@/components/admin/CategoryManagement';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -190,10 +191,11 @@ const Products = () => {
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="all">Todos os Produtos</TabsTrigger>
           <TabsTrigger value="low-stock">Estoque Baixo</TabsTrigger>
           <TabsTrigger value="out-of-stock">Sem Estoque</TabsTrigger>
+          <TabsTrigger value="categories">Categorias</TabsTrigger>
           <TabsTrigger value="reports">Relatórios</TabsTrigger>
         </TabsList>
 
@@ -227,6 +229,10 @@ const Products = () => {
             onRefresh={refetchProducts}
             emptyMessage="Nenhum produto sem estoque encontrado."
           />
+        </TabsContent>
+
+        <TabsContent value="categories" className="space-y-4">
+          <CategoryManagement />
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-4">
