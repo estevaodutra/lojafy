@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { 
@@ -43,11 +44,11 @@ const Footer = () => {
           <div className="space-y-4">
             <h4 className="font-semibold text-foreground">Links Úteis</h4>
             <ul className="space-y-2 text-muted-foreground">
-              <li><a href="#" className="hover:text-primary transition-colors">Quem Somos</a></li>
-              <li><a href="#" className="hover:text-primary transition-colors">Política de Troca</a></li>
-              <li><a href="#" className="hover:text-primary transition-colors">Termos de Uso</a></li>
-              <li><a href="#" className="hover:text-primary transition-colors">FAQ</a></li>
-              <li><a href="#" className="hover:text-primary transition-colors">Rastrear Pedido</a></li>
+              <li><Link to="/quem-somos" className="hover:text-primary transition-colors">Quem Somos</Link></li>
+              <li><Link to="/politica-troca" className="hover:text-primary transition-colors">Política de Troca</Link></li>
+              <li><Link to="/termos-uso" className="hover:text-primary transition-colors">Termos de Uso</Link></li>
+              <li><Link to="/faq" className="hover:text-primary transition-colors">FAQ</Link></li>
+              <li><Link to="/rastrear-pedido" className="hover:text-primary transition-colors">Rastrear Pedido</Link></li>
             </ul>
           </div>
 
@@ -55,11 +56,11 @@ const Footer = () => {
           <div className="space-y-4">
             <h4 className="font-semibold text-foreground">Atendimento</h4>
             <ul className="space-y-2 text-muted-foreground">
-              <li><a href="#" className="hover:text-primary transition-colors">Central de Ajuda</a></li>
-              <li><a href="#" className="hover:text-primary transition-colors">Fale Conosco</a></li>
-              <li><a href="#" className="hover:text-primary transition-colors">WhatsApp</a></li>
-              <li><a href="#" className="hover:text-primary transition-colors">E-mail</a></li>
-              <li><a href="#" className="hover:text-primary transition-colors">Ouvidoria</a></li>
+              <li><Link to="/central-ajuda" className="hover:text-primary transition-colors">Central de Ajuda</Link></li>
+              <li><Link to="/contato" className="hover:text-primary transition-colors">Fale Conosco</Link></li>
+              <li><Link to="/contato" className="hover:text-primary transition-colors">WhatsApp</Link></li>
+              <li><Link to="/contato" className="hover:text-primary transition-colors">E-mail</Link></li>
+              <li><Link to="/contato" className="hover:text-primary transition-colors">Ouvidoria</Link></li>
             </ul>
           </div>
 

@@ -147,9 +147,11 @@ const ProductGrid = () => {
                 </Link>
 
                 <div className="p-4 pt-0">
-                  <Button className="w-full">
-                    Comprar
-                  </Button>
+                  <Link to={`/produto/${product.id}`}>
+                    <Button className="w-full">
+                      Comprar
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>
