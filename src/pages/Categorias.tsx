@@ -17,7 +17,7 @@ const Categorias = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState("relevance");
   const [priceRange, setPriceRange] = useState([0, 10000]);
-  const [selectedBrand, setSelectedBrand] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState("all");
 
   const selectedCategory = slug ? mockCategories.find(cat => cat.slug === slug) : null;
   const filteredProducts = selectedCategory 
@@ -109,7 +109,7 @@ const Categorias = () => {
                       <SelectValue placeholder="Todas as marcas" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todas as marcas</SelectItem>
+                      <SelectItem value="all">Todas as marcas</SelectItem>
                       {brands.map((brand) => (
                         <SelectItem key={brand} value={brand}>{brand}</SelectItem>
                       ))}
