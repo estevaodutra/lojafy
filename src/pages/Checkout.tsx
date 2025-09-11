@@ -17,7 +17,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PixPayment from "@/components/PixPayment";
 import { ModernPixPayment } from '@/components/ModernPixPayment';
-import { createPixPayment as createModernPixPayment, PixPaymentRequest } from '@/lib/mercadoPago';
+import { createModernPixPayment, PixPaymentRequest } from '@/lib/mercadoPago';
 import { ShoppingCart, CreditCard, Truck, Shield, AlertTriangle } from "lucide-react";
 
 const Checkout = () => {
@@ -32,7 +32,7 @@ const Checkout = () => {
   const [modernPixData, setModernPixData] = useState<{
     qr_code: string;
     qr_code_base64: string;
-    payment_id: number;
+    payment_id: string;
   } | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
@@ -345,16 +345,13 @@ const Checkout = () => {
 
     try {
       const paymentRequest: PixPaymentRequest = {
+        amount: parseFloat(total.toFixed(2)),
         description: `Pedido - ${cartItems.length} item(s)`,
-        transaction_amount: parseFloat(total.toFixed(2)),
         payer: {
           email: formData.email,
-          first_name: formData.firstName,
-          last_name: formData.lastName || '',
-          identification: {
-            type: "CPF",
-            number: formData.cpf.replace(/\D/g, '')
-          }
+          firstName: formData.firstName,
+          lastName: formData.lastName || '',
+          cpf: formData.cpf
         }
       };
 
@@ -365,7 +362,7 @@ const Checkout = () => {
       setModernPixData({
         qr_code: response.qr_code,
         qr_code_base64: response.qr_code_base64,
-        payment_id: response.id
+        payment_id: response.payment_id
       });
 
       toast({
