@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -82,66 +83,70 @@ const ProductGrid = () => {
               className="group hover:shadow-card-hover transition-all duration-300 border-border overflow-hidden"
             >
               <CardContent className="p-0">
-                <div className="relative">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <Badge 
-                    variant={product.badgeType}
-                    className="absolute top-3 left-3"
-                  >
-                    {product.badge}
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="absolute top-3 right-3 bg-white/80 hover:bg-white"
-                  >
-                    <Heart className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <div className="p-4 space-y-3">
-                  <h3 className="font-semibold text-foreground line-clamp-2">
-                    {product.name}
-                  </h3>
-                  
-                  <div className="flex items-center gap-1">
-                    <div className="flex">
-                      {[...Array(5)].map((_, i) => (
-                        <Star 
-                          key={i}
-                          className={`h-4 w-4 ${
-                            i < Math.floor(product.rating) 
-                              ? 'fill-yellow-400 text-yellow-400' 
-                              : 'text-gray-300'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-sm text-muted-foreground">
-                      ({product.reviews})
-                    </span>
+                <Link to={`/produto/${product.id}`}>
+                  <div className="relative">
+                    <img
+                      src={product.image}
+                      alt={product.name}
+                      className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <Badge 
+                      variant={product.badgeType}
+                      className="absolute top-3 left-3"
+                    >
+                      {product.badge}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute top-3 right-3 bg-white/80 hover:bg-white"
+                    >
+                      <Heart className="h-4 w-4" />
+                    </Button>
                   </div>
 
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl font-bold text-foreground">
-                        {formatPrice(product.price)}
+                  <div className="p-4 space-y-3">
+                    <h3 className="font-semibold text-foreground line-clamp-2">
+                      {product.name}
+                    </h3>
+                    
+                    <div className="flex items-center gap-1">
+                      <div className="flex">
+                        {[...Array(5)].map((_, i) => (
+                          <Star 
+                            key={i}
+                            className={`h-4 w-4 ${
+                              i < Math.floor(product.rating) 
+                                ? 'fill-yellow-400 text-yellow-400' 
+                                : 'text-gray-300'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        ({product.reviews})
                       </span>
-                      {product.originalPrice && (
-                        <span className="text-sm text-muted-foreground line-through">
-                          {formatPrice(product.originalPrice)}
-                        </span>
-                      )}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      ou 10x de {formatPrice(product.price / 10)}
-                    </p>
-                  </div>
 
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-bold text-foreground">
+                          {formatPrice(product.price)}
+                        </span>
+                        {product.originalPrice && (
+                          <span className="text-sm text-muted-foreground line-through">
+                            {formatPrice(product.originalPrice)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        ou 10x de {formatPrice(product.price / 10)}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+
+                <div className="p-4 pt-0">
                   <Button className="w-full">
                     Comprar
                   </Button>

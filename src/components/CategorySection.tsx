@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
   Smartphone, 
@@ -78,19 +79,20 @@ const CategorySection = () => {
           {categories.map((category) => {
             const IconComponent = category.icon;
             return (
-              <Card 
-                key={category.id}
-                className="group hover:shadow-card-hover transition-all duration-300 cursor-pointer border-border bg-card"
-              >
-                <CardContent className="p-6 flex flex-col items-center text-center space-y-3">
-                  <div className={`w-16 h-16 ${category.color} rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
-                    <IconComponent className="h-8 w-8 text-white" />
-                  </div>
-                  <h3 className="font-medium text-foreground text-sm">
-                    {category.name}
-                  </h3>
-                </CardContent>
-              </Card>
+              <Link key={category.id} to="/categorias">
+                <Card 
+                  className="group hover:shadow-card-hover transition-all duration-300 cursor-pointer border-border bg-card"
+                >
+                  <CardContent className="p-6 flex flex-col items-center text-center space-y-3">
+                    <div className={`w-16 h-16 ${category.color} rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
+                      <IconComponent className="h-8 w-8 text-white" />
+                    </div>
+                    <h3 className="font-medium text-foreground text-sm">
+                      {category.name}
+                    </h3>
+                  </CardContent>
+                </Card>
+              </Link>
             );
           })}
         </div>

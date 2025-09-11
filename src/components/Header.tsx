@@ -1,6 +1,7 @@
 import { Search, User, Heart, ShoppingCart, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Link } from "react-router-dom";
 
 const Header = () => {
   return (
@@ -16,12 +17,12 @@ const Header = () => {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center space-x-2">
+          <Link to="/" className="flex items-center space-x-2">
             <div className="w-10 h-10 bg-hero-gradient rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-xl">E</span>
             </div>
             <span className="text-2xl font-bold text-foreground">EcoShop</span>
-          </div>
+          </Link>
 
           {/* Search Bar - Hidden on mobile */}
           <div className="hidden md:flex flex-1 max-w-2xl mx-8">
@@ -76,20 +77,20 @@ const Header = () => {
 
         {/* Navigation Menu */}
         <nav className="hidden md:flex items-center space-x-8 mt-4">
-          <Button variant="ghost" className="text-foreground hover:text-primary">
-            Início
+          <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
+            <Link to="/">Início</Link>
           </Button>
-          <Button variant="ghost" className="text-foreground hover:text-primary">
-            Lançamentos
+          <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
+            <Link to="/categorias">Lançamentos</Link>
           </Button>
-          <Button variant="ghost" className="text-foreground hover:text-primary">
-            Promoções
+          <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
+            <Link to="/promocoes">Promoções</Link>
           </Button>
-          <Button variant="ghost" className="text-foreground hover:text-primary">
-            Categorias
+          <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
+            <Link to="/categorias">Categorias</Link>
           </Button>
-          <Button variant="ghost" className="text-foreground hover:text-primary">
-            Contato
+          <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
+            <Link to="/contato">Contato</Link>
           </Button>
         </nav>
       </div>
