@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { FavoritesProvider } from "@/contexts/FavoritesContext";
+import { CartProvider } from "@/contexts/CartContext";
 import Index from "./pages/Index";
 import Categorias from "./pages/Categorias";
 import Promocoes from "./pages/Promocoes";
@@ -17,6 +18,7 @@ import TermosUso from "./pages/TermosUso";
 import FAQ from "./pages/FAQ";
 import RastrearPedido from "./pages/RastrearPedido";
 import CentralAjuda from "./pages/CentralAjuda";
+import Carrinho from "./pages/Carrinho";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +27,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <FavoritesProvider>
+        <CartProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
@@ -43,10 +46,12 @@ const App = () => (
             <Route path="/faq" element={<FAQ />} />
             <Route path="/rastrear-pedido" element={<RastrearPedido />} />
             <Route path="/central-ajuda" element={<CentralAjuda />} />
+            <Route path="/carrinho" element={<Carrinho />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+        </CartProvider>
       </FavoritesProvider>
     </TooltipProvider>
   </QueryClientProvider>

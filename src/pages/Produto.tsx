@@ -23,12 +23,14 @@ import {
 } from "lucide-react";
 import { mockProducts } from "@/data/mockData";
 import { useFavorites } from "@/contexts/FavoritesContext";
+import { useCart } from "@/contexts/CartContext";
 
 const Produto = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
+  const { addItem } = useCart();
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState("");
@@ -65,6 +67,16 @@ const Produto = () => {
   };
 
   const handleAddToCart = () => {
+    const cartItem = {
+      productId: product.id,
+      productName: product.name,
+      productImage: product.image,
+      price: product.price,
+      quantity: quantity,
+      variants: selectedVariant ? { variant: selectedVariant } : undefined,
+    };
+    
+    addItem(cartItem);
     toast({
       title: "Produto adicionado ao carrinho!",
       description: `${quantity}x ${product.name}`,

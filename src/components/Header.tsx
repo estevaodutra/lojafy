@@ -3,9 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import { useFavorites } from "@/contexts/FavoritesContext";
+import { useCart } from "@/contexts/CartContext";
 
 const Header = () => {
   const { favoritesCount } = useFavorites();
+  const { itemsCount } = useCart();
   
   return (
     <header className="w-full border-b bg-background sticky top-0 z-50">
@@ -71,10 +73,16 @@ const Header = () => {
             </Button>
 
             {/* Cart */}
-            <Button variant="ghost" size="sm" className="flex flex-col items-center p-2 relative">
-              <ShoppingCart className="h-5 w-5" />
-              <span className="text-xs">Carrinho</span>
-              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">3</span>
+            <Button variant="ghost" size="sm" className="flex flex-col items-center p-2 relative" asChild>
+              <Link to="/carrinho">
+                <ShoppingCart className="h-5 w-5" />
+                <span className="text-xs">Carrinho</span>
+                {itemsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {itemsCount}
+                  </span>
+                )}
+              </Link>
             </Button>
 
             {/* Mobile Menu */}
