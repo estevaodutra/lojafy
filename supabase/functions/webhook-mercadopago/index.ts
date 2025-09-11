@@ -74,16 +74,54 @@ serve(async (req) => {
       external_reference: paymentData.external_reference
     });
 
-    // Find order by payment_id
-    const { data: orderData, error: orderError } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('payment_id', paymentId.toString())
-      .single();
+    // Try to find order by payment_id first; if not found, try by external_reference with retries
+    let orderData: any = null;
 
-    if (orderError) {
-      console.error('Order not found:', orderError);
-      return new Response('Order not found', { status: 404, headers: corsHeaders });
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      const { data: orderByPayment, error: byPaymentError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('payment_id', paymentId.toString())
+        .maybeSingle();
+
+      if (orderByPayment) {
+        orderData = orderByPayment;
+        break;
+      }
+
+      const { data: orderByRef, error: byRefError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('external_reference', paymentData.external_reference)
+        .maybeSingle();
+
+      if (orderByRef) {
+        orderData = orderByRef;
+
+        // Backfill payment_id if missing
+        if (!orderByRef.payment_id) {
+          const { error: setPidError } = await supabase
+            .from('orders')
+            .update({ payment_id: paymentId.toString(), updated_at: new Date().toISOString() })
+            .eq('id', orderByRef.id);
+          if (setPidError) {
+            console.error('Failed to backfill payment_id:', setPidError);
+          }
+        }
+        break;
+      }
+
+      console.log(`Order not found yet (attempt ${attempt}/5). Retrying...`);
+      await new Promise((res) => setTimeout(res, 1500));
+    }
+
+    if (!orderData) {
+      console.error('Order not found after retries', {
+        payment_id: paymentId.toString(),
+        external_reference: paymentData.external_reference,
+      });
+      // Respond 200 so MP can consider delivery successful and will retry later
+      return new Response('OK', { status: 200, headers: corsHeaders });
     }
 
     console.log('Found order:', orderData.id);
