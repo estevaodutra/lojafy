@@ -1,3 +1,13 @@
+export interface ProductVariant {
+  id: string;
+  name: string;
+  type: 'size' | 'color' | 'model';
+  value: string;
+  priceModifier?: number;
+  image?: string;
+  inStock: boolean;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -13,6 +23,7 @@ export interface Product {
   inStock: boolean;
   images: string[];
   reviews: Review[];
+  variants?: ProductVariant[];
 }
 
 export interface Review {
@@ -39,4 +50,36 @@ export interface ContactForm {
   email: string;
   subject: string;
   message: string;
+}
+
+export interface CheckoutForm {
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  paymentMethod: 'credit' | 'debit' | 'pix' | 'boleto';
+  cardNumber?: string;
+  cardName?: string;
+  cardExpiry?: string;
+  cardCvv?: string;
+}
+
+export interface OrderItem {
+  productId: string;
+  productName: string;
+  productImage: string;
+  price: number;
+  quantity: number;
+  variants?: Record<string, string>;
+}
+
+export interface FAQItem {
+  id: string;
+  question: string;
+  answer: string;
+  category: string;
 }
