@@ -16,7 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PixPayment from "@/components/PixPayment";
-import { ShoppingCart, CreditCard, Truck, Shield } from "lucide-react";
+import { ShoppingCart, CreditCard, Truck, Shield, AlertTriangle } from "lucide-react";
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -186,6 +186,60 @@ const Checkout = () => {
     }
   };
 
+  const saveUserDataAndAddress = async () => {
+    if (!user) return;
+
+    try {
+      // Update user profile with phone and CPF if they're filled
+      if (formData.phone || formData.cpf) {
+        const profileUpdateData: any = {};
+        if (formData.phone) profileUpdateData.phone = formData.phone;
+        if (formData.cpf) profileUpdateData.cpf = cleanCPF(formData.cpf);
+
+        await supabase
+          .from('profiles')
+          .update(profileUpdateData)
+          .eq('user_id', user.id);
+      }
+
+      // Save/update address if all required fields are filled
+      if (formData.address && formData.number && formData.neighborhood && formData.city && formData.state && formData.zipCode) {
+        // First, set all existing addresses as non-default
+        await supabase
+          .from('addresses')
+          .update({ is_default: false })
+          .eq('user_id', user.id);
+
+        // Then insert or update the new address as default
+        const addressData = {
+          user_id: user.id,
+          type: 'delivery',
+          street: formData.address,
+          number: formData.number,
+          complement: formData.complement || null,
+          neighborhood: formData.neighborhood,
+          city: formData.city,
+          state: formData.state,
+          zip_code: formData.zipCode,
+          is_default: true,
+        };
+
+        const { error: addressError } = await supabase
+          .from('addresses')
+          .upsert(addressData, { 
+            onConflict: 'user_id,street,number,city',
+            ignoreDuplicates: false 
+          });
+
+        if (addressError) {
+          console.error('Error saving address:', addressError);
+        }
+      }
+    } catch (error) {
+      console.error('Error saving user data:', error);
+    }
+  };
+
   const createPixPayment = async () => {
     setIsProcessingPayment(true);
     try {
@@ -208,6 +262,9 @@ const Checkout = () => {
         });
         return;
       }
+
+      // Save user data and address before processing payment
+      await saveUserDataAndAddress();
 
       const orderItems = cartItems.map(item => ({
         productId: item.productId,
@@ -325,6 +382,39 @@ const Checkout = () => {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Checkout Form */}
           <div className="lg:col-span-2 space-y-6">
+            
+            {/* Profile completion warning for logged-in users */}
+            {user && (!profile?.phone || !profile?.cpf) && (
+              <Card className="border-amber-200 bg-amber-50">
+                <CardContent className="pt-6">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-amber-800">Complete seu perfil</h3>
+                      <p className="text-sm text-amber-700 mt-1">
+                        Para uma experiência mais rápida, complete as informações do seu perfil. 
+                        Os dados serão salvos automaticamente após a compra.
+                      </p>
+                      {!profile?.phone && !profile?.cpf && (
+                        <p className="text-xs text-amber-600 mt-2">
+                          Preencha telefone e CPF para que sejam salvos no seu perfil.
+                        </p>
+                      )}
+                      {!profile?.phone && profile?.cpf && (
+                        <p className="text-xs text-amber-600 mt-2">
+                          Preencha seu telefone para que seja salvo no seu perfil.
+                        </p>
+                      )}
+                      {profile?.phone && !profile?.cpf && (
+                        <p className="text-xs text-amber-600 mt-2">
+                          Preencha seu CPF para que seja salvo no seu perfil.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             
             {/* Show PIX Payment if available */}
             {pixPaymentData ? (
