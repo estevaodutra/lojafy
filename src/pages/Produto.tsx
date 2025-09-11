@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -22,10 +22,13 @@ import {
   ZoomIn
 } from "lucide-react";
 import { mockProducts } from "@/data/mockData";
+import { useFavorites } from "@/contexts/FavoritesContext";
 
 const Produto = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { toast } = useToast();
+  const { addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState("");
@@ -69,9 +72,29 @@ const Produto = () => {
   };
 
   const handleAddToWishlist = () => {
-    toast({
-      title: "Produto adicionado aos favoritos!",
-      description: product.name,
+    if (isFavorite(product.id)) {
+      removeFromFavorites(product.id);
+      toast({
+        title: "Produto removido dos favoritos",
+        description: product.name,
+        variant: "destructive",
+      });
+    } else {
+      addToFavorites(product);
+      toast({
+        title: "Produto adicionado aos favoritos!",
+        description: product.name,
+      });
+    }
+  };
+
+  const handleBuyNow = () => {
+    navigate('/checkout', { 
+      state: { 
+        product, 
+        quantity, 
+        variant: selectedVariant 
+      } 
     });
   };
 
@@ -236,15 +259,22 @@ const Produto = () => {
                   size="lg"
                   variant="outline"
                   onClick={handleAddToWishlist}
+                  className={isFavorite(product.id) ? "text-destructive border-destructive" : ""}
                 >
-                  <Heart className="h-5 w-5" />
+                  <Heart className={`h-5 w-5 ${isFavorite(product.id) ? 'fill-current' : ''}`} />
                 </Button>
                 <Button size="lg" variant="outline">
                   <Share2 className="h-5 w-5" />
                 </Button>
               </div>
 
-              <Button size="lg" className="w-full" variant="secondary">
+              <Button 
+                size="lg" 
+                className="w-full" 
+                variant="secondary"
+                onClick={handleBuyNow}
+                disabled={!product.inStock}
+              >
                 Comprar Agora
               </Button>
             </div>

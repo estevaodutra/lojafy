@@ -2,8 +2,11 @@ import { Search, User, Heart, ShoppingCart, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
+import { useFavorites } from "@/contexts/FavoritesContext";
 
 const Header = () => {
+  const { favoritesCount } = useFavorites();
+  
   return (
     <header className="w-full border-b bg-background sticky top-0 z-50">
       {/* Top Bar */}
@@ -55,10 +58,16 @@ const Header = () => {
             </Button>
 
             {/* Favorites */}
-            <Button variant="ghost" size="sm" className="hidden sm:flex flex-col items-center p-2 relative">
-              <Heart className="h-5 w-5" />
-              <span className="text-xs">Favoritos</span>
-              <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">2</span>
+            <Button variant="ghost" size="sm" className="hidden sm:flex flex-col items-center p-2 relative" asChild>
+              <Link to="/favoritos">
+                <Heart className="h-5 w-5" />
+                <span className="text-xs">Favoritos</span>
+                {favoritesCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {favoritesCount}
+                  </span>
+                )}
+              </Link>
             </Button>
 
             {/* Cart */}
