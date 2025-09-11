@@ -217,6 +217,7 @@ export type Database = {
         Row: {
           billing_address: Json | null
           created_at: string
+          external_reference: string | null
           id: string
           notes: string | null
           order_number: string
@@ -237,6 +238,7 @@ export type Database = {
         Insert: {
           billing_address?: Json | null
           created_at?: string
+          external_reference?: string | null
           id?: string
           notes?: string | null
           order_number: string
@@ -257,6 +259,7 @@ export type Database = {
         Update: {
           billing_address?: Json | null
           created_at?: string
+          external_reference?: string | null
           id?: string
           notes?: string | null
           order_number?: string

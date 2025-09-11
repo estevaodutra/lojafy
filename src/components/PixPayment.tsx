@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Clock, Copy, QrCode } from "lucide-react";
+import { CheckCircle, Clock, Copy, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import type { PixPaymentData } from "@/types";
 
 interface PixPaymentProps {
@@ -10,9 +11,14 @@ interface PixPaymentProps {
   onPaymentConfirmed?: () => void;
 }
 
+// Status polling interval (5 seconds)
+const POLLING_INTERVAL = 5000;
+
 export default function PixPayment({ paymentData, onPaymentConfirmed }: PixPaymentProps) {
   const [timeRemaining, setTimeRemaining] = useState<string>("");
   const [isExpired, setIsExpired] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState(paymentData.status);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const { toast } = useToast();
 
   // Calculate time remaining for PIX expiration
@@ -41,6 +47,37 @@ export default function PixPayment({ paymentData, onPaymentConfirmed }: PixPayme
     return () => clearInterval(interval);
   }, [paymentData.expires_at]);
 
+  // Poll payment status
+  useEffect(() => {
+    if (currentStatus === 'approved' || isExpired) return;
+
+    const checkPaymentStatus = async () => {
+      try {
+        const { data: order } = await supabase
+          .from('orders')
+          .select('payment_status')
+          .eq('payment_id', paymentData.payment_id.toString())
+          .maybeSingle();
+
+        if (order && order.payment_status === 'approved') {
+          setCurrentStatus('approved');
+          toast({
+            title: "Pagamento aprovado!",
+            description: "Seu pagamento PIX foi processado com sucesso.",
+          });
+          if (onPaymentConfirmed) {
+            setTimeout(onPaymentConfirmed, 1500);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking payment status:', error);
+      }
+    };
+
+    const interval = setInterval(checkPaymentStatus, POLLING_INTERVAL);
+    return () => clearInterval(interval);
+  }, [currentStatus, isExpired, paymentData.payment_id, toast, onPaymentConfirmed]);
+
   // Copy PIX code to clipboard
   const copyPixCode = async () => {
     try {
@@ -58,8 +95,45 @@ export default function PixPayment({ paymentData, onPaymentConfirmed }: PixPayme
     }
   };
 
+  // Manual status check
+  const checkStatusManually = async () => {
+    setIsCheckingStatus(true);
+    try {
+      const { data: order } = await supabase
+        .from('orders')
+        .select('payment_status')
+        .eq('payment_id', paymentData.payment_id.toString())
+        .maybeSingle();
+
+      if (order && order.payment_status === 'approved') {
+        setCurrentStatus('approved');
+        toast({
+          title: "Pagamento aprovado!",
+          description: "Seu pagamento PIX foi processado com sucesso.",
+        });
+        if (onPaymentConfirmed) {
+          setTimeout(onPaymentConfirmed, 1500);
+        }
+      } else {
+        toast({
+          title: "Pagamento ainda pendente",
+          description: "O pagamento ainda não foi processado. Tente novamente em alguns instantes.",
+        });
+      }
+    } catch (error) {
+      console.error('Error checking payment status:', error);
+      toast({
+        title: "Erro ao verificar status",
+        description: "Não foi possível verificar o status do pagamento.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  };
+
   const getStatusIcon = () => {
-    switch (paymentData.status) {
+    switch (currentStatus) {
       case 'approved':
         return <CheckCircle className="h-6 w-6 text-green-600" />;
       case 'pending':
@@ -71,7 +145,7 @@ export default function PixPayment({ paymentData, onPaymentConfirmed }: PixPayme
   };
 
   const getStatusText = () => {
-    switch (paymentData.status) {
+    switch (currentStatus) {
       case 'approved':
         return "Pagamento aprovado!";
       case 'pending':
@@ -87,7 +161,7 @@ export default function PixPayment({ paymentData, onPaymentConfirmed }: PixPayme
     }
   };
 
-  if (paymentData.status === 'approved') {
+  if (currentStatus === 'approved') {
     return (
       <Card className="w-full max-w-md mx-auto">
         <CardHeader className="text-center">
@@ -179,6 +253,29 @@ export default function PixPayment({ paymentData, onPaymentConfirmed }: PixPayme
           <p>📷 Escaneie o QR Code ou cole o código</p>
           <p>✅ Confirme o pagamento</p>
           <p>⏱️ O pagamento será processado em instantes</p>
+        </div>
+
+        {/* Manual Status Check */}
+        <div className="text-center">
+          <Button
+            onClick={checkStatusManually}
+            disabled={isCheckingStatus}
+            variant="outline"
+            size="sm"
+            className="w-full"
+          >
+            {isCheckingStatus ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Verificando...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Verificar Status
+              </>
+            )}
+          </Button>
         </div>
 
         {/* Payment ID */}

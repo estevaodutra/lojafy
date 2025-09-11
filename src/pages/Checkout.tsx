@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { CheckoutForm, OrderItem, PixPaymentData } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
+import { formatCPF, validateCPF, cleanCPF } from "@/lib/cpf";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PixPayment from "@/components/PixPayment";
@@ -58,7 +59,13 @@ const Checkout = () => {
   };
 
   const handleInputChange = (field: keyof CheckoutForm, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    if (field === 'cpf') {
+      // Format CPF automatically
+      const formattedValue = formatCPF(value);
+      setFormData(prev => ({ ...prev, [field]: formattedValue }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
   };
 
   const applyCoupon = () => {
@@ -79,8 +86,8 @@ const Checkout = () => {
   const createPixPayment = async () => {
     setIsProcessingPayment(true);
     try {
-      // Validate CPF (basic validation)
-      if (!formData.cpf || formData.cpf.length < 11) {
+      // Validate CPF
+      if (!validateCPF(formData.cpf)) {
         toast({
           title: "CPF inválido",
           description: "Por favor, informe um CPF válido.",
@@ -113,7 +120,7 @@ const Checkout = () => {
           email: formData.email,
           firstName: formData.firstName,
           lastName: formData.lastName,
-          cpf: formData.cpf.replace(/\D/g, ''), // Remove non-digits
+          cpf: cleanCPF(formData.cpf),
         },
         orderItems,
         shippingAddress: {
@@ -139,7 +146,6 @@ const Checkout = () => {
       }
 
       setPixPaymentData(data);
-      setCurrentStep(4); // Move to PIX payment step
       
       toast({
         title: "PIX gerado com sucesso!",
@@ -221,6 +227,18 @@ const Checkout = () => {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Checkout Form */}
           <div className="lg:col-span-2 space-y-6">
+            
+            {/* Show PIX Payment if available */}
+            {pixPaymentData ? (
+              <div className="flex justify-center">
+                <PixPayment 
+                  paymentData={pixPaymentData} 
+                  onPaymentConfirmed={handlePixPaymentConfirmed}
+                />
+              </div>
+            ) : (
+              <>
+                {/* Regular checkout steps */}
             {currentStep === 1 && (
               <Card>
                 <CardHeader>
@@ -276,6 +294,7 @@ const Checkout = () => {
                       value={formData.cpf}
                       onChange={(e) => handleInputChange("cpf", e.target.value)}
                       placeholder="000.000.000-00"
+                      maxLength={14}
                     />
                   </div>
                 </CardContent>
@@ -433,26 +452,31 @@ const Checkout = () => {
               </Card>
             )}
 
-            {/* Navigation Buttons */}
-            <div className="flex justify-between">
-              <Button 
-                variant="outline" 
-                onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
-                disabled={currentStep === 1}
-              >
-                Voltar
-              </Button>
-              
-              {currentStep < 4 ? (
-                <Button onClick={() => setCurrentStep(currentStep + 1)}>
-                  Continuar
-                </Button>
-              ) : (
-                <Button onClick={handleSubmit}>
-                  Finalizar Pedido
-                </Button>
-              )}
-            </div>
+                {/* Navigation Buttons */}
+                <div className="flex justify-between">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
+                    disabled={currentStep === 1}
+                  >
+                    Voltar
+                  </Button>
+                  
+                  {currentStep < 4 ? (
+                    <Button onClick={() => setCurrentStep(currentStep + 1)}>
+                      Continuar
+                    </Button>
+                  ) : (
+                    <Button 
+                      onClick={handleSubmit} 
+                      disabled={isProcessingPayment}
+                    >
+                      {isProcessingPayment ? "Processando..." : "Finalizar Pedido"}
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Order Summary */}
