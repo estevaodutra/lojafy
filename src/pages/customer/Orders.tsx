@@ -1,50 +1,72 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Package, Eye, Truck, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+
+interface OrderItem {
+  id: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  product_snapshot: any;
+}
+
+interface Order {
+  id: string;
+  order_number: string;
+  status: string;
+  payment_status: string;
+  total_amount: number;
+  created_at: string;
+  tracking_number?: string;
+  order_items: OrderItem[];
+}
 
 const Orders = () => {
-  // Mock orders data
-  const orders = [
-    {
-      id: '1',
-      orderNumber: 'ORD-20241201-000001',
-      status: 'shipped',
-      total: 299.99,
-      items: 2,
-      date: '2024-12-01',
-      estimatedDelivery: '2024-12-05',
-      trackingNumber: 'BR123456789',
-      products: [
-        { name: 'iPhone 15 Pro Max', quantity: 1, price: 199.99 },
-        { name: 'Fone Sony WH-1000XM4', quantity: 1, price: 99.99 }
-      ]
-    },
-    {
-      id: '2',
-      orderNumber: 'ORD-20241128-000002',
-      status: 'delivered',
-      total: 159.99,
-      items: 1,
-      date: '2024-11-28',
-      deliveredAt: '2024-11-30',
-      products: [
-        { name: 'Apple Watch Series 9', quantity: 1, price: 159.99 }
-      ]
-    },
-    {
-      id: '3',
-      orderNumber: 'ORD-20241125-000003',
-      status: 'pending',
-      total: 89.99,
-      items: 1,
-      date: '2024-11-25',
-      products: [
-        { name: 'Carregador sem fio', quantity: 1, price: 89.99 }
-      ]
-    }
-  ];
+  const { user } = useAuth();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if (!user) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select(`
+            id,
+            order_number,
+            status,
+            payment_status,
+            total_amount,
+            created_at,
+            tracking_number,
+            order_items (
+              id,
+              quantity,
+              unit_price,
+              total_price,
+              product_snapshot
+            )
+          `)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setOrders(data || []);
+      } catch (error) {
+        console.error('Erro ao buscar pedidos:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, [user]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -88,16 +110,21 @@ const Orders = () => {
         </p>
       </div>
 
-      {orders.length > 0 ? (
+      {loading ? (
+        <div className="text-center py-12">
+          <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+          <p className="text-muted-foreground mt-2">Carregando pedidos...</p>
+        </div>
+      ) : orders.length > 0 ? (
         <div className="space-y-4">
           {orders.map((order) => (
             <Card key={order.id}>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-lg">#{order.orderNumber}</CardTitle>
+                    <CardTitle className="text-lg">#{order.order_number}</CardTitle>
                     <CardDescription>
-                      Pedido realizado em {new Date(order.date).toLocaleDateString('pt-BR')}
+                      Pedido realizado em {new Date(order.created_at).toLocaleDateString('pt-BR')}
                     </CardDescription>
                   </div>
                   <Badge variant={getStatusVariant(order.status)} className="flex items-center gap-1">
@@ -109,49 +136,52 @@ const Orders = () => {
               <CardContent className="space-y-4">
                 {/* Products */}
                 <div className="space-y-2">
-                  {order.products.map((product, index) => (
-                    <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                      <div>
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Quantidade: {product.quantity}
-                        </p>
+                  {order.order_items.map((item, index) => {
+                    const productName = item.product_snapshot?.name || 'Produto';
+                    return (
+                      <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                        <div>
+                          <p className="font-medium">{productName}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Quantidade: {item.quantity}
+                          </p>
+                        </div>
+                        <span className="font-semibold">
+                          R$ {Number(item.total_price).toFixed(2)}
+                        </span>
                       </div>
-                      <span className="font-semibold">
-                        R$ {product.price.toFixed(2)}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Order Summary */}
                 <div className="flex items-center justify-between pt-2 border-t border-border">
                   <div className="text-sm text-muted-foreground">
-                    {order.items} item(s) • Total: 
+                    {order.order_items.length} item(s) • Total: 
                   </div>
                   <span className="text-lg font-bold">
-                    R$ {order.total.toFixed(2)}
+                    R$ {Number(order.total_amount).toFixed(2)}
                   </span>
                 </div>
 
-                {/* Delivery Info */}
-                {order.status === 'shipped' && order.estimatedDelivery && (
-                  <div className="bg-secondary/50 p-3 rounded-lg">
-                    <p className="text-sm font-medium text-secondary-foreground">
-                      📦 Previsão de entrega: {new Date(order.estimatedDelivery).toLocaleDateString('pt-BR')}
+                {/* Payment Status */}
+                {order.payment_status && (
+                  <div className={`p-3 rounded-lg ${
+                    order.payment_status === 'paid' 
+                      ? 'bg-success/10 text-success-foreground' 
+                      : 'bg-warning/10 text-warning-foreground'
+                  }`}>
+                    <p className="text-sm font-medium">
+                      {order.payment_status === 'paid' ? '✅ Pagamento confirmado' : '⏱️ Aguardando pagamento'}
                     </p>
-                    {order.trackingNumber && (
-                      <p className="text-sm text-muted-foreground">
-                        Código de rastreamento: {order.trackingNumber}
-                      </p>
-                    )}
                   </div>
                 )}
 
-                {order.status === 'delivered' && order.deliveredAt && (
-                  <div className="bg-success/10 p-3 rounded-lg">
-                    <p className="text-sm font-medium text-success-foreground">
-                      ✅ Entregue em {new Date(order.deliveredAt).toLocaleDateString('pt-BR')}
+                {/* Tracking Info */}
+                {order.tracking_number && (
+                  <div className="bg-secondary/50 p-3 rounded-lg">
+                    <p className="text-sm font-medium text-secondary-foreground">
+                      📦 Código de rastreamento: {order.tracking_number}
                     </p>
                   </div>
                 )}
@@ -162,7 +192,7 @@ const Orders = () => {
                     <Eye className="h-4 w-4 mr-2" />
                     Ver detalhes
                   </Button>
-                  {order.status === 'shipped' && order.trackingNumber && (
+                  {order.tracking_number && (
                     <Button variant="outline" size="sm">
                       <Truck className="h-4 w-4 mr-2" />
                       Rastrear pedido

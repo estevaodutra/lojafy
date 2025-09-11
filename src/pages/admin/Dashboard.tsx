@@ -1,39 +1,123 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, Package, ShoppingCart, Users, DollarSign, AlertTriangle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+
+interface AdminOrder {
+  id: string;
+  order_number: string;
+  total_amount: number;
+  status: string;
+  created_at: string;
+  user_id: string;
+  profiles: {
+    first_name: string;
+    last_name: string;
+  };
+}
+
+interface LowStockProduct {
+  id: string;
+  name: string;
+  stock_quantity: number;
+  min_stock_level: number;
+}
+
+interface DashboardStats {
+  totalRevenue: number;
+  totalOrders: number;
+  totalProducts: number;
+  totalCustomers: number;
+}
 
 const Dashboard = () => {
-  // Mock data for charts and metrics
-  const salesData = [
-    { month: 'Jan', vendas: 12000 },
-    { month: 'Fev', vendas: 19000 },
-    { month: 'Mar', vendas: 15000 },
-    { month: 'Abr', vendas: 22000 },
-    { month: 'Mai', vendas: 18000 },
-    { month: 'Jun', vendas: 25000 },
-  ];
+  const [recentOrders, setRecentOrders] = useState<AdminOrder[]>([]);
+  const [lowStockProducts, setLowStockProducts] = useState<LowStockProduct[]>([]);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalRevenue: 0,
+    totalOrders: 0,
+    totalProducts: 0,
+    totalCustomers: 0
+  });
+  const [loading, setLoading] = useState(true);
 
-  const categoryData = [
-    { name: 'Eletrônicos', value: 35, color: '#3b82f6' },
-    { name: 'Áudio', value: 25, color: '#10b981' },
-    { name: 'Computadores', value: 20, color: '#f59e0b' },
-    { name: 'Wearables', value: 20, color: '#ef4444' },
-  ];
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        // Fetch recent orders with user info
+        const { data: ordersData, error: ordersError } = await supabase
+          .from('orders')
+          .select(`
+            id,
+            order_number,
+            total_amount,
+            status,
+            created_at,
+            user_id
+          `)
+          .order('created_at', { ascending: false })
+          .limit(5);
 
-  const recentOrders = [
-    { id: '1', customer: 'Maria Silva', total: 299.99, status: 'shipped', date: '2024-12-01' },
-    { id: '2', customer: 'João Santos', total: 159.99, status: 'delivered', date: '2024-11-30' },
-    { id: '3', customer: 'Ana Costa', total: 89.99, status: 'pending', date: '2024-11-29' },
-  ];
+        // Fetch user profiles for orders
+        let ordersWithProfiles: AdminOrder[] = [];
+        if (ordersData) {
+          const userIds = [...new Set(ordersData.map(order => order.user_id))];
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('user_id, first_name, last_name')
+            .in('user_id', userIds);
 
-  const lowStockProducts = [
-    { name: 'iPhone 15 Pro Max', stock: 2, minStock: 5 },
-    { name: 'Apple Watch Series 9', stock: 1, minStock: 3 },
-    { name: 'MacBook Pro M3', stock: 3, minStock: 5 },
-  ];
+          ordersWithProfiles = ordersData.map(order => ({
+            ...order,
+            profiles: profilesData?.find(p => p.user_id === order.user_id) || {
+              first_name: 'Cliente',
+              last_name: ''
+            }
+          }));
+        }
+
+        if (ordersError) throw ordersError;
+
+        // Fetch low stock products
+        const { data: lowStockData, error: lowStockError } = await supabase
+          .from('products')
+          .select('id, name, stock_quantity, min_stock_level')
+          .lt('stock_quantity', 'min_stock_level')
+          .eq('active', true)
+          .limit(5);
+
+        if (lowStockError) throw lowStockError;
+
+        // Fetch dashboard statistics
+        const [ordersCount, productsCount, customersCount, revenue] = await Promise.all([
+          supabase.from('orders').select('id', { count: 'exact', head: true }),
+          supabase.from('products').select('id', { count: 'exact', head: true }).eq('active', true),
+          supabase.from('profiles').select('id', { count: 'exact', head: true }),
+          supabase.from('orders').select('total_amount').eq('payment_status', 'paid')
+        ]);
+
+        const totalRevenue = revenue.data?.reduce((sum, order) => sum + Number(order.total_amount), 0) || 0;
+
+        setRecentOrders(ordersWithProfiles);
+        setLowStockProducts(lowStockData || []);
+        setStats({
+          totalRevenue,
+          totalOrders: ordersCount.count || 0,
+          totalProducts: productsCount.count || 0,
+          totalCustomers: customersCount.count || 0
+        });
+      } catch (error) {
+        console.error('Erro ao buscar dados do dashboard:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
 
   const getStatusVariant = (status: string) => {
     switch (status) {
@@ -70,12 +154,11 @@ const Dashboard = () => {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 25.000</div>
+            <div className="text-2xl font-bold">
+              {loading ? '...' : `R$ ${stats.totalRevenue.toFixed(2)}`}
+            </div>
             <p className="text-xs text-muted-foreground">
-              <span className="text-success inline-flex items-center">
-                <TrendingUp className="h-3 w-3 mr-1" />
-                +12.5%
-              </span> em relação ao mês anterior
+              Total de vendas confirmadas
             </p>
           </CardContent>
         </Card>
@@ -86,12 +169,11 @@ const Dashboard = () => {
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">156</div>
+            <div className="text-2xl font-bold">
+              {loading ? '...' : stats.totalOrders}
+            </div>
             <p className="text-xs text-muted-foreground">
-              <span className="text-success inline-flex items-center">
-                <TrendingUp className="h-3 w-3 mr-1" />
-                +8.2%
-              </span> este mês
+              Total de pedidos realizados
             </p>
           </CardContent>
         </Card>
@@ -102,9 +184,11 @@ const Dashboard = () => {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">324</div>
+            <div className="text-2xl font-bold">
+              {loading ? '...' : stats.totalProducts}
+            </div>
             <p className="text-xs text-muted-foreground">
-              3 com estoque baixo
+              {lowStockProducts.length} com estoque baixo
             </p>
           </CardContent>
         </Card>
@@ -115,12 +199,11 @@ const Dashboard = () => {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,243</div>
+            <div className="text-2xl font-bold">
+              {loading ? '...' : stats.totalCustomers}
+            </div>
             <p className="text-xs text-muted-foreground">
-              <span className="text-success inline-flex items-center">
-                <TrendingUp className="h-3 w-3 mr-1" />
-                +23
-              </span> novos este mês
+              Usuários registrados
             </p>
           </CardContent>
         </Card>
@@ -131,52 +214,32 @@ const Dashboard = () => {
         {/* Sales Chart */}
         <Card>
           <CardHeader>
-            <CardTitle>Vendas por Mês</CardTitle>
+            <CardTitle>Estatísticas de Vendas</CardTitle>
             <CardDescription>
-              Faturamento dos últimos 6 meses
+              Acompanhe o desempenho das vendas
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={salesData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip 
-                  formatter={(value) => [`R$ ${value}`, 'Vendas']}
-                />
-                <Bar dataKey="vendas" fill="hsl(var(--primary))" />
-              </BarChart>
-            </ResponsiveContainer>
+          <CardContent className="text-center py-12">
+            <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">
+              Gráficos de vendas serão implementados com dados reais
+            </p>
           </CardContent>
         </Card>
 
-        {/* Category Pie Chart */}
+        {/* Category Stats */}
         <Card>
           <CardHeader>
-            <CardTitle>Vendas por Categoria</CardTitle>
+            <CardTitle>Categorias de Produtos</CardTitle>
             <CardDescription>
-              Distribuição de vendas por categoria de produtos
+              Distribuição por categoria
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={categoryData}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  dataKey="value"
-                  label={({ name, value }) => `${name}: ${value}%`}
-                >
-                  {categoryData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+          <CardContent className="text-center py-12">
+            <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">
+              Estatísticas de categoria serão implementadas
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -199,27 +262,41 @@ const Dashboard = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentOrders.map((order) => (
-                <div
-                  key={order.id}
-                  className="flex items-center justify-between p-3 border border-border rounded-lg"
-                >
-                  <div>
-                    <p className="font-medium">{order.customer}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(order.date).toLocaleDateString('pt-BR')}
-                    </p>
+            {loading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-muted-foreground mt-2 text-sm">Carregando...</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {recentOrders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="flex items-center justify-between p-3 border border-border rounded-lg"
+                  >
+                    <div>
+                      <p className="font-medium">
+                        {order.profiles?.first_name} {order.profiles?.last_name}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        #{order.order_number} • {new Date(order.created_at).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                    <div className="text-right space-y-1">
+                      <p className="font-semibold">R$ {Number(order.total_amount).toFixed(2)}</p>
+                      <Badge variant={getStatusVariant(order.status)} className="text-xs">
+                        {getStatusLabel(order.status)}
+                      </Badge>
+                    </div>
                   </div>
-                  <div className="text-right space-y-1">
-                    <p className="font-semibold">R$ {order.total.toFixed(2)}</p>
-                    <Badge variant={getStatusVariant(order.status)} className="text-xs">
-                      {getStatusLabel(order.status)}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+                {recentOrders.length === 0 && (
+                  <p className="text-center text-muted-foreground py-4">
+                    Nenhum pedido encontrado
+                  </p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -242,26 +319,38 @@ const Dashboard = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {lowStockProducts.map((product, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-3 border border-warning/20 bg-warning/5 rounded-lg"
-                >
-                  <div>
-                    <p className="font-medium">{product.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Estoque mínimo: {product.minStock}
-                    </p>
+            {loading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-muted-foreground mt-2 text-sm">Carregando...</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {lowStockProducts.map((product) => (
+                  <div
+                    key={product.id}
+                    className="flex items-center justify-between p-3 border border-warning/20 bg-warning/5 rounded-lg"
+                  >
+                    <div>
+                      <p className="font-medium">{product.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Estoque mínimo: {product.min_stock_level}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="destructive" className="text-xs">
+                        {product.stock_quantity} restantes
+                      </Badge>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <Badge variant="destructive" className="text-xs">
-                      {product.stock} restantes
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+                {lowStockProducts.length === 0 && (
+                  <p className="text-center text-muted-foreground py-4">
+                    Todos os produtos estão com estoque adequado
+                  </p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

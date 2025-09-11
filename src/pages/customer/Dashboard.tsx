@@ -1,33 +1,56 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { Package, MapPin, Heart, Clock, Truck, CheckCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+
+interface Order {
+  id: string;
+  order_number: string;
+  status: string;
+  total_amount: number;
+  created_at: string;
+  order_items: { id: string }[];
+}
 
 const Dashboard = () => {
   const { user, profile } = useAuth();
+  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data - in real app, fetch from API
-  const recentOrders = [
-    { 
-      id: '1', 
-      orderNumber: 'ORD-20241201-000001',
-      status: 'shipped', 
-      total: 299.99, 
-      items: 2,
-      date: '2024-12-01'
-    },
-    { 
-      id: '2', 
-      orderNumber: 'ORD-20241128-000002',
-      status: 'delivered', 
-      total: 159.99, 
-      items: 1,
-      date: '2024-11-28'
-    },
-  ];
+  useEffect(() => {
+    const fetchRecentOrders = async () => {
+      if (!user) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select(`
+            id,
+            order_number,
+            status,
+            total_amount,
+            created_at,
+            order_items (id)
+          `)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        if (error) throw error;
+        setRecentOrders(data || []);
+      } catch (error) {
+        console.error('Erro ao buscar pedidos:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRecentOrders();
+  }, [user]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -140,7 +163,12 @@ const Dashboard = () => {
           </div>
         </CardHeader>
         <CardContent>
-          {recentOrders.length > 0 ? (
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+              <p className="text-muted-foreground mt-2">Carregando pedidos...</p>
+            </div>
+          ) : recentOrders.length > 0 ? (
             <div className="space-y-4">
               {recentOrders.map((order) => (
                 <div
@@ -150,9 +178,9 @@ const Dashboard = () => {
                   <div className="flex items-center space-x-4">
                     {getStatusIcon(order.status)}
                     <div>
-                      <p className="font-medium">#{order.orderNumber}</p>
+                      <p className="font-medium">#{order.order_number}</p>
                       <p className="text-sm text-muted-foreground">
-                        {order.items} item(s) • {new Date(order.date).toLocaleDateString('pt-BR')}
+                        {order.order_items?.length || 0} item(s) • {new Date(order.created_at).toLocaleDateString('pt-BR')}
                       </p>
                     </div>
                   </div>
@@ -161,7 +189,7 @@ const Dashboard = () => {
                       {getStatusLabel(order.status)}
                     </Badge>
                     <span className="font-semibold">
-                      R$ {order.total.toFixed(2)}
+                      R$ {Number(order.total_amount).toFixed(2)}
                     </span>
                   </div>
                 </div>
