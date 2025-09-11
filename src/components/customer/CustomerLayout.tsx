@@ -1,0 +1,65 @@
+import React from 'react';
+import { Link, useLocation, Outlet } from 'react-router-dom';
+import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { User, Package, MapPin, Heart, HelpCircle, Settings } from 'lucide-react';
+
+const customerMenuItems = [
+  { title: 'Resumo', url: '/minha-conta', icon: User },
+  { title: 'Meus Pedidos', url: '/minha-conta/pedidos', icon: Package },
+  { title: 'Endereços', url: '/minha-conta/enderecos', icon: MapPin },
+  { title: 'Favoritos', url: '/minha-conta/favoritos', icon: Heart },
+  { title: 'Configurações', url: '/minha-conta/configuracoes', icon: Settings },
+  { title: 'Ajuda', url: '/minha-conta/ajuda', icon: HelpCircle },
+];
+
+const CustomerSidebar = () => {
+  const location = useLocation();
+  const currentPath = location.pathname;
+
+  const isActive = (path: string) => currentPath === path;
+
+  return (
+    <Sidebar className="w-64">
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Minha Conta</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {customerMenuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <Link 
+                      to={item.url}
+                      className={isActive(item.url) ? "bg-sidebar-accent text-sidebar-accent-foreground" : ""}
+                    >
+                      <item.icon className="mr-2 h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+    </Sidebar>
+  );
+};
+
+const CustomerLayout: React.FC = () => {
+  return (
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full">
+        <CustomerSidebar />
+        <main className="flex-1 p-6">
+          <div className="mb-6">
+            <SidebarTrigger className="md:hidden" />
+          </div>
+          <Outlet />
+        </main>
+      </div>
+    </SidebarProvider>
+  );
+};
+
+export default CustomerLayout;

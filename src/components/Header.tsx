@@ -1,13 +1,17 @@
-import { Search, User, Heart, ShoppingCart, Menu } from "lucide-react";
+import { Search, User, Heart, ShoppingCart, Menu, LogOut, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { useCart } from "@/contexts/CartContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const Header = () => {
   const { favoritesCount } = useFavorites();
   const { itemsCount } = useCart();
+  const { user, signOut, profile, isAdmin } = useAuth();
   
   return (
     <header className="w-full border-b bg-background sticky top-0 z-50">
@@ -54,10 +58,51 @@ const Header = () => {
             </Button>
 
             {/* User Account */}
-            <Button variant="ghost" size="sm" className="hidden sm:flex flex-col items-center p-2">
-              <User className="h-5 w-5" />
-              <span className="text-xs">Conta</span>
-            </Button>
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="hidden sm:flex flex-col items-center p-2">
+                    <Avatar className="h-5 w-5">
+                      <AvatarImage src={profile?.avatar_url} />
+                      <AvatarFallback>
+                        {profile?.first_name?.[0]}{profile?.last_name?.[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-xs">
+                      {profile?.first_name ? `${profile.first_name}` : 'Conta'}
+                    </span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem asChild>
+                    <Link to="/minha-conta" className="w-full">
+                      <User className="mr-2 h-4 w-4" />
+                      Minha Conta
+                    </Link>
+                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin" className="w-full">
+                        <Settings className="mr-2 h-4 w-4" />
+                        Painel Admin
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={signOut}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sair
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button variant="ghost" size="sm" className="hidden sm:flex flex-col items-center p-2" asChild>
+                <Link to="/auth">
+                  <User className="h-5 w-5" />
+                  <span className="text-xs">Entrar</span>
+                </Link>
+              </Button>
+            )}
 
             {/* Favorites */}
             <Button variant="ghost" size="sm" className="hidden sm:flex flex-col items-center p-2 relative" asChild>
