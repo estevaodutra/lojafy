@@ -191,13 +191,21 @@ const Produto = () => {
   };
 
   const handleBuyNow = () => {
-    navigate('/checkout', { 
-      state: { 
-        product, 
-        quantity, 
-        variant: selectedVariant 
-      } 
+    const cartItem = {
+      productId: product.id,
+      productName: product.name,
+      productImage: product.main_image_url || product.image_url || '/placeholder.svg',
+      price: Number(product.price),
+      quantity: quantity,
+      variants: selectedVariant ? { variant: selectedVariant } : undefined,
+    };
+    
+    addItem(cartItem);
+    toast({
+      title: "Produto adicionado ao carrinho!",
+      description: `${quantity}x ${product.name}`,
     });
+    navigate('/carrinho');
   };
 
 
