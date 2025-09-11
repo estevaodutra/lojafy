@@ -220,8 +220,11 @@ export type Database = {
           id: string
           notes: string | null
           order_number: string
+          payment_id: string | null
           payment_method: string | null
           payment_status: string | null
+          pix_qr_code: string | null
+          pix_qr_code_base64: string | null
           shipping_address: Json | null
           shipping_amount: number | null
           status: string
@@ -237,8 +240,11 @@ export type Database = {
           id?: string
           notes?: string | null
           order_number: string
+          payment_id?: string | null
           payment_method?: string | null
           payment_status?: string | null
+          pix_qr_code?: string | null
+          pix_qr_code_base64?: string | null
           shipping_address?: Json | null
           shipping_amount?: number | null
           status?: string
@@ -254,8 +260,11 @@ export type Database = {
           id?: string
           notes?: string | null
           order_number?: string
+          payment_id?: string | null
           payment_method?: string | null
           payment_status?: string | null
+          pix_qr_code?: string | null
+          pix_qr_code_base64?: string | null
           shipping_address?: Json | null
           shipping_amount?: number | null
           status?: string
@@ -425,6 +434,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          cpf: string | null
           created_at: string
           first_name: string | null
           id: string
@@ -436,6 +446,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          cpf?: string | null
           created_at?: string
           first_name?: string | null
           id?: string
@@ -447,6 +458,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          cpf?: string | null
           created_at?: string
           first_name?: string | null
           id?: string

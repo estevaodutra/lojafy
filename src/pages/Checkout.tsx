@@ -8,9 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { CheckoutForm, OrderItem } from "@/types";
+import { CheckoutForm, OrderItem, PixPaymentData } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import PixPayment from "@/components/PixPayment";
 import { ShoppingCart, CreditCard, Truck, Shield } from "lucide-react";
 
 const Checkout = () => {
@@ -19,6 +21,8 @@ const Checkout = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [couponCode, setCouponCode] = useState("");
   const [shippingCost, setShippingCost] = useState(15.90);
+  const [pixPaymentData, setPixPaymentData] = useState<PixPaymentData | null>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   
   // Mock cart items - in a real app, this would come from context/state
   const [cartItems] = useState<OrderItem[]>([
@@ -37,6 +41,7 @@ const Checkout = () => {
     firstName: "",
     lastName: "",
     phone: "",
+    cpf: "",
     address: "",
     city: "",
     state: "",
@@ -71,9 +76,104 @@ const Checkout = () => {
     }
   };
 
+  const createPixPayment = async () => {
+    setIsProcessingPayment(true);
+    try {
+      // Validate CPF (basic validation)
+      if (!formData.cpf || formData.cpf.length < 11) {
+        toast({
+          title: "CPF inválido",
+          description: "Por favor, informe um CPF válido.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Erro de autenticação",
+          description: "Você precisa estar logado para finalizar a compra.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const orderItems = cartItems.map(item => ({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.price,
+      }));
+
+      const paymentRequest = {
+        amount: total,
+        description: `Pedido - ${cartItems.length} item(s)`,
+        payer: {
+          email: formData.email,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          cpf: formData.cpf.replace(/\D/g, ''), // Remove non-digits
+        },
+        orderItems,
+        shippingAddress: {
+          street: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
+        },
+      };
+
+      const { data, error } = await supabase.functions.invoke('create-pix-payment', {
+        body: paymentRequest,
+      });
+
+      if (error) {
+        console.error('PIX payment error:', error);
+        toast({
+          title: "Erro ao criar pagamento PIX",
+          description: error.message || "Tente novamente em alguns instantes.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setPixPaymentData(data);
+      setCurrentStep(4); // Move to PIX payment step
+      
+      toast({
+        title: "PIX gerado com sucesso!",
+        description: "Escaneie o QR Code ou copie o código para efetuar o pagamento.",
+      });
+
+    } catch (error) {
+      console.error('Error creating PIX payment:', error);
+      toast({
+        title: "Erro inesperado",
+        description: "Ocorreu um erro ao processar seu pagamento. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
   const handleSubmit = () => {
+    if (formData.paymentMethod === 'pix') {
+      createPixPayment();
+    } else {
+      // Handle other payment methods (credit card, etc.)
+      toast({
+        title: "Pedido realizado!",
+        description: "Seu pedido foi processado com sucesso. Você receberá um e-mail de confirmação.",
+      });
+      navigate("/");
+    }
+  };
+
+  const handlePixPaymentConfirmed = () => {
     toast({
-      title: "Pedido realizado!",
+      title: "Pagamento confirmado!",
       description: "Seu pedido foi processado com sucesso. Você receberá um e-mail de confirmação.",
     });
     navigate("/");
@@ -83,7 +183,7 @@ const Checkout = () => {
     { number: 1, title: "Dados Pessoais", icon: ShoppingCart },
     { number: 2, title: "Entrega", icon: Truck },
     { number: 3, title: "Pagamento", icon: CreditCard },
-    { number: 4, title: "Confirmação", icon: Shield }
+    { number: 4, title: "PIX", icon: Shield }
   ];
 
   return (
@@ -167,6 +267,15 @@ const Checkout = () => {
                       value={formData.phone}
                       onChange={(e) => handleInputChange("phone", e.target.value)}
                       placeholder="(11) 99999-9999"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="cpf">CPF</Label>
+                    <Input
+                      id="cpf"
+                      value={formData.cpf}
+                      onChange={(e) => handleInputChange("cpf", e.target.value)}
+                      placeholder="000.000.000-00"
                     />
                   </div>
                 </CardContent>

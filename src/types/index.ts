@@ -57,6 +57,7 @@ export interface CheckoutForm {
   firstName: string;
   lastName: string;
   phone: string;
+  cpf: string;
   address: string;
   city: string;
   state: string;
@@ -66,6 +67,49 @@ export interface CheckoutForm {
   cardName?: string;
   cardExpiry?: string;
   cardCvv?: string;
+}
+
+export interface MercadoPagoPixResponse {
+  id: number;
+  status: string;
+  payment_method_id: string;
+  payment_type_id: string;
+  date_created: string;
+  date_approved: string | null;
+  date_last_updated: string;
+  transaction_amount: number;
+  currency_id: string;
+  description: string;
+  external_reference: string;
+  payer: {
+    id: string;
+    email: string;
+    identification: {
+      type: string;
+      number: string;
+    };
+  };
+  point_of_interaction: {
+    type: string;
+    application_data: {
+      name: string;
+      version: string;
+    };
+    transaction_data: {
+      qr_code_base64: string;
+      qr_code: string;
+      ticket_url: string;
+    };
+  };
+}
+
+export interface PixPaymentData {
+  payment_id: number;
+  status: string;
+  qr_code: string;
+  qr_code_base64: string;
+  ticket_url: string;
+  expires_at: string;
 }
 
 export interface OrderItem {
