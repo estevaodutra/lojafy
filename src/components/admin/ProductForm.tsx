@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -11,11 +11,15 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, X } from 'lucide-react';
+import { Loader2, Plus, X, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { ImageUploadArea } from './ImageUploadArea';
+import { VariantsManager, ProductVariant } from './VariantsManager';
+import { DimensionsInput } from './DimensionsInput';
+import { CategoryCreationModal } from './CategoryCreationModal';
+import { SubcategoryCreationModal } from './SubcategoryCreationModal';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório').max(255, 'Nome muito longo'),
@@ -23,11 +27,17 @@ const productSchema = z.object({
   price: z.coerce.number().min(0.01, 'Preço deve ser maior que zero'),
   original_price: z.coerce.number().optional(),
   category_id: z.string().uuid('Selecione uma categoria válida'),
+  subcategory_id: z.string().uuid().optional(),
   brand: z.string().optional(),
   sku: z.string().optional(),
+  gtin_ean13: z.string().regex(/^\d{13}$/, 'GTIN/EAN-13 deve ter 13 dígitos').optional().or(z.literal('')),
   stock_quantity: z.coerce.number().min(0, 'Estoque não pode ser negativo'),
   min_stock_level: z.coerce.number().min(1, 'Estoque mínimo deve ser pelo menos 1'),
-  image_url: z.string().url('URL de imagem inválida').optional().or(z.literal('')),
+  // Dimensions
+  height: z.coerce.number().positive('Altura deve ser positiva').optional(),
+  width: z.coerce.number().positive('Largura deve ser positiva').optional(),
+  length: z.coerce.number().positive('Comprimento deve ser positivo').optional(),
+  weight: z.coerce.number().positive('Peso deve ser positivo').optional(),
   active: z.boolean().default(true),
   featured: z.boolean().default(false),
   badge: z.string().optional(),
@@ -46,7 +56,23 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
   const [specifications, setSpecifications] = useState<{ key: string; value: string }[]>(
     product?.specifications ? Object.entries(product.specifications).map(([key, value]) => ({ key, value: value as string })) : []
   );
-  const [images, setImages] = useState<string[]>(product?.images || []);
+  const [images, setImages] = useState<any[]>([]);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [dimensions, setDimensions] = useState({
+    height: product?.height || undefined,
+    width: product?.width || undefined,
+    length: product?.length || undefined,
+    weight: product?.weight || undefined,
+  });
+
+  const handleDimensionsChange = (newDimensions: any) => {
+    setDimensions(newDimensions);
+    // Update form values
+    form.setValue('height', newDimensions.height);
+    form.setValue('width', newDimensions.width);
+    form.setValue('length', newDimensions.length);
+    form.setValue('weight', newDimensions.weight);
+  };
   const { toast } = useToast();
 
   const form = useForm<ProductFormData>({
@@ -57,16 +83,23 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       price: product?.price || 0,
       original_price: product?.original_price || 0,
       category_id: product?.category_id || '',
+      subcategory_id: product?.subcategory_id || '',
       brand: product?.brand || '',
       sku: product?.sku || '',
+      gtin_ean13: product?.gtin_ean13 || '',
       stock_quantity: product?.stock_quantity || 0,
       min_stock_level: product?.min_stock_level || 5,
-      image_url: product?.image_url || '',
+      height: product?.height || undefined,
+      width: product?.width || undefined,
+      length: product?.length || undefined,
+      weight: product?.weight || undefined,
       active: product?.active ?? true,
       featured: product?.featured ?? false,
       badge: product?.badge || '',
     },
   });
+
+  const selectedCategoryId = form.watch('category_id');
 
   // Fetch categories
   const { data: categories = [], isLoading: categoriesLoading } = useQuery({
@@ -83,6 +116,25 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
     },
   });
 
+  // Fetch subcategories based on selected category
+  const { data: subcategories = [], isLoading: subcategoriesLoading } = useQuery({
+    queryKey: ['subcategories', selectedCategoryId],
+    queryFn: async () => {
+      if (!selectedCategoryId) return [];
+      
+      const { data, error } = await supabase
+        .from('subcategories')
+        .select('*')
+        .eq('category_id', selectedCategoryId)
+        .eq('active', true)
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedCategoryId,
+  });
+
   const onSubmit = async (data: ProductFormData) => {
     setIsSubmitting(true);
     
@@ -95,6 +147,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         return acc;
       }, {} as Record<string, string>);
 
+      // Get main image URL from uploaded images
+      const mainImage = images.find(img => img.isMain);
+      const imageUrls = images.map(img => img.url || img.preview).filter(Boolean);
+
       // Prepare product data
       const productData: any = {
         name: data.name,
@@ -102,27 +158,39 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         price: data.price,
         original_price: data.original_price || null,
         category_id: data.category_id,
+        subcategory_id: data.subcategory_id || null,
         brand: data.brand || null,
-        sku: data.sku || null,
+        sku: data.sku || null, // Will be auto-generated if empty
+        gtin_ean13: data.gtin_ean13 || null, // Will be auto-generated if empty
         stock_quantity: data.stock_quantity,
         min_stock_level: data.min_stock_level,
-        image_url: data.image_url || null,
+        height: dimensions.height || null,
+        width: dimensions.width || null,
+        length: dimensions.length || null,
+        weight: dimensions.weight || null,
+        main_image_url: mainImage?.url || mainImage?.preview || null,
+        image_url: mainImage?.url || mainImage?.preview || null, // Backward compatibility
         active: data.active,
         featured: data.featured,
         badge: data.badge || null,
         specifications: specificationsObj,
-        images: images.filter(img => img.trim() !== ''),
+        images: imageUrls,
         updated_at: new Date().toISOString(),
       };
 
+      let savedProduct;
+      
       if (product?.id) {
         // Update existing product
-        const { error } = await supabase
+        const { data: updated, error } = await supabase
           .from('products')
           .update(productData)
-          .eq('id', product.id);
+          .eq('id', product.id)
+          .select()
+          .single();
 
         if (error) throw error;
+        savedProduct = updated;
 
         toast({
           title: "Produto atualizado",
@@ -130,16 +198,54 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         });
       } else {
         // Create new product
-        const { error } = await supabase
+        const { data: created, error } = await supabase
           .from('products')
-          .insert(productData);
+          .insert(productData)
+          .select()
+          .single();
 
         if (error) throw error;
+        savedProduct = created;
 
         toast({
           title: "Produto criado",
           description: "O novo produto foi adicionado ao catálogo.",
         });
+      }
+
+      // Save variants if any
+      if (variants.length > 0 && savedProduct?.id) {
+        const variantData = variants.map(variant => ({
+          product_id: savedProduct.id,
+          type: variant.type,
+          name: variant.name,
+          value: variant.value,
+          price_modifier: variant.priceModifier,
+          stock_quantity: variant.stockQuantity,
+          image_url: variant.imageUrl || null,
+          active: variant.active
+        }));
+
+        // Delete existing variants for updates
+        if (product?.id) {
+          await supabase
+            .from('product_variants')
+            .delete()
+            .eq('product_id', product.id);
+        }
+
+        const { error: variantError } = await supabase
+          .from('product_variants')
+          .insert(variantData);
+
+        if (variantError) {
+          console.error('Error saving variants:', variantError);
+          toast({
+            title: "Aviso",
+            description: "Produto salvo, mas houve erro ao salvar as variações.",
+            variant: "destructive",
+          });
+        }
       }
 
       onSuccess();
@@ -155,6 +261,56 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
     }
   };
 
+  // Auto-generate SKU
+  const generateSku = useCallback(async () => {
+    try {
+      const categoryName = categories.find(cat => cat.id === form.getValues('category_id'))?.name;
+      const brandName = form.getValues('brand');
+      
+      const { data, error } = await supabase.rpc('generate_sku', {
+        category_name: categoryName,
+        brand_name: brandName
+      });
+      
+      if (error) throw error;
+      
+      form.setValue('sku', data);
+      toast({
+        title: "SKU gerado",
+        description: `SKU gerado automaticamente: ${data}`,
+      });
+    } catch (error) {
+      console.error('Error generating SKU:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível gerar o SKU automaticamente.",
+        variant: "destructive",
+      });
+    }
+  }, [categories, form, toast]);
+
+  // Auto-generate GTIN/EAN-13
+  const generateGtin = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.rpc('generate_gtin_ean13');
+      
+      if (error) throw error;
+      
+      form.setValue('gtin_ean13', data);
+      toast({
+        title: "GTIN/EAN-13 gerado",
+        description: `Código gerado automaticamente: ${data}`,
+      });
+    } catch (error) {
+      console.error('Error generating GTIN:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível gerar o GTIN/EAN-13 automaticamente.",
+        variant: "destructive",
+      });
+    }
+  }, [form, toast]);
+
   const addSpecification = () => {
     setSpecifications(prev => [...prev, { key: '', value: '' }]);
   };
@@ -169,16 +325,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
     ));
   };
 
-  const addImage = () => {
-    setImages(prev => [...prev, '']);
-  };
-
-  const removeImage = (index: number) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const updateImage = (index: number, value: string) => {
-    setImages(prev => prev.map((img, i) => i === index ? value : img));
+  // Reset subcategory when category changes
+  const handleCategoryChange = (categoryId: string) => {
+    form.setValue('category_id', categoryId);
+    form.setValue('subcategory_id', ''); // Reset subcategory
   };
 
   return (
@@ -241,66 +391,152 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
               )}
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="category_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Categoria *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={categoriesLoading}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione uma categoria" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categories.map(category => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="category_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Categoria *</FormLabel>
+                      <div className="flex gap-2">
+                        <Select 
+                          onValueChange={handleCategoryChange} 
+                          value={field.value} 
+                          disabled={categoriesLoading}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione uma categoria" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="bg-background border border-border shadow-lg">
+                            {categories.map(category => (
+                              <SelectItem key={category.id} value={category.id}>
+                                {category.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <CategoryCreationModal
+                          onCategoryCreated={(categoryId) => {
+                            form.setValue('category_id', categoryId);
+                          }}
+                        />
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="sku"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>SKU</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Código do produto..." {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      Código único de identificação
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
+                {selectedCategoryId && (
+                  <FormField
+                    control={form.control}
+                    name="subcategory_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Subcategoria</FormLabel>
+                        <div className="flex gap-2">
+                          <Select 
+                            onValueChange={field.onChange} 
+                            value={field.value || ''} 
+                            disabled={subcategoriesLoading}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione uma subcategoria" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-background border border-border shadow-lg">
+                              <SelectItem value="">Nenhuma subcategoria</SelectItem>
+                              {subcategories.map(subcategory => (
+                                <SelectItem key={subcategory.id} value={subcategory.id}>
+                                  {subcategory.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <SubcategoryCreationModal
+                            categoryId={selectedCategoryId}
+                            onSubcategoryCreated={(subcategoryId) => {
+                              form.setValue('subcategory_id', subcategoryId);
+                            }}
+                          />
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 )}
-              />
+              </div>
 
-              <FormField
-                control={form.control}
-                name="badge"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Badge</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: Novo, Promoção..." {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      Etiqueta de destaque (opcional)
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="sku"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>SKU</FormLabel>
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <Input placeholder="Será gerado automaticamente..." {...field} />
+                        </FormControl>
+                        <Button type="button" variant="outline" size="sm" onClick={generateSku}>
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <FormDescription>
+                        Código único de identificação (gerado automaticamente se vazio)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="gtin_ean13"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>GTIN/EAN-13</FormLabel>
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <Input 
+                            placeholder="13 dígitos iniciados por 789..." 
+                            maxLength={13}
+                            {...field} 
+                          />
+                        </FormControl>
+                        <Button type="button" variant="outline" size="sm" onClick={generateGtin}>
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <FormDescription>
+                        Código de barras (gerado automaticamente se vazio)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
+
+            <FormField
+              control={form.control}
+              name="badge"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Badge/Etiqueta</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ex: Novo, Promoção, Bestseller..." {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    Etiqueta de destaque que aparecerá no produto (opcional)
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </CardContent>
         </Card>
 
@@ -404,52 +640,69 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         {/* Images */}
         <Card>
           <CardHeader>
-            <CardTitle>Imagens</CardTitle>
+            <CardTitle>Imagens do Produto</CardTitle>
             <CardDescription>
-              URLs das imagens do produto
+              Faça upload de até 10 imagens do produto. A primeira imagem será definida como principal.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <FormField
-              control={form.control}
-              name="image_url"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Imagem Principal</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://exemplo.com/imagem.jpg" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    URL da imagem principal do produto
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
+          <CardContent>
+            <ImageUploadArea
+              images={images}
+              onImagesChange={setImages}
+              maxImages={10}
+              productId={product?.id}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Specifications and Dimensions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Especificações Técnicas</CardTitle>
+            <CardDescription>
+              Dimensões, peso e características técnicas do produto
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Dimensions */}
+            <DimensionsInput 
+              dimensions={dimensions}
+              onDimensionsChange={handleDimensionsChange}
             />
 
             <Separator />
 
+            {/* Custom Specifications */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium">Imagens Adicionais</h4>
-                <Button type="button" variant="outline" size="sm" onClick={addImage}>
+                <h4 className="text-sm font-medium">Especificações Customizadas</h4>
+                <Button type="button" variant="outline" size="sm" onClick={addSpecification}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Adicionar Imagem
+                  Adicionar Especificação
                 </Button>
               </div>
 
-              {images.map((image, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <Input
-                    placeholder="https://exemplo.com/imagem.jpg"
-                    value={image}
-                    onChange={(e) => updateImage(index, e.target.value)}
-                  />
+              {specifications.map((spec, index) => (
+                <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                  <div className="md:col-span-2">
+                    <Input
+                      placeholder="Nome da especificação"
+                      value={spec.key}
+                      onChange={(e) => updateSpecification(index, 'key', e.target.value)}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Input
+                      placeholder="Valor"
+                      value={spec.value}
+                      onChange={(e) => updateSpecification(index, 'value', e.target.value)}
+                    />
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => removeImage(index)}
+                    onClick={() => removeSpecification(index)}
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -459,51 +712,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
           </CardContent>
         </Card>
 
-        {/* Specifications */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Especificações Técnicas</CardTitle>
-            <CardDescription>
-              Características e detalhes técnicos do produto
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-medium">Especificações</h4>
-              <Button type="button" variant="outline" size="sm" onClick={addSpecification}>
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Especificação
-              </Button>
-            </div>
-
-            {specifications.map((spec, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-2">
-                <div className="md:col-span-2">
-                  <Input
-                    placeholder="Nome da especificação"
-                    value={spec.key}
-                    onChange={(e) => updateSpecification(index, 'key', e.target.value)}
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <Input
-                    placeholder="Valor"
-                    value={spec.value}
-                    onChange={(e) => updateSpecification(index, 'value', e.target.value)}
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => removeSpecification(index)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        {/* Product Variants */}
+        <VariantsManager
+          variants={variants}
+          onVariantsChange={setVariants}
+        />
 
         {/* Settings */}
         <Card>
