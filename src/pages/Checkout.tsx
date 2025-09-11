@@ -16,6 +16,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PixPayment from "@/components/PixPayment";
+import { ModernPixPayment } from '@/components/ModernPixPayment';
+import { createPixPayment as createModernPixPayment, PixPaymentRequest } from '@/lib/mercadoPago';
 import { ShoppingCart, CreditCard, Truck, Shield, AlertTriangle } from "lucide-react";
 
 const Checkout = () => {
@@ -27,6 +29,11 @@ const Checkout = () => {
   const [couponCode, setCouponCode] = useState("");
   const [shippingCost, setShippingCost] = useState(15.90);
   const [pixPaymentData, setPixPaymentData] = useState<PixPaymentData | null>(null);
+  const [modernPixData, setModernPixData] = useState<{
+    qr_code: string;
+    qr_code_base64: string;
+    payment_id: number;
+  } | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   // Check if cart is empty and redirect
@@ -324,8 +331,62 @@ const Checkout = () => {
     }
   };
 
+  const createModernPix = async () => {
+    if (!formData.firstName || !formData.email || !formData.cpf) {
+      toast({
+        title: "Dados incompletos",
+        description: "Preencha todos os dados pessoais para continuar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessingPayment(true);
+
+    try {
+      const paymentRequest: PixPaymentRequest = {
+        description: `Pedido - ${cartItems.length} item(s)`,
+        transaction_amount: parseFloat(total.toFixed(2)),
+        payer: {
+          email: formData.email,
+          first_name: formData.firstName,
+          last_name: formData.lastName || '',
+          identification: {
+            type: "CPF",
+            number: formData.cpf.replace(/\D/g, '')
+          }
+        }
+      };
+
+      console.log('Creating modern PIX payment...', paymentRequest);
+      const response = await createModernPixPayment(paymentRequest);
+      
+      console.log('Modern PIX payment created:', response);
+      setModernPixData({
+        qr_code: response.qr_code,
+        qr_code_base64: response.qr_code_base64,
+        payment_id: response.id
+      });
+
+      toast({
+        title: "PIX gerado com sucesso!",
+        description: "Escaneie o QR Code ou copie o código PIX para efetuar o pagamento.",
+      });
+
+    } catch (error) {
+      console.error('Error creating modern PIX:', error);
+      toast({
+        title: "Erro ao gerar PIX",
+        description: error instanceof Error ? error.message : "Tente novamente em alguns instantes.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
   const handleSubmit = () => {
-    createPixPayment();
+    createModernPix();
   };
 
   const handlePixPaymentConfirmed = () => {
@@ -414,9 +475,17 @@ const Checkout = () => {
             )}
             
             {/* Show PIX Payment if available */}
-            {pixPaymentData ? (
+            {modernPixData ? (
               <div className="flex justify-center">
-                <PixPayment 
+                <ModernPixPayment 
+                  qrCode={modernPixData.qr_code}
+                  qrCodeBase64={modernPixData.qr_code_base64}
+                  amount={total}
+                />
+              </div>
+            ) : pixPaymentData ? (
+              <div className="flex justify-center">
+                <PixPayment
                   paymentData={pixPaymentData} 
                   onPaymentConfirmed={handlePixPaymentConfirmed}
                 />
