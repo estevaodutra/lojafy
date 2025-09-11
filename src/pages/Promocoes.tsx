@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronRight, Clock, Star, Heart, Zap } from "lucide-react";
-import { promotionalProducts } from "@/data/mockData";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const Promocoes = () => {
   const [timeLeft, setTimeLeft] = useState({
@@ -37,6 +39,23 @@ const Promocoes = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Fetch promotional products (products with original_price)
+  const { data: promotionalProducts = [], isLoading } = useQuery({
+    queryKey: ['promotional-products'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('active', true)
+        .not('original_price', 'is', null)
+        .gt('original_price', 'price')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -46,6 +65,45 @@ const Promocoes = () => {
 
   const calculateDiscount = (original: number, current: number) => {
     return Math.round(((original - current) / original) * 100);
+  };
+
+  const getBadgeVariant = (badge: string): "default" | "destructive" | "secondary" | "outline" => {
+    const lowercaseBadge = badge.toLowerCase();
+    if (lowercaseBadge.includes('oferta') || lowercaseBadge.includes('desconto')) return "destructive";
+    if (lowercaseBadge.includes('novo') || lowercaseBadge.includes('lançamento')) return "default";
+    if (lowercaseBadge.includes('popular') || lowercaseBadge.includes('destaque')) return "secondary";
+    return "outline";
+  };
+
+  const handleFavoriteToggle = (product: any) => {
+    if (isFavorite(product.id)) {
+      removeFromFavorites(product.id);
+      toast({
+        title: "Removido dos favoritos",
+        description: `${product.name} foi removido dos seus favoritos.`,
+      });
+    } else {
+      addToFavorites({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        originalPrice: product.original_price,
+        image: product.main_image_url || product.image_url || (product.images?.[0]) || '/placeholder.svg',
+        rating: product.rating || 0,
+        badge: product.badge,
+        description: product.description || '',
+        specifications: product.specifications || {},
+        category: product.category || '',
+        brand: product.brand || '',
+        inStock: product.stock_quantity > 0,
+        images: product.images || [],
+        reviews: []
+      });
+      toast({
+        title: "Adicionado aos favoritos",
+        description: `${product.name} foi adicionado aos seus favoritos.`,
+      });
+    }
   };
 
   return (
@@ -96,79 +154,90 @@ const Promocoes = () => {
         </div>
 
         {/* Offer of the Day */}
-        <section className="mb-12">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="bg-gradient-to-r from-yellow-400 to-orange-500 p-2 rounded-lg">
-              <Zap className="h-6 w-6 text-white" />
+        {isLoading ? (
+          <section className="mb-12">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="bg-gradient-to-r from-yellow-400 to-orange-500 p-2 rounded-lg">
+                <Zap className="h-6 w-6 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold">Oferta do Dia</h2>
             </div>
-            <h2 className="text-2xl font-bold">Oferta do Dia</h2>
-          </div>
-
-          {promotionalProducts.slice(0, 1).map((product) => (
-            <Card key={product.id} className="overflow-hidden">
+            <Card className="overflow-hidden">
               <CardContent className="p-0">
                 <div className="grid md:grid-cols-2 gap-0">
-                  <div className="relative">
-                    <img
-                      src={product.image}
-                      alt={product.name}
-                      className="w-full h-80 object-cover"
-                    />
-                    <Badge className="absolute top-4 left-4 bg-red-500 text-white">
-                      -{calculateDiscount(product.originalPrice!, product.price)}% OFF
-                    </Badge>
-                  </div>
-                  
-                  <div className="p-8 flex flex-col justify-center">
-                    <h3 className="text-2xl font-bold mb-4">{product.name}</h3>
-                    <p className="text-muted-foreground mb-6">{product.description}</p>
-                    
-                    <div className="space-y-2 mb-6">
-                      <p className="text-2xl text-muted-foreground line-through">
-                        De: {formatPrice(product.originalPrice!)}
-                      </p>
-                      <p className="text-4xl font-bold text-red-500">
-                        Por: {formatPrice(product.price)}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        ou 12x de {formatPrice(product.price / 12)} sem juros
-                      </p>
-                    </div>
-
-                    <div className="flex gap-3">
-                      <Link to={`/produto/${product.id}`} className="flex-1">
-                        <Button size="lg" className="w-full">
-                          Comprar Agora
-                        </Button>
-                      </Link>
-                      <Button 
-                        size="lg" 
-                        variant="outline"
-                        onClick={() => {
-                          if (isFavorite(product.id)) {
-                            removeFromFavorites(product.id);
-                            toast({
-                              title: "Removido dos favoritos",
-                              description: `${product.name} foi removido dos seus favoritos.`,
-                            });
-                          } else {
-                            addToFavorites(product);
-                            toast({
-                              title: "Adicionado aos favoritos",
-                              description: `${product.name} foi adicionado aos seus favoritos.`,
-                            });
-                          }
-                        }}
-                      >
-                        <Heart className={`h-5 w-5 ${isFavorite(product.id) ? 'fill-red-500 text-red-500' : ''}`} />
-                      </Button>
-                    </div>
+                  <Skeleton className="h-80 w-full" />
+                  <div className="p-8 space-y-4">
+                    <Skeleton className="h-8 w-3/4" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-12 w-1/2" />
+                    <Skeleton className="h-10 w-full" />
                   </div>
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </section>
+          </section>
+        ) : promotionalProducts.length > 0 ? (
+          <section className="mb-12">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="bg-gradient-to-r from-yellow-400 to-orange-500 p-2 rounded-lg">
+                <Zap className="h-6 w-6 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold">Oferta do Dia</h2>
+            </div>
+
+            {promotionalProducts.slice(0, 1).map((product) => (
+              <Card key={product.id} className="overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="grid md:grid-cols-2 gap-0">
+                    <div className="relative">
+                      <img
+                        src={product.main_image_url || product.image_url || (product.images?.[0]) || '/placeholder.svg'}
+                        alt={product.name}
+                        className="w-full h-80 object-cover"
+                      />
+                      <Badge className="absolute top-4 left-4 bg-red-500 text-white">
+                        -{calculateDiscount(product.original_price!, product.price)}% OFF
+                      </Badge>
+                    </div>
+                    
+                    <div className="p-8 flex flex-col justify-center">
+                      <h3 className="text-2xl font-bold mb-4">{product.name}</h3>
+                      <p className="text-muted-foreground mb-6">{product.description}</p>
+                      
+                      <div className="space-y-2 mb-6">
+                        <p className="text-2xl text-muted-foreground line-through">
+                          De: {formatPrice(product.original_price!)}
+                        </p>
+                        <p className="text-4xl font-bold text-red-500">
+                          Por: {formatPrice(product.price)}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          ou 12x de {formatPrice(product.price / 12)} sem juros
+                        </p>
+                      </div>
+
+                      <div className="flex gap-3">
+                        <Link to={`/produto/${product.id}`} className="flex-1">
+                          <Button size="lg" className="w-full">
+                            Comprar Agora
+                          </Button>
+                        </Link>
+                        <Button 
+                          size="lg" 
+                          variant="outline"
+                          onClick={() => handleFavoriteToggle(product)}
+                        >
+                          <Heart className={`h-5 w-5 ${isFavorite(product.id) ? 'fill-red-500 text-red-500' : ''}`} />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </section>
+        ) : null}
 
         <Separator className="my-12" />
 
@@ -181,88 +250,97 @@ const Promocoes = () => {
             <h2 className="text-2xl font-bold">Promoção Relâmpago</h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {promotionalProducts.map((product) => (
-              <Card key={product.id} className="group cursor-pointer hover:shadow-lg transition-shadow">
-                <CardContent className="p-4">
-                  <Link to={`/produto/${product.id}`}>
-                    <div className="relative mb-4">
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="w-full h-48 object-cover rounded-md"
-                      />
-                      <Badge className="absolute top-2 left-2 bg-red-500 text-white">
-                        -{calculateDiscount(product.originalPrice!, product.price)}% OFF
-                      </Badge>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="absolute top-2 right-2 h-8 w-8 p-0 bg-background/80 hover:bg-background"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          if (isFavorite(product.id)) {
-                            removeFromFavorites(product.id);
-                            toast({
-                              title: "Removido dos favoritos",
-                              description: `${product.name} foi removido dos seus favoritos.`,
-                            });
-                          } else {
-                            addToFavorites(product);
-                            toast({
-                              title: "Adicionado aos favoritos",
-                              description: `${product.name} foi adicionado aos seus favoritos.`,
-                            });
-                          }
-                        }}
-                      >
-                        <Heart className={`h-4 w-4 ${isFavorite(product.id) ? 'fill-red-500 text-red-500' : ''}`} />
-                      </Button>
-                    </div>
-
-                    <h3 className="font-medium mb-2 line-clamp-2">{product.name}</h3>
-
-                    <div className="flex items-center mb-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-4 w-4 ${
-                              i < Math.floor(product.rating)
-                                ? "fill-yellow-400 text-yellow-400"
-                                : "text-gray-300"
-                            }`}
-                          />
-                        ))}
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Card key={i}>
+                  <CardContent className="p-4">
+                    <Skeleton className="w-full h-48 rounded-md mb-4" />
+                    <Skeleton className="h-4 w-3/4 mb-2" />
+                    <Skeleton className="h-4 w-1/2 mb-2" />
+                    <Skeleton className="h-6 w-1/3 mb-4" />
+                    <Skeleton className="h-10 w-full" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : promotionalProducts.length === 0 ? (
+            <div className="text-center py-12">
+              <h3 className="text-lg font-semibold mb-2">Nenhuma promoção ativa</h3>
+              <p className="text-muted-foreground">Cadastre produtos com preço original para exibir promoções.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {promotionalProducts.map((product) => (
+                <Card key={product.id} className="group cursor-pointer hover:shadow-lg transition-shadow">
+                  <CardContent className="p-4">
+                    <Link to={`/produto/${product.id}`}>
+                      <div className="relative mb-4">
+                        <img
+                          src={product.main_image_url || product.image_url || (product.images?.[0]) || '/placeholder.svg'}
+                          alt={product.name}
+                          className="w-full h-48 object-cover rounded-md"
+                        />
+                        <Badge className="absolute top-2 left-2 bg-red-500 text-white">
+                          -{calculateDiscount(product.original_price!, product.price)}% OFF
+                        </Badge>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="absolute top-2 right-2 h-8 w-8 p-0 bg-background/80 hover:bg-background"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleFavoriteToggle(product);
+                          }}
+                        >
+                          <Heart className={`h-4 w-4 ${isFavorite(product.id) ? 'fill-red-500 text-red-500' : ''}`} />
+                        </Button>
                       </div>
-                      <span className="text-sm text-muted-foreground ml-2">
-                        ({product.rating})
-                      </span>
-                    </div>
 
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground line-through">
-                        {formatPrice(product.originalPrice!)}
-                      </p>
-                      <p className="text-xl font-bold text-red-500">
-                        {formatPrice(product.price)}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        ou 12x de {formatPrice(product.price / 12)} sem juros
-                      </p>
-                    </div>
-                  </Link>
+                      <h3 className="font-medium mb-2 line-clamp-2">{product.name}</h3>
 
-                  <Link to={`/produto/${product.id}`}>
-                    <Button className="w-full mt-4">
-                      Comprar
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                      <div className="flex items-center mb-2">
+                        <div className="flex">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`h-4 w-4 ${
+                                i < Math.floor(product.rating || 0)
+                                  ? "fill-yellow-400 text-yellow-400"
+                                  : "text-gray-300"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-sm text-muted-foreground ml-2">
+                          ({product.rating || 0})
+                        </span>
+                      </div>
+
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground line-through">
+                          {formatPrice(product.original_price!)}
+                        </p>
+                        <p className="text-xl font-bold text-red-500">
+                          {formatPrice(product.price)}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          ou 12x de {formatPrice(product.price / 12)} sem juros
+                        </p>
+                      </div>
+                    </Link>
+
+                    <Link to={`/produto/${product.id}`}>
+                      <Button className="w-full mt-4">
+                        Comprar
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Benefits Banner */}

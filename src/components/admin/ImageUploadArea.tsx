@@ -21,13 +21,15 @@ interface ImageUploadAreaProps {
   onImagesChange: (images: ImageFile[]) => void;
   maxImages?: number;
   productId?: string;
+  existingImages?: string[]; // URLs of existing images
 }
 
 export const ImageUploadArea: React.FC<ImageUploadAreaProps> = ({
   images,
   onImagesChange,
   maxImages = 10,
-  productId
+  productId,
+  existingImages = []
 }) => {
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);

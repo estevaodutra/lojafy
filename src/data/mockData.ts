@@ -5,6 +5,9 @@ import productHeadphones from "@/assets/product-headphones.jpg";
 import productWatch from "@/assets/product-watch.jpg";
 import productLaptop from "@/assets/product-laptop.jpg";
 
+// DEPRECATED: This mock data is no longer used in the application.
+// All data now comes from Supabase. This file is kept for reference only.
+
 export const mockProducts: Product[] = [
   {
     id: "1",

@@ -1,5 +1,8 @@
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   Smartphone, 
   Headphones, 
@@ -8,61 +11,74 @@ import {
   Baby,
   Shirt,
   Gamepad2,
-  Book
+  Book,
+  Laptop,
+  Watch,
+  ShoppingCart
 } from "lucide-react";
 
-const categories = [
-  {
-    id: 1,
-    name: "Eletrônicos",
-    icon: Smartphone,
-    color: "bg-blue-500",
-  },
-  {
-    id: 2,
-    name: "Áudio & TV",
-    icon: Headphones,
-    color: "bg-purple-500",
-  },
-  {
-    id: 3,
-    name: "Casa & Jardim",
-    icon: Home,
-    color: "bg-green-500",
-  },
-  {
-    id: 4,
-    name: "Beleza",
-    icon: Sparkles,
-    color: "bg-pink-500",
-  },
-  {
-    id: 5,
-    name: "Infantil",
-    icon: Baby,
-    color: "bg-yellow-500",
-  },
-  {
-    id: 6,
-    name: "Moda",
-    icon: Shirt,
-    color: "bg-red-500",
-  },
-  {
-    id: 7,
-    name: "Games",
-    icon: Gamepad2,
-    color: "bg-indigo-500",
-  },
-  {
-    id: 8,
-    name: "Livros",
-    icon: Book,
-    color: "bg-orange-500",
-  },
-];
+// Icon mapping for categories
+const iconMap: Record<string, any> = {
+  'Eletrônicos': Smartphone,
+  'Electronics': Smartphone,
+  'Áudio': Headphones,
+  'Audio': Headphones,
+  'Casa': Home,
+  'Home': Home,
+  'Beleza': Sparkles,
+  'Beauty': Sparkles,
+  'Infantil': Baby,
+  'Kids': Baby,
+  'Moda': Shirt,
+  'Fashion': Shirt,
+  'Games': Gamepad2,
+  'Livros': Book,
+  'Books': Book,
+  'Computadores': Laptop,
+  'Computers': Laptop,
+  'Wearables': Watch,
+  'default': ShoppingCart
+};
+
+// Color mapping for categories
+const colorMap: Record<string, string> = {
+  'Eletrônicos': 'bg-blue-500',
+  'Electronics': 'bg-blue-500',
+  'Áudio': 'bg-purple-500',
+  'Audio': 'bg-purple-500',
+  'Casa': 'bg-green-500',
+  'Home': 'bg-green-500',
+  'Beleza': 'bg-pink-500',
+  'Beauty': 'bg-pink-500',
+  'Infantil': 'bg-yellow-500',
+  'Kids': 'bg-yellow-500',
+  'Moda': 'bg-red-500',
+  'Fashion': 'bg-red-500',
+  'Games': 'bg-indigo-500',
+  'Livros': 'bg-orange-500',
+  'Books': 'bg-orange-500',
+  'Computadores': 'bg-gray-600',
+  'Computers': 'bg-gray-600',
+  'Wearables': 'bg-teal-500',
+  'default': 'bg-slate-500'
+};
 
 const CategorySection = () => {
+  // Fetch categories from Supabase
+  const { data: categories = [], isLoading } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('active', true)
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
   return (
     <section className="py-16 bg-muted/30">
       <div className="container mx-auto px-4">
@@ -75,27 +91,52 @@ const CategorySection = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-6">
-          {categories.map((category) => {
-            const IconComponent = category.icon;
-            return (
-              <Link key={category.id} to="/categorias">
-                <Card 
-                  className="group hover:shadow-card-hover transition-all duration-300 cursor-pointer border-border bg-card"
-                >
-                  <CardContent className="p-6 flex flex-col items-center text-center space-y-3">
-                    <div className={`w-16 h-16 ${category.color} rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
-                      <IconComponent className="h-8 w-8 text-white" />
-                    </div>
-                    <h3 className="font-medium text-foreground text-sm">
-                      {category.name}
-                    </h3>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
-        </div>
+        {isLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-6">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Card key={i} className="border-border bg-card">
+                <CardContent className="p-6 flex flex-col items-center text-center space-y-3">
+                  <Skeleton className="w-16 h-16 rounded-full" />
+                  <Skeleton className="h-4 w-20" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : categories.length === 0 ? (
+          <div className="text-center py-12">
+            <h3 className="text-lg font-semibold mb-2">Nenhuma categoria encontrada</h3>
+            <p className="text-muted-foreground">Cadastre categorias para exibi-las aqui.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-6">
+            {categories.map((category) => {
+              const IconComponent = iconMap[category.name] || iconMap.default;
+              const colorClass = colorMap[category.name] || colorMap.default;
+              
+              return (
+                <Link key={category.id} to={`/categorias/${category.slug}`}>
+                  <Card 
+                    className="group hover:shadow-card-hover transition-all duration-300 cursor-pointer border-border bg-card"
+                  >
+                    <CardContent className="p-6 flex flex-col items-center text-center space-y-3">
+                      <div className={`w-16 h-16 ${colorClass} rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
+                        <IconComponent className="h-8 w-8 text-white" />
+                      </div>
+                      <h3 className="font-medium text-foreground text-sm">
+                        {category.name}
+                      </h3>
+                      {category.product_count > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {category.product_count} produtos
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
   );

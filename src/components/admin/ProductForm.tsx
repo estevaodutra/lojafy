@@ -56,7 +56,20 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
   const [specifications, setSpecifications] = useState<{ key: string; value: string }[]>(
     product?.specifications ? Object.entries(product.specifications).map(([key, value]) => ({ key, value: value as string })) : []
   );
-  const [images, setImages] = useState<any[]>([]);
+  const [images, setImages] = useState<any[]>(() => {
+    // Initialize with existing product images if editing
+    if (product?.images && Array.isArray(product.images)) {
+      return product.images.map((url: string, index: number) => ({
+        id: `existing-${index}`,
+        file: null,
+        preview: url,
+        url: url,
+        isMain: index === 0 || url === product.main_image_url,
+        isUploading: false
+      }));
+    }
+    return [];
+  });
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [dimensions, setDimensions] = useState({
     height: product?.height || undefined,
