@@ -267,6 +267,56 @@ export type Database = {
         }
         Relationships: []
       }
+      product_variants: {
+        Row: {
+          active: boolean | null
+          created_at: string
+          id: string
+          image_url: string | null
+          name: string
+          price_modifier: number | null
+          product_id: string
+          stock_quantity: number | null
+          type: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          name: string
+          price_modifier?: number | null
+          product_id: string
+          stock_quantity?: number | null
+          type: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          name?: string
+          price_modifier?: number | null
+          product_id?: string
+          stock_quantity?: number | null
+          type?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_product_variants_product"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           active: boolean | null
@@ -276,9 +326,13 @@ export type Database = {
           created_at: string
           description: string | null
           featured: boolean | null
+          gtin_ean13: string | null
+          height: number | null
           id: string
           image_url: string | null
           images: string[] | null
+          length: number | null
+          main_image_url: string | null
           min_stock_level: number | null
           name: string
           original_price: number | null
@@ -288,7 +342,10 @@ export type Database = {
           sku: string | null
           specifications: Json | null
           stock_quantity: number | null
+          subcategory_id: string | null
           updated_at: string
+          weight: number | null
+          width: number | null
         }
         Insert: {
           active?: boolean | null
@@ -298,9 +355,13 @@ export type Database = {
           created_at?: string
           description?: string | null
           featured?: boolean | null
+          gtin_ean13?: string | null
+          height?: number | null
           id?: string
           image_url?: string | null
           images?: string[] | null
+          length?: number | null
+          main_image_url?: string | null
           min_stock_level?: number | null
           name: string
           original_price?: number | null
@@ -310,7 +371,10 @@ export type Database = {
           sku?: string | null
           specifications?: Json | null
           stock_quantity?: number | null
+          subcategory_id?: string | null
           updated_at?: string
+          weight?: number | null
+          width?: number | null
         }
         Update: {
           active?: boolean | null
@@ -320,9 +384,13 @@ export type Database = {
           created_at?: string
           description?: string | null
           featured?: boolean | null
+          gtin_ean13?: string | null
+          height?: number | null
           id?: string
           image_url?: string | null
           images?: string[] | null
+          length?: number | null
+          main_image_url?: string | null
           min_stock_level?: number | null
           name?: string
           original_price?: number | null
@@ -332,9 +400,19 @@ export type Database = {
           sku?: string | null
           specifications?: Json | null
           stock_quantity?: number | null
+          subcategory_id?: string | null
           updated_at?: string
+          weight?: number | null
+          width?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_products_subcategory"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "products_category_id_fkey"
             columns: ["category_id"]
@@ -418,13 +496,59 @@ export type Database = {
           },
         ]
       }
+      subcategories: {
+        Row: {
+          active: boolean | null
+          category_id: string
+          created_at: string
+          id: string
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean | null
+          category_id: string
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean | null
+          category_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_subcategories_category"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      generate_gtin_ean13: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       generate_order_number: {
         Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_sku: {
+        Args: { brand_name?: string; category_name?: string }
         Returns: string
       }
     }
