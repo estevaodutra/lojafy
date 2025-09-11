@@ -27,7 +27,7 @@ const productSchema = z.object({
   price: z.coerce.number().min(0.01, 'Preço deve ser maior que zero'),
   original_price: z.coerce.number().optional(),
   category_id: z.string().uuid('Selecione uma categoria válida'),
-  subcategory_id: z.string().uuid().optional(),
+  subcategory_id: z.string().optional(),
   brand: z.string().optional(),
   sku: z.string().optional(),
   gtin_ean13: z.string().regex(/^\d{13}$/, 'GTIN/EAN-13 deve ter 13 dígitos').optional().or(z.literal('')),
@@ -83,7 +83,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       price: product?.price || 0,
       original_price: product?.original_price || 0,
       category_id: product?.category_id || '',
-      subcategory_id: product?.subcategory_id || '',
+      subcategory_id: product?.subcategory_id || 'none',
       brand: product?.brand || '',
       sku: product?.sku || '',
       gtin_ean13: product?.gtin_ean13 || '',
@@ -158,7 +158,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         price: data.price,
         original_price: data.original_price || null,
         category_id: data.category_id,
-        subcategory_id: data.subcategory_id || null,
+        subcategory_id: data.subcategory_id === 'none' ? null : data.subcategory_id,
         brand: data.brand || null,
         sku: data.sku || null, // Will be auto-generated if empty
         gtin_ean13: data.gtin_ean13 || null, // Will be auto-generated if empty
@@ -328,7 +328,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
   // Reset subcategory when category changes
   const handleCategoryChange = (categoryId: string) => {
     form.setValue('category_id', categoryId);
-    form.setValue('subcategory_id', ''); // Reset subcategory
+    form.setValue('subcategory_id', 'none'); // Reset subcategory
   };
 
   return (
@@ -437,9 +437,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
                       <FormItem>
                         <FormLabel>Subcategoria</FormLabel>
                         <div className="flex gap-2">
-                          <Select 
+                           <Select 
                             onValueChange={field.onChange} 
-                            value={field.value || ''} 
+                            value={field.value || 'none'} 
                             disabled={subcategoriesLoading}
                           >
                             <FormControl>
@@ -448,7 +448,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent className="bg-background border border-border shadow-lg">
-                              <SelectItem value="">Nenhuma subcategoria</SelectItem>
+                              <SelectItem value="none">Nenhuma subcategoria</SelectItem>
                               {subcategories.map(subcategory => (
                                 <SelectItem key={subcategory.id} value={subcategory.id}>
                                   {subcategory.name}
