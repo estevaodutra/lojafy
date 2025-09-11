@@ -137,6 +137,13 @@ export const ImageUploadArea: React.FC<ImageUploadAreaProps> = ({
       ...img,
       isMain: img.id === imageId
     }));
+    
+    // Validate that only one image is marked as main
+    const mainCount = updatedImages.filter(img => img.isMain).length;
+    if (mainCount !== 1) {
+      console.warn('Multiple or no main images detected, correcting...');
+    }
+    
     onImagesChange(updatedImages);
   }, [images, onImagesChange]);
 

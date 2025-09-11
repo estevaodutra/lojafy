@@ -59,14 +59,32 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
   const [images, setImages] = useState<any[]>(() => {
     // Initialize with existing product images if editing
     if (product?.images && Array.isArray(product.images)) {
-      return product.images.map((url: string, index: number) => ({
+      const initialImages = product.images.map((url: string, index: number) => ({
         id: `existing-${index}`,
         file: null,
         preview: url,
         url: url,
-        isMain: index === 0 || url === product.main_image_url,
+        isMain: product.main_image_url ? url === product.main_image_url : index === 0,
         isUploading: false
       }));
+      
+      // Ensure only one image is marked as main
+      const mainCount = initialImages.filter(img => img.isMain).length;
+      if (mainCount === 0 && initialImages.length > 0) {
+        initialImages[0].isMain = true;
+      } else if (mainCount > 1) {
+        // If multiple images are marked as main, keep only the first one found
+        let foundMain = false;
+        initialImages.forEach(img => {
+          if (img.isMain && foundMain) {
+            img.isMain = false;
+          } else if (img.isMain) {
+            foundMain = true;
+          }
+        });
+      }
+      
+      return initialImages;
     }
     return [];
   });
