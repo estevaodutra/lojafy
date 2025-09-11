@@ -25,18 +25,26 @@ const Categorias = () => {
   const { addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
   const { toast } = useToast();
 
-  // Fetch categories
+  // Fetch categories with real product count
   const { data: categories = [], isLoading: categoriesLoading } = useQuery({
-    queryKey: ['categories'],
+    queryKey: ['categories-with-count'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: categoriesData, error: categoriesError } = await supabase
         .from('categories')
-        .select('*')
+        .select(`
+          *,
+          products!left(id, active)
+        `)
         .eq('active', true)
         .order('name');
       
-      if (error) throw error;
-      return data;
+      if (categoriesError) throw categoriesError;
+      
+      // Calculate product count manually
+      return categoriesData.map(category => ({
+        ...category,
+        real_product_count: category.products?.filter((p: any) => p.active).length || 0
+      }));
     },
   });
 
@@ -180,7 +188,7 @@ const Categorias = () => {
                             selectedCategory?.id === category.id ? 'bg-accent' : ''
                           }`}
                         >
-                          {category.name} ({category.product_count || 0})
+                          {category.name} ({category.real_product_count || 0})
                         </Link>
                       ))
                     )}

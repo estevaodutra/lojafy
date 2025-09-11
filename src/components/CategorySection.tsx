@@ -64,18 +64,26 @@ const colorMap: Record<string, string> = {
 };
 
 const CategorySection = () => {
-  // Fetch categories from Supabase
+  // Fetch categories with real product count from Supabase
   const { data: categories = [], isLoading } = useQuery({
-    queryKey: ['categories'],
+    queryKey: ['categories-with-count'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: categoriesData, error: categoriesError } = await supabase
         .from('categories')
-        .select('*')
+        .select(`
+          *,
+          products!left(id, active)
+        `)
         .eq('active', true)
         .order('name');
       
-      if (error) throw error;
-      return data;
+      if (categoriesError) throw categoriesError;
+      
+      // Calculate product count manually
+      return categoriesData.map(category => ({
+        ...category,
+        real_product_count: category.products?.filter((p: any) => p.active).length || 0
+      }));
     },
   });
 
@@ -125,9 +133,9 @@ const CategorySection = () => {
                       <h3 className="font-medium text-foreground text-sm">
                         {category.name}
                       </h3>
-                      {category.product_count > 0 && (
+                      {(category.real_product_count || 0) > 0 && (
                         <p className="text-xs text-muted-foreground">
-                          {category.product_count} produtos
+                          {category.real_product_count} produtos
                         </p>
                       )}
                     </CardContent>
