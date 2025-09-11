@@ -143,11 +143,16 @@ serve(async (req) => {
       );
     }
 
+    // Generate order number
+    const orderNumber = externalReference.toUpperCase().replace('ORDER_', 'ORD-');
+    console.log('Generated order number:', orderNumber);
+
     // Create order in database
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
       .insert({
         user_id: user.id,
+        order_number: orderNumber,
         total_amount: amount,
         payment_method: 'pix',
         payment_status: 'pending',
