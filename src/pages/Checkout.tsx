@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CheckoutForm, OrderItem, PixPaymentData } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCPF, validateCPF, cleanCPF } from "@/lib/cpf";
+import { useCart } from "@/contexts/CartContext";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PixPayment from "@/components/PixPayment";
@@ -19,23 +20,24 @@ import { ShoppingCart, CreditCard, Truck, Shield } from "lucide-react";
 const Checkout = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { items: cartItems, clearCart } = useCart();
   const [currentStep, setCurrentStep] = useState(1);
   const [couponCode, setCouponCode] = useState("");
   const [shippingCost, setShippingCost] = useState(15.90);
   const [pixPaymentData, setPixPaymentData] = useState<PixPaymentData | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  
-  // Mock cart items - in a real app, this would come from context/state
-  const [cartItems] = useState<OrderItem[]>([
-    {
-      productId: "1",
-      productName: "iPhone 15 Pro Max",
-      productImage: "/src/assets/product-phone.jpg",
-      price: 7999,
-      quantity: 1,
-      variants: { color: "Titânio Natural", storage: "256GB" }
+
+  // Check if cart is empty and redirect
+  useEffect(() => {
+    if (cartItems.length === 0) {
+      toast({
+        title: "Carrinho vazio",
+        description: "Adicione produtos ao carrinho antes de finalizar a compra.",
+        variant: "destructive",
+      });
+      navigate("/carrinho");
     }
-  ]);
+  }, [cartItems, navigate, toast]);
 
   const [formData, setFormData] = useState<CheckoutForm>({
     email: "",
@@ -178,6 +180,7 @@ const Checkout = () => {
   };
 
   const handlePixPaymentConfirmed = () => {
+    clearCart();
     toast({
       title: "Pagamento confirmado!",
       description: "Seu pedido foi processado com sucesso. Você receberá um e-mail de confirmação.",
