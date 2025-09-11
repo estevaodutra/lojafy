@@ -226,10 +226,7 @@ const Checkout = () => {
 
         const { error: addressError } = await supabase
           .from('addresses')
-          .upsert(addressData, { 
-            onConflict: 'user_id,street,number,city',
-            ignoreDuplicates: false 
-          });
+          .insert(addressData);
 
         if (addressError) {
           console.error('Error saving address:', addressError);

@@ -59,7 +59,7 @@ export default function PixPayment({ paymentData, onPaymentConfirmed }: PixPayme
           .eq('payment_id', paymentData.payment_id.toString())
           .maybeSingle();
 
-        if (order && order.payment_status === 'approved') {
+        if (order && order.payment_status === 'paid') {
           setCurrentStatus('approved');
           toast({
             title: "Pagamento aprovado!",
@@ -105,8 +105,8 @@ export default function PixPayment({ paymentData, onPaymentConfirmed }: PixPayme
         .eq('payment_id', paymentData.payment_id.toString())
         .maybeSingle();
 
-      if (order && order.payment_status === 'approved') {
-        setCurrentStatus('approved');
+        if (order && order.payment_status === 'paid') {
+          setCurrentStatus('approved');
         toast({
           title: "Pagamento aprovado!",
           description: "Seu pagamento PIX foi processado com sucesso.",
