@@ -12,6 +12,7 @@ import { CheckoutForm, OrderItem, PixPaymentData } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCPF, validateCPF, cleanCPF } from "@/lib/cpf";
 import { useCart } from "@/contexts/CartContext";
+import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PixPayment from "@/components/PixPayment";
@@ -21,6 +22,7 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { items: cartItems, clearCart } = useCart();
+  const { user, session, profile } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [couponCode, setCouponCode] = useState("");
   const [shippingCost, setShippingCost] = useState(15.90);
@@ -54,6 +56,52 @@ const Checkout = () => {
     zipCode: "",
     paymentMethod: "pix"
   });
+
+  // Load user data when component mounts
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (user && session) {
+        // Prefill with user profile data
+        setFormData(prev => ({
+          ...prev,
+          email: user.email || "",
+          firstName: profile?.first_name || "",
+          lastName: profile?.last_name || "",
+          phone: profile?.phone || "",
+          cpf: profile?.cpf || "",
+        }));
+
+        // Try to get user's default address
+        try {
+          const { data: addresses } = await supabase
+            .from('addresses')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('is_default', { ascending: false })
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (addresses && addresses.length > 0) {
+            const address = addresses[0];
+            setFormData(prev => ({
+              ...prev,
+              address: address.street || "",
+              number: address.number || "",
+              complement: address.complement || "",
+              neighborhood: address.neighborhood || "",
+              city: address.city || "",
+              state: address.state || "",
+              zipCode: address.zip_code || "",
+            }));
+          }
+        } catch (error) {
+          console.error('Error loading user address:', error);
+        }
+      }
+    };
+
+    loadUserData();
+  }, [user, session, profile]);
 
   const [isLoadingCep, setIsLoadingCep] = useState(false);
 
