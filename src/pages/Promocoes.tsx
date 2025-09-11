@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ChevronRight, Clock, Star, Heart, Zap } from "lucide-react";
 import { promotionalProducts } from "@/data/mockData";
+import { useFavorites } from "@/contexts/FavoritesContext";
+import { useToast } from "@/hooks/use-toast";
 
 const Promocoes = () => {
   const [timeLeft, setTimeLeft] = useState({
@@ -15,6 +17,8 @@ const Promocoes = () => {
     minutes: 45,
     seconds: 32
   });
+  const { addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
+  const { toast } = useToast();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -132,11 +136,31 @@ const Promocoes = () => {
                     </div>
 
                     <div className="flex gap-3">
-                      <Button size="lg" className="flex-1">
-                        Comprar Agora
-                      </Button>
-                      <Button size="lg" variant="outline">
-                        <Heart className="h-5 w-5" />
+                      <Link to={`/produto/${product.id}`} className="flex-1">
+                        <Button size="lg" className="w-full">
+                          Comprar Agora
+                        </Button>
+                      </Link>
+                      <Button 
+                        size="lg" 
+                        variant="outline"
+                        onClick={() => {
+                          if (isFavorite(product.id)) {
+                            removeFromFavorites(product.id);
+                            toast({
+                              title: "Removido dos favoritos",
+                              description: `${product.name} foi removido dos seus favoritos.`,
+                            });
+                          } else {
+                            addToFavorites(product);
+                            toast({
+                              title: "Adicionado aos favoritos",
+                              description: `${product.name} foi adicionado aos seus favoritos.`,
+                            });
+                          }
+                        }}
+                      >
+                        <Heart className={`h-5 w-5 ${isFavorite(product.id) ? 'fill-red-500 text-red-500' : ''}`} />
                       </Button>
                     </div>
                   </div>
@@ -175,8 +199,25 @@ const Promocoes = () => {
                         size="sm"
                         variant="ghost"
                         className="absolute top-2 right-2 h-8 w-8 p-0 bg-background/80 hover:bg-background"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (isFavorite(product.id)) {
+                            removeFromFavorites(product.id);
+                            toast({
+                              title: "Removido dos favoritos",
+                              description: `${product.name} foi removido dos seus favoritos.`,
+                            });
+                          } else {
+                            addToFavorites(product);
+                            toast({
+                              title: "Adicionado aos favoritos",
+                              description: `${product.name} foi adicionado aos seus favoritos.`,
+                            });
+                          }
+                        }}
                       >
-                        <Heart className="h-4 w-4" />
+                        <Heart className={`h-4 w-4 ${isFavorite(product.id) ? 'fill-red-500 text-red-500' : ''}`} />
                       </Button>
                     </div>
 
@@ -213,9 +254,11 @@ const Promocoes = () => {
                     </div>
                   </Link>
 
-                  <Button className="w-full mt-4">
-                    Comprar
-                  </Button>
+                  <Link to={`/produto/${product.id}`}>
+                    <Button className="w-full mt-4">
+                      Comprar
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
             ))}

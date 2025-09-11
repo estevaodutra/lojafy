@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 import heroBanner from "@/assets/hero-banner.jpg";
 
 const Hero = () => {
@@ -19,19 +20,23 @@ const Hero = () => {
               Até <strong className="text-yellow-300">70% OFF</strong> em eletrônicos, moda e casa
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button 
-                size="lg"
-                className="bg-white text-primary hover:bg-gray-100 font-semibold text-lg px-8 py-4"
-              >
-                Comprar Agora
-              </Button>
-              <Button 
-                variant="outline"
-                size="lg"
-                className="border-white text-white hover:bg-white hover:text-primary font-semibold text-lg px-8 py-4"
-              >
-                Ver Ofertas
-              </Button>
+              <Link to="/promocoes">
+                <Button 
+                  size="lg"
+                  className="bg-white text-primary hover:bg-gray-100 font-semibold text-lg px-8 py-4"
+                >
+                  Comprar Agora
+                </Button>
+              </Link>
+              <Link to="/promocoes">
+                <Button 
+                  variant="outline"
+                  size="lg"
+                  className="border-white text-white hover:bg-white hover:text-primary font-semibold text-lg px-8 py-4"
+                >
+                  Ver Ofertas
+                </Button>
+              </Link>
             </div>
           </div>
           

@@ -11,6 +11,8 @@ import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { ChevronRight, Grid3X3, List, Star, Filter, Heart } from "lucide-react";
 import { mockProducts, mockCategories } from "@/data/mockData";
+import { useFavorites } from "@/contexts/FavoritesContext";
+import { useToast } from "@/hooks/use-toast";
 
 const Categorias = () => {
   const { slug } = useParams();
@@ -18,6 +20,8 @@ const Categorias = () => {
   const [sortBy, setSortBy] = useState("relevance");
   const [priceRange, setPriceRange] = useState([0, 10000]);
   const [selectedBrand, setSelectedBrand] = useState("all");
+  const { addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
+  const { toast } = useToast();
 
   const selectedCategory = slug ? mockCategories.find(cat => cat.slug === slug) : null;
   const filteredProducts = selectedCategory 
@@ -192,8 +196,25 @@ const Categorias = () => {
                           size="sm"
                           variant="ghost"
                           className="absolute top-2 right-2 h-8 w-8 p-0 bg-background/80 hover:bg-background"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (isFavorite(product.id)) {
+                              removeFromFavorites(product.id);
+                              toast({
+                                title: "Removido dos favoritos",
+                                description: `${product.name} foi removido dos seus favoritos.`,
+                              });
+                            } else {
+                              addToFavorites(product);
+                              toast({
+                                title: "Adicionado aos favoritos",
+                                description: `${product.name} foi adicionado aos seus favoritos.`,
+                              });
+                            }
+                          }}
                         >
-                          <Heart className="h-4 w-4" />
+                          <Heart className={`h-4 w-4 ${isFavorite(product.id) ? 'fill-red-500 text-red-500' : ''}`} />
                         </Button>
                       </div>
 
@@ -232,9 +253,11 @@ const Categorias = () => {
                       </div>
                     </Link>
 
-                    <Button className="w-full mt-4">
-                      Comprar
-                    </Button>
+                    <Link to={`/produto/${product.id}`}>
+                      <Button className="w-full mt-4">
+                        Comprar
+                      </Button>
+                    </Link>
                   </CardContent>
                 </Card>
               ))}

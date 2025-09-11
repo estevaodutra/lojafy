@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import { useCart } from "@/contexts/CartContext";
+import { useFavorites } from "@/contexts/FavoritesContext";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +60,9 @@ const products = [
 ];
 
 const ProductGrid = () => {
+  const { addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
+  const { toast } = useToast();
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -101,8 +106,40 @@ const ProductGrid = () => {
                       variant="ghost"
                       size="sm"
                       className="absolute top-3 right-3 bg-white/80 hover:bg-white"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (isFavorite(product.id.toString())) {
+                          removeFromFavorites(product.id.toString());
+                          toast({
+                            title: "Removido dos favoritos",
+                            description: `${product.name} foi removido dos seus favoritos.`,
+                          });
+                        } else {
+                          addToFavorites({
+                            id: product.id.toString(),
+                            name: product.name,
+                            price: product.price,
+                            originalPrice: product.originalPrice,
+                            image: product.image,
+                            rating: product.rating,
+                            badge: product.badge,
+                            description: "",
+                            specifications: {},
+                            category: "",
+                            brand: "",
+                            inStock: true,
+                            images: [product.image],
+                            reviews: [],
+                          });
+                          toast({
+                            title: "Adicionado aos favoritos",
+                            description: `${product.name} foi adicionado aos seus favoritos.`,
+                          });
+                        }
+                      }}
                     >
-                      <Heart className="h-4 w-4" />
+                      <Heart className={`h-4 w-4 ${isFavorite(product.id.toString()) ? 'fill-red-500 text-red-500' : ''}`} />
                     </Button>
                   </div>
 
