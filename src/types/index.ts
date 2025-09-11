@@ -59,14 +59,13 @@ export interface CheckoutForm {
   phone: string;
   cpf: string;
   address: string;
+  number: string;
+  complement: string;
+  neighborhood: string;
   city: string;
   state: string;
   zipCode: string;
-  paymentMethod: 'credit' | 'debit' | 'pix' | 'boleto';
-  cardNumber?: string;
-  cardName?: string;
-  cardExpiry?: string;
-  cardCvv?: string;
+  paymentMethod: 'pix';
 }
 
 export interface MercadoPagoPixResponse {

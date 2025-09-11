@@ -46,11 +46,16 @@ const Checkout = () => {
     phone: "",
     cpf: "",
     address: "",
+    number: "",
+    complement: "",
+    neighborhood: "",
     city: "",
     state: "",
     zipCode: "",
-    paymentMethod: "credit"
+    paymentMethod: "pix"
   });
+
+  const [isLoadingCep, setIsLoadingCep] = useState(false);
 
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const discount = couponCode === "DESCONTO10" ? subtotal * 0.1 : 0;
@@ -60,11 +65,59 @@ const Checkout = () => {
     return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
+  const searchCep = async (cep: string) => {
+    const cleanCep = cep.replace(/\D/g, '');
+    if (cleanCep.length !== 8) return;
+
+    setIsLoadingCep(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await response.json();
+      
+      if (!data.erro) {
+        setFormData(prev => ({
+          ...prev,
+          address: data.logradouro || "",
+          neighborhood: data.bairro || "",
+          city: data.localidade || "",
+          state: data.uf || ""
+        }));
+        
+        toast({
+          title: "CEP encontrado!",
+          description: "Endereço preenchido automaticamente.",
+        });
+      } else {
+        toast({
+          title: "CEP não encontrado",
+          description: "Verifique o CEP informado.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Erro ao buscar CEP",
+        description: "Tente novamente em alguns instantes.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingCep(false);
+    }
+  };
+
   const handleInputChange = (field: keyof CheckoutForm, value: string) => {
     if (field === 'cpf') {
       // Format CPF automatically
       const formattedValue = formatCPF(value);
       setFormData(prev => ({ ...prev, [field]: formattedValue }));
+    } else if (field === 'zipCode') {
+      // Format CEP and trigger search
+      const formattedCep = value.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2');
+      setFormData(prev => ({ ...prev, [field]: formattedCep }));
+      
+      if (formattedCep.length === 9) {
+        searchCep(formattedCep);
+      }
     } else {
       setFormData(prev => ({ ...prev, [field]: value }));
     }
@@ -127,6 +180,9 @@ const Checkout = () => {
         orderItems,
         shippingAddress: {
           street: formData.address,
+          number: formData.number,
+          complement: formData.complement,
+          neighborhood: formData.neighborhood,
           city: formData.city,
           state: formData.state,
           zipCode: formData.zipCode,
@@ -167,16 +223,7 @@ const Checkout = () => {
   };
 
   const handleSubmit = () => {
-    if (formData.paymentMethod === 'pix') {
-      createPixPayment();
-    } else {
-      // Handle other payment methods (credit card, etc.)
-      toast({
-        title: "Pedido realizado!",
-        description: "Seu pedido foi processado com sucesso. Você receberá um e-mail de confirmação.",
-      });
-      navigate("/");
-    }
+    createPixPayment();
   };
 
   const handlePixPaymentConfirmed = () => {
@@ -312,51 +359,113 @@ const Checkout = () => {
                     Endereço de Entrega
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label htmlFor="zipCode">CEP</Label>
-                    <Input
-                      id="zipCode"
-                      value={formData.zipCode}
-                      onChange={(e) => handleInputChange("zipCode", e.target.value)}
-                      placeholder="00000-000"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="address">Endereço</Label>
-                    <Input
-                      id="address"
-                      value={formData.address}
-                      onChange={(e) => handleInputChange("address", e.target.value)}
-                      placeholder="Rua, número e complemento"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="city">Cidade</Label>
-                      <Input
-                        id="city"
-                        value={formData.city}
-                        onChange={(e) => handleInputChange("city", e.target.value)}
-                        placeholder="Sua cidade"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="state">Estado</Label>
-                      <Select onValueChange={(value) => handleInputChange("state", value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="SP">São Paulo</SelectItem>
-                          <SelectItem value="RJ">Rio de Janeiro</SelectItem>
-                          <SelectItem value="MG">Minas Gerais</SelectItem>
-                          <SelectItem value="RS">Rio Grande do Sul</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </CardContent>
+                 <CardContent className="space-y-4">
+                   <div>
+                     <Label htmlFor="zipCode">CEP</Label>
+                     <Input
+                       id="zipCode"
+                       value={formData.zipCode}
+                       onChange={(e) => handleInputChange("zipCode", e.target.value)}
+                       placeholder="00000-000"
+                       maxLength={9}
+                       disabled={isLoadingCep}
+                     />
+                     {isLoadingCep && (
+                       <p className="text-sm text-muted-foreground mt-1">
+                         Buscando endereço...
+                       </p>
+                     )}
+                   </div>
+                   <div>
+                     <Label htmlFor="address">Logradouro</Label>
+                     <Input
+                       id="address"
+                       value={formData.address}
+                       onChange={(e) => handleInputChange("address", e.target.value)}
+                       placeholder="Nome da rua"
+                     />
+                   </div>
+                   <div className="grid grid-cols-3 gap-4">
+                     <div className="col-span-1">
+                       <Label htmlFor="number">Número</Label>
+                       <Input
+                         id="number"
+                         value={formData.number}
+                         onChange={(e) => handleInputChange("number", e.target.value)}
+                         placeholder="123"
+                       />
+                     </div>
+                     <div className="col-span-2">
+                       <Label htmlFor="complement">Complemento</Label>
+                       <Input
+                         id="complement"
+                         value={formData.complement}
+                         onChange={(e) => handleInputChange("complement", e.target.value)}
+                         placeholder="Apto, casa, etc. (opcional)"
+                       />
+                     </div>
+                   </div>
+                   <div>
+                     <Label htmlFor="neighborhood">Bairro</Label>
+                     <Input
+                       id="neighborhood"
+                       value={formData.neighborhood}
+                       onChange={(e) => handleInputChange("neighborhood", e.target.value)}
+                       placeholder="Nome do bairro"
+                     />
+                   </div>
+                   <div className="grid grid-cols-2 gap-4">
+                     <div>
+                       <Label htmlFor="city">Cidade</Label>
+                       <Input
+                         id="city"
+                         value={formData.city}
+                         onChange={(e) => handleInputChange("city", e.target.value)}
+                         placeholder="Sua cidade"
+                       />
+                     </div>
+                     <div>
+                       <Label htmlFor="state">Estado</Label>
+                       <Select 
+                         value={formData.state} 
+                         onValueChange={(value) => handleInputChange("state", value)}
+                       >
+                         <SelectTrigger>
+                           <SelectValue placeholder="Selecione" />
+                         </SelectTrigger>
+                         <SelectContent>
+                           <SelectItem value="AC">Acre</SelectItem>
+                           <SelectItem value="AL">Alagoas</SelectItem>
+                           <SelectItem value="AP">Amapá</SelectItem>
+                           <SelectItem value="AM">Amazonas</SelectItem>
+                           <SelectItem value="BA">Bahia</SelectItem>
+                           <SelectItem value="CE">Ceará</SelectItem>
+                           <SelectItem value="DF">Distrito Federal</SelectItem>
+                           <SelectItem value="ES">Espírito Santo</SelectItem>
+                           <SelectItem value="GO">Goiás</SelectItem>
+                           <SelectItem value="MA">Maranhão</SelectItem>
+                           <SelectItem value="MT">Mato Grosso</SelectItem>
+                           <SelectItem value="MS">Mato Grosso do Sul</SelectItem>
+                           <SelectItem value="MG">Minas Gerais</SelectItem>
+                           <SelectItem value="PA">Pará</SelectItem>
+                           <SelectItem value="PB">Paraíba</SelectItem>
+                           <SelectItem value="PR">Paraná</SelectItem>
+                           <SelectItem value="PE">Pernambuco</SelectItem>
+                           <SelectItem value="PI">Piauí</SelectItem>
+                           <SelectItem value="RJ">Rio de Janeiro</SelectItem>
+                           <SelectItem value="RN">Rio Grande do Norte</SelectItem>
+                           <SelectItem value="RS">Rio Grande do Sul</SelectItem>
+                           <SelectItem value="RO">Rondônia</SelectItem>
+                           <SelectItem value="RR">Roraima</SelectItem>
+                           <SelectItem value="SC">Santa Catarina</SelectItem>
+                           <SelectItem value="SP">São Paulo</SelectItem>
+                           <SelectItem value="SE">Sergipe</SelectItem>
+                           <SelectItem value="TO">Tocantins</SelectItem>
+                         </SelectContent>
+                       </Select>
+                     </div>
+                   </div>
+                 </CardContent>
               </Card>
             )}
 
@@ -369,63 +478,23 @@ const Checkout = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div>
-                    <Label>Método de Pagamento</Label>
-                    <Select onValueChange={(value) => handleInputChange("paymentMethod", value as any)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="credit">Cartão de Crédito</SelectItem>
-                        <SelectItem value="debit">Cartão de Débito</SelectItem>
-                        <SelectItem value="pix">PIX</SelectItem>
-                        <SelectItem value="boleto">Boleto</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="p-4 border rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                        <Shield className="w-5 h-5 text-primary-foreground" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold">PIX</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Pagamento instantâneo e seguro
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  
-                  {(formData.paymentMethod === "credit" || formData.paymentMethod === "debit") && (
-                    <>
-                      <div>
-                        <Label htmlFor="cardNumber">Número do Cartão</Label>
-                        <Input
-                          id="cardNumber"
-                          value={formData.cardNumber || ""}
-                          onChange={(e) => handleInputChange("cardNumber", e.target.value)}
-                          placeholder="0000 0000 0000 0000"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="cardName">Nome no Cartão</Label>
-                        <Input
-                          id="cardName"
-                          value={formData.cardName || ""}
-                          onChange={(e) => handleInputChange("cardName", e.target.value)}
-                          placeholder="Nome como está no cartão"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="cardExpiry">Validade</Label>
-                          <Input
-                            id="cardExpiry"
-                            value={formData.cardExpiry || ""}
-                            onChange={(e) => handleInputChange("cardExpiry", e.target.value)}
-                            placeholder="MM/AA"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="cardCvv">CVV</Label>
-                          <Input
-                            id="cardCvv"
-                            value={formData.cardCvv || ""}
-                            onChange={(e) => handleInputChange("cardCvv", e.target.value)}
-                            placeholder="000"
-                          />
-                        </div>
-                      </div>
-                    </>
-                  )}
+                  <p className="text-sm text-muted-foreground">
+                    Após confirmar o pedido, você receberá o QR Code para pagamento via PIX.
+                    O pagamento é processado instantaneamente.
+                  </p>
                 </CardContent>
               </Card>
             )}
@@ -446,10 +515,8 @@ const Checkout = () => {
                     <p><strong>Nome:</strong> {formData.firstName} {formData.lastName}</p>
                     <p><strong>E-mail:</strong> {formData.email}</p>
                     <p><strong>Telefone:</strong> {formData.phone}</p>
-                    <p><strong>Endereço:</strong> {formData.address}, {formData.city} - {formData.state}</p>
-                    <p><strong>Pagamento:</strong> {formData.paymentMethod === 'credit' ? 'Cartão de Crédito' : 
-                      formData.paymentMethod === 'debit' ? 'Cartão de Débito' : 
-                      formData.paymentMethod === 'pix' ? 'PIX' : 'Boleto'}</p>
+                     <p><strong>Endereço:</strong> {formData.address}, {formData.number} {formData.complement && `- ${formData.complement}`}, {formData.neighborhood}, {formData.city} - {formData.state}</p>
+                     <p><strong>Pagamento:</strong> PIX</p>
                   </div>
                 </CardContent>
               </Card>

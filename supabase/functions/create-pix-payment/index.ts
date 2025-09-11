@@ -106,11 +106,15 @@ serve(async (req) => {
 
     console.log('Enviando para Mercado Pago:', { ...paymentData, payer: { ...paymentData.payer, identification: { ...paymentData.payer.identification, number: '***' } } });
 
+    // Generate unique idempotency key
+    const idempotencyKey = `${externalReference}_${Date.now()}`;
+    
     const mpResponse = await fetch('https://api.mercadopago.com/v1/payments', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${mercadoPagoToken}`,
         'Content-Type': 'application/json',
+        'X-Idempotency-Key': idempotencyKey,
       },
       body: JSON.stringify(paymentData),
     });
