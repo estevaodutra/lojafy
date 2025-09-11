@@ -1,21 +1,27 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Copy, Check, QrCode } from 'lucide-react';
+import { Copy, Check, QrCode, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ModernPixPaymentProps {
   qrCode: string;
   qrCodeBase64: string;
   amount: number;
+  paymentId?: string;
+  onPaymentConfirmed?: () => void;
 }
 
 export const ModernPixPayment: React.FC<ModernPixPaymentProps> = ({
   qrCode,
   qrCodeBase64,
-  amount
+  amount,
+  paymentId,
+  onPaymentConfirmed
 }) => {
   const [copied, setCopied] = useState(false);
+  const [checking, setChecking] = useState(false);
   const { toast } = useToast();
 
   const copyPixCode = async () => {
@@ -35,6 +41,52 @@ export const ModernPixPayment: React.FC<ModernPixPaymentProps> = ({
         description: "Tente novamente ou copie manualmente",
         variant: "destructive",
       });
+    }
+  };
+
+  const checkPaymentStatus = async () => {
+    if (!paymentId) {
+      toast({
+        title: "Erro",
+        description: "ID do pagamento não encontrado",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setChecking(true);
+    try {
+      const { data: order, error } = await supabase
+        .from('orders')
+        .select('payment_status')
+        .eq('payment_id', paymentId)
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      if (order?.payment_status === 'paid') {
+        toast({
+          title: "Pagamento confirmado!",
+          description: "Seu pagamento foi processado com sucesso",
+        });
+        onPaymentConfirmed?.();
+      } else {
+        toast({
+          title: "Pagamento pendente",
+          description: "O pagamento ainda não foi processado",
+        });
+      }
+    } catch (error) {
+      console.error('Error checking payment status:', error);
+      toast({
+        title: "Erro ao verificar status",
+        description: "Tente novamente em alguns instantes",
+        variant: "destructive",
+      });
+    } finally {
+      setChecking(false);
     }
   };
 
@@ -104,24 +156,45 @@ export const ModernPixPayment: React.FC<ModernPixPaymentProps> = ({
             </p>
           </div>
           
-          <Button 
-            onClick={copyPixCode}
-            className="w-full h-12 text-base font-medium relative overflow-hidden group"
-            disabled={!qrCode}
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-primary to-primary-foreground opacity-0 group-hover:opacity-10 transition-opacity"></div>
-            {copied ? (
-              <>
-                <Check className="mr-2 h-5 w-5" />
-                Copiado!
-              </>
-            ) : (
-              <>
-                <Copy className="mr-2 h-5 w-5" />
-                Copiar código PIX
-              </>
-            )}
-          </Button>
+          <div className="space-y-3">
+            <Button 
+              onClick={copyPixCode}
+              className="w-full h-12 text-base font-medium relative overflow-hidden group"
+              disabled={!qrCode}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-primary to-primary-foreground opacity-0 group-hover:opacity-10 transition-opacity"></div>
+              {copied ? (
+                <>
+                  <Check className="mr-2 h-5 w-5" />
+                  Copiado!
+                </>
+              ) : (
+                <>
+                  <Copy className="mr-2 h-5 w-5" />
+                  Copiar código PIX
+                </>
+              )}
+            </Button>
+
+            <Button 
+              onClick={checkPaymentStatus}
+              variant="outline"
+              className="w-full h-12 text-base font-medium"
+              disabled={checking || !paymentId}
+            >
+              {checking ? (
+                <>
+                  <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                  Verificando...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-5 w-5" />
+                  Verificar status
+                </>
+              )}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

@@ -478,6 +478,8 @@ const Checkout = () => {
                   qrCode={modernPixData.qr_code}
                   qrCodeBase64={modernPixData.qr_code_base64}
                   amount={total}
+                  paymentId={modernPixData.payment_id}
+                  onPaymentConfirmed={handlePixPaymentConfirmed}
                 />
               </div>
             ) : pixPaymentData ? (
