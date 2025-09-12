@@ -11,7 +11,7 @@ import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
 
 const Carrinho = () => {
-  const { items, itemsCount, totalPrice, updateQuantity, removeItem, clearCart, syncPrices, isUpdatingPrices } = useCart();
+  const { items, itemsCount, totalPrice, updateQuantity, removeItem, clearCart, syncPrices, isUpdatingPrices, lastSyncTime } = useCart();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -20,6 +20,19 @@ const Carrinho = () => {
       style: 'currency',
       currency: 'BRL'
     }).format(price);
+  };
+
+  const formatLastSync = () => {
+    if (!lastSyncTime) return null;
+    
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - lastSyncTime.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes === 0) return 'Agora mesmo';
+    if (diffInMinutes === 1) return 'Há 1 minuto';
+    if (diffInMinutes < 60) return `Há ${diffInMinutes} minutos`;
+    if (diffInMinutes < 1440) return `Há ${Math.floor(diffInMinutes / 60)} horas`;
+    return lastSyncTime.toLocaleDateString('pt-BR');
   };
 
   const handleQuantityChange = (productId: string, newQuantity: number) => {
@@ -52,21 +65,28 @@ const Carrinho = () => {
     const result = await syncPrices();
     
     if (result.updated) {
+      let message = '';
+      const changes = [];
+      
       if (result.updatedItems.length > 0) {
-        toast({
-          title: "Preços atualizados!",
-          description: `${result.updatedItems.length} produto(s) tiveram preços alterados: ${result.updatedItems.join(', ')}`,
-        });
-      } else {
-        toast({
-          title: "Carrinho atualizado",
-          description: "Alguns produtos foram removidos pois não estão mais disponíveis",
-        });
+        changes.push(`${result.updatedItems.length} produto(s) com preços atualizados`);
       }
+      
+      if (result.removedItems.length > 0) {
+        changes.push(`${result.removedItems.length} produto(s) removidos (indisponíveis)`);
+      }
+      
+      message = changes.join(' e ');
+      
+      toast({
+        title: "Carrinho atualizado!",
+        description: message,
+        variant: result.removedItems.length > 0 ? "destructive" : "default",
+      });
     } else {
       toast({
-        title: "Preços atualizados",
-        description: "Todos os preços estão em dia!",
+        title: "✅ Tudo em dia!",
+        description: "Todos os preços e produtos estão atualizados",
       });
     }
   };
@@ -128,28 +148,35 @@ const Carrinho = () => {
               </div>
             </div>
             {items.length > 0 && (
-              <div className="flex space-x-2">
-                <Button 
-                  variant="outline" 
-                  onClick={handleSyncPrices}
-                  disabled={isUpdatingPrices}
-                >
-                  {isUpdatingPrices ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                      Atualizando...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Atualizar preços
-                    </>
-                  )}
-                </Button>
-                <Button variant="outline" onClick={handleClearCart}>
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Limpar Carrinho
-                </Button>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0 sm:space-x-2">
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={handleSyncPrices}
+                    disabled={isUpdatingPrices}
+                  >
+                    {isUpdatingPrices ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Atualizando...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Atualizar preços
+                      </>
+                    )}
+                  </Button>
+                  <Button variant="outline" onClick={handleClearCart}>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Limpar Carrinho
+                  </Button>
+                </div>
+                {lastSyncTime && (
+                  <div className="text-sm text-muted-foreground">
+                    Última atualização: {formatLastSync()}
+                  </div>
+                )}
               </div>
             )}
           </div>

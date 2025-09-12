@@ -12,8 +12,9 @@ interface CartContextType {
   clearCart: () => void;
   isInCart: (productId: string) => boolean;
   getItemQuantity: (productId: string) => number;
-  syncPrices: () => Promise<{ updated: boolean; updatedItems: string[] }>;
+  syncPrices: () => Promise<{ updated: boolean; updatedItems: string[]; removedItems: string[] }>;
   isUpdatingPrices: boolean;
+  lastSyncTime: Date | null;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -33,18 +34,106 @@ interface CartProviderProps {
 export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   const [items, setItems] = useState<OrderItem[]>([]);
   const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
-  // Load cart from localStorage on mount
-  useEffect(() => {
-    const savedCart = localStorage.getItem('cart');
-    if (savedCart) {
-      try {
-        const parsedCart = JSON.parse(savedCart);
-        setItems(parsedCart);
-      } catch (error) {
-        console.error('Error loading cart from localStorage:', error);
+  const syncPricesInternal = async (cartItems: OrderItem[] = items) => {
+    if (cartItems.length === 0) return { updated: false, updatedItems: [], removedItems: [] };
+
+    try {
+      const productIds = cartItems.map(item => item.productId);
+      console.log('🔍 Checking prices for products:', productIds);
+      
+      const { data: products, error } = await supabase
+        .from('products')
+        .select('id, price, name, active')
+        .in('id', productIds);
+
+      if (error) throw error;
+
+      const updatedItems: string[] = [];
+      const removedItems: string[] = [];
+      const activeProducts = products?.filter(p => p.active) || [];
+      
+      const newItems = cartItems.map(item => {
+        const product = activeProducts.find(p => p.id === item.productId);
+        
+        if (!product) {
+          // Product no longer exists or is inactive
+          removedItems.push(item.productName);
+          console.log('❌ Product removed or inactive:', item.productName);
+          return null;
+        }
+        
+        const currentPrice = Number(product.price);
+        const cartPrice = Number(item.price);
+        
+        if (currentPrice !== cartPrice) {
+          console.log('💰 Price change detected:', {
+            product: product.name,
+            oldPrice: cartPrice,
+            newPrice: currentPrice,
+            difference: currentPrice - cartPrice
+          });
+          updatedItems.push(product.name);
+          return { ...item, price: currentPrice };
+        }
+        
+        return item;
+      }).filter(Boolean) as OrderItem[];
+
+      const hasChanges = updatedItems.length > 0 || removedItems.length > 0;
+      
+      if (hasChanges) {
+        setItems(newItems);
+        setLastSyncTime(new Date());
+        console.log('✅ Cart updated:', {
+          updatedPrices: updatedItems.length,
+          removedProducts: removedItems.length,
+          totalItems: newItems.length
+        });
       }
+
+      return { 
+        updated: hasChanges, 
+        updatedItems, 
+        removedItems 
+      };
+    } catch (error) {
+      console.error('❌ Error syncing cart prices:', error);
+      return { updated: false, updatedItems: [], removedItems: [] };
     }
+  };
+
+  // Load cart from localStorage on mount and auto-sync prices
+  useEffect(() => {
+    const loadCartAndSync = async () => {
+      const savedCart = localStorage.getItem('cart');
+      if (savedCart) {
+        try {
+          const parsedCart = JSON.parse(savedCart);
+          console.log('📦 Loaded cart from localStorage:', parsedCart.length, 'items');
+          
+          // Validate and sanitize prices
+          const sanitizedCart = parsedCart.map((item: OrderItem) => ({
+            ...item,
+            price: Number(item.price) || 0,
+            quantity: Number(item.quantity) || 1,
+          }));
+          
+          setItems(sanitizedCart);
+          
+          // Auto-sync prices if we have items
+          if (sanitizedCart.length > 0) {
+            console.log('🔄 Auto-syncing prices on cart load...');
+            await syncPricesInternal(sanitizedCart);
+          }
+        } catch (error) {
+          console.error('❌ Error loading cart from localStorage:', error);
+        }
+      }
+    };
+    
+    loadCartAndSync();
   }, []);
 
   // Save cart to localStorage whenever items change
@@ -53,18 +142,34 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   }, [items]);
 
   const addItem = (item: OrderItem) => {
+    console.log('➕ Adding item to cart:', {
+      name: item.productName,
+      price: item.price,
+      quantity: item.quantity,
+      variants: item.variants
+    });
+    
+    // Ensure price is a valid number
+    const sanitizedItem = {
+      ...item,
+      price: Number(item.price) || 0,
+      quantity: Number(item.quantity) || 1,
+    };
+    
     setItems(currentItems => {
-      const existingItem = currentItems.find(i => i.productId === item.productId);
+      const existingItem = currentItems.find(i => i.productId === sanitizedItem.productId);
       
       if (existingItem) {
+        console.log('🔄 Updating existing item quantity:', existingItem.quantity, '+', sanitizedItem.quantity);
         return currentItems.map(i =>
-          i.productId === item.productId
-            ? { ...i, quantity: i.quantity + item.quantity }
+          i.productId === sanitizedItem.productId
+            ? { ...i, quantity: i.quantity + sanitizedItem.quantity }
             : i
         );
       }
       
-      return [...currentItems, item];
+      console.log('🆕 Adding new item to cart');
+      return [...currentItems, sanitizedItem];
     });
   };
 
@@ -101,42 +206,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   };
 
   const syncPrices = async () => {
-    if (items.length === 0) return { updated: false, updatedItems: [] };
-
     setIsUpdatingPrices(true);
     try {
-      const productIds = items.map(item => item.productId);
-      
-      const { data: products, error } = await supabase
-        .from('products')
-        .select('id, price, name')
-        .in('id', productIds)
-        .eq('active', true);
-
-      if (error) throw error;
-
-      const updatedItems: string[] = [];
-      const newItems = items.map(item => {
-        const product = products?.find(p => p.id === item.productId);
-        if (product && Number(product.price) !== item.price) {
-          updatedItems.push(product.name);
-          return { ...item, price: Number(product.price) };
-        }
-        return item;
-      }).filter(item => {
-        // Remove items where product no longer exists or is inactive
-        return products?.some(p => p.id === item.productId);
-      });
-
-      if (updatedItems.length > 0 || newItems.length !== items.length) {
-        setItems(newItems);
-        return { updated: true, updatedItems };
-      }
-
-      return { updated: false, updatedItems: [] };
-    } catch (error) {
-      console.error('Error syncing cart prices:', error);
-      return { updated: false, updatedItems: [] };
+      return await syncPricesInternal();
     } finally {
       setIsUpdatingPrices(false);
     }
@@ -157,6 +229,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     getItemQuantity,
     syncPrices,
     isUpdatingPrices,
+    lastSyncTime,
   };
 
   return (
