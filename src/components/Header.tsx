@@ -1,17 +1,31 @@
-import { Search, User, Heart, ShoppingCart, Menu, LogOut, Settings } from "lucide-react";
+import { Search, User, Heart, ShoppingCart, Menu, LogOut, Settings, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
+import { useState } from "react";
 
 const Header = () => {
   const { favoritesCount } = useFavorites();
   const { itemsCount } = useCart();
   const { user, signOut, profile, isAdmin } = useAuth();
+  const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchTerm.trim()) {
+      navigate(`/busca?q=${encodeURIComponent(searchTerm.trim())}`);
+      setSearchTerm("");
+      setMobileMenuOpen(false);
+    }
+  };
   
   return (
     <header className="w-full border-b bg-background sticky top-0 z-50">
@@ -35,27 +49,26 @@ const Header = () => {
 
           {/* Search Bar - Hidden on mobile */}
           <div className="hidden md:flex flex-1 max-w-2xl mx-8">
-            <div className="relative w-full">
+            <form onSubmit={handleSearch} className="relative w-full">
               <Input
                 type="text"
                 placeholder="Buscar produtos..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-4 pr-12 py-3 w-full rounded-lg border-border"
               />
               <Button 
+                type="submit"
                 size="sm" 
                 className="absolute right-1 top-1 h-8 px-3 bg-primary hover:bg-primary/90"
               >
                 <Search className="h-4 w-4" />
               </Button>
-            </div>
+            </form>
           </div>
 
           {/* Actions */}
           <div className="flex items-center space-x-2">
-            {/* Mobile Search */}
-            <Button variant="ghost" size="sm" className="md:hidden">
-              <Search className="h-5 w-5" />
-            </Button>
 
             {/* User Account */}
             {user ? (
@@ -131,9 +144,174 @@ const Header = () => {
             </Button>
 
             {/* Mobile Menu */}
-            <Button variant="ghost" size="sm" className="md:hidden">
-              <Menu className="h-5 w-5" />
-            </Button>
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="sm" className="md:hidden">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-80 p-0">
+                <SheetHeader className="border-b p-4">
+                  <div className="flex items-center justify-between">
+                    <SheetTitle className="text-lg font-bold">Menu</SheetTitle>
+                    <SheetClose className="rounded-sm opacity-70 transition-opacity hover:opacity-100">
+                      <X className="h-4 w-4" />
+                    </SheetClose>
+                  </div>
+                </SheetHeader>
+                
+                <div className="flex flex-col h-full">
+                  {/* Mobile Search */}
+                  <div className="p-4 border-b">
+                    <form onSubmit={handleSearch} className="relative">
+                      <Input
+                        type="text"
+                        placeholder="Buscar produtos..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-4 pr-12 py-3 w-full rounded-lg"
+                      />
+                      <Button 
+                        type="submit"
+                        size="sm" 
+                        className="absolute right-1 top-1 h-8 px-3"
+                      >
+                        <Search className="h-4 w-4" />
+                      </Button>
+                    </form>
+                  </div>
+
+                  {/* Navigation Links */}
+                  <nav className="flex-1 p-4">
+                    <div className="space-y-4">
+                      <Link 
+                        to="/" 
+                        className="block py-2 text-foreground hover:text-primary transition-colors"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Início
+                      </Link>
+                      <Link 
+                        to="/categorias" 
+                        className="block py-2 text-foreground hover:text-primary transition-colors"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Lançamentos
+                      </Link>
+                      <Link 
+                        to="/promocoes" 
+                        className="block py-2 text-foreground hover:text-primary transition-colors"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Promoções
+                      </Link>
+                      <Link 
+                        to="/categorias" 
+                        className="block py-2 text-foreground hover:text-primary transition-colors"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Categorias
+                      </Link>
+                      <Link 
+                        to="/contato" 
+                        className="block py-2 text-foreground hover:text-primary transition-colors"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Contato
+                      </Link>
+                    </div>
+                  </nav>
+
+                  {/* User Section */}
+                  <div className="border-t p-4">
+                    {user ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-3 p-2">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={profile?.avatar_url} />
+                            <AvatarFallback>
+                              {profile?.first_name?.[0]}{profile?.last_name?.[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">
+                            {profile?.first_name ? `${profile.first_name}` : 'Minha Conta'}
+                          </span>
+                        </div>
+                        <div className="space-y-2">
+                          <Link 
+                            to="/minha-conta" 
+                            className="block py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            <User className="inline mr-2 h-4 w-4" />
+                            Minha Conta
+                          </Link>
+                          {isAdmin && (
+                            <Link 
+                              to="/admin" 
+                              className="block py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors"
+                              onClick={() => setMobileMenuOpen(false)}
+                            >
+                              <Settings className="inline mr-2 h-4 w-4" />
+                              Painel Admin
+                            </Link>
+                          )}
+                          <button 
+                            onClick={() => {
+                              signOut();
+                              setMobileMenuOpen(false);
+                            }}
+                            className="block w-full text-left py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors"
+                          >
+                            <LogOut className="inline mr-2 h-4 w-4" />
+                            Sair
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Link 
+                        to="/auth" 
+                        className="flex items-center justify-center py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <User className="mr-2 h-4 w-4" />
+                        Entrar
+                      </Link>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex gap-4 mt-4">
+                      <Link 
+                        to="/favoritos" 
+                        className="flex-1 flex items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors relative"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Heart className="h-4 w-4 mr-2" />
+                        <span className="text-sm">Favoritos</span>
+                        {favoritesCount > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                            {favoritesCount}
+                          </span>
+                        )}
+                      </Link>
+                      <Link 
+                        to="/carrinho" 
+                        className="flex-1 flex items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors relative"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        <span className="text-sm">Carrinho</span>
+                        {itemsCount > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                            {itemsCount}
+                          </span>
+                        )}
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
 

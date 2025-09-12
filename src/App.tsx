@@ -13,6 +13,7 @@ import Contato from "./pages/Contato";
 import Produto from "./pages/Produto";
 import Favoritos from "./pages/Favoritos";
 import Checkout from "./pages/Checkout";
+import Busca from "./pages/Busca";
 import QuemSomos from "./pages/QuemSomos";
 import PoliticaTroca from "./pages/PoliticaTroca";
 import TermosUso from "./pages/TermosUso";
@@ -63,6 +64,7 @@ const App = () => (
               <Route path="/produto/:id" element={<Produto />} />
               <Route path="/favoritos" element={<Favoritos />} />
               <Route path="/checkout" element={<Checkout />} />
+              <Route path="/busca" element={<Busca />} />
               <Route path="/quem-somos" element={<QuemSomos />} />
               <Route path="/politica-troca" element={<PoliticaTroca />} />
               <Route path="/termos-uso" element={<TermosUso />} />
