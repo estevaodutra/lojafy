@@ -34,6 +34,8 @@ import AdminLayout from "./components/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminProducts from "./pages/admin/Products";
 import AdminBanners from "./pages/admin/Banners";
+import AdminOrders from "./pages/admin/Orders";
+import AdminCustomers from "./pages/admin/Customers";
 import IntegracaoPage from "./pages/admin/Integracoes";
 
 const queryClient = new QueryClient({
@@ -90,6 +92,8 @@ const App = () => (
                 <Route index element={<AdminDashboard />} />
                 <Route path="banners" element={<AdminBanners />} />
                 <Route path="produtos" element={<AdminProducts />} />
+                <Route path="pedidos" element={<AdminOrders />} />
+                <Route path="clientes" element={<AdminCustomers />} />
                 <Route path="integracoes" element={<IntegracaoPage />} />
               </Route>
               
