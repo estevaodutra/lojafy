@@ -2,3 +2,6 @@ project_id = "bbrmjrjorcgsgeztzbsr"
 
 [functions.webhook-mercadopago]
 verify_jwt = false
+
+[functions.webhook-n8n-payment]
+verify_jwt = false
