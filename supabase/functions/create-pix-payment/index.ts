@@ -127,14 +127,13 @@ serve(async (req) => {
             gtin_ean13: product?.gtin_ean13 || '',
             categoria: product?.categories?.name || '',
             subcategoria: product?.subcategories?.name || '',
-            especificacoes: product?.specifications || {},
+            especificacoes: '',
             dimensoes: {
               peso: product?.weight || 0,
               altura: product?.height || 0,
               largura: product?.width || 0,
               comprimento: product?.length || 0
             },
-            imagens: product?.images || [],
             imagem_principal: product?.main_image_url || product?.image_url || '',
             estoque_atual: product?.stock_quantity || 0,
             avaliacao: product?.rating || 0,
@@ -159,7 +158,16 @@ serve(async (req) => {
         email: payer.email,
         telefone: profileData?.phone || '',
         cpf: payer.cpf.replace(/\D/g, ''),
-        endereco_completo: shippingAddress
+        endereco: shippingAddress ? {
+          rua: shippingAddress.street || '',
+          numero: shippingAddress.number || '',
+          complemento: shippingAddress.complement || '',
+          bairro: shippingAddress.neighborhood || '',
+          cidade: shippingAddress.city || '',
+          estado: shippingAddress.state || '',
+          uf: shippingAddress.state || '',
+          cep: shippingAddress.zip_code || ''
+        } : null
       },
       produtos: completeProducts,
       pagamento: {
