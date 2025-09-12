@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -11,7 +11,7 @@ import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
 
 const Carrinho = () => {
-  const { items, itemsCount, totalPrice, updateQuantity, removeItem, clearCart } = useCart();
+  const { items, itemsCount, totalPrice, updateQuantity, removeItem, clearCart, syncPrices, isUpdatingPrices } = useCart();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -46,6 +46,29 @@ const Carrinho = () => {
   const handleCheckout = () => {
     if (items.length === 0) return;
     navigate('/checkout');
+  };
+
+  const handleSyncPrices = async () => {
+    const result = await syncPrices();
+    
+    if (result.updated) {
+      if (result.updatedItems.length > 0) {
+        toast({
+          title: "Preços atualizados!",
+          description: `${result.updatedItems.length} produto(s) tiveram preços alterados: ${result.updatedItems.join(', ')}`,
+        });
+      } else {
+        toast({
+          title: "Carrinho atualizado",
+          description: "Alguns produtos foram removidos pois não estão mais disponíveis",
+        });
+      }
+    } else {
+      toast({
+        title: "Preços atualizados",
+        description: "Todos os preços estão em dia!",
+      });
+    }
   };
 
   const shippingThreshold = 199;
@@ -105,10 +128,29 @@ const Carrinho = () => {
               </div>
             </div>
             {items.length > 0 && (
-              <Button variant="outline" onClick={handleClearCart}>
-                <Trash2 className="w-4 h-4 mr-2" />
-                Limpar Carrinho
-              </Button>
+              <div className="flex space-x-2">
+                <Button 
+                  variant="outline" 
+                  onClick={handleSyncPrices}
+                  disabled={isUpdatingPrices}
+                >
+                  {isUpdatingPrices ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Atualizando...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Atualizar preços
+                    </>
+                  )}
+                </Button>
+                <Button variant="outline" onClick={handleClearCart}>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Limpar Carrinho
+                </Button>
+              </div>
             )}
           </div>
 

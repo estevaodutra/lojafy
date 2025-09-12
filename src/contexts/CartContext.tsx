@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { OrderItem } from '@/types';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CartContextType {
   items: OrderItem[];
@@ -11,6 +12,8 @@ interface CartContextType {
   clearCart: () => void;
   isInCart: (productId: string) => boolean;
   getItemQuantity: (productId: string) => number;
+  syncPrices: () => Promise<{ updated: boolean; updatedItems: string[] }>;
+  isUpdatingPrices: boolean;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -29,6 +32,7 @@ interface CartProviderProps {
 
 export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   const [items, setItems] = useState<OrderItem[]>([]);
+  const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
 
   // Load cart from localStorage on mount
   useEffect(() => {
@@ -96,6 +100,48 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     return item?.quantity || 0;
   };
 
+  const syncPrices = async () => {
+    if (items.length === 0) return { updated: false, updatedItems: [] };
+
+    setIsUpdatingPrices(true);
+    try {
+      const productIds = items.map(item => item.productId);
+      
+      const { data: products, error } = await supabase
+        .from('products')
+        .select('id, price, name')
+        .in('id', productIds)
+        .eq('active', true);
+
+      if (error) throw error;
+
+      const updatedItems: string[] = [];
+      const newItems = items.map(item => {
+        const product = products?.find(p => p.id === item.productId);
+        if (product && Number(product.price) !== item.price) {
+          updatedItems.push(product.name);
+          return { ...item, price: Number(product.price) };
+        }
+        return item;
+      }).filter(item => {
+        // Remove items where product no longer exists or is inactive
+        return products?.some(p => p.id === item.productId);
+      });
+
+      if (updatedItems.length > 0 || newItems.length !== items.length) {
+        setItems(newItems);
+        return { updated: true, updatedItems };
+      }
+
+      return { updated: false, updatedItems: [] };
+    } catch (error) {
+      console.error('Error syncing cart prices:', error);
+      return { updated: false, updatedItems: [] };
+    } finally {
+      setIsUpdatingPrices(false);
+    }
+  };
+
   const itemsCount = items.reduce((total, item) => total + item.quantity, 0);
   const totalPrice = items.reduce((total, item) => total + (item.price * item.quantity), 0);
 
@@ -109,6 +155,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     clearCart,
     isInCart,
     getItemQuantity,
+    syncPrices,
+    isUpdatingPrices,
   };
 
   return (

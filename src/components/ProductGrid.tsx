@@ -25,7 +25,8 @@ const ProductGrid = () => {
       
       if (error) throw error;
       return data || [];
-    }
+    },
+    staleTime: 1000 * 60 * 1, // 1 minute for featured products
   });
 
   const formatPrice = (price: number) => {
