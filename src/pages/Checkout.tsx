@@ -17,6 +17,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PixPayment from "@/components/PixPayment";
 import { ModernPixPayment } from '@/components/ModernPixPayment';
+import { PixPaymentModal } from '@/components/PixPaymentModal';
 import { createModernPixPayment, PixPaymentRequest } from '@/lib/mercadoPago';
 import { ShoppingCart, CreditCard, Truck, Shield, AlertTriangle } from "lucide-react";
 
@@ -35,6 +36,13 @@ const Checkout = () => {
     payment_id: string;
   } | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [showPixModal, setShowPixModal] = useState(false);
+  const [pixModalData, setPixModalData] = useState<{
+    qrCodeBase64: string;
+    qrCodeCopyPaste: string;
+    paymentId: string;
+    amount: number;
+  } | null>(null);
 
   // Check if cart is empty and redirect
   useEffect(() => {
@@ -376,11 +384,15 @@ const Checkout = () => {
       const response = await createModernPixPayment(paymentRequest);
       
       console.log('Modern PIX payment created:', response);
-      setModernPixData({
-        qr_code: response.qr_code,
-        qr_code_base64: response.qr_code_base64,
-        payment_id: response.payment_id
+      
+      // Open the PIX modal with the payment data
+      setPixModalData({
+        qrCodeBase64: response.qr_code_base64,
+        qrCodeCopyPaste: response.qr_code,
+        paymentId: response.payment_id,
+        amount: parseFloat(total.toFixed(2))
       });
+      setShowPixModal(true);
 
       toast({
         title: "PIX gerado com sucesso!",
@@ -407,7 +419,7 @@ const Checkout = () => {
     clearCart();
     toast({
       title: "Pagamento confirmado!",
-      description: "Seu pedido foi processado com sucesso. Você receberá um e-mail de confirmação.",
+      description: "Seu pedido foi processado com sucesso.",
     });
     navigate("/");
   };
@@ -844,9 +856,22 @@ const Checkout = () => {
             </Card>
           </div>
         </div>
-      </main>
+       </main>
       
       <Footer />
+
+      {/* PIX Payment Modal */}
+      {pixModalData && (
+        <PixPaymentModal
+          isOpen={showPixModal}
+          onClose={() => setShowPixModal(false)}
+          qrCodeBase64={pixModalData.qrCodeBase64}
+          qrCodeCopyPaste={pixModalData.qrCodeCopyPaste}
+          paymentId={pixModalData.paymentId}
+          amount={pixModalData.amount}
+          onPaymentConfirmed={handlePixPaymentConfirmed}
+        />
+      )}
     </div>
   );
 };

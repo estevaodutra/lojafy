@@ -27,6 +27,12 @@ export interface PixPaymentResponse {
   expires_at: string;
 }
 
+export interface N8NPixPaymentResponse {
+  qrCodeBase64: string;
+  qrCodeCopyPaste: string;
+  paymentId: string;
+}
+
 export async function createModernPixPayment(paymentData: PixPaymentRequest): Promise<PixPaymentResponse> {
   try {
     console.log('Starting PIX payment creation...');
@@ -49,13 +55,16 @@ export async function createModernPixPayment(paymentData: PixPaymentRequest): Pr
 
     console.log('PIX payment created successfully:', response.data);
 
+    // N8N returns an array, so we take the first element
+    const pixData = Array.isArray(response.data) ? response.data[0] : response.data;
+
     return {
-      payment_id: response.data.payment_id,
-      status: response.data.status,
-      qr_code: response.data.qr_code,
-      qr_code_base64: response.data.qr_code_base64,
+      payment_id: pixData.paymentId || response.data.payment_id,
+      status: response.data.status || 'pending',
+      qr_code: pixData.qrCodeCopyPaste || response.data.qr_code,
+      qr_code_base64: pixData.qrCodeBase64 || response.data.qr_code_base64,
       ticket_url: response.data.ticket_url,
-      expires_at: response.data.expires_at
+      expires_at: response.data.expires_at || new Date(Date.now() + 15 * 60 * 1000).toISOString()
     };
 
   } catch (error) {
