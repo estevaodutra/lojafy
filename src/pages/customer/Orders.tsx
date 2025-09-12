@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Package, Eye, Truck, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import OrderDetailsModal from '@/components/OrderDetailsModal';
 
 interface OrderItem {
   id: string;
@@ -29,6 +30,8 @@ const Orders = () => {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -99,6 +102,11 @@ const Orders = () => {
       case 'cancelled': return 'destructive';
       default: return 'outline';
     }
+  };
+
+  const handleViewDetails = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    setIsModalOpen(true);
   };
 
   return (
@@ -188,7 +196,7 @@ const Orders = () => {
 
                 {/* Actions */}
                 <div className="flex items-center space-x-2 pt-2">
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={() => handleViewDetails(order.id)}>
                     <Eye className="h-4 w-4 mr-2" />
                     Ver detalhes
                   </Button>
@@ -222,6 +230,15 @@ const Orders = () => {
           </CardContent>
         </Card>
       )}
+
+      <OrderDetailsModal
+        orderId={selectedOrderId}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedOrderId(null);
+        }}
+      />
     </div>
   );
 };

@@ -25,6 +25,10 @@ import Auth from "./pages/Auth";
 import CustomerLayout from "./components/customer/CustomerLayout";
 import CustomerDashboard from "./pages/customer/Dashboard";
 import CustomerOrders from "./pages/customer/Orders";
+import CustomerAddresses from "./pages/customer/Addresses";
+import CustomerFavorites from "./pages/customer/Favorites";
+import CustomerSettings from "./pages/customer/Settings";
+import CustomerHelp from "./pages/customer/Help";
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminProducts from "./pages/admin/Products";
@@ -72,6 +76,10 @@ const App = () => (
               <Route path="/minha-conta" element={<CustomerLayout />}>
                 <Route index element={<CustomerDashboard />} />
                 <Route path="pedidos" element={<CustomerOrders />} />
+                <Route path="enderecos" element={<CustomerAddresses />} />
+                <Route path="favoritos" element={<CustomerFavorites />} />
+                <Route path="configuracoes" element={<CustomerSettings />} />
+                <Route path="ajuda" element={<CustomerHelp />} />
               </Route>
               
               {/* Admin Panel Routes */}
