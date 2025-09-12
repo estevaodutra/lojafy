@@ -76,7 +76,7 @@ const App = () => (
               <Route path="/minha-conta" element={<CustomerLayout />}>
                 <Route index element={<CustomerDashboard />} />
                 <Route path="pedidos" element={<CustomerOrders />} />
-                <Route path="enderecos" element={<CustomerAddresses />} />
+                
                 <Route path="favoritos" element={<CustomerFavorites />} />
                 <Route path="configuracoes" element={<CustomerSettings />} />
                 <Route path="ajuda" element={<CustomerHelp />} />
