@@ -62,6 +62,45 @@ export type Database = {
         }
         Relationships: []
       }
+      api_keys: {
+        Row: {
+          active: boolean
+          api_key: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          key_name: string
+          last_used: string | null
+          permissions: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          api_key: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          key_name: string
+          last_used?: string | null
+          permissions?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          api_key?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          key_name?: string
+          last_used?: string | null
+          permissions?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           active: boolean | null
@@ -554,6 +593,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_api_key: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       generate_gtin_ean13: {
         Args: Record<PropertyKey, never>
         Returns: string

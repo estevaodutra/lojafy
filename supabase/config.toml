@@ -5,3 +5,15 @@ verify_jwt = false
 
 [functions.webhook-n8n-payment]
 verify_jwt = false
+
+[functions.api-produtos-cadastrar]
+verify_jwt = false
+
+[functions.api-produtos-listar]
+verify_jwt = false
+
+[functions.api-categorias-listar]
+verify_jwt = false
+
+[functions.api-categorias-cadastrar]
+verify_jwt = false

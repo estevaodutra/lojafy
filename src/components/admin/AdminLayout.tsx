@@ -10,7 +10,7 @@ const adminMenuItems = [
   { title: 'Produtos', url: '/admin/produtos', icon: Package },
   { title: 'Pedidos', url: '/admin/pedidos', icon: ShoppingCart },
   { title: 'Clientes', url: '/admin/clientes', icon: Users },
-  { title: 'Configurações', url: '/admin/configuracoes', icon: Settings },
+  { title: 'Integracoes', url: '/admin/integracoes', icon: Settings },
 ];
 
 const AdminSidebar = () => {
