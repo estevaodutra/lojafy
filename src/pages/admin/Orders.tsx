@@ -20,10 +20,10 @@ interface Order {
   total_amount: number;
   created_at: string;
   user_id: string;
-  profiles?: {
+  profiles: {
     first_name: string;
     last_name: string;
-  } | null;
+  };
 }
 
 const AdminOrders = () => {
@@ -42,7 +42,7 @@ const AdminOrders = () => {
     try {
       setLoading(true);
       
-      // First get all orders
+      // Get orders first
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('*')
@@ -50,23 +50,32 @@ const AdminOrders = () => {
 
       if (ordersError) throw ordersError;
 
-      // Then get profiles for each user
-      const ordersWithProfiles = await Promise.all(
-        (ordersData || []).map(async (order) => {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('first_name, last_name')
-            .eq('user_id', order.user_id)
-            .single();
+      // Get profiles for all unique user_ids
+      const userIds = [...new Set((ordersData || []).map(order => order.user_id))];
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name')
+        .in('user_id', userIds);
 
-          return {
-            ...order,
-            profiles: profile
-          };
-        })
+      // Create a profiles map for quick lookup
+      const profilesMap = new Map(
+        (profilesData || []).map(profile => [profile.user_id, profile])
       );
 
-      setOrders(ordersWithProfiles as Order[]);
+      // Combine orders with profiles
+      const ordersWithProfiles = (ordersData || [])
+        .map(order => {
+          const profile = profilesMap.get(order.user_id);
+          return {
+            ...order,
+            profiles: profile ? {
+              first_name: profile.first_name,
+              last_name: profile.last_name
+            } : { first_name: '', last_name: '' }
+          };
+        }) as Order[];
+      
+      setOrders(ordersWithProfiles);
     } catch (error) {
       console.error('Error fetching orders:', error);
       toast({
@@ -132,7 +141,7 @@ const AdminOrders = () => {
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      `${order.profiles?.first_name} ${order.profiles?.last_name}`.toLowerCase().includes(searchTerm.toLowerCase());
+      `${order.profiles.first_name} ${order.profiles.last_name}`.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -216,7 +225,7 @@ const AdminOrders = () => {
                   <TableRow key={order.id}>
                     <TableCell className="font-medium">{order.order_number}</TableCell>
                     <TableCell>
-                      {order.profiles?.first_name} {order.profiles?.last_name}
+                      {order.profiles.first_name} {order.profiles.last_name}
                     </TableCell>
                     <TableCell>
                       {format(new Date(order.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}

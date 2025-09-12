@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar } from 'lucide-react';
+import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface OrderItem {
@@ -36,7 +36,15 @@ interface Order {
   shipping_address?: any;
   billing_address?: any;
   notes?: string;
+  user_id: string;
   order_items: OrderItem[];
+}
+
+interface CustomerProfile {
+  first_name: string;
+  last_name: string;
+  cpf?: string;
+  phone?: string;
 }
 
 interface OrderDetailsModalProps {
@@ -47,6 +55,7 @@ interface OrderDetailsModalProps {
 
 const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, onClose }) => {
   const [order, setOrder] = useState<Order | null>(null);
+  const [customer, setCustomer] = useState<CustomerProfile | null>(null);
   const [statusHistory, setStatusHistory] = useState<OrderStatusHistory[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -79,6 +88,17 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
 
       if (error) throw error;
       setOrder(data);
+
+      // Fetch customer profile
+      if (data?.user_id) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('first_name, last_name, cpf, phone')
+          .eq('user_id', data.user_id)
+          .single();
+        
+        setCustomer(profileData);
+      }
     } catch (error) {
       console.error('Erro ao buscar detalhes do pedido:', error);
     } finally {
@@ -156,7 +176,14 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
-            <span>Detalhes do Pedido #{order?.order_number}</span>
+            <div>
+              <div>Pedido #{order?.order_number}</div>
+              {customer && (
+                <div className="text-sm font-normal text-muted-foreground mt-1">
+                  Cliente: {customer.first_name} {customer.last_name}
+                </div>
+              )}
+            </div>
             {order && (
               <Badge variant={getStatusVariant(order.status)} className="flex items-center gap-1">
                 {getStatusIcon(order.status)}
@@ -173,6 +200,42 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
           </div>
         ) : order ? (
           <div className="space-y-6">
+            {/* Customer Info */}
+            {customer && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Informações do Cliente
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <p className="font-medium text-muted-foreground">Nome</p>
+                      <p className="font-semibold">{customer.first_name} {customer.last_name}</p>
+                    </div>
+                    {customer.cpf && (
+                      <div>
+                        <p className="font-medium text-muted-foreground">CPF</p>
+                        <p className="font-semibold">{customer.cpf}</p>
+                      </div>
+                    )}
+                    {customer.phone && (
+                      <div>
+                        <p className="font-medium text-muted-foreground">Telefone</p>
+                        <p className="font-semibold">{customer.phone}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-medium text-muted-foreground">Total do Pedido</p>
+                      <p className="font-semibold text-lg text-primary">{formatPrice(Number(order.total_amount))}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Order Info */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Card>
