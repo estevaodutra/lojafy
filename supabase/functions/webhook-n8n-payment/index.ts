@@ -81,7 +81,7 @@ serve(async (req) => {
     switch (webhookData.status.toLowerCase()) {
       case 'approved':
         newStatus = 'paid';
-        paymentStatus = 'completed';
+        paymentStatus = 'paid';
         console.log('Payment approved - updating to paid status');
         break;
       case 'pending':
