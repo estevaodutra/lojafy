@@ -344,6 +344,13 @@ const Checkout = () => {
     setIsProcessingPayment(true);
 
     try {
+      const orderItems = cartItems.map(item => ({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.price,
+      }));
+
       const paymentRequest: PixPaymentRequest = {
         amount: parseFloat(total.toFixed(2)),
         description: `Pedido - ${cartItems.length} item(s)`,
@@ -352,6 +359,16 @@ const Checkout = () => {
           firstName: formData.firstName,
           lastName: formData.lastName || '',
           cpf: formData.cpf
+        },
+        orderItems,
+        shippingAddress: {
+          street: formData.address,
+          number: formData.number,
+          complement: formData.complement,
+          neighborhood: formData.neighborhood,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
         }
       };
 
