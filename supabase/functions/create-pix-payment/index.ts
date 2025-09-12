@@ -74,71 +74,133 @@ serve(async (req) => {
       );
     }
 
-    const mercadoPagoToken = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN');
-    if (!mercadoPagoToken) {
-      console.error('Mercado Pago token not configured');
-      return new Response(
-        JSON.stringify({ error: 'Payment service not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     // Generate unique external reference
     const externalReference = `order_${Date.now()}_${user.id.substring(0, 8)}`;
     
-    // Create PIX payment with Mercado Pago
-    const paymentData = {
-      transaction_amount: amount,
-      payment_method_id: "pix",
-      payer: {
-        email: payer.email,
-        first_name: payer.firstName,
-        last_name: payer.lastName,
-        identification: {
-          type: "CPF",
-          number: payer.cpf.replace(/\D/g, '') // Remove non-digits
-        }
+    // Fetch complete user profile data
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+
+    if (profileError) {
+      console.error('Error fetching user profile:', profileError);
+    }
+
+    // Fetch complete product information
+    let completeProducts = [];
+    if (orderItems && orderItems.length > 0) {
+      const productIds = orderItems.map(item => item.productId);
+      
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select(`
+          *,
+          categories:category_id (
+            id,
+            name,
+            slug
+          ),
+          subcategories:subcategory_id (
+            id,
+            name,
+            slug
+          )
+        `)
+        .in('id', productIds);
+
+      if (productsError) {
+        console.error('Error fetching products:', productsError);
+      } else {
+        completeProducts = orderItems.map(orderItem => {
+          const product = productsData?.find(p => p.id === orderItem.productId);
+          return {
+            id: orderItem.productId,
+            nome: orderItem.productName,
+            descricao_completa: product?.description || '',
+            preco_unitario: orderItem.unitPrice,
+            quantidade: orderItem.quantity,
+            valor_total_item: orderItem.quantity * orderItem.unitPrice,
+            marca: product?.brand || '',
+            sku: product?.sku || '',
+            gtin_ean13: product?.gtin_ean13 || '',
+            categoria: product?.categories?.name || '',
+            subcategoria: product?.subcategories?.name || '',
+            especificacoes: product?.specifications || {},
+            dimensoes: {
+              peso: product?.weight || 0,
+              altura: product?.height || 0,
+              largura: product?.width || 0,
+              comprimento: product?.length || 0
+            },
+            imagens: product?.images || [],
+            imagem_principal: product?.main_image_url || product?.image_url || '',
+            estoque_atual: product?.stock_quantity || 0,
+            avaliacao: product?.rating || 0,
+            numero_avaliacoes: product?.review_count || 0
+          };
+        });
+      }
+    }
+
+    // Prepare complete payload for N8N webhook
+    const n8nPayload = {
+      pedido: {
+        external_reference: externalReference,
+        timestamp: new Date().toISOString(),
+        valor_total: amount,
+        descricao: description || `Pedido - ${externalReference}`,
+        quantidade_itens: orderItems?.length || 0
       },
-      description: description || `Pedido - ${externalReference}`,
-      external_reference: externalReference,
-      notification_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/webhook-mercadopago`
+      cliente: {
+        user_id: user.id,
+        nome_completo: `${payer.firstName || ''} ${payer.lastName || ''}`.trim(),
+        email: payer.email,
+        telefone: profileData?.phone || '',
+        cpf: payer.cpf.replace(/\D/g, ''),
+        endereco_completo: shippingAddress
+      },
+      produtos: completeProducts,
+      pagamento: {
+        metodo: 'pix',
+        valor: amount
+      }
     };
 
-    console.log('Enviando para Mercado Pago:', { ...paymentData, payer: { ...paymentData.payer, identification: { ...paymentData.payer.identification, number: '***' } } });
-
-    // Generate unique idempotency key
-    const idempotencyKey = `${externalReference}_${Date.now()}`;
-    
-    const mpResponse = await fetch('https://api.mercadopago.com/v1/payments', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${mercadoPagoToken}`,
-        'Content-Type': 'application/json',
-        'X-Idempotency-Key': idempotencyKey,
-      },
-      body: JSON.stringify(paymentData),
+    console.log('Enviando para N8N webhook:', { 
+      ...n8nPayload, 
+      cliente: { ...n8nPayload.cliente, cpf: '***' } 
     });
 
-    const mpResult = await mpResponse.json();
-    console.log('Resposta Mercado Pago:', { status: mpResponse.status, id: mpResult.id, status_detail: mpResult.status_detail });
+    // Send to N8N webhook
+    const n8nResponse = await fetch('https://n8n-n8n.nuwfic.easypanel.host/webhook/gerar_pix', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(n8nPayload),
+    });
 
-    if (!mpResponse.ok) {
-      console.error('Mercado Pago error:', mpResult);
+    const n8nResult = await n8nResponse.json();
+    console.log('Resposta N8N:', { status: n8nResponse.status, data: n8nResult });
+
+    if (!n8nResponse.ok) {
+      console.error('N8N webhook error:', n8nResult);
       return new Response(
         JSON.stringify({ 
-          error: 'Payment creation failed', 
-          details: mpResult.message || 'Unknown error' 
+          error: 'PIX generation failed', 
+          details: n8nResult.message || 'N8N webhook error' 
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Extract PIX data from response
-    const pixData = mpResult.point_of_interaction?.transaction_data;
-    if (!pixData) {
-      console.error('No PIX data in response');
+    // Validate N8N response has required PIX data
+    if (!n8nResult.qr_code) {
+      console.error('No QR code in N8N response');
       return new Response(
-        JSON.stringify({ error: 'PIX data not available' }),
+        JSON.stringify({ error: 'PIX QR code not available from N8N' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -147,7 +209,7 @@ serve(async (req) => {
     const orderNumber = externalReference.toUpperCase().replace('ORDER_', 'ORD-');
     console.log('Generated order number:', orderNumber);
 
-    // Create order in database
+    // Create order in database with N8N response data
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
       .insert({
@@ -157,9 +219,9 @@ serve(async (req) => {
         payment_method: 'pix',
         payment_status: 'pending',
         status: 'pending',
-        payment_id: mpResult.id.toString(),
-        pix_qr_code: pixData.qr_code,
-        pix_qr_code_base64: pixData.qr_code_base64,
+        payment_id: n8nResult.payment_id || n8nResult.id || externalReference,
+        pix_qr_code: n8nResult.qr_code,
+        pix_qr_code_base64: n8nResult.qr_code_base64 || '',
         shipping_address: shippingAddress,
         external_reference: externalReference
       })
@@ -197,19 +259,19 @@ serve(async (req) => {
       }
     }
 
-    // Return PIX payment data
+    // Return PIX payment data from N8N
     const responseData = {
       order_id: orderData.id,
-      payment_id: mpResult.id,
-      status: mpResult.status,
-      qr_code: pixData.qr_code,
-      qr_code_base64: pixData.qr_code_base64,
-      ticket_url: pixData.ticket_url,
-      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h expiration
+      payment_id: n8nResult.payment_id || n8nResult.id || externalReference,
+      status: n8nResult.status || 'pending',
+      qr_code: n8nResult.qr_code,
+      qr_code_base64: n8nResult.qr_code_base64 || '',
+      ticket_url: n8nResult.ticket_url || '',
+      expires_at: n8nResult.expires_at || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h expiration default
       external_reference: externalReference
     };
 
-    console.log('PIX payment criado com sucesso:', { order_id: responseData.order_id, payment_id: responseData.payment_id });
+    console.log('PIX payment criado com sucesso via N8N:', { order_id: responseData.order_id, payment_id: responseData.payment_id });
 
     return new Response(
       JSON.stringify(responseData),
