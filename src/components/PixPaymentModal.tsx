@@ -74,7 +74,7 @@ export function PixPaymentModal({
 
       if (error) throw error;
 
-      if (data?.payment_status === 'approved') {
+      if (data?.payment_status === 'paid') {
         toast({
           title: "Pagamento confirmado!",
           description: "Seu pedido foi processado com sucesso.",

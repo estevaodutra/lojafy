@@ -65,11 +65,30 @@ serve(async (req) => {
     }
 
     if (!orderData) {
-      console.error('Order not found for payment ID:', paymentId);
-      return new Response(
-        JSON.stringify({ error: `Order not found for payment ID: ${paymentId}` }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      // Try fallback search by external_reference if provided
+      if (webhookData.external_reference) {
+        console.log('Trying fallback search by external_reference:', webhookData.external_reference);
+        const { data: orderByRef, error: orderByRefError } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('external_reference', webhookData.external_reference)
+          .maybeSingle();
+        
+        if (orderByRefError) {
+          console.error('Error searching for order by external_reference:', orderByRefError);
+        } else if (orderByRef) {
+          orderData = orderByRef;
+          console.log('Found order by external_reference:', orderByRef.id);
+        }
+      }
+
+      if (!orderData) {
+        console.error('Order not found for payment ID:', paymentId);
+        return new Response(
+          JSON.stringify({ error: `Order not found for payment ID: ${paymentId}` }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     console.log('Found order:', orderData.id, 'Current status:', orderData.status);
@@ -80,9 +99,9 @@ serve(async (req) => {
 
     switch (webhookData.status.toLowerCase()) {
       case 'approved':
-        newStatus = 'paid';
+        newStatus = 'processing';
         paymentStatus = 'paid';
-        console.log('Payment approved - updating to paid status');
+        console.log('Payment approved - updating to processing status');
         break;
       case 'pending':
         newStatus = 'pending';
@@ -124,9 +143,9 @@ serve(async (req) => {
     }
 
     // Create status history entry
-    const historyNotes = `Payment ${webhookData.status} via N8N - Payment ID: ${paymentId}`;
+    let historyNotes = `Payment ${webhookData.status} via N8N - Payment ID: ${paymentId}`;
     if (webhookData.amount) {
-      historyNotes.concat(` - Amount: ${webhookData.amount}`);
+      historyNotes += ` - Amount: ${webhookData.amount}`;
     }
 
     const { error: historyError } = await supabase
