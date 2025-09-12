@@ -46,12 +46,29 @@ export const ApiKeyManager: React.FC = () => {
     }
   });
 
+  // Generate client-side API key fallback
+  const generateClientApiKey = async (): Promise<string> => {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    const hex = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+    return `sk_${hex}`;
+  };
+
   // Create API key mutation
   const createKeyMutation = useMutation({
     mutationFn: async (keyName: string) => {
-      // Generate API key
-      const { data: keyData, error: keyError } = await supabase.rpc('generate_api_key');
-      if (keyError) throw keyError;
+      let apiKey: string;
+      
+      try {
+        // Try to generate API key using database function
+        const { data: keyData, error: keyError } = await supabase.rpc('generate_api_key');
+        if (keyError) throw keyError;
+        apiKey = keyData;
+      } catch (error) {
+        // Fallback to client-side generation
+        console.warn('Database API key generation failed, using client-side fallback:', error);
+        apiKey = await generateClientApiKey();
+      }
 
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
@@ -63,7 +80,7 @@ export const ApiKeyManager: React.FC = () => {
         .insert({
           user_id: user.id,
           key_name: keyName,
-          api_key: keyData,
+          api_key: apiKey,
           permissions: {
             produtos: { read: true, write: true },
             categorias: { read: true, write: true }
