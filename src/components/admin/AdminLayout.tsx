@@ -1,12 +1,13 @@
 import React from 'react';
 import { Link, useLocation, Outlet, Navigate } from 'react-router-dom';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { BarChart3, Package, ShoppingCart, Users, Settings, Home } from 'lucide-react';
+import { BarChart3, Package, ShoppingCart, Users, Settings, Home, Image } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
 const adminMenuItems = [
   { title: 'Dashboard', url: '/admin', icon: BarChart3 },
+  { title: 'Banners', url: '/admin/banners', icon: Image },
   { title: 'Produtos', url: '/admin/produtos', icon: Package },
   { title: 'Pedidos', url: '/admin/pedidos', icon: ShoppingCart },
   { title: 'Clientes', url: '/admin/clientes', icon: Users },

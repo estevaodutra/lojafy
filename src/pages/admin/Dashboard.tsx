@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, Package, ShoppingCart, Users, DollarSign, AlertTriangle } from 'lucide-react';
+import { TrendingUp, Package, ShoppingCart, Users, DollarSign, AlertTriangle, Image } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface AdminOrder {
@@ -354,6 +354,36 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Ações Rápidas</CardTitle>
+          <CardDescription>
+            Acesso rápido às principais funcionalidades
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Button variant="outline" className="h-20 flex flex-col items-center justify-center gap-2">
+              <Image className="h-6 w-6" />
+              <span className="text-sm">Gerenciar Banners</span>
+            </Button>
+            <Button variant="outline" className="h-20 flex flex-col items-center justify-center gap-2">
+              <Package className="h-6 w-6" />
+              <span className="text-sm">Adicionar Produto</span>
+            </Button>
+            <Button variant="outline" className="h-20 flex flex-col items-center justify-center gap-2">
+              <ShoppingCart className="h-6 w-6" />
+              <span className="text-sm">Ver Pedidos</span>
+            </Button>
+            <Button variant="outline" className="h-20 flex flex-col items-center justify-center gap-2">
+              <Users className="h-6 w-6" />
+              <span className="text-sm">Clientes</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

@@ -33,6 +33,7 @@ import CustomerHelp from "./pages/customer/Help";
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminProducts from "./pages/admin/Products";
+import AdminBanners from "./pages/admin/Banners";
 import IntegracaoPage from "./pages/admin/Integracoes";
 
 const queryClient = new QueryClient({
@@ -87,6 +88,7 @@ const App = () => (
               {/* Admin Panel Routes */}
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<AdminDashboard />} />
+                <Route path="banners" element={<AdminBanners />} />
                 <Route path="produtos" element={<AdminProducts />} />
                 <Route path="integracoes" element={<IntegracaoPage />} />
               </Route>
