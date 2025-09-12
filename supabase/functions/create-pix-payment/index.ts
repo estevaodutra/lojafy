@@ -204,11 +204,25 @@ serve(async (req) => {
       );
     }
 
-    // Validate N8N response has required PIX data
-    if (!n8nResult.qr_code) {
-      console.error('No QR code in N8N response');
+    // N8N returns an array, extract the first PIX data
+    let pixData;
+    if (Array.isArray(n8nResult) && n8nResult.length > 0) {
+      pixData = n8nResult[0];
+    } else if (n8nResult && typeof n8nResult === 'object') {
+      pixData = n8nResult;
+    } else {
+      console.error('Invalid N8N response format:', n8nResult);
       return new Response(
-        JSON.stringify({ error: 'PIX QR code not available from N8N' }),
+        JSON.stringify({ error: 'Invalid PIX response format from N8N' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate N8N response has required PIX data
+    if (!pixData.qrCodeBase64 || !pixData.qrCodeCopyPaste) {
+      console.error('Missing PIX data in N8N response:', pixData);
+      return new Response(
+        JSON.stringify({ error: 'PIX QR code data not available from N8N' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -227,9 +241,9 @@ serve(async (req) => {
         payment_method: 'pix',
         payment_status: 'pending',
         status: 'pending',
-        payment_id: n8nResult.payment_id || n8nResult.id || externalReference,
-        pix_qr_code: n8nResult.qr_code,
-        pix_qr_code_base64: n8nResult.qr_code_base64 || '',
+        payment_id: pixData.paymentId || externalReference,
+        pix_qr_code: pixData.qrCodeCopyPaste,
+        pix_qr_code_base64: pixData.qrCodeBase64,
         shipping_address: shippingAddress,
         external_reference: externalReference
       })
@@ -270,12 +284,12 @@ serve(async (req) => {
     // Return PIX payment data from N8N
     const responseData = {
       order_id: orderData.id,
-      payment_id: n8nResult.payment_id || n8nResult.id || externalReference,
-      status: n8nResult.status || 'pending',
-      qr_code: n8nResult.qr_code,
-      qr_code_base64: n8nResult.qr_code_base64 || '',
-      ticket_url: n8nResult.ticket_url || '',
-      expires_at: n8nResult.expires_at || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h expiration default
+      payment_id: pixData.paymentId || externalReference,
+      status: 'pending',
+      qr_code: pixData.qrCodeCopyPaste,
+      qr_code_base64: pixData.qrCodeBase64,
+      ticket_url: '',
+      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 min expiration
       external_reference: externalReference
     };
 
