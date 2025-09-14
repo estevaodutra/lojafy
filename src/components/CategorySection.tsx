@@ -128,15 +128,17 @@ const CategorySection = () => {
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-6">
-            {Array.from({ length: 8 }).map((_, i) => (
+          <div className="flex justify-center">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6 max-w-4xl">
+              {Array.from({ length: 8 }).map((_, i) => (
               <Card key={i} className="border-border bg-card">
                 <CardContent className="p-6 flex flex-col items-center text-center space-y-3">
                   <Skeleton className="w-16 h-16 rounded-full" />
                   <Skeleton className="h-4 w-20" />
                 </CardContent>
               </Card>
-            ))}
+              ))}
+            </div>
           </div>
         ) : categories.length === 0 ? (
           <div className="text-center py-12">
@@ -144,8 +146,9 @@ const CategorySection = () => {
             <p className="text-muted-foreground">Cadastre categorias para exibi-las aqui.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-6">
-            {categories.map((category) => {
+          <div className="flex justify-center">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6 max-w-4xl">
+              {categories.map((category) => {
               const IconComponent = iconMap[category.name] || iconMap.default;
               const colorClass = colorMap[category.name] || colorMap.default;
               
@@ -170,7 +173,8 @@ const CategorySection = () => {
                   </Card>
                 </Link>
               );
-            })}
+              })}
+            </div>
           </div>
         )}
       </div>
