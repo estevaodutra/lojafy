@@ -68,63 +68,50 @@ const colorMap: Record<string, string> = {
 };
 
 const CategorySection = () => {
-  // Fetch homepage categories with real product count from Supabase
+  // Fetch categories that are NOT in homepage_categories
   const { data: categories = [], isLoading } = useQuery({
-    queryKey: ['homepage-categories-with-count'],
+    queryKey: ['non-homepage-categories'],
     queryFn: async () => {
-      const { data: homepageData, error: homepageError } = await supabase
+      // Get IDs of categories that are in homepage_categories
+      const { data: homepageCategories, error: homepageError } = await supabase
         .from('homepage_categories')
-        .select(`
-          id,
-          category_id,
-          position,
-          active,
-          custom_title,
-          custom_description,
-          custom_icon,
-          custom_color,
-          custom_image_url
-        `)
-        .eq('active', true)
-        .order('position');
+        .select('category_id')
+        .eq('active', true);
       
       if (homepageError) throw homepageError;
       
-      // Get category details for each homepage category
-      const categoriesWithData = await Promise.all(
-        homepageData.map(async (homepageCategory) => {
-          const { data: categoryData, error: categoryError } = await supabase
-            .from('categories')
-            .select(`
-              id,
-              name,
-              slug,
-              icon,
-              color,
-              active,
-              products!left(id, active)
-            `)
-            .eq('id', homepageCategory.category_id)
-            .eq('active', true)
-            .single();
-          
-          if (categoryError || !categoryData) return null;
-          
-          const productCount = categoryData.products?.filter((p: any) => p.active).length || 0;
-          
-          return {
-            id: categoryData.id,
-            name: homepageCategory.custom_title || categoryData.name,
-            slug: categoryData.slug,
-            icon: homepageCategory.custom_icon || categoryData.icon,
-            color: homepageCategory.custom_color || categoryData.color,
-            real_product_count: productCount,
-            position: homepageCategory.position
-          };
-        })
-      );
+      const homepageCategoryIds = homepageCategories?.map(hc => hc.category_id) || [];
       
-      return categoriesWithData.filter(Boolean);
+      // Get all active categories excluding those in homepage_categories
+      let query = supabase
+        .from('categories')
+        .select(`
+          id,
+          name,
+          slug,
+          icon,
+          color,
+          products!left(id, active)
+        `)
+        .eq('active', true);
+      
+      if (homepageCategoryIds.length > 0) {
+        query = query.not('id', 'in', `(${homepageCategoryIds.join(',')})`);
+      }
+      
+      const { data: categoriesData, error: categoriesError } = await query.order('name');
+      
+      if (categoriesError) throw categoriesError;
+      
+      // Count active products for each category
+      return categoriesData?.map(category => ({
+        id: category.id,
+        name: category.name,
+        slug: category.slug,
+        icon: category.icon,
+        color: category.color,
+        real_product_count: category.products?.filter((p: any) => p.active).length || 0
+      })) || [];
     },
   });
 
@@ -133,10 +120,10 @@ const CategorySection = () => {
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Explore por Categoria
+            Outras Categorias
           </h2>
           <p className="text-lg text-muted-foreground">
-            Encontre exatamente o que você procura
+            Explore mais opções disponíveis
           </p>
         </div>
 
