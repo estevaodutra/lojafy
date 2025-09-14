@@ -263,6 +263,20 @@ const ConfiguracaoVisual = () => {
                   <p className="text-sm text-muted-foreground">Usada em badges e elementos especiais</p>
                 </div>
               </div>
+              
+              <div className="flex justify-end pt-4">
+                <Button 
+                  onClick={handleSave} 
+                  disabled={!hasChanges || updateConfigMutation.isPending}
+                >
+                  {updateConfigMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Salvar Configurações
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
