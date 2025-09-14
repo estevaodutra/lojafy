@@ -27,6 +27,8 @@ const iconMap: Record<string, any> = {
   'Home': Home,
   'Beleza': Sparkles,
   'Beauty': Sparkles,
+  'Saúde': Sparkles,
+  'Health': Sparkles,
   'Infantil': Baby,
   'Kids': Baby,
   'Moda': Shirt,
@@ -50,6 +52,8 @@ const colorMap: Record<string, string> = {
   'Home': 'bg-green-500',
   'Beleza': 'bg-pink-500',
   'Beauty': 'bg-pink-500',
+  'Saúde': 'bg-emerald-500',
+  'Health': 'bg-emerald-500',
   'Infantil': 'bg-yellow-500',
   'Kids': 'bg-yellow-500',
   'Moda': 'bg-red-500',
@@ -64,26 +68,63 @@ const colorMap: Record<string, string> = {
 };
 
 const CategorySection = () => {
-  // Fetch categories with real product count from Supabase
+  // Fetch homepage categories with real product count from Supabase
   const { data: categories = [], isLoading } = useQuery({
-    queryKey: ['categories-with-count'],
+    queryKey: ['homepage-categories-with-count'],
     queryFn: async () => {
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('categories')
+      const { data: homepageData, error: homepageError } = await supabase
+        .from('homepage_categories')
         .select(`
-          *,
-          products!left(id, active)
+          id,
+          category_id,
+          position,
+          active,
+          custom_title,
+          custom_description,
+          custom_icon,
+          custom_color,
+          custom_image_url
         `)
         .eq('active', true)
-        .order('name');
+        .order('position');
       
-      if (categoriesError) throw categoriesError;
+      if (homepageError) throw homepageError;
       
-      // Calculate product count manually
-      return categoriesData.map(category => ({
-        ...category,
-        real_product_count: category.products?.filter((p: any) => p.active).length || 0
-      }));
+      // Get category details for each homepage category
+      const categoriesWithData = await Promise.all(
+        homepageData.map(async (homepageCategory) => {
+          const { data: categoryData, error: categoryError } = await supabase
+            .from('categories')
+            .select(`
+              id,
+              name,
+              slug,
+              icon,
+              color,
+              active,
+              products!left(id, active)
+            `)
+            .eq('id', homepageCategory.category_id)
+            .eq('active', true)
+            .single();
+          
+          if (categoryError || !categoryData) return null;
+          
+          const productCount = categoryData.products?.filter((p: any) => p.active).length || 0;
+          
+          return {
+            id: categoryData.id,
+            name: homepageCategory.custom_title || categoryData.name,
+            slug: categoryData.slug,
+            icon: homepageCategory.custom_icon || categoryData.icon,
+            color: homepageCategory.custom_color || categoryData.color,
+            real_product_count: productCount,
+            position: homepageCategory.position
+          };
+        })
+      );
+      
+      return categoriesWithData.filter(Boolean);
     },
   });
 

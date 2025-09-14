@@ -143,6 +143,7 @@ const CategoryForm: React.FC<CategoryFormProps> = ({
       toast.success(category?.id ? 'Categoria atualizada com sucesso' : 'Categoria criada com sucesso');
       queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
       queryClient.invalidateQueries({ queryKey: ['homepage-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['homepage-categories-with-count'] });
       onSuccess();
     },
     onError: (error: any) => {

@@ -110,6 +110,7 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
     onSuccess: (_, { isOnHomepage }) => {
       toast.success(`Categoria ${isOnHomepage ? 'removida da' : 'adicionada à'} homepage com sucesso`);
       queryClient.invalidateQueries({ queryKey: ['homepage-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['homepage-categories-with-count'] });
     },
     onError: (error: any) => {
       toast.error('Erro ao alterar status da homepage: ' + error.message);
