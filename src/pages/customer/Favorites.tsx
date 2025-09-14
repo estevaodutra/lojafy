@@ -108,18 +108,22 @@ const Favorites = () => {
 
                   <div className="space-y-2">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-bold text-primary">
-                        {formatPrice(product.price)}
-                      </span>
-                      {product.originalPrice && product.originalPrice > product.price && (
+                      {product.originalPrice ? (
                         <>
                           <span className="text-sm text-muted-foreground line-through">
-                            {formatPrice(product.originalPrice)}
+                            De: {formatPrice(product.price)}
+                          </span>
+                          <span className="text-2xl font-bold text-primary">
+                            Por: {formatPrice(product.originalPrice)}
                           </span>
                           <Badge variant="destructive" className="text-xs">
-                            {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
+                            {Math.round(((product.price - product.originalPrice) / product.price) * 100)}% OFF
                           </Badge>
                         </>
+                      ) : (
+                        <span className="text-2xl font-bold text-primary">
+                          {formatPrice(product.price)}
+                        </span>
                       )}
                     </div>
                   </div>

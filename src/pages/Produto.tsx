@@ -133,7 +133,7 @@ const Produto = () => {
 
   const calculateDiscount = () => {
     if (!product.original_price) return 0;
-    return Math.round(((Number(product.original_price) - Number(product.price)) / Number(product.original_price)) * 100);
+    return Math.round(((Number(product.price) - Number(product.original_price)) / Number(product.price)) * 100);
   };
 
   const productImages = product.images && product.images.length > 0 
@@ -306,17 +306,28 @@ const Produto = () => {
 
             {/* Price */}
             <div className="space-y-2">
-              {product.original_price && (
-                <p className="text-lg text-muted-foreground line-through">
-                  De: {formatPrice(Number(product.original_price))}
-                </p>
+              {product.original_price ? (
+                <>
+                  <p className="text-lg text-muted-foreground line-through">
+                    De: {formatPrice(Number(product.price))}
+                  </p>
+                  <p className="text-4xl font-bold text-primary">
+                    Por: {formatPrice(Number(product.original_price))}
+                  </p>
+                  <p className="text-muted-foreground">
+                    ou 12x de {formatPrice(Number(product.original_price) / 12)} sem juros
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-4xl font-bold text-primary">
+                    {formatPrice(Number(product.price))}
+                  </p>
+                  <p className="text-muted-foreground">
+                    ou 12x de {formatPrice(Number(product.price) / 12)} sem juros
+                  </p>
+                </>
               )}
-              <p className="text-4xl font-bold text-primary">
-                {formatPrice(Number(product.price))}
-              </p>
-              <p className="text-muted-foreground">
-                ou 12x de {formatPrice(Number(product.price) / 12)} sem juros
-              </p>
             </div>
 
             {/* Product Information */}

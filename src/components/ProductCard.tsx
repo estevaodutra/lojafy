@@ -133,17 +133,23 @@ const ProductCard = ({ product }: ProductCardProps) => {
 
             <div className="space-y-1 mt-auto">
               <div className="flex items-center gap-2">
-                <span className="text-2xl font-bold text-foreground">
-                  {formatPrice(Number(product.price))}
-                </span>
-                {product.original_price && (
-                  <span className="text-sm text-muted-foreground line-through">
-                    {formatPrice(Number(product.original_price))}
+                {product.original_price ? (
+                  <>
+                    <span className="text-sm text-muted-foreground line-through">
+                      De: {formatPrice(Number(product.price))}
+                    </span>
+                    <span className="text-2xl font-bold text-foreground">
+                      Por: {formatPrice(Number(product.original_price))}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-2xl font-bold text-foreground">
+                    {formatPrice(Number(product.price))}
                   </span>
                 )}
               </div>
               <p className="text-sm text-muted-foreground">
-                ou 10x de {formatPrice(Number(product.price) / 10)}
+                ou 10x de {formatPrice(Number(product.original_price || product.price) / 10)}
               </p>
             </div>
           </div>
