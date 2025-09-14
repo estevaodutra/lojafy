@@ -62,17 +62,25 @@ Deno.serve(async (req) => {
       nome,
       descricao,
       preco,
+      preco_promocional,
+      preco_custo,
       estoque,
+      nivel_minimo_estoque,
+      alerta_estoque_baixo,
       sku,
       gtin,
       categoria_id,
+      subcategoria_id,
       imagens = [],
+      imagem_principal,
       marca,
       especificacoes = {},
       peso,
       largura,
       altura,
-      comprimento
+      comprimento,
+      produto_destaque,
+      badge
     } = body;
 
     // Validate required fields
@@ -86,20 +94,69 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Validate business rules
+    if (preco_promocional && preco_promocional >= preco) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Preço promocional deve ser menor que o preço regular',
+          received: { preco, preco_promocional }
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (preco_custo && preco_custo >= preco) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Preço de custo deve ser menor que o preço de venda',
+          received: { preco, preco_custo }
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate subcategory belongs to category if both are provided
+    if (subcategoria_id && categoria_id) {
+      const { data: subcategory, error: subcategoryError } = await supabase
+        .from('subcategories')
+        .select('category_id')
+        .eq('id', subcategoria_id)
+        .eq('active', true)
+        .single();
+
+      if (subcategoryError || subcategory?.category_id !== categoria_id) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Subcategoria não pertence à categoria especificada ou não existe',
+            received: { categoria_id, subcategoria_id }
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // Create product data
     const productData: any = {
       name: nome,
       description: descricao,
       price: preco,
+      original_price: preco_promocional,
+      cost_price: preco_custo,
       stock_quantity: estoque || 0,
+      min_stock_level: nivel_minimo_estoque || 5,
+      low_stock_alert: alerta_estoque_baixo || false,
       category_id: categoria_id,
+      subcategory_id: subcategoria_id,
       images: imagens,
+      main_image_url: imagem_principal,
       brand: marca,
       specifications: especificacoes,
       weight: peso,
       width: largura,
       height: altura,
       length: comprimento,
+      featured: produto_destaque || false,
+      badge: badge,
       active: true
     };
 
@@ -129,6 +186,12 @@ Deno.serve(async (req) => {
       );
     }
 
+    console.log('Produto criado com sucesso:', { 
+      id: product.id, 
+      name: product.name, 
+      sku: product.sku 
+    });
+
     return new Response(
       JSON.stringify({ 
         success: true,
@@ -136,10 +199,30 @@ Deno.serve(async (req) => {
         data: {
           id: product.id,
           nome: product.name,
+          descricao: product.description,
           sku: product.sku,
           gtin: product.gtin_ean13,
           preco: product.price,
-          estoque: product.stock_quantity
+          preco_promocional: product.original_price,
+          preco_custo: product.cost_price,
+          estoque: product.stock_quantity,
+          nivel_minimo_estoque: product.min_stock_level,
+          alerta_estoque_baixo: product.low_stock_alert,
+          categoria_id: product.category_id,
+          subcategoria_id: product.subcategory_id,
+          marca: product.brand,
+          produto_destaque: product.featured,
+          badge: product.badge,
+          imagens: product.images,
+          imagem_principal: product.main_image_url,
+          especificacoes: product.specifications,
+          peso: product.weight,
+          largura: product.width,
+          altura: product.height,
+          comprimento: product.length,
+          ativo: product.active,
+          criado_em: product.created_at,
+          atualizado_em: product.updated_at
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

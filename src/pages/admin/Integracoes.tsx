@@ -12,40 +12,77 @@ const endpoints = [
     title: 'Cadastrar Produto',
     method: 'POST' as const,
     url: '/functions/v1/api-produtos-cadastrar',
-    description: 'Cria um novo produto no sistema. SKU e GTIN são gerados automaticamente se não fornecidos.',
+    description: 'Cria um novo produto no sistema com suporte completo a preços promocionais, controle de estoque e dimensões. SKU e GTIN são gerados automaticamente se não fornecidos. Peso deve ser informado em quilogramas (kg).',
     requestBody: {
-      nome: 'Tênis Esportivo',
-      descricao: 'Tênis leve para corrida',
+      nome: 'Tênis Esportivo Premium',
+      descricao: 'Tênis leve para corrida com tecnologia avançada de amortecimento',
       preco: 199.90,
+      preco_promocional: 179.90,
+      preco_custo: 120.00,
       estoque: 50,
+      nivel_minimo_estoque: 5,
+      alerta_estoque_baixo: true,
       sku: '',
       gtin: '',
       categoria_id: 'cat123',
+      subcategoria_id: 'subcat456',
       marca: 'Nike',
+      produto_destaque: false,
+      badge: 'NOVIDADE',
+      imagem_principal: 'https://loja.com/produtos/tenis-principal.jpg',
       imagens: [
         'https://loja.com/produtos/tenis1.jpg',
-        'https://loja.com/produtos/tenis2.jpg'
+        'https://loja.com/produtos/tenis2.jpg',
+        'https://loja.com/produtos/tenis3.jpg'
       ],
       especificacoes: {
-        'material': 'Sintético',
-        'cor': 'Preto',
-        'tamanho': '42'
+        'material': 'Sintético com mesh respirável',
+        'cor': 'Preto com detalhes azuis',
+        'tamanho': '42',
+        'tecnologia': 'Air Max',
+        'garantia': '12 meses'
       },
       peso: 0.5,
-      largura: 12,
-      altura: 8,
-      comprimento: 30
+      largura: 12.5,
+      altura: 8.2,
+      comprimento: 30.5
     },
     responseExample: {
       success: true,
       message: 'Produto criado com sucesso',
       data: {
         id: 'prod123',
-        nome: 'Tênis Esportivo',
-        sku: 'TENI-NIKE-001',
+        nome: 'Tênis Esportivo Premium',
+        descricao: 'Tênis leve para corrida com tecnologia avançada de amortecimento',
+        sku: 'CALC-NIKE-001',
         gtin: '7891234567890',
         preco: 199.90,
-        estoque: 50
+        preco_promocional: 179.90,
+        preco_custo: 120.00,
+        estoque: 50,
+        nivel_minimo_estoque: 5,
+        alerta_estoque_baixo: true,
+        categoria_id: 'cat123',
+        subcategoria_id: 'subcat456',
+        marca: 'Nike',
+        produto_destaque: false,
+        badge: 'NOVIDADE',
+        imagens: ['https://loja.com/produtos/tenis1.jpg', 'https://loja.com/produtos/tenis2.jpg'],
+        imagem_principal: 'https://loja.com/produtos/tenis-principal.jpg',
+        especificacoes: {
+          'material': 'Sintético com mesh respirável',
+          'cor': 'Preto com detalhes azuis',
+          'tamanho': '42',
+          'tecnologia': 'Air Max',
+          'garantia': '12 meses'
+        },
+        peso: 0.5,
+        largura: 12.5,
+        altura: 8.2,
+        comprimento: 30.5,
+        ativo: true,
+        criado_em: '2025-01-12T10:00:00Z',
+        atualizado_em: '2025-01-12T10:00:00Z'
       }
     }
   },
