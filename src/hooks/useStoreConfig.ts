@@ -101,15 +101,15 @@ export const useStoreConfig = () => {
       root.style.setProperty('--accent', `${accentHsl[0]} ${accentHsl[1]}% ${accentHsl[2]}%`);
       root.style.setProperty('--buy-button', `${buyButtonHsl[0]} ${buyButtonHsl[1]}% ${buyButtonHsl[2]}%`);
       root.style.setProperty('--buy-button-text', `${buyButtonTextHsl[0]} ${buyButtonTextHsl[1]}% ${buyButtonTextHsl[2]}%`);
-      root.style.setProperty('--cart-button', `${cartButtonHsl[0]} ${cartButtonHsl[1]}% ${cartButtonHsl[2]}%`);
-      root.style.setProperty('--cart-button-text', `${cartButtonTextHsl[0]} ${cartButtonTextHsl[1]}% ${cartButtonTextHsl[2]}%`);
-      root.style.setProperty('--buy-now-button', `${buyNowButtonHsl[0]} ${buyNowButtonHsl[1]}% ${buyNowButtonHsl[2]}%`);
-      root.style.setProperty('--buy-now-button-text', `${buyNowButtonTextHsl[0]} ${buyNowButtonTextHsl[1]}% ${buyNowButtonTextHsl[2]}%`);
-      root.style.setProperty('--checkout-button', `${checkoutButtonHsl[0]} ${checkoutButtonHsl[1]}% ${checkoutButtonHsl[2]}%`);
-      root.style.setProperty('--checkout-button-text', `${checkoutButtonTextHsl[0]} ${checkoutButtonTextHsl[1]}% ${checkoutButtonTextHsl[2]}%`);
-      root.style.setProperty('--order-highlight-bg', `${orderHighlightBgHsl[0]} ${orderHighlightBgHsl[1]}% ${orderHighlightBgHsl[2]}%`);
-      root.style.setProperty('--security-text', `${securityTextHsl[0]} ${securityTextHsl[1]}% ${securityTextHsl[2]}%`);
-      root.style.setProperty('--continue-shopping-text', `${continueShoppingTextHsl[0]} ${continueShoppingTextHsl[1]}% ${continueShoppingTextHsl[2]}%`);
+      root.style.setProperty('--cart-button-color', `${cartButtonHsl[0]} ${cartButtonHsl[1]}% ${cartButtonHsl[2]}%`);
+      root.style.setProperty('--cart-button-text-color', `${cartButtonTextHsl[0]} ${cartButtonTextHsl[1]}% ${cartButtonTextHsl[2]}%`);
+      root.style.setProperty('--buy-now-button-color', `${buyNowButtonHsl[0]} ${buyNowButtonHsl[1]}% ${buyNowButtonHsl[2]}%`);
+      root.style.setProperty('--buy-now-button-text-color', `${buyNowButtonTextHsl[0]} ${buyNowButtonTextHsl[1]}% ${buyNowButtonTextHsl[2]}%`);
+      root.style.setProperty('--checkout-button-color', `${checkoutButtonHsl[0]} ${checkoutButtonHsl[1]}% ${checkoutButtonHsl[2]}%`);
+      root.style.setProperty('--checkout-button-text-color', `${checkoutButtonTextHsl[0]} ${checkoutButtonTextHsl[1]}% ${checkoutButtonTextHsl[2]}%`);
+      root.style.setProperty('--order-highlight-bg-color', `${orderHighlightBgHsl[0]} ${orderHighlightBgHsl[1]}% ${orderHighlightBgHsl[2]}%`);
+      root.style.setProperty('--security-text-color', `${securityTextHsl[0]} ${securityTextHsl[1]}% ${securityTextHsl[2]}%`);
+      root.style.setProperty('--continue-shopping-text-color', `${continueShoppingTextHsl[0]} ${continueShoppingTextHsl[1]}% ${continueShoppingTextHsl[2]}%`);
       
       // Apply header colors directly (for non-HSL usage)
       root.style.setProperty('--header-bg', config.header_background_color);

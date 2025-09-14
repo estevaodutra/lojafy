@@ -150,15 +150,8 @@ All colors MUST be HSL.
     @apply bg-checkout-button text-checkout-button-foreground hover:bg-checkout-button/90 transition-colors;
   }
   
-  .bg-order-highlight {
-    @apply bg-order-highlight;
-  }
-  
+  /* Helper text class mapping security color token */
   .text-security {
-    @apply text-security-text;
-  }
-  
-  .text-continue-shopping {
-    @apply text-continue-shopping;
+    color: hsl(var(--security-text-color));
   }
 }
