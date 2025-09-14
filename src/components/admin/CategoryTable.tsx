@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Edit, MoreHorizontal, Trash2, Copy, FolderOpen, Eye, EyeOff } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Edit, MoreHorizontal, Trash2, Copy, FolderOpen, Eye, EyeOff, Star, StarOff } from 'lucide-react';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import * as LucideIcons from 'lucide-react';
@@ -31,6 +31,19 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
 }) => {
   const [deleteCategory, setDeleteCategory] = useState<any>(null);
   const queryClient = useQueryClient();
+
+  // Fetch homepage categories
+  const { data: homepageCategories = [] } = useQuery({
+    queryKey: ['homepage-categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('homepage_categories')
+        .select('category_id');
+      
+      if (error) throw error;
+      return data.map(hc => hc.category_id);
+    },
+  });
 
   const deleteMutation = useMutation({
     mutationFn: async (categoryId: string) => {
@@ -68,6 +81,38 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
     },
     onError: (error: any) => {
       toast.error('Erro ao alterar status: ' + error.message);
+    },
+  });
+
+  const toggleHomepageMutation = useMutation({
+    mutationFn: async ({ categoryId, isOnHomepage }: { categoryId: string; isOnHomepage: boolean }) => {
+      if (isOnHomepage) {
+        // Remove from homepage
+        const { error } = await supabase
+          .from('homepage_categories')
+          .delete()
+          .eq('category_id', categoryId);
+        
+        if (error) throw error;
+      } else {
+        // Add to homepage
+        const { error } = await supabase
+          .from('homepage_categories')
+          .insert([{
+            category_id: categoryId,
+            position: 1,
+            active: true
+          }]);
+        
+        if (error) throw error;
+      }
+    },
+    onSuccess: (_, { isOnHomepage }) => {
+      toast.success(`Categoria ${isOnHomepage ? 'removida da' : 'adicionada à'} homepage com sucesso`);
+      queryClient.invalidateQueries({ queryKey: ['homepage-categories'] });
+    },
+    onError: (error: any) => {
+      toast.error('Erro ao alterar status da homepage: ' + error.message);
     },
   });
 
@@ -118,6 +163,7 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
               <TableHead>Cor</TableHead>
               <TableHead>Produtos</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Homepage</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -148,6 +194,18 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
                   <Badge variant={category.active ? "default" : "secondary"}>
                     {category.active ? 'Ativo' : 'Inativo'}
                   </Badge>
+                </TableCell>
+                <TableCell>
+                  {homepageCategories.includes(category.id) ? (
+                    <Badge variant="default" className="gap-1">
+                      <Star className="h-3 w-3" />
+                      Na Homepage
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">
+                      Não exibida
+                    </Badge>
+                  )}
                 </TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
@@ -184,6 +242,24 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
                           <>
                             <Eye className="mr-2 h-4 w-4" />
                             Ativar
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => toggleHomepageMutation.mutate({ 
+                          categoryId: category.id, 
+                          isOnHomepage: homepageCategories.includes(category.id)
+                        })}
+                      >
+                        {homepageCategories.includes(category.id) ? (
+                          <>
+                            <StarOff className="mr-2 h-4 w-4" />
+                            Remover da Homepage
+                          </>
+                        ) : (
+                          <>
+                            <Star className="mr-2 h-4 w-4" />
+                            Adicionar à Homepage
                           </>
                         )}
                       </DropdownMenuItem>

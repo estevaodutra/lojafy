@@ -4,10 +4,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Star } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
 interface CategoryFormProps {
@@ -40,8 +40,27 @@ const CategoryForm: React.FC<CategoryFormProps> = ({
     color: '#3b82f6',
     active: true
   });
+  
+  const [showOnHomepage, setShowOnHomepage] = useState(false);
 
   const queryClient = useQueryClient();
+
+  // Check if category is on homepage
+  const { data: homepageCategory } = useQuery({
+    queryKey: ['homepage-category', category?.id],
+    queryFn: async () => {
+      if (!category?.id) return null;
+      const { data, error } = await supabase
+        .from('homepage_categories')
+        .select('*')
+        .eq('category_id', category.id)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
+    },
+    enabled: !!category?.id,
+  });
 
   useEffect(() => {
     if (category) {
@@ -54,6 +73,10 @@ const CategoryForm: React.FC<CategoryFormProps> = ({
       });
     }
   }, [category]);
+
+  useEffect(() => {
+    setShowOnHomepage(!!homepageCategory);
+  }, [homepageCategory]);
 
   const generateSlug = (name: string): string => {
     return name
@@ -74,6 +97,8 @@ const CategoryForm: React.FC<CategoryFormProps> = ({
 
   const saveMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      let categoryId = category?.id;
+      
       if (category?.id) {
         const { error } = await supabase
           .from('categories')
@@ -82,9 +107,34 @@ const CategoryForm: React.FC<CategoryFormProps> = ({
         
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { data: newCategory, error } = await supabase
           .from('categories')
-          .insert([data]);
+          .insert([data])
+          .select()
+          .single();
+        
+        if (error) throw error;
+        categoryId = newCategory.id;
+      }
+
+      // Handle homepage category
+      if (showOnHomepage && !homepageCategory) {
+        // Add to homepage
+        const { error } = await supabase
+          .from('homepage_categories')
+          .insert([{
+            category_id: categoryId,
+            position: 1,
+            active: true
+          }]);
+        
+        if (error) throw error;
+      } else if (!showOnHomepage && homepageCategory) {
+        // Remove from homepage
+        const { error } = await supabase
+          .from('homepage_categories')
+          .delete()
+          .eq('id', homepageCategory.id);
         
         if (error) throw error;
       }
@@ -92,6 +142,7 @@ const CategoryForm: React.FC<CategoryFormProps> = ({
     onSuccess: () => {
       toast.success(category?.id ? 'Categoria atualizada com sucesso' : 'Categoria criada com sucesso');
       queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['homepage-categories'] });
       onSuccess();
     },
     onError: (error: any) => {
@@ -223,13 +274,27 @@ const CategoryForm: React.FC<CategoryFormProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center space-x-2">
-        <Switch
-          id="active"
-          checked={formData.active}
-          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, active: checked }))}
-        />
-        <Label htmlFor="active">Categoria ativa</Label>
+      <div className="space-y-4">
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="active"
+            checked={formData.active}
+            onCheckedChange={(checked) => setFormData(prev => ({ ...prev, active: checked }))}
+          />
+          <Label htmlFor="active">Categoria ativa</Label>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="homepage"
+            checked={showOnHomepage}
+            onCheckedChange={setShowOnHomepage}
+          />
+          <Label htmlFor="homepage" className="flex items-center gap-2">
+            <Star className="h-4 w-4" />
+            Mostrar na Homepage
+          </Label>
+        </div>
       </div>
 
       <div className="flex justify-end gap-2 pt-4">
