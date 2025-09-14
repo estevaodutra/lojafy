@@ -144,9 +144,9 @@ const endpoints = [
     title: 'Listar Subcategorias',
     method: 'GET' as const,
     url: '/functions/v1/api-subcategorias-listar',
-    description: 'Retorna a lista de subcategorias de uma categoria específica.',
+    description: 'Retorna todas as subcategorias ou de uma categoria específica, sempre com informações da categoria pai e contagem de produtos.',
     queryParams: [
-      { name: 'category_id', description: 'ID da categoria pai (obrigatório)', example: 'cat123' },
+      { name: 'category_id', description: 'ID da categoria pai (opcional)', example: 'cat123' },
       { name: 'active', description: 'Filtrar por status ativo', example: 'true' },
       { name: 'page', description: 'Página (padrão: 1)', example: '1' },
       { name: 'limit', description: 'Itens por página (máx: 100, padrão: 50)', example: '20' },
@@ -168,12 +168,26 @@ const endpoints = [
           ativo: true,
           criado_em: '2025-01-12T10:00:00Z',
           atualizado_em: '2025-01-12T10:00:00Z'
+        },
+        {
+          id: 'subcat456',
+          nome: 'Smartphones',
+          slug: 'smartphones',
+          categoria_pai: {
+            id: 'cat456',
+            nome: 'Eletrônicos',
+            slug: 'eletronicos'
+          },
+          total_produtos: 32,
+          ativo: true,
+          criado_em: '2025-01-12T11:15:00Z',
+          atualizado_em: '2025-01-12T11:15:00Z'
         }
       ],
       pagination: {
         page: 1,
         limit: 50,
-        total: 1,
+        total: 45,
         totalPages: 1,
         hasNext: false,
         hasPrev: false

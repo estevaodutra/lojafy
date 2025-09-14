@@ -87,19 +87,7 @@ serve(async (req) => {
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
     const search = url.searchParams.get('search');
 
-    // Validate required category_id parameter
-    if (!categoryId) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'category_id parameter is required' 
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
+    // category_id parameter is now optional
 
     // Build query
     let query = supabase
@@ -117,8 +105,12 @@ serve(async (req) => {
           name,
           slug
         )
-      `)
-      .eq('category_id', categoryId);
+      `);
+
+    // Apply category filter if provided
+    if (categoryId) {
+      query = query.eq('category_id', categoryId);
+    }
 
     // Apply filters
     if (active !== null) {
@@ -190,8 +182,12 @@ serve(async (req) => {
     // Get total count for pagination (without limit)
     let countQuery = supabase
       .from('subcategories')
-      .select('*', { count: 'exact', head: true })
-      .eq('category_id', categoryId);
+      .select('*', { count: 'exact', head: true });
+
+    // Apply category filter if provided
+    if (categoryId) {
+      countQuery = countQuery.eq('category_id', categoryId);
+    }
 
     if (active !== null) {
       countQuery = countQuery.eq('active', active === 'true');
