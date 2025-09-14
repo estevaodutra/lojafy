@@ -8,8 +8,7 @@ import { Loader2 } from 'lucide-react';
 const adminMenuItems = [
   { title: 'Dashboard', url: '/admin', icon: BarChart3 },
   { title: 'Produtos', url: '/admin/produtos', icon: Package },
-  { title: 'Categorias Destaque', url: '/admin/categorias-destaque', icon: Star },
-  { title: 'Produtos Destaque', url: '/admin/produtos-destaque', icon: Star },
+  { title: 'Categorias', url: '/admin/categorias', icon: Package },
   { title: 'Pedidos', url: '/admin/pedidos', icon: ShoppingCart },
   { title: 'Clientes', url: '/admin/clientes', icon: Users },
   { title: 'Integracoes', url: '/admin/integracoes', icon: Settings },

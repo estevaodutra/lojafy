@@ -38,8 +38,7 @@ import AdminOrders from "./pages/admin/Orders";
 import AdminCustomers from "./pages/admin/Customers";
 import IntegracaoPage from "./pages/admin/Integracoes";
 import HomepageManagement from "./pages/admin/Homepage";
-import CategoriasDestaque from "./pages/admin/CategoriasDestaque";
-import ProdutosDestaque from "./pages/admin/ProdutosDestaque";
+import AdminCategorias from "./pages/admin/Categorias";
 import Depoimentos from "./pages/admin/Depoimentos";
 import NewsletterConfig from "./pages/admin/NewsletterConfig";
 import ConfiguracaoVisual from "./pages/admin/ConfiguracaoVisual";
@@ -97,8 +96,7 @@ const App = () => (
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<AdminDashboard />} />
                 <Route path="produtos" element={<AdminProducts />} />
-                <Route path="produtos-destaque" element={<ProdutosDestaque />} />
-                <Route path="categorias-destaque" element={<CategoriasDestaque />} />
+                <Route path="categorias" element={<AdminCategorias />} />
                 <Route path="pedidos" element={<AdminOrders />} />
                 <Route path="clientes" element={<AdminCustomers />} />
                 <Route path="integracoes" element={<IntegracaoPage />} />

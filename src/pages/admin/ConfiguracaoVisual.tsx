@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Palette, Image, Settings, Star, Package, Loader2 } from 'lucide-react';
+import { Palette, Image, Settings, Star, Package, Loader2, Save } from 'lucide-react';
 import { ColorPicker } from '@/components/admin/ColorPicker';
 import { LogoUpload } from '@/components/admin/LogoUpload';
 
@@ -36,6 +36,8 @@ const ConfiguracaoVisual = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('header');
+  const [localConfig, setLocalConfig] = useState<StoreConfig | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
 
   const { data: config, isLoading } = useQuery({
     queryKey: ['store-config'],
@@ -51,21 +53,29 @@ const ConfiguracaoVisual = () => {
     },
   });
 
+  // Update local config when server config changes
+  useEffect(() => {
+    if (config && !localConfig) {
+      setLocalConfig(config);
+    }
+  }, [config]);
+
   const updateConfigMutation = useMutation({
     mutationFn: async (updates: Partial<StoreConfig>) => {
-      if (!config) throw new Error('No config found');
+      if (!localConfig) throw new Error('No config found');
       
       const { error } = await supabase
         .from('store_config')
         .update(updates)
-        .eq('id', config.id);
+        .eq('id', localConfig.id);
       
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['store-config'] });
+      setHasChanges(false);
       toast({
-        title: "Configuração salva",
+        title: "Configurações salvas",
         description: "As mudanças foram aplicadas com sucesso.",
       });
     },
@@ -78,12 +88,30 @@ const ConfiguracaoVisual = () => {
     },
   });
 
-  const handleSave = (updates: Partial<StoreConfig>) => {
-    updateConfigMutation.mutate(updates);
+  const handleLocalChange = (updates: Partial<StoreConfig>) => {
+    if (localConfig) {
+      setLocalConfig({ ...localConfig, ...updates });
+      setHasChanges(true);
+    }
+  };
+
+  const handleSave = () => {
+    if (localConfig && config) {
+      const changes: Partial<StoreConfig> = {};
+      (Object.keys(localConfig) as Array<keyof StoreConfig>).forEach(key => {
+        if (localConfig[key] !== config[key]) {
+          (changes as any)[key] = localConfig[key];
+        }
+      });
+      
+      if (Object.keys(changes).length > 0) {
+        updateConfigMutation.mutate(changes);
+      }
+    }
   };
 
   const handleBenefitUpdate = (benefits: any[]) => {
-    handleSave({ benefits_config: benefits });
+    handleLocalChange({ benefits_config: benefits });
   };
 
   if (isLoading) {
@@ -94,7 +122,7 @@ const ConfiguracaoVisual = () => {
     );
   }
 
-  if (!config) {
+  if (!localConfig) {
     return (
       <div className="text-center p-8">
         <p>Configuração não encontrada.</p>
@@ -131,8 +159,8 @@ const ConfiguracaoVisual = () => {
                 <Label htmlFor="storeName">Nome da Loja</Label>
                 <Input
                   id="storeName"
-                  value={config.store_name}
-                  onChange={(e) => handleSave({ store_name: e.target.value })}
+                  value={localConfig.store_name}
+                  onChange={(e) => handleLocalChange({ store_name: e.target.value })}
                   placeholder="Nome da sua loja"
                 />
               </div>
@@ -141,8 +169,8 @@ const ConfiguracaoVisual = () => {
                 <Label htmlFor="headerMessage">Mensagem da Faixa Superior</Label>
                 <Input
                   id="headerMessage"
-                  value={config.header_message}
-                  onChange={(e) => handleSave({ header_message: e.target.value })}
+                  value={localConfig.header_message}
+                  onChange={(e) => handleLocalChange({ header_message: e.target.value })}
                   placeholder="Ex: Frete grátis para todo o Brasil acima de R$ 199"
                 />
               </div>
@@ -151,15 +179,15 @@ const ConfiguracaoVisual = () => {
                 <div className="space-y-2">
                   <Label>Cor de Fundo da Faixa</Label>
                   <ColorPicker
-                    color={config.header_background_color}
-                    onChange={(color) => handleSave({ header_background_color: color })}
+                    color={localConfig.header_background_color}
+                    onChange={(color) => handleLocalChange({ header_background_color: color })}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Cor do Texto da Faixa</Label>
                   <ColorPicker
-                    color={config.header_message_color}
-                    onChange={(color) => handleSave({ header_message_color: color })}
+                    color={localConfig.header_message_color}
+                    onChange={(color) => handleLocalChange({ header_message_color: color })}
                   />
                 </div>
               </div>
@@ -167,9 +195,23 @@ const ConfiguracaoVisual = () => {
               <div className="space-y-2">
                 <Label>Logo da Loja</Label>
                 <LogoUpload
-                  onImageUploaded={(url) => handleSave({ logo_url: url })}
-                  currentImage={config.logo_url}
+                  onImageUploaded={(url) => handleLocalChange({ logo_url: url })}
+                  currentImage={localConfig.logo_url}
                 />
+              </div>
+              
+              <div className="flex justify-end pt-4">
+                <Button 
+                  onClick={handleSave} 
+                  disabled={!hasChanges || updateConfigMutation.isPending}
+                >
+                  {updateConfigMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Salvar Configurações
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -188,24 +230,24 @@ const ConfiguracaoVisual = () => {
                 <div className="space-y-2">
                   <Label>Cor Primária</Label>
                   <ColorPicker
-                    color={config.primary_color}
-                    onChange={(color) => handleSave({ primary_color: color })}
+                    color={localConfig.primary_color}
+                    onChange={(color) => handleLocalChange({ primary_color: color })}
                   />
                   <p className="text-sm text-muted-foreground">Usada em botões principais e links</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Cor Secundária</Label>
                   <ColorPicker
-                    color={config.secondary_color}
-                    onChange={(color) => handleSave({ secondary_color: color })}
+                    color={localConfig.secondary_color}
+                    onChange={(color) => handleLocalChange({ secondary_color: color })}
                   />
                   <p className="text-sm text-muted-foreground">Usada em backgrounds e superfícies</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Cor de Destaque</Label>
                   <ColorPicker
-                    color={config.accent_color}
-                    onChange={(color) => handleSave({ accent_color: color })}
+                    color={localConfig.accent_color}
+                    onChange={(color) => handleLocalChange({ accent_color: color })}
                   />
                   <p className="text-sm text-muted-foreground">Usada em badges e elementos especiais</p>
                 </div>
@@ -227,25 +269,39 @@ const ConfiguracaoVisual = () => {
                 <div className="space-y-2">
                   <Label>Cor do Botão "Comprar"</Label>
                   <ColorPicker
-                    color={config.buy_button_color}
-                    onChange={(color) => handleSave({ buy_button_color: color })}
+                    color={localConfig.buy_button_color}
+                    onChange={(color) => handleLocalChange({ buy_button_color: color })}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Cor do Texto do Botão</Label>
                   <ColorPicker
-                    color={config.buy_button_text_color}
-                    onChange={(color) => handleSave({ buy_button_text_color: color })}
+                    color={localConfig.buy_button_text_color}
+                    onChange={(color) => handleLocalChange({ buy_button_text_color: color })}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Cor das Informações do Produto</Label>
                   <ColorPicker
-                    color={config.product_info_color}
-                    onChange={(color) => handleSave({ product_info_color: color })}
+                    color={localConfig.product_info_color}
+                    onChange={(color) => handleLocalChange({ product_info_color: color })}
                   />
                   <p className="text-sm text-muted-foreground">Usada em preços e avaliações</p>
                 </div>
+              </div>
+              
+              <div className="flex justify-end pt-4">
+                <Button 
+                  onClick={handleSave} 
+                  disabled={!hasChanges || updateConfigMutation.isPending}
+                >
+                  {updateConfigMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Salvar Configurações
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -260,17 +316,17 @@ const ConfiguracaoVisual = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {config.benefits_config.map((benefit, index) => (
+              {localConfig.benefits_config.map((benefit, index) => (
                 <div key={benefit.id} className="border rounded-lg p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="font-medium">{benefit.title}</h3>
-                    <Switch
-                      checked={benefit.active}
-                      onCheckedChange={(checked) => {
-                        const updated = [...config.benefits_config];
-                        updated[index].active = checked;
-                        handleBenefitUpdate(updated);
-                      }}
+                      <Switch
+                        checked={benefit.active}
+                        onCheckedChange={(checked) => {
+                          const updated = [...localConfig.benefits_config];
+                          updated[index].active = checked;
+                          handleBenefitUpdate(updated);
+                        }}
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -279,7 +335,7 @@ const ConfiguracaoVisual = () => {
                       <Input
                         value={benefit.title}
                         onChange={(e) => {
-                          const updated = [...config.benefits_config];
+                          const updated = [...localConfig.benefits_config];
                           updated[index].title = e.target.value;
                           handleBenefitUpdate(updated);
                         }}
@@ -290,7 +346,7 @@ const ConfiguracaoVisual = () => {
                       <Input
                         value={benefit.description}
                         onChange={(e) => {
-                          const updated = [...config.benefits_config];
+                          const updated = [...localConfig.benefits_config];
                           updated[index].description = e.target.value;
                           handleBenefitUpdate(updated);
                         }}
@@ -302,14 +358,28 @@ const ConfiguracaoVisual = () => {
                     <ColorPicker
                       color={benefit.color}
                       onChange={(color) => {
-                        const updated = [...config.benefits_config];
+                        const updated = [...localConfig.benefits_config];
                         updated[index].color = color;
                         handleBenefitUpdate(updated);
                       }}
                     />
                   </div>
                 </div>
-              ))}
+                ))}
+                
+                <div className="flex justify-end pt-4">
+                  <Button 
+                    onClick={handleSave} 
+                    disabled={!hasChanges || updateConfigMutation.isPending}
+                  >
+                    {updateConfigMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    Salvar Configurações
+                  </Button>
+                </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -327,17 +397,31 @@ const ConfiguracaoVisual = () => {
                 <Label htmlFor="highlightText">Texto do Destaque</Label>
                 <Input
                   id="highlightText"
-                  value={config.order_summary_highlight_text}
-                  onChange={(e) => handleSave({ order_summary_highlight_text: e.target.value })}
+                  value={localConfig.order_summary_highlight_text}
+                  onChange={(e) => handleLocalChange({ order_summary_highlight_text: e.target.value })}
                   placeholder="Ex: Economize com o frete grátis!"
                 />
               </div>
               <div className="space-y-2">
                 <Label>Cor do Destaque</Label>
                 <ColorPicker
-                  color={config.order_summary_highlight_color}
-                  onChange={(color) => handleSave({ order_summary_highlight_color: color })}
+                  color={localConfig.order_summary_highlight_color}
+                  onChange={(color) => handleLocalChange({ order_summary_highlight_color: color })}
                 />
+              </div>
+              
+              <div className="flex justify-end pt-4">
+                <Button 
+                  onClick={handleSave} 
+                  disabled={!hasChanges || updateConfigMutation.isPending}
+                >
+                  {updateConfigMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Salvar Configurações
+                </Button>
               </div>
             </CardContent>
           </Card>
