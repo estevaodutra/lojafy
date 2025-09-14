@@ -304,13 +304,13 @@ const Carrinho = () => {
                   <div className="space-y-3">
                     <Button 
                       onClick={handleCheckout}
-                      className="w-full" 
+                      className="w-full btn-checkout" 
                       size="lg"
                     >
                       Finalizar Compra
                     </Button>
                     
-                    <Button variant="outline" className="w-full" asChild>
+                    <Button variant="outline" className="w-full text-continue-shopping" asChild>
                       <Link to="/">
                         Continuar Comprando
                       </Link>
@@ -318,11 +318,11 @@ const Carrinho = () => {
                   </div>
 
                   <div className="text-center pt-4">
-                    <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
+                    <div className="flex items-center justify-center space-x-2 text-sm">
                       <div className="w-4 h-4 bg-success rounded-full flex items-center justify-center">
                         <div className="w-2 h-2 bg-white rounded-full" />
                       </div>
-                      <span>Compra 100% segura</span>
+                      <span className="text-security">Compra 100% segura</span>
                     </div>
                   </div>
                 </CardContent>

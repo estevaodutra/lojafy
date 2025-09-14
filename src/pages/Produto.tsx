@@ -396,7 +396,7 @@ const Produto = () => {
               <div className="flex gap-3">
                 <Button
                   size="lg"
-                  className="flex-1"
+                  className="flex-1 btn-cart"
                   onClick={handleAddToCart}
                   disabled={(product.stock_quantity || 0) <= 0}
                 >
@@ -418,8 +418,7 @@ const Produto = () => {
 
               <Button 
                 size="lg" 
-                className="w-full" 
-                variant="secondary"
+                className="w-full btn-buy-now" 
                 onClick={handleBuyNow}
                 disabled={(product.stock_quantity || 0) <= 0}
               >

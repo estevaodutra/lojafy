@@ -65,6 +65,27 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        "cart-button": {
+          DEFAULT: "hsl(var(--cart-button-color))",
+          foreground: "hsl(var(--cart-button-text-color))",
+        },
+        "buy-now-button": {
+          DEFAULT: "hsl(var(--buy-now-button-color))",
+          foreground: "hsl(var(--buy-now-button-text-color))",
+        },
+        "checkout-button": {
+          DEFAULT: "hsl(var(--checkout-button-color))",
+          foreground: "hsl(var(--checkout-button-text-color))",
+        },
+        "order-highlight": {
+          DEFAULT: "hsl(var(--order-highlight-bg-color))",
+        },
+        "security-text": {
+          DEFAULT: "hsl(var(--security-text-color))",
+        },
+        "continue-shopping": {
+          DEFAULT: "hsl(var(--continue-shopping-text-color))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

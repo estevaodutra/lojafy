@@ -151,7 +151,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
 
         <div className="p-4 pt-0">
           <Link to={`/produto/${product.id}`}>
-            <Button className="w-full">
+            <Button className="w-full btn-cart">
               Comprar
             </Button>
           </Link>

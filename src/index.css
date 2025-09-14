@@ -63,6 +63,17 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* E-commerce Custom Colors */
+    --cart-button-color: 221 83% 53%;
+    --cart-button-text-color: 0 0% 100%;
+    --buy-now-button-color: 142 76% 36%;
+    --buy-now-button-text-color: 0 0% 100%;
+    --checkout-button-color: 221 83% 53%;
+    --checkout-button-text-color: 0 0% 100%;
+    --order-highlight-bg-color: 221 83% 95%;
+    --security-text-color: 142 76% 36%;
+    --continue-shopping-text-color: 215 25% 27%;
   }
 
   .dark {
@@ -101,6 +112,17 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* E-commerce Custom Colors - Dark Mode */
+    --cart-button-color: 221 83% 53%;
+    --cart-button-text-color: 0 0% 100%;
+    --buy-now-button-color: 142 76% 36%;
+    --buy-now-button-text-color: 0 0% 100%;
+    --checkout-button-color: 221 83% 53%;
+    --checkout-button-text-color: 0 0% 100%;
+    --order-highlight-bg-color: 221 83% 15%;
+    --security-text-color: 142 76% 36%;
+    --continue-shopping-text-color: 210 40% 98%;
   }
 }
 
@@ -111,5 +133,32 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  /* E-commerce Custom Button Classes */
+  .btn-cart {
+    @apply bg-cart-button text-cart-button-foreground hover:bg-cart-button/90 transition-colors;
+  }
+  
+  .btn-buy-now {
+    @apply bg-buy-now-button text-buy-now-button-foreground hover:bg-buy-now-button/90 transition-colors;
+  }
+  
+  .btn-checkout {
+    @apply bg-checkout-button text-checkout-button-foreground hover:bg-checkout-button/90 transition-colors;
+  }
+  
+  .bg-order-highlight {
+    @apply bg-order-highlight;
+  }
+  
+  .text-security {
+    @apply text-security-text;
+  }
+  
+  .text-continue-shopping {
+    @apply text-continue-shopping;
   }
 }
