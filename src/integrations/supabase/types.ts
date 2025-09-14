@@ -542,6 +542,7 @@ export type Database = {
           badge: string | null
           brand: string | null
           category_id: string | null
+          cost_price: number | null
           created_at: string
           description: string | null
           featured: boolean | null
@@ -551,6 +552,7 @@ export type Database = {
           image_url: string | null
           images: string[] | null
           length: number | null
+          low_stock_alert: boolean | null
           main_image_url: string | null
           min_stock_level: number | null
           name: string
@@ -571,6 +573,7 @@ export type Database = {
           badge?: string | null
           brand?: string | null
           category_id?: string | null
+          cost_price?: number | null
           created_at?: string
           description?: string | null
           featured?: boolean | null
@@ -580,6 +583,7 @@ export type Database = {
           image_url?: string | null
           images?: string[] | null
           length?: number | null
+          low_stock_alert?: boolean | null
           main_image_url?: string | null
           min_stock_level?: number | null
           name: string
@@ -600,6 +604,7 @@ export type Database = {
           badge?: string | null
           brand?: string | null
           category_id?: string | null
+          cost_price?: number | null
           created_at?: string
           description?: string | null
           featured?: boolean | null
@@ -609,6 +614,7 @@ export type Database = {
           image_url?: string | null
           images?: string[] | null
           length?: number | null
+          low_stock_alert?: boolean | null
           main_image_url?: string | null
           min_stock_level?: number | null
           name?: string

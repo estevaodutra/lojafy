@@ -24,8 +24,9 @@ import { SubcategoryCreationModal } from './SubcategoryCreationModal';
 const productSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório').max(255, 'Nome muito longo'),
   description: z.string().optional(),
-  price: z.coerce.number().min(0.01, 'Preço deve ser maior que zero'),
-  original_price: z.coerce.number().optional(),
+  cost_price: z.coerce.number().min(0, 'Preço de custo não pode ser negativo').optional(),
+  price: z.coerce.number().min(0.01, 'Preço de venda deve ser maior que zero'),
+  original_price: z.coerce.number().min(0, 'Preço promocional não pode ser negativo').optional(),
   category_id: z.string().uuid('Selecione uma categoria válida'),
   subcategory_id: z.string().optional(),
   brand: z.string().optional(),
@@ -33,6 +34,7 @@ const productSchema = z.object({
   gtin_ean13: z.string().regex(/^\d{13}$/, 'GTIN/EAN-13 deve ter 13 dígitos').optional().or(z.literal('')),
   stock_quantity: z.coerce.number().min(0, 'Estoque não pode ser negativo'),
   min_stock_level: z.coerce.number().min(1, 'Estoque mínimo deve ser pelo menos 1'),
+  low_stock_alert: z.boolean().default(false),
   // Dimensions
   height: z.coerce.number().positive('Altura deve ser positiva').optional(),
   width: z.coerce.number().positive('Largura deve ser positiva').optional(),
@@ -111,8 +113,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
     defaultValues: {
       name: product?.name || '',
       description: product?.description || '',
+      cost_price: product?.cost_price || undefined,
       price: product?.price || 0,
-      original_price: product?.original_price || 0,
+      original_price: product?.original_price || undefined,
       category_id: product?.category_id || '',
       subcategory_id: product?.subcategory_id || 'none',
       brand: product?.brand || '',
@@ -120,6 +123,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       gtin_ean13: product?.gtin_ean13 || '',
       stock_quantity: product?.stock_quantity || 0,
       min_stock_level: product?.min_stock_level || 5,
+      low_stock_alert: product?.low_stock_alert ?? false,
       height: product?.height || undefined,
       width: product?.width || undefined,
       length: product?.length || undefined,
@@ -186,6 +190,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       const productData: any = {
         name: data.name,
         description: data.description || null,
+        cost_price: data.cost_price || null,
         price: data.price,
         original_price: data.original_price || null,
         category_id: data.category_id,
@@ -195,6 +200,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         gtin_ean13: data.gtin_ean13 || null, // Will be auto-generated if empty
         stock_quantity: data.stock_quantity,
         min_stock_level: data.min_stock_level,
+        low_stock_alert: data.low_stock_alert,
         height: dimensions.height || null,
         width: dimensions.width || null,
         length: dimensions.length || null,
@@ -571,22 +577,22 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
           </CardContent>
         </Card>
 
-        {/* Pricing and Stock */}
+        {/* Preços */}
         <Card>
           <CardHeader>
-            <CardTitle>Preço e Estoque</CardTitle>
+            <CardTitle>Preços</CardTitle>
             <CardDescription>
-              Configurações de preço e controle de estoque
+              Configuração de valores e cálculo de margem de lucro
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
-                name="price"
+                name="cost_price"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Preço *</FormLabel>
+                    <FormLabel>Preço de Custo</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
@@ -595,6 +601,31 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
                         {...field}
                       />
                     </FormControl>
+                    <FormDescription>
+                      Quanto custou o produto
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="price"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Preço de Venda *</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="0,00" 
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Preço principal do produto
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -605,7 +636,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
                 name="original_price"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Preço Original</FormLabel>
+                    <FormLabel>Preço Promocional</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
@@ -615,7 +646,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
                       />
                     </FormControl>
                     <FormDescription>
-                      Para mostrar desconto (opcional)
+                      Se preenchido, preço de venda fica taxado
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -623,6 +654,49 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
               />
             </div>
 
+            {/* Profit Calculation */}
+            {(() => {
+              const costPrice = form.watch('cost_price');
+              const salePrice = form.watch('price');
+              
+              if (costPrice && salePrice && costPrice > 0) {
+                const profitAmount = salePrice - costPrice;
+                const profitPercentage = (profitAmount / costPrice) * 100;
+                
+                return (
+                  <div className="bg-muted/50 p-4 rounded-lg border">
+                    <h4 className="text-sm font-medium mb-2">Cálculo de Lucro</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Margem:</span>
+                        <div className="font-semibold text-primary">
+                          {profitPercentage.toFixed(2)}%
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Lucro:</span>
+                        <div className="font-semibold text-primary">
+                          R$ {profitAmount.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+          </CardContent>
+        </Card>
+
+        {/* Estoque */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Estoque</CardTitle>
+            <CardDescription>
+              Controle de quantidade e alertas de estoque
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -638,6 +712,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
                         {...field}
                       />
                     </FormControl>
+                    <FormDescription>
+                      Quantidade disponível para venda
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -658,9 +735,32 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
                       />
                     </FormControl>
                     <FormDescription>
-                      Para alertas de estoque baixo
+                      Quando alertar sobre estoque baixo
                     </FormDescription>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <FormLabel>Alertar Quando Atingir Estoque Mínimo</FormLabel>
+                <FormDescription>
+                  Receber notificação quando estoque ficar baixo
+                </FormDescription>
+              </div>
+              <FormField
+                control={form.control}
+                name="low_stock_alert"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
                   </FormItem>
                 )}
               />
@@ -686,60 +786,65 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
           </CardContent>
         </Card>
 
-        {/* Specifications and Dimensions */}
+        {/* Dimensões */}
         <Card>
           <CardHeader>
-            <CardTitle>Especificações Técnicas</CardTitle>
+            <CardTitle>Dimensões e Peso</CardTitle>
             <CardDescription>
-              Dimensões, peso e características técnicas do produto
+              Medidas físicas do produto para cálculo de frete
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Dimensions */}
+          <CardContent>
             <DimensionsInput 
               dimensions={dimensions}
               onDimensionsChange={handleDimensionsChange}
             />
+          </CardContent>
+        </Card>
 
-            <Separator />
+        {/* Specifications */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Especificações Técnicas</CardTitle>
+            <CardDescription>
+              Características e especificações customizadas do produto
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium">Especificações Customizadas</h4>
+              <Button type="button" variant="outline" size="sm" onClick={addSpecification}>
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar Especificação
+              </Button>
+            </div>
 
-            {/* Custom Specifications */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium">Especificações Customizadas</h4>
-                <Button type="button" variant="outline" size="sm" onClick={addSpecification}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Adicionar Especificação
+            {specifications.map((spec, index) => (
+              <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                <div className="md:col-span-2">
+                  <Input
+                    placeholder="Nome da especificação"
+                    value={spec.key}
+                    onChange={(e) => updateSpecification(index, 'key', e.target.value)}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Input
+                    placeholder="Valor"
+                    value={spec.value}
+                    onChange={(e) => updateSpecification(index, 'value', e.target.value)}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => removeSpecification(index)}
+                >
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
-
-              {specifications.map((spec, index) => (
-                <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-2">
-                  <div className="md:col-span-2">
-                    <Input
-                      placeholder="Nome da especificação"
-                      value={spec.key}
-                      onChange={(e) => updateSpecification(index, 'key', e.target.value)}
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <Input
-                      placeholder="Valor"
-                      value={spec.value}
-                      onChange={(e) => updateSpecification(index, 'value', e.target.value)}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeSpecification(index)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
+            ))}
           </CardContent>
         </Card>
 
