@@ -1,7 +1,7 @@
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
 import ProductGrid from "@/components/ProductGrid";
-import CategorySection from "@/components/CategorySection";
+import CategoryCarousels from "@/components/CategoryCarousels";
 import Benefits from "@/components/Benefits";
 import Testimonials from "@/components/Testimonials";
 import Newsletter from "@/components/Newsletter";
@@ -14,7 +14,7 @@ const Index = () => {
       <main>
         <Hero />
         <ProductGrid />
-        <CategorySection />
+        <CategoryCarousels />
         <Benefits />
         <Testimonials />
         <Newsletter />
