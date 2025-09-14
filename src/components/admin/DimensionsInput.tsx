@@ -101,18 +101,18 @@ export const DimensionsInput: React.FC<DimensionsInputProps> = ({
             </h4>
             
             <div className="space-y-2">
-              <Label htmlFor="weight" className="text-xs">Peso em Gramas</Label>
+              <Label htmlFor="weight" className="text-xs">Peso em Quilos</Label>
               <Input
                 id="weight"
                 type="number"
-                step="1"
+                step="0.001"
                 min="0"
-                placeholder="0"
+                placeholder="0.000"
                 value={dimensions.weight || ''}
                 onChange={(e) => updateDimension('weight', e.target.value)}
                 className="text-center"
               />
-              <div className="text-xs text-muted-foreground text-center">gramas</div>
+              <div className="text-xs text-muted-foreground text-center">kg</div>
             </div>
 
             {/* Volume calculado */}
