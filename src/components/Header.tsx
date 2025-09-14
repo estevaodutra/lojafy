@@ -9,11 +9,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import { useState } from "react";
+import { useStoreConfig } from '@/hooks/useStoreConfig';
 
 const Header = () => {
   const { favoritesCount } = useFavorites();
   const { itemsCount } = useCart();
   const { user, signOut, profile, isAdmin } = useAuth();
+  const { config } = useStoreConfig();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -30,9 +32,15 @@ const Header = () => {
   return (
     <header className="w-full border-b bg-background sticky top-0 z-50">
       {/* Top Bar */}
-      <div className="bg-primary text-primary-foreground py-2">
+      <div 
+        className="py-2"
+        style={{ 
+          backgroundColor: config?.header_background_color || '#000000', 
+          color: config?.header_message_color || '#ffffff' 
+        }}
+      >
         <div className="container mx-auto px-4 text-center text-sm">
-          🚚 Frete GRÁTIS para compras acima de R$ 199 | 📦 Entrega em todo o Brasil
+          {config?.header_message || '🚚 Frete GRÁTIS para compras acima de R$ 199 | 📦 Entrega em todo o Brasil'}
         </div>
       </div>
 
@@ -41,10 +49,16 @@ const Header = () => {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-            <div className="w-10 h-10 bg-hero-gradient rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">E</span>
-            </div>
-            <span className="text-2xl font-bold text-foreground">EcoShop</span>
+            {config?.logo_url ? (
+              <img src={config.logo_url} alt={config.store_name} className="h-10 w-auto" />
+            ) : (
+              <div className="w-10 h-10 bg-hero-gradient rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-xl">E</span>
+              </div>
+            )}
+            <span className="text-2xl font-bold text-foreground">
+              {config?.store_name || 'EcoShop'}
+            </span>
           </Link>
 
           {/* Search Bar - Hidden on mobile */}

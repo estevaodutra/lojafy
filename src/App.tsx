@@ -42,6 +42,7 @@ import CategoriasDestaque from "./pages/admin/CategoriasDestaque";
 import ProdutosDestaque from "./pages/admin/ProdutosDestaque";
 import Depoimentos from "./pages/admin/Depoimentos";
 import NewsletterConfig from "./pages/admin/NewsletterConfig";
+import ConfiguracaoVisual from "./pages/admin/ConfiguracaoVisual";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -102,6 +103,7 @@ const App = () => (
                 <Route path="clientes" element={<AdminCustomers />} />
                 <Route path="integracoes" element={<IntegracaoPage />} />
                 <Route path="homepage" element={<HomepageManagement />} />
+                <Route path="configuracao-visual" element={<ConfiguracaoVisual />} />
                 <Route path="banners" element={<AdminBanners />} />
                 <Route path="depoimentos" element={<Depoimentos />} />
                 <Route path="newsletter-config" element={<NewsletterConfig />} />

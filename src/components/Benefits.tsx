@@ -1,5 +1,6 @@
 import { Truck, CreditCard, Shield, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useStoreConfig } from '@/hooks/useStoreConfig';
 
 const benefits = [
   {
@@ -33,19 +34,35 @@ const benefits = [
 ];
 
 const Benefits = () => {
+  const { config } = useStoreConfig();
+  
+  // Use configured benefits or fallback to default
+  const displayBenefits = config?.benefits_config?.filter(b => b.active) || benefits;
+  
+  // Icon mapping
+  const iconMap = {
+    Truck,
+    CreditCard, 
+    Shield,
+    RefreshCw
+  };
+  
   return (
     <section className="py-16 bg-background">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {benefits.map((benefit) => {
-            const IconComponent = benefit.icon;
+          {displayBenefits.map((benefit) => {
+            const IconComponent = iconMap[benefit.icon as keyof typeof iconMap] || benefit.icon;
             return (
               <Card 
                 key={benefit.id}
                 className="text-center border-border bg-card hover:shadow-card transition-all duration-300"
               >
                 <CardContent className="p-6 flex flex-col items-center space-y-4">
-                  <div className={`w-16 h-16 ${benefit.color} rounded-full flex items-center justify-center`}>
+                  <div 
+                    className="w-16 h-16 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: benefit.color }}
+                  >
                     <IconComponent className="h-8 w-8 text-white" />
                   </div>
                   <div>

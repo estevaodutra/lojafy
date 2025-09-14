@@ -718,6 +718,69 @@ export type Database = {
           },
         ]
       }
+      store_config: {
+        Row: {
+          accent_color: string | null
+          active: boolean
+          benefits_config: Json | null
+          buy_button_color: string | null
+          buy_button_text_color: string | null
+          created_at: string
+          header_background_color: string | null
+          header_message: string | null
+          header_message_color: string | null
+          id: string
+          logo_url: string | null
+          order_summary_highlight_color: string | null
+          order_summary_highlight_text: string | null
+          primary_color: string | null
+          product_info_color: string | null
+          secondary_color: string | null
+          store_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          accent_color?: string | null
+          active?: boolean
+          benefits_config?: Json | null
+          buy_button_color?: string | null
+          buy_button_text_color?: string | null
+          created_at?: string
+          header_background_color?: string | null
+          header_message?: string | null
+          header_message_color?: string | null
+          id?: string
+          logo_url?: string | null
+          order_summary_highlight_color?: string | null
+          order_summary_highlight_text?: string | null
+          primary_color?: string | null
+          product_info_color?: string | null
+          secondary_color?: string | null
+          store_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          accent_color?: string | null
+          active?: boolean
+          benefits_config?: Json | null
+          buy_button_color?: string | null
+          buy_button_text_color?: string | null
+          created_at?: string
+          header_background_color?: string | null
+          header_message?: string | null
+          header_message_color?: string | null
+          id?: string
+          logo_url?: string | null
+          order_summary_highlight_color?: string | null
+          order_summary_highlight_text?: string | null
+          primary_color?: string | null
+          product_info_color?: string | null
+          secondary_color?: string | null
+          store_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       subcategories: {
         Row: {
           active: boolean | null

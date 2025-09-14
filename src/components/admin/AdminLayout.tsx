@@ -17,6 +17,7 @@ const adminMenuItems = [
 
 const designMenuItems = [
   { title: 'Visão Geral', url: '/admin/homepage', icon: Globe },
+  { title: 'Configuração Visual', url: '/admin/configuracao-visual', icon: Palette },
   { title: 'Banners', url: '/admin/banners', icon: Image },
   { title: 'Depoimentos', url: '/admin/depoimentos', icon: MessageSquare },
   { title: 'Newsletter', url: '/admin/newsletter-config', icon: Mail },
