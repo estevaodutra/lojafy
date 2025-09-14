@@ -257,15 +257,17 @@ const Categorias = () => {
                 </CardContent>
               </Card>
             ) : (
-              featuredCategories.map((category) => (
+              featuredCategories
+                .filter((category) => category.categories) // Filter out categories with missing data
+                .map((category) => (
                 <Card key={category.id}>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-16 bg-muted rounded flex items-center justify-center">
-                        {category.custom_image_url || category.categories.image_url ? (
+                        {category.custom_image_url || category.categories?.image_url ? (
                           <img 
-                            src={category.custom_image_url || category.categories.image_url} 
-                            alt={category.custom_title || category.categories.name}
+                            src={category.custom_image_url || category.categories?.image_url} 
+                            alt={category.custom_title || category.categories?.name || 'Categoria'}
                             className="w-full h-full object-cover rounded"
                           />
                         ) : (
@@ -276,7 +278,7 @@ const Categorias = () => {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="font-medium">
-                            {category.custom_title || category.categories.name}
+                            {category.custom_title || category.categories?.name || 'Categoria sem nome'}
                           </h3>
                           {category.is_featured && (
                             <Badge variant="secondary">Destaque Principal</Badge>
@@ -286,7 +288,7 @@ const Categorias = () => {
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          {category.custom_description || `Categoria: ${category.categories.name}`}
+                          {category.custom_description || `Categoria: ${category.categories?.name || 'Indefinida'}`}
                         </p>
                       </div>
                       
