@@ -9,8 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useCallback } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { BannerUpload } from './BannerUpload';
 
 interface Banner {
   id: string;
@@ -31,11 +30,6 @@ interface BannerFormProps {
   existingBanners: Banner[];
 }
 
-interface BannerImageFile {
-  file: File;
-  preview: string;
-  uploading: boolean;
-}
 
 const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existingBanners }) => {
   const [formData, setFormData] = useState({
@@ -48,7 +42,7 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
     position: 1,
     active: true
   });
-  const [images, setImages] = useState<BannerImageFile[]>([]);
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -65,7 +59,6 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
         position: banner.position,
         active: banner.active
       });
-      setImages([]);
     } else {
       setFormData({
         title: '',
@@ -77,7 +70,6 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
         position: getNextAvailablePosition(),
         active: true
       });
-      setImages([]);
     }
   }, [banner, existingBanners, isOpen]);
 
@@ -169,7 +161,7 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
       return;
     }
 
-    if (!formData.image_url && images.length === 0) {
+    if (!formData.image_url) {
       toast({
         title: "Erro de validação",
         description: "É necessário adicionar uma imagem para o banner.",
@@ -178,15 +170,7 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
       return;
     }
 
-    // Use uploaded image URL if available
-    const finalImageUrl = images.length > 0 
-      ? `https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/${images[0].file.name}`
-      : formData.image_url;
-
-    const dataToSubmit = {
-      ...formData,
-      image_url: finalImageUrl
-    };
+    const dataToSubmit = formData;
 
     if (banner) {
       updateBannerMutation.mutate(dataToSubmit);
@@ -195,60 +179,8 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
     }
   };
 
-  const uploadImage = useCallback(async (file: File): Promise<string> => {
-    const fileName = `banner-${Date.now()}-${file.name}`;
-    
-    const { error: uploadError } = await supabase.storage
-      .from('product-images')
-      .upload(fileName, file);
-
-    if (uploadError) {
-      throw uploadError;
-    }
-
-    return `https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/${fileName}`;
-  }, []);
-
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    const file = acceptedFiles[0]; // Only take the first file
-    if (!file) return;
-
-    const preview = URL.createObjectURL(file);
-    const newImage: BannerImageFile = {
-      file,
-      preview,
-      uploading: true
-    };
-
-    setImages([newImage]);
-
-    try {
-      const imageUrl = await uploadImage(file);
-      setFormData(prev => ({ ...prev, image_url: imageUrl }));
-      setImages([{ ...newImage, uploading: false }]);
-    } catch (error) {
-      console.error('Upload failed:', error);
-      setImages([]);
-      toast({
-        title: "Erro no upload",
-        description: "Falha ao fazer upload da imagem. Tente novamente.",
-        variant: "destructive",
-      });
-    }
-  }, [uploadImage, toast]);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.webp']
-    },
-    maxFiles: 1,
-    multiple: false
-  });
-
-  const removeImage = () => {
-    setImages([]);
-    setFormData(prev => ({ ...prev, image_url: '' }));
+  const handleImageUploaded = (url: string) => {
+    setFormData(prev => ({ ...prev, image_url: url }));
   };
 
   const availablePositions = getAvailablePositions();
@@ -300,67 +232,10 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
 
             <div>
               <Label>Imagem do Banner *</Label>
-              <div className="space-y-4">
-                {images.length > 0 ? (
-                  <div className="space-y-2">
-                    <div className="relative">
-                      <img
-                        src={images[0].preview}
-                        alt="Preview"
-                        className="w-full h-32 object-cover rounded-md border"
-                      />
-                      {images[0].uploading && (
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-md">
-                          <div className="animate-spin h-6 w-6 border-2 border-white border-t-transparent rounded-full"></div>
-                        </div>
-                      )}
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        className="absolute top-2 right-2"
-                        onClick={removeImage}
-                      >
-                        ×
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <div
-                      {...getRootProps()}
-                      className={`border-2 border-dashed rounded-md p-6 text-center cursor-pointer transition-colors ${
-                        isDragActive ? 'border-primary bg-primary/5' : 'border-border'
-                      }`}
-                    >
-                      <input {...getInputProps()} />
-                      <div className="space-y-2">
-                        <div className="mx-auto w-12 h-12 text-muted-foreground">
-                          📸
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {isDragActive
-                            ? 'Solte a imagem aqui...'
-                            : 'Arraste uma imagem ou clique para selecionar'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          PNG, JPG, WEBP até 10MB
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-2">
-                      <Label htmlFor="image_url">Ou insira URL da imagem</Label>
-                      <Input
-                        id="image_url"
-                        value={formData.image_url}
-                        onChange={(e) => setFormData(prev => ({ ...prev, image_url: e.target.value }))}
-                        placeholder="https://exemplo.com/imagem.jpg"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
+              <BannerUpload
+                onImageUploaded={handleImageUploaded}
+                currentImage={formData.image_url}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
