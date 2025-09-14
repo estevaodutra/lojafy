@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.api-categorias-cadastrar]
 verify_jwt = false
+
+[functions.api-subcategorias-listar]
+verify_jwt = false
+
+[functions.api-subcategorias-cadastrar]
+verify_jwt = false

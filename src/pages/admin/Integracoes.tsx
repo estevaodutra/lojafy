@@ -139,6 +139,72 @@ const endpoints = [
         imagem_url: 'https://loja.com/categorias/eletronicos.jpg'
       }
     }
+  },
+  {
+    title: 'Listar Subcategorias',
+    method: 'GET' as const,
+    url: '/functions/v1/api-subcategorias-listar',
+    description: 'Retorna a lista de subcategorias de uma categoria específica.',
+    queryParams: [
+      { name: 'category_id', description: 'ID da categoria pai (obrigatório)', example: 'cat123' },
+      { name: 'active', description: 'Filtrar por status ativo', example: 'true' },
+      { name: 'page', description: 'Página (padrão: 1)', example: '1' },
+      { name: 'limit', description: 'Itens por página (máx: 100, padrão: 50)', example: '20' },
+      { name: 'search', description: 'Buscar por nome da subcategoria', example: 'esportivo' }
+    ],
+    responseExample: {
+      success: true,
+      data: [
+        {
+          id: 'subcat123',
+          nome: 'Tênis Esportivo',
+          slug: 'tenis-esportivo',
+          categoria_pai: {
+            id: 'cat123',
+            nome: 'Calçados',
+            slug: 'calcados'
+          },
+          total_produtos: 15,
+          ativo: true,
+          criado_em: '2025-01-12T10:00:00Z',
+          atualizado_em: '2025-01-12T10:00:00Z'
+        }
+      ],
+      pagination: {
+        page: 1,
+        limit: 50,
+        total: 1,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false
+      }
+    }
+  },
+  {
+    title: 'Cadastrar Subcategoria',
+    method: 'POST' as const,
+    url: '/functions/v1/api-subcategorias-cadastrar',
+    description: 'Cria uma nova subcategoria dentro de uma categoria específica. O slug é gerado automaticamente.',
+    requestBody: {
+      nome: 'Tênis Esportivo',
+      category_id: 'cat123'
+    },
+    responseExample: {
+      success: true,
+      message: 'Subcategoria criada com sucesso',
+      data: {
+        id: 'subcat456',
+        nome: 'Tênis Esportivo',
+        slug: 'tenis-esportivo',
+        categoria_pai: {
+          id: 'cat123',
+          nome: 'Calçados'
+        },
+        ativo: true,
+        criado_em: '2025-01-12T10:00:00Z',
+        atualizado_em: '2025-01-12T10:00:00Z'
+      }
+    }
   }
 ];
 
