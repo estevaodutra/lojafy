@@ -725,17 +725,26 @@ export type Database = {
           benefits_config: Json | null
           buy_button_color: string | null
           buy_button_text_color: string | null
+          buy_now_button_color: string | null
+          buy_now_button_text_color: string | null
+          cart_button_color: string | null
+          cart_button_text_color: string | null
+          checkout_button_color: string | null
+          checkout_button_text_color: string | null
+          continue_shopping_text_color: string | null
           created_at: string
           header_background_color: string | null
           header_message: string | null
           header_message_color: string | null
           id: string
           logo_url: string | null
+          order_highlight_bg_color: string | null
           order_summary_highlight_color: string | null
           order_summary_highlight_text: string | null
           primary_color: string | null
           product_info_color: string | null
           secondary_color: string | null
+          security_text_color: string | null
           store_name: string | null
           updated_at: string
         }
@@ -745,17 +754,26 @@ export type Database = {
           benefits_config?: Json | null
           buy_button_color?: string | null
           buy_button_text_color?: string | null
+          buy_now_button_color?: string | null
+          buy_now_button_text_color?: string | null
+          cart_button_color?: string | null
+          cart_button_text_color?: string | null
+          checkout_button_color?: string | null
+          checkout_button_text_color?: string | null
+          continue_shopping_text_color?: string | null
           created_at?: string
           header_background_color?: string | null
           header_message?: string | null
           header_message_color?: string | null
           id?: string
           logo_url?: string | null
+          order_highlight_bg_color?: string | null
           order_summary_highlight_color?: string | null
           order_summary_highlight_text?: string | null
           primary_color?: string | null
           product_info_color?: string | null
           secondary_color?: string | null
+          security_text_color?: string | null
           store_name?: string | null
           updated_at?: string
         }
@@ -765,17 +783,26 @@ export type Database = {
           benefits_config?: Json | null
           buy_button_color?: string | null
           buy_button_text_color?: string | null
+          buy_now_button_color?: string | null
+          buy_now_button_text_color?: string | null
+          cart_button_color?: string | null
+          cart_button_text_color?: string | null
+          checkout_button_color?: string | null
+          checkout_button_text_color?: string | null
+          continue_shopping_text_color?: string | null
           created_at?: string
           header_background_color?: string | null
           header_message?: string | null
           header_message_color?: string | null
           id?: string
           logo_url?: string | null
+          order_highlight_bg_color?: string | null
           order_summary_highlight_color?: string | null
           order_summary_highlight_text?: string | null
           primary_color?: string | null
           product_info_color?: string | null
           secondary_color?: string | null
+          security_text_color?: string | null
           store_name?: string | null
           updated_at?: string
         }

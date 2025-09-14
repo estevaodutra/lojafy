@@ -8,8 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { Palette, Image, Settings, Star, Package, Loader2, Save } from 'lucide-react';
+import { Palette, Image, Settings, Star, Package, Loader2, Save, ShoppingCart } from 'lucide-react';
 import { ColorPicker } from '@/components/admin/ColorPicker';
 import { LogoUpload } from '@/components/admin/LogoUpload';
 
@@ -29,6 +30,15 @@ interface StoreConfig {
   benefits_config: any[];
   order_summary_highlight_color: string;
   order_summary_highlight_text: string;
+  cart_button_color: string;
+  cart_button_text_color: string;
+  buy_now_button_color: string;
+  buy_now_button_text_color: string;
+  checkout_button_color: string;
+  checkout_button_text_color: string;
+  order_highlight_bg_color: string;
+  security_text_color: string;
+  continue_shopping_text_color: string;
   active: boolean;
 }
 
@@ -138,10 +148,11 @@ const ConfiguracaoVisual = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="header">Header & Logo</TabsTrigger>
           <TabsTrigger value="cores">Cores Principais</TabsTrigger>
           <TabsTrigger value="botoes">Botões & Produtos</TabsTrigger>
+          <TabsTrigger value="ecommerce">E-commerce</TabsTrigger>
           <TabsTrigger value="vantagens">Vantagens</TabsTrigger>
           <TabsTrigger value="resumo">Resumo Pedido</TabsTrigger>
         </TabsList>
@@ -287,6 +298,122 @@ const ConfiguracaoVisual = () => {
                     onChange={(color) => handleLocalChange({ product_info_color: color })}
                   />
                   <p className="text-sm text-muted-foreground">Usada em preços e avaliações</p>
+                </div>
+              </div>
+              
+              <div className="flex justify-end pt-4">
+                <Button 
+                  onClick={handleSave} 
+                  disabled={!hasChanges || updateConfigMutation.isPending}
+                >
+                  {updateConfigMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Salvar Configurações
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="ecommerce" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5" />
+                Botões E-commerce
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Configure as cores dos botões de carrinho e checkout
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h4 className="font-medium">Botões do Produto</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Cor do Botão "Adicionar ao Carrinho"</Label>
+                    <ColorPicker
+                      color={localConfig.cart_button_color}
+                      onChange={(color) => handleLocalChange({ cart_button_color: color })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cor do Texto "Adicionar ao Carrinho"</Label>
+                    <ColorPicker
+                      color={localConfig.cart_button_text_color}
+                      onChange={(color) => handleLocalChange({ cart_button_text_color: color })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cor do Botão "Comprar Agora"</Label>
+                    <ColorPicker
+                      color={localConfig.buy_now_button_color}
+                      onChange={(color) => handleLocalChange({ buy_now_button_color: color })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cor do Texto "Comprar Agora"</Label>
+                    <ColorPicker
+                      color={localConfig.buy_now_button_text_color}
+                      onChange={(color) => handleLocalChange({ buy_now_button_text_color: color })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <h4 className="font-medium">Botões de Checkout</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Cor do Botão "Finalizar Compra"</Label>
+                    <ColorPicker
+                      color={localConfig.checkout_button_color}
+                      onChange={(color) => handleLocalChange({ checkout_button_color: color })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cor do Texto "Finalizar Compra"</Label>
+                    <ColorPicker
+                      color={localConfig.checkout_button_text_color}
+                      onChange={(color) => handleLocalChange({ checkout_button_text_color: color })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <h4 className="font-medium">Textos e Áreas</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Cor de Fundo das Áreas Destacadas</Label>
+                    <ColorPicker
+                      color={localConfig.order_highlight_bg_color}
+                      onChange={(color) => handleLocalChange({ order_highlight_bg_color: color })}
+                    />
+                    <p className="text-sm text-muted-foreground">Fundo de informações especiais</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cor do Texto de Segurança</Label>
+                    <ColorPicker
+                      color={localConfig.security_text_color}
+                      onChange={(color) => handleLocalChange({ security_text_color: color })}
+                    />
+                    <p className="text-sm text-muted-foreground">"Compra 100% segura"</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cor do Link "Continuar Comprando"</Label>
+                    <ColorPicker
+                      color={localConfig.continue_shopping_text_color}
+                      onChange={(color) => handleLocalChange({ continue_shopping_text_color: color })}
+                    />
+                  </div>
                 </div>
               </div>
               
