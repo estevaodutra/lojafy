@@ -10,6 +10,13 @@ interface SimpleImageUploadProps {
   currentImage?: string | null;
   accept?: string;
   maxSize?: number;
+  dimensions?: {
+    width: number;
+    height: number;
+    description: string;
+    recommendedFormat?: string;
+  };
+  aspectRatio?: number;
 }
 
 export const SimpleImageUpload: React.FC<SimpleImageUploadProps> = ({
@@ -17,6 +24,8 @@ export const SimpleImageUpload: React.FC<SimpleImageUploadProps> = ({
   currentImage,
   accept = 'image/*',
   maxSize = 5 * 1024 * 1024, // 5MB
+  dimensions,
+  aspectRatio,
 }) => {
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
@@ -88,6 +97,11 @@ export const SimpleImageUpload: React.FC<SimpleImageUploadProps> = ({
             src={currentImage}
             alt="Upload preview"
             className="max-w-32 max-h-32 object-cover rounded-lg border"
+            style={dimensions ? {
+              maxWidth: Math.min(200, dimensions.width),
+              maxHeight: Math.min(200, dimensions.height),
+              aspectRatio: aspectRatio || 'auto'
+            } : undefined}
           />
           <Button
             size="sm"
@@ -116,8 +130,13 @@ export const SimpleImageUpload: React.FC<SimpleImageUploadProps> = ({
             {isDragActive ? 'Solte a imagem aqui' : 'Envie uma imagem'}
           </p>
           <p className="text-xs text-muted-foreground">
-            Clique ou arraste para selecionar
+            {dimensions ? `Recomendado: ${dimensions.width}x${dimensions.height}px` : 'Clique ou arraste para selecionar'}
           </p>
+          {dimensions && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {dimensions.description} • {dimensions.recommendedFormat}
+            </p>
+          )}
           {isUploading && (
             <div className="mt-2">
               <div className="animate-pulse text-xs">Enviando...</div>

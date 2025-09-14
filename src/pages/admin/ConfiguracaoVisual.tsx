@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Palette, Image, Settings, Star, Package, Loader2 } from 'lucide-react';
 import { ColorPicker } from '@/components/admin/ColorPicker';
-import { SimpleImageUpload } from '@/components/admin/SimpleImageUpload';
+import { LogoUpload } from '@/components/admin/LogoUpload';
 
 interface StoreConfig {
   id: string;
@@ -166,10 +166,9 @@ const ConfiguracaoVisual = () => {
 
               <div className="space-y-2">
                 <Label>Logo da Loja</Label>
-                <SimpleImageUpload
+                <LogoUpload
                   onImageUploaded={(url) => handleSave({ logo_url: url })}
                   currentImage={config.logo_url}
-                  accept="image/*"
                 />
               </div>
             </CardContent>
