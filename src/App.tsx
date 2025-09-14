@@ -37,6 +37,11 @@ import AdminBanners from "./pages/admin/Banners";
 import AdminOrders from "./pages/admin/Orders";
 import AdminCustomers from "./pages/admin/Customers";
 import IntegracaoPage from "./pages/admin/Integracoes";
+import HomepageManagement from "./pages/admin/Homepage";
+import CategoriasDestaque from "./pages/admin/CategoriasDestaque";
+import ProdutosDestaque from "./pages/admin/ProdutosDestaque";
+import Depoimentos from "./pages/admin/Depoimentos";
+import NewsletterConfig from "./pages/admin/NewsletterConfig";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -90,11 +95,16 @@ const App = () => (
               {/* Admin Panel Routes */}
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<AdminDashboard />} />
-                <Route path="banners" element={<AdminBanners />} />
                 <Route path="produtos" element={<AdminProducts />} />
+                <Route path="produtos-destaque" element={<ProdutosDestaque />} />
+                <Route path="categorias-destaque" element={<CategoriasDestaque />} />
                 <Route path="pedidos" element={<AdminOrders />} />
                 <Route path="clientes" element={<AdminCustomers />} />
                 <Route path="integracoes" element={<IntegracaoPage />} />
+                <Route path="homepage" element={<HomepageManagement />} />
+                <Route path="banners" element={<AdminBanners />} />
+                <Route path="depoimentos" element={<Depoimentos />} />
+                <Route path="newsletter-config" element={<NewsletterConfig />} />
               </Route>
               
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
