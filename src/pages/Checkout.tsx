@@ -242,16 +242,46 @@ const Checkout = () => {
     if (!user) return;
 
     try {
-      // Update user profile with phone and CPF if they're filled
-      if (formData.phone || formData.cpf) {
-        const profileUpdateData: any = {};
-        if (formData.phone) profileUpdateData.phone = formData.phone;
-        if (formData.cpf) profileUpdateData.cpf = cleanCPF(formData.cpf);
+      // Update user profile with checkout data to complete missing information
+      const profileUpdateData: any = {};
+      let profileUpdated = false;
 
-        await supabase
+      // Complete missing first name
+      if (formData.firstName && (!profile?.first_name || profile.first_name.trim() === '')) {
+        profileUpdateData.first_name = formData.firstName.trim();
+        profileUpdated = true;
+      }
+
+      // Complete missing last name
+      if (formData.lastName && (!profile?.last_name || profile.last_name.trim() === '')) {
+        profileUpdateData.last_name = formData.lastName.trim();
+        profileUpdated = true;
+      }
+
+      // Update phone if missing or empty
+      if (formData.phone && (!profile?.phone || profile.phone.trim() === '')) {
+        profileUpdateData.phone = formData.phone.trim();
+        profileUpdated = true;
+      }
+
+      // Update CPF if missing or empty
+      if (formData.cpf && (!profile?.cpf || profile.cpf.trim() === '')) {
+        profileUpdateData.cpf = cleanCPF(formData.cpf);
+        profileUpdated = true;
+      }
+
+      // Update profile if any data was changed
+      if (profileUpdated) {
+        const { error: profileError } = await supabase
           .from('profiles')
           .update(profileUpdateData)
           .eq('user_id', user.id);
+
+        if (profileError) {
+          console.error('Error updating profile:', profileError);
+        } else {
+          console.log('Profile updated with checkout data');
+        }
       }
 
       // Save/update address if all required fields are filled and it's not a label method
