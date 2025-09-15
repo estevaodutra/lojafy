@@ -405,9 +405,9 @@ const ProductTable: React.FC<ProductTableProps> = ({
                         />
                       </TableHead>
                       <TableHead className="w-[100px]">Imagem</TableHead>
-                      <TableHead>Produto</TableHead>
-                      <TableHead>SKU</TableHead>
-                      <TableHead>Categoria</TableHead>
+                      <TableHead className="w-[200px]">Produto</TableHead>
+                      <TableHead className="w-[100px]">SKU</TableHead>
+                      <TableHead className="w-[120px]">Categoria</TableHead>
                       <TableHead>Preço</TableHead>
                       <TableHead>Estoque</TableHead>
                       <TableHead>Status</TableHead>
@@ -439,19 +439,23 @@ const ProductTable: React.FC<ProductTableProps> = ({
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{product.name}</p>
+                            <p className="font-medium truncate max-w-[200px]" title={product.name}>
+                              {product.name}
+                            </p>
                             <p className="text-sm text-muted-foreground">
                               {product.brand || 'Marca não informada'}
                             </p>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <code className="text-xs bg-muted px-2 py-1 rounded">
+                          <code className="text-xs bg-muted px-2 py-1 rounded whitespace-nowrap">
                             {product.sku || 'N/A'}
                           </code>
                         </TableCell>
                         <TableCell>
-                          {product.categories?.name || 'Sem categoria'}
+                          <span className="truncate max-w-[120px] block" title={product.categories?.name || 'Sem categoria'}>
+                            {product.categories?.name || 'Sem categoria'}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <div>
