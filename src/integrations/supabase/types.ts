@@ -385,6 +385,41 @@ export type Database = {
           },
         ]
       }
+      order_shipping_files: {
+        Row: {
+          file_name: string
+          file_path: string
+          file_size: number
+          id: string
+          order_id: string
+          uploaded_at: string
+        }
+        Insert: {
+          file_name: string
+          file_path: string
+          file_size: number
+          id?: string
+          order_id: string
+          uploaded_at?: string
+        }
+        Update: {
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          id?: string
+          order_id?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_shipping_files_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_status_history: {
         Row: {
           created_at: string
@@ -425,6 +460,7 @@ export type Database = {
           billing_address: Json | null
           created_at: string
           external_reference: string | null
+          has_shipping_file: boolean | null
           id: string
           notes: string | null
           order_number: string
@@ -435,6 +471,9 @@ export type Database = {
           pix_qr_code_base64: string | null
           shipping_address: Json | null
           shipping_amount: number | null
+          shipping_estimated_days: number | null
+          shipping_method_id: string | null
+          shipping_method_name: string | null
           status: string
           tax_amount: number | null
           total_amount: number
@@ -446,6 +485,7 @@ export type Database = {
           billing_address?: Json | null
           created_at?: string
           external_reference?: string | null
+          has_shipping_file?: boolean | null
           id?: string
           notes?: string | null
           order_number: string
@@ -456,6 +496,9 @@ export type Database = {
           pix_qr_code_base64?: string | null
           shipping_address?: Json | null
           shipping_amount?: number | null
+          shipping_estimated_days?: number | null
+          shipping_method_id?: string | null
+          shipping_method_name?: string | null
           status?: string
           tax_amount?: number | null
           total_amount: number
@@ -467,6 +510,7 @@ export type Database = {
           billing_address?: Json | null
           created_at?: string
           external_reference?: string | null
+          has_shipping_file?: boolean | null
           id?: string
           notes?: string | null
           order_number?: string
@@ -477,6 +521,9 @@ export type Database = {
           pix_qr_code_base64?: string | null
           shipping_address?: Json | null
           shipping_amount?: number | null
+          shipping_estimated_days?: number | null
+          shipping_method_id?: string | null
+          shipping_method_name?: string | null
           status?: string
           tax_amount?: number | null
           total_amount?: number
@@ -484,7 +531,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "orders_shipping_method_id_fkey"
+            columns: ["shipping_method_id"]
+            isOneToOne: false
+            referencedRelation: "shipping_methods"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_variants: {
         Row: {
@@ -723,6 +778,151 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      shipping_methods: {
+        Row: {
+          active: boolean
+          base_price: number
+          created_at: string
+          description: string | null
+          estimated_days: number
+          id: string
+          is_free_above_amount: number | null
+          is_label_method: boolean
+          max_file_size_mb: number | null
+          name: string
+          priority: number
+          requires_upload: boolean
+          transporter: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          base_price?: number
+          created_at?: string
+          description?: string | null
+          estimated_days?: number
+          id?: string
+          is_free_above_amount?: number | null
+          is_label_method?: boolean
+          max_file_size_mb?: number | null
+          name: string
+          priority?: number
+          requires_upload?: boolean
+          transporter?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          base_price?: number
+          created_at?: string
+          description?: string | null
+          estimated_days?: number
+          id?: string
+          is_free_above_amount?: number | null
+          is_label_method?: boolean
+          max_file_size_mb?: number | null
+          name?: string
+          priority?: number
+          requires_upload?: boolean
+          transporter?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      shipping_rules: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          id: string
+          max_order_value: number | null
+          max_weight: number | null
+          min_order_value: number | null
+          min_weight: number | null
+          percentage_modifier: number | null
+          price_modifier: number
+          shipping_method_id: string
+          updated_at: string
+          zone_id: string | null
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          max_order_value?: number | null
+          max_weight?: number | null
+          min_order_value?: number | null
+          min_weight?: number | null
+          percentage_modifier?: number | null
+          price_modifier?: number
+          shipping_method_id: string
+          updated_at?: string
+          zone_id?: string | null
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          max_order_value?: number | null
+          max_weight?: number | null
+          min_order_value?: number | null
+          min_weight?: number | null
+          percentage_modifier?: number | null
+          price_modifier?: number
+          shipping_method_id?: string
+          updated_at?: string
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipping_rules_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipping_rules_shipping_method_id_fkey"
+            columns: ["shipping_method_id"]
+            isOneToOne: false
+            referencedRelation: "shipping_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipping_rules_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "shipping_zones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipping_zones: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          zip_code_end: string
+          zip_code_start: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          zip_code_end: string
+          zip_code_start: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          zip_code_end?: string
+          zip_code_start?: string
+        }
+        Relationships: []
       }
       store_config: {
         Row: {

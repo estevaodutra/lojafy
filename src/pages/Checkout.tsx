@@ -20,6 +20,7 @@ import { ModernPixPayment } from '@/components/ModernPixPayment';
 import { PixPaymentModal } from '@/components/PixPaymentModal';
 import { createModernPixPayment, PixPaymentRequest } from '@/lib/mercadoPago';
 import { ShoppingCart, CreditCard, Truck, Shield, AlertTriangle } from "lucide-react";
+import { ShippingMethodSelector } from "@/components/ShippingMethodSelector";
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -28,7 +29,9 @@ const Checkout = () => {
   const { user, session, profile } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [couponCode, setCouponCode] = useState("");
-  const [shippingCost, setShippingCost] = useState(15.90);
+  const [selectedShippingMethod, setSelectedShippingMethod] = useState<any>(null);
+  const [shippingCost, setShippingCost] = useState(0);
+  const [shippingFile, setShippingFile] = useState<any>(null);
   const [pixPaymentData, setPixPaymentData] = useState<PixPaymentData | null>(null);
   const [modernPixData, setModernPixData] = useState<{
     qr_code: string;
@@ -119,6 +122,15 @@ const Checkout = () => {
   }, [user, session, profile]);
 
   const [isLoadingCep, setIsLoadingCep] = useState(false);
+
+  const handleShippingMethodChange = (method: any, calculatedPrice: number) => {
+    setSelectedShippingMethod(method);
+    setShippingCost(calculatedPrice);
+  };
+
+  const handleShippingFileUpload = (file: any) => {
+    setShippingFile(file);
+  };
 
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const discount = couponCode === "DESCONTO10" ? subtotal * 0.1 : 0;
@@ -591,113 +603,133 @@ const Checkout = () => {
                     Endereço de Entrega
                   </CardTitle>
                 </CardHeader>
-                 <CardContent className="space-y-4">
-                   <div>
-                     <Label htmlFor="zipCode">CEP</Label>
-                     <Input
-                       id="zipCode"
-                       value={formData.zipCode}
-                       onChange={(e) => handleInputChange("zipCode", e.target.value)}
-                       placeholder="00000-000"
-                       maxLength={9}
-                       disabled={isLoadingCep}
-                     />
-                     {isLoadingCep && (
-                       <p className="text-sm text-muted-foreground mt-1">
-                         Buscando endereço...
-                       </p>
-                     )}
-                   </div>
-                   <div>
-                     <Label htmlFor="address">Logradouro</Label>
-                     <Input
-                       id="address"
-                       value={formData.address}
-                       onChange={(e) => handleInputChange("address", e.target.value)}
-                       placeholder="Nome da rua"
-                     />
-                   </div>
-                   <div className="grid grid-cols-3 gap-4">
-                     <div className="col-span-1">
-                       <Label htmlFor="number">Número</Label>
-                       <Input
-                         id="number"
-                         value={formData.number}
-                         onChange={(e) => handleInputChange("number", e.target.value)}
-                         placeholder="123"
-                       />
-                     </div>
-                     <div className="col-span-2">
-                       <Label htmlFor="complement">Complemento</Label>
-                       <Input
-                         id="complement"
-                         value={formData.complement}
-                         onChange={(e) => handleInputChange("complement", e.target.value)}
-                         placeholder="Apto, casa, etc. (opcional)"
-                       />
-                     </div>
-                   </div>
-                   <div>
-                     <Label htmlFor="neighborhood">Bairro</Label>
-                     <Input
-                       id="neighborhood"
-                       value={formData.neighborhood}
-                       onChange={(e) => handleInputChange("neighborhood", e.target.value)}
-                       placeholder="Nome do bairro"
-                     />
-                   </div>
-                   <div className="grid grid-cols-2 gap-4">
-                     <div>
-                       <Label htmlFor="city">Cidade</Label>
-                       <Input
-                         id="city"
-                         value={formData.city}
-                         onChange={(e) => handleInputChange("city", e.target.value)}
-                         placeholder="Sua cidade"
-                       />
-                     </div>
-                     <div>
-                       <Label htmlFor="state">Estado</Label>
-                       <Select 
-                         value={formData.state} 
-                         onValueChange={(value) => handleInputChange("state", value)}
-                       >
-                         <SelectTrigger>
-                           <SelectValue placeholder="Selecione" />
-                         </SelectTrigger>
-                         <SelectContent>
-                           <SelectItem value="AC">Acre</SelectItem>
-                           <SelectItem value="AL">Alagoas</SelectItem>
-                           <SelectItem value="AP">Amapá</SelectItem>
-                           <SelectItem value="AM">Amazonas</SelectItem>
-                           <SelectItem value="BA">Bahia</SelectItem>
-                           <SelectItem value="CE">Ceará</SelectItem>
-                           <SelectItem value="DF">Distrito Federal</SelectItem>
-                           <SelectItem value="ES">Espírito Santo</SelectItem>
-                           <SelectItem value="GO">Goiás</SelectItem>
-                           <SelectItem value="MA">Maranhão</SelectItem>
-                           <SelectItem value="MT">Mato Grosso</SelectItem>
-                           <SelectItem value="MS">Mato Grosso do Sul</SelectItem>
-                           <SelectItem value="MG">Minas Gerais</SelectItem>
-                           <SelectItem value="PA">Pará</SelectItem>
-                           <SelectItem value="PB">Paraíba</SelectItem>
-                           <SelectItem value="PR">Paraná</SelectItem>
-                           <SelectItem value="PE">Pernambuco</SelectItem>
-                           <SelectItem value="PI">Piauí</SelectItem>
-                           <SelectItem value="RJ">Rio de Janeiro</SelectItem>
-                           <SelectItem value="RN">Rio Grande do Norte</SelectItem>
-                           <SelectItem value="RS">Rio Grande do Sul</SelectItem>
-                           <SelectItem value="RO">Rondônia</SelectItem>
-                           <SelectItem value="RR">Roraima</SelectItem>
-                           <SelectItem value="SC">Santa Catarina</SelectItem>
-                           <SelectItem value="SP">São Paulo</SelectItem>
-                           <SelectItem value="SE">Sergipe</SelectItem>
-                           <SelectItem value="TO">Tocantins</SelectItem>
-                         </SelectContent>
-                       </Select>
-                     </div>
-                   </div>
-                 </CardContent>
+                <CardContent className="space-y-4">
+                  {/* Shipping Method Selector */}
+                  <ShippingMethodSelector
+                    orderValue={subtotal}
+                    zipCode={formData.zipCode}
+                    weight={1} // Calculate this based on products if needed
+                    selectedMethodId={selectedShippingMethod?.id}
+                    onMethodChange={handleShippingMethodChange}
+                    onFileUploaded={handleShippingFileUpload}
+                  />
+                  
+                  {/* Address fields - only show if not using label method or if method requires address */}
+                  {(!selectedShippingMethod?.is_label_method) && (
+                    <div className="space-y-4 pt-4 border-t">
+                      <div className="flex items-center gap-2">
+                        <Truck className="w-4 h-4" />
+                        <Label className="text-base font-semibold">Endereço de Entrega</Label>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="zipCode">CEP</Label>
+                        <Input
+                          id="zipCode"
+                          value={formData.zipCode}
+                          onChange={(e) => handleInputChange("zipCode", e.target.value)}
+                          placeholder="00000-000"
+                          maxLength={9}
+                          disabled={isLoadingCep}
+                        />
+                        {isLoadingCep && (
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Buscando endereço...
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <Label htmlFor="address">Logradouro</Label>
+                        <Input
+                          id="address"
+                          value={formData.address}
+                          onChange={(e) => handleInputChange("address", e.target.value)}
+                          placeholder="Nome da rua"
+                        />
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-1">
+                          <Label htmlFor="number">Número</Label>
+                          <Input
+                            id="number"
+                            value={formData.number}
+                            onChange={(e) => handleInputChange("number", e.target.value)}
+                            placeholder="123"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <Label htmlFor="complement">Complemento</Label>
+                          <Input
+                            id="complement"
+                            value={formData.complement}
+                            onChange={(e) => handleInputChange("complement", e.target.value)}
+                            placeholder="Apto, casa, etc. (opcional)"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="neighborhood">Bairro</Label>
+                        <Input
+                          id="neighborhood"
+                          value={formData.neighborhood}
+                          onChange={(e) => handleInputChange("neighborhood", e.target.value)}
+                          placeholder="Nome do bairro"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="city">Cidade</Label>
+                          <Input
+                            id="city"
+                            value={formData.city}
+                            onChange={(e) => handleInputChange("city", e.target.value)}
+                            placeholder="Sua cidade"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="state">Estado</Label>
+                          <Select 
+                            value={formData.state} 
+                            onValueChange={(value) => handleInputChange("state", value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="AC">Acre</SelectItem>
+                              <SelectItem value="AL">Alagoas</SelectItem>
+                              <SelectItem value="AP">Amapá</SelectItem>
+                              <SelectItem value="AM">Amazonas</SelectItem>
+                              <SelectItem value="BA">Bahia</SelectItem>
+                              <SelectItem value="CE">Ceará</SelectItem>
+                              <SelectItem value="DF">Distrito Federal</SelectItem>
+                              <SelectItem value="ES">Espírito Santo</SelectItem>
+                              <SelectItem value="GO">Goiás</SelectItem>
+                              <SelectItem value="MA">Maranhão</SelectItem>
+                              <SelectItem value="MT">Mato Grosso</SelectItem>
+                              <SelectItem value="MS">Mato Grosso do Sul</SelectItem>
+                              <SelectItem value="MG">Minas Gerais</SelectItem>
+                              <SelectItem value="PA">Pará</SelectItem>
+                              <SelectItem value="PB">Paraíba</SelectItem>
+                              <SelectItem value="PR">Paraná</SelectItem>
+                              <SelectItem value="PE">Pernambuco</SelectItem>
+                              <SelectItem value="PI">Piauí</SelectItem>
+                              <SelectItem value="RJ">Rio de Janeiro</SelectItem>
+                              <SelectItem value="RN">Rio Grande do Norte</SelectItem>
+                              <SelectItem value="RS">Rio Grande do Sul</SelectItem>
+                              <SelectItem value="RO">Rondônia</SelectItem>
+                              <SelectItem value="RR">Roraima</SelectItem>
+                              <SelectItem value="SC">Santa Catarina</SelectItem>
+                              <SelectItem value="SP">São Paulo</SelectItem>
+                              <SelectItem value="SE">Sergipe</SelectItem>
+                              <SelectItem value="TO">Tocantins</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
               </Card>
             )}
 
@@ -844,7 +876,12 @@ const Checkout = () => {
                   )}
                   <div className="flex justify-between">
                     <span>Frete</span>
-                    <span>{formatPrice(shippingCost)}</span>
+                    <span>
+                      {selectedShippingMethod 
+                        ? (shippingCost === 0 ? "GRÁTIS" : formatPrice(shippingCost))
+                        : "A calcular"
+                      }
+                    </span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-bold text-lg">

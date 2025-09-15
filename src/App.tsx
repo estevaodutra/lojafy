@@ -42,6 +42,7 @@ import AdminCategorias from "./pages/admin/Categorias";
 import Depoimentos from "./pages/admin/Depoimentos";
 import NewsletterConfig from "./pages/admin/NewsletterConfig";
 import ConfiguracaoVisual from "./pages/admin/ConfiguracaoVisual";
+import Frete from "./pages/admin/Frete";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -105,6 +106,7 @@ const App = () => (
                 <Route path="banners" element={<AdminBanners />} />
                 <Route path="depoimentos" element={<Depoimentos />} />
                 <Route path="newsletter-config" element={<NewsletterConfig />} />
+                <Route path="frete" element={<Frete />} />
               </Route>
               
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

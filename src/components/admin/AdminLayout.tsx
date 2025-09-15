@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation, Outlet, Navigate } from 'react-router-dom';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { BarChart3, Package, ShoppingCart, Users, Settings, Home, Image, Globe, Star, MessageSquare, Mail, Palette } from 'lucide-react';
+import { BarChart3, Package, ShoppingCart, Users, Settings, Home, Image, Globe, Star, MessageSquare, Mail, Palette, Truck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
@@ -10,6 +10,7 @@ const adminMenuItems = [
   { title: 'Produtos', url: '/admin/produtos', icon: Package },
   { title: 'Categorias', url: '/admin/categorias', icon: Package },
   { title: 'Pedidos', url: '/admin/pedidos', icon: ShoppingCart },
+  { title: 'Frete', url: '/admin/frete', icon: Truck },
   { title: 'Clientes', url: '/admin/clientes', icon: Users },
   { title: 'Integracoes', url: '/admin/integracoes', icon: Settings },
 ];
