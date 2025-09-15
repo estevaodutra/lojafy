@@ -34,6 +34,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setSession(session);
         setUser(session?.user ?? null);
         
+        // Send auth events to N8N for specific events
+        if (session?.user?.email) {
+          switch (event) {
+            case 'SIGNED_IN':
+              // This is handled in the signIn function for password login
+              // But we also catch token refresh logins here
+              setTimeout(() => sendAuthEvent('token_refresh_login', session.user.email!, session.user.id), 100);
+              break;
+            case 'TOKEN_REFRESHED':
+              setTimeout(() => sendAuthEvent('token_refreshed', session.user.email!, session.user.id), 100);
+              break;
+            case 'SIGNED_OUT':
+              setTimeout(() => sendAuthEvent('logout', session.user.email!, session.user.id), 100);
+              break;
+          }
+        }
+        
         // Fetch profile when user logs in
         if (session?.user) {
           setTimeout(async () => {
@@ -63,11 +80,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => subscription.unsubscribe();
   }, []);
 
+  const sendAuthEvent = async (event_type: string, email: string, user_id?: string, status: 'success' | 'error' = 'success', metadata?: Record<string, any>) => {
+    try {
+      await supabase.functions.invoke('webhook-auth-events', {
+        body: {
+          event_type,
+          email,
+          user_id,
+          status,
+          metadata
+        }
+      });
+    } catch (error) {
+      console.error('Failed to send auth event:', error);
+    }
+  };
+
   const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
     try {
       const redirectUrl = `${window.location.origin}/`;
       
-      const { error } = await supabase.auth.signUp({
+      const { error, data } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -80,6 +113,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
       
       if (error) {
+        // Send error event to N8N
+        await sendAuthEvent('signup', email, undefined, 'error', { error: error.message });
+        
         toast({
           variant: "destructive",
           title: "Erro no cadastro",
@@ -87,6 +123,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         });
         return { error };
       }
+
+      // Send successful signup event to N8N
+      await sendAuthEvent('signup', email, data.user?.id, 'success', { 
+        first_name: firstName, 
+        last_name: lastName 
+      });
 
       toast({
         title: "Cadastro realizado!",
@@ -101,12 +143,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error, data } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       
       if (error) {
+        // Send error event to N8N
+        await sendAuthEvent('login', email, undefined, 'error', { error: error.message });
+        
         toast({
           variant: "destructive",
           title: "Erro no login",
@@ -114,6 +159,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         });
         return { error };
       }
+
+      // Send successful login event to N8N
+      await sendAuthEvent('login', email, data.user?.id, 'success');
 
       toast({
         title: "Login realizado!",

@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.webhook-n8n-payment]
 verify_jwt = false
 
+[functions.webhook-auth-events]
+verify_jwt = false
+
 [functions.api-produtos-cadastrar]
 verify_jwt = false
 
