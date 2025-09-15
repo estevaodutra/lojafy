@@ -915,6 +915,10 @@ export type Database = {
         Args: { brand_name?: string; category_name?: string }
         Returns: string
       }
+      is_admin_user: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "customer" | "admin" | "super_admin"
