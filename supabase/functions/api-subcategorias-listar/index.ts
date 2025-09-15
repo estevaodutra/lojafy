@@ -6,6 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
 };
 
+function parseBoolean(param: string | null): boolean | null {
+  if (param === null) return null;
+  const v = param.toLowerCase();
+  if (['1','true','yes','on'].includes(v)) return true;
+  if (['0','false','no','off'].includes(v)) return false;
+  return null;
+}
+
 Deno.serve(async (req) => {
   const startTime = Date.now();
   console.log(`[${new Date().toISOString()}] Starting api-subcategorias-listar request`);
@@ -161,13 +169,15 @@ Deno.serve(async (req) => {
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
     const search = url.searchParams.get('search');
+    const withCounts = parseBoolean(url.searchParams.get('with_counts')) ?? false;
 
     console.log('[PARAMS] Query parameters:', { 
       categoryId, 
       active, 
       page, 
       limit, 
-      search 
+      search,
+      withCounts,
     });
 
     console.log('[QUERY] Building subcategories query');
@@ -188,7 +198,8 @@ Deno.serve(async (req) => {
     }
 
     if (search) {
-      query = query.ilike('name', `%${search}%`);
+      const s = `%${search}%`;
+      query = query.or(`name.ilike.${s},slug.ilike.${s}`);
     }
 
     // Order by name
@@ -274,31 +285,34 @@ Deno.serve(async (req) => {
       console.log('[CATEGORIES] Successfully fetched', categories?.length || 0, 'categories');
     }
 
-    // Get product counts for each subcategory
+    // Optional product counts for current page only
     const subcategoryIds = subcategories.map(s => s.id);
     let productCounts: { [key: string]: number } = {};
 
-    console.log('[PRODUCTS] Calculating product counts for', subcategoryIds.length, 'subcategories');
-    
-    if (subcategoryIds.length > 0) {
-      const { data: productCountData, error: productCountError } = await supabase
-        .from('products')
-        .select('subcategory_id')
-        .in('subcategory_id', subcategoryIds)
-        .eq('active', true);
-
-      if (productCountError) {
-        console.warn('[PRODUCTS] Error fetching product counts:', productCountError);
-        // Continue with zero counts rather than failing
-      } else {
-        // Count products per subcategory
-        productCountData?.forEach(product => {
-          if (product.subcategory_id) {
-            productCounts[product.subcategory_id] = (productCounts[product.subcategory_id] || 0) + 1;
+    if (withCounts && subcategoryIds.length > 0) {
+      console.log('[PRODUCTS] Computing product counts via HEAD for', subcategoryIds.length, 'subcategories');
+      await Promise.all(
+        subcategories.map(async (s) => {
+          try {
+            const { count, error } = await supabase
+              .from('products')
+              .select('*', { count: 'exact', head: true })
+              .eq('subcategory_id', s.id)
+              .eq('active', true);
+            if (error) {
+              console.warn('[PRODUCTS] Count failed for subcategory', s.id, error);
+              productCounts[s.id] = 0;
+            } else {
+              productCounts[s.id] = count ?? 0;
+            }
+          } catch (e) {
+            console.warn('[PRODUCTS] Count exception for subcategory', s.id, e);
+            productCounts[s.id] = 0;
           }
-        });
-        console.log('[PRODUCTS] Product counts calculated successfully');
-      }
+        })
+      );
+    } else {
+      console.log('[PRODUCTS] Skipping product counts (with_counts=false)');
     }
 
     console.log('[PROCESS] Processing subcategories data');
@@ -306,7 +320,7 @@ Deno.serve(async (req) => {
     // Format response data
     const formattedData = subcategories.map(subcategory => {
       const category = categoriesMap[subcategory.category_id];
-      return {
+      const base: any = {
         id: subcategory.id,
         nome: subcategory.name,
         slug: subcategory.slug,
@@ -315,11 +329,14 @@ Deno.serve(async (req) => {
           nome: category.name,
           slug: category.slug
         } : null,
-        total_produtos: productCounts[subcategory.id] || 0,
         ativo: subcategory.active,
         criado_em: subcategory.created_at,
         atualizado_em: subcategory.updated_at
       };
+      if (withCounts) {
+        base.total_produtos = productCounts[subcategory.id] || 0;
+      }
+      return base;
     });
 
     console.log('[PROCESS] Subcategories processed successfully');
