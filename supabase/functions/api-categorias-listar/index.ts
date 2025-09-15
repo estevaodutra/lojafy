@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
         icon,
         color,
         image_url,
-        COALESCE(product_count, 0) as product_count,
+        product_count,
         active,
         created_at,
         updated_at
