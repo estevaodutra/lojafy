@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User } from 'lucide-react';
+import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User, FileText, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface OrderItem {
@@ -47,6 +47,14 @@ interface CustomerProfile {
   phone?: string;
 }
 
+interface ShippingFile {
+  id: string;
+  file_name: string;
+  file_path: string;
+  file_size: number;
+  uploaded_at: string;
+}
+
 interface OrderDetailsModalProps {
   orderId: string | null;
   isOpen: boolean;
@@ -57,12 +65,14 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
   const [order, setOrder] = useState<Order | null>(null);
   const [customer, setCustomer] = useState<CustomerProfile | null>(null);
   const [statusHistory, setStatusHistory] = useState<OrderStatusHistory[]>([]);
+  const [shippingFiles, setShippingFiles] = useState<ShippingFile[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (orderId && isOpen) {
       fetchOrderDetails();
       fetchStatusHistory();
+      fetchShippingFiles();
     }
   }, [orderId, isOpen]);
 
@@ -121,6 +131,53 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
     } catch (error) {
       console.error('Erro ao buscar histórico:', error);
     }
+  };
+
+  const fetchShippingFiles = async () => {
+    if (!orderId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('order_shipping_files')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('uploaded_at', { ascending: false });
+
+      if (error) throw error;
+      setShippingFiles(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar arquivos de envio:', error);
+    }
+  };
+
+  const downloadShippingFile = async (filePath: string, fileName: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('shipping-files')
+        .download(filePath);
+
+      if (error) throw error;
+
+      // Create download link
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Erro ao baixar arquivo:', error);
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   const getStatusIcon = (status: string) => {
@@ -359,6 +416,45 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                 </div>
               </CardContent>
             </Card>
+
+            {/* Shipping Files */}
+            {shippingFiles.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Etiquetas de Envio
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {shippingFiles.map((file) => (
+                      <div key={file.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-center w-10 h-10 bg-primary/10 rounded-lg">
+                            <FileText className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{file.file_name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {formatFileSize(file.file_size)} • Enviado em {formatDate(file.uploaded_at)}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => downloadShippingFile(file.file_path, file.file_name)}
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Baixar
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Addresses */}
             {(order.shipping_address || order.billing_address) && (
