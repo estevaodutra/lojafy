@@ -213,6 +213,31 @@ const Checkout = () => {
     }
   };
 
+  // Helper function to check if selected method is label method
+  const isLabelMethod = () => {
+    return selectedShippingMethod?.is_label_method === true;
+  };
+
+  // Validation for step progression
+  const canAdvanceToNextStep = () => {
+    switch (currentStep) {
+      case 1:
+        return formData.email && formData.firstName && formData.cpf;
+      case 2:
+        // If label method, only need shipping method selected
+        if (isLabelMethod()) {
+          return selectedShippingMethod && (selectedShippingMethod.requires_file ? shippingFile : true);
+        }
+        // Regular method requires full address
+        return selectedShippingMethod && formData.address && formData.number && 
+               formData.neighborhood && formData.city && formData.state && formData.zipCode;
+      case 3:
+        return formData.paymentMethod;
+      default:
+        return true;
+    }
+  };
+
   const saveUserDataAndAddress = async () => {
     if (!user) return;
 
@@ -229,8 +254,8 @@ const Checkout = () => {
           .eq('user_id', user.id);
       }
 
-      // Save/update address if all required fields are filled
-      if (formData.address && formData.number && formData.neighborhood && formData.city && formData.state && formData.zipCode) {
+      // Save/update address if all required fields are filled and it's not a label method
+      if (!isLabelMethod() && formData.address && formData.number && formData.neighborhood && formData.city && formData.state && formData.zipCode) {
         // First, set all existing addresses as non-default
         await supabase
           .from('addresses')
@@ -307,7 +332,7 @@ const Checkout = () => {
           cpf: cleanCPF(formData.cpf),
         },
         orderItems,
-        shippingAddress: {
+        shippingAddress: isLabelMethod() ? null : {
           street: formData.address,
           number: formData.number,
           complement: formData.complement,
@@ -381,7 +406,7 @@ const Checkout = () => {
           cpf: formData.cpf
         },
         orderItems,
-        shippingAddress: {
+        shippingAddress: isLabelMethod() ? null : {
           street: formData.address,
           number: formData.number,
           complement: formData.complement,
@@ -614,8 +639,8 @@ const Checkout = () => {
                     onFileUploaded={handleShippingFileUpload}
                   />
                   
-                  {/* Address fields - only show if not using label method or if method requires address */}
-                  {(!selectedShippingMethod?.is_label_method) && (
+                  {/* Address fields - only show if not using label method */}
+                  {!isLabelMethod() && (
                     <div className="space-y-4 pt-4 border-t">
                       <div className="flex items-center gap-2">
                         <Truck className="w-4 h-4" />
@@ -729,6 +754,26 @@ const Checkout = () => {
                       </div>
                     </div>
                   )}
+                  
+                  {/* Label method info message */}
+                  {isLabelMethod() && (
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
+                        <div>
+                          <h4 className="font-semibold text-blue-800">Envio com Etiqueta</h4>
+                          <p className="text-sm text-blue-700 mt-1">
+                            Com esta modalidade de envio, não é necessário informar o endereço de entrega. 
+                            {selectedShippingMethod?.requires_file && !shippingFile && (
+                              <span className="block mt-1 font-medium">
+                                Por favor, faça o upload da etiqueta de envio para continuar.
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -779,8 +824,19 @@ const Checkout = () => {
                     <p><strong>Nome:</strong> {formData.firstName} {formData.lastName}</p>
                     <p><strong>E-mail:</strong> {formData.email}</p>
                     <p><strong>Telefone:</strong> {formData.phone}</p>
-                     <p><strong>Endereço:</strong> {formData.address}, {formData.number} {formData.complement && `- ${formData.complement}`}, {formData.neighborhood}, {formData.city} - {formData.state}</p>
-                     <p><strong>Pagamento:</strong> PIX</p>
+                    {!isLabelMethod() ? (
+                      <p><strong>Endereço:</strong> {formData.address}, {formData.number} {formData.complement && `- ${formData.complement}`}, {formData.neighborhood}, {formData.city} - {formData.state}</p>
+                    ) : (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                        <p><strong>Entrega:</strong> Envio com Etiqueta</p>
+                        {shippingFile && (
+                          <p className="text-xs text-blue-600 mt-1">
+                            Etiqueta anexada: {shippingFile.name}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    <p><strong>Pagamento:</strong> PIX</p>
                   </div>
                 </CardContent>
               </Card>
@@ -797,7 +853,10 @@ const Checkout = () => {
                   </Button>
                   
                   {currentStep < 4 ? (
-                    <Button onClick={() => setCurrentStep(currentStep + 1)}>
+                    <Button 
+                      onClick={() => setCurrentStep(currentStep + 1)}
+                      disabled={!canAdvanceToNextStep()}
+                    >
                       Continuar
                     </Button>
                   ) : (
