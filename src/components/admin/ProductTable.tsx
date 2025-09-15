@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,8 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Edit, Copy, Trash2, Eye, Search, Filter } from 'lucide-react';
+import { MoreHorizontal, Edit, Copy, Trash2, Eye, Search, Filter, ExternalLink, Check, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -33,6 +35,8 @@ const ProductTable: React.FC<ProductTableProps> = ({
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [isSelectAllChecked, setIsSelectAllChecked] = useState(false);
   const itemsPerPage = 10;
   const { toast } = useToast();
 
@@ -57,6 +61,92 @@ const ProductTable: React.FC<ProductTableProps> = ({
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentProducts = filteredProducts.slice(startIndex, endIndex);
+
+  // Mass selection functions
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedProducts(currentProducts.map(p => p.id));
+      setIsSelectAllChecked(true);
+    } else {
+      setSelectedProducts([]);
+      setIsSelectAllChecked(false);
+    }
+  };
+
+  const handleSelectProduct = (productId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedProducts(prev => [...prev, productId]);
+    } else {
+      setSelectedProducts(prev => prev.filter(id => id !== productId));
+      setIsSelectAllChecked(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .in('id', selectedProducts);
+
+      if (error) throw error;
+
+      toast({
+        title: "Produtos excluídos",
+        description: `${selectedProducts.length} produto(s) removido(s) com sucesso.`,
+      });
+
+      setSelectedProducts([]);
+      setIsSelectAllChecked(false);
+      onRefresh();
+    } catch (error) {
+      console.error('Error bulk deleting products:', error);
+      toast({
+        title: "Erro ao excluir produtos",
+        description: "Ocorreu um erro ao tentar excluir os produtos selecionados.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleBulkToggleStatus = async (newStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ 
+          active: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .in('id', selectedProducts);
+
+      if (error) throw error;
+
+      toast({
+        title: "Status atualizado",
+        description: `${selectedProducts.length} produto(s) ${newStatus ? 'ativado(s)' : 'desativado(s)'} com sucesso.`,
+      });
+
+      setSelectedProducts([]);
+      setIsSelectAllChecked(false);
+      onRefresh();
+    } catch (error) {
+      console.error('Error bulk updating products:', error);
+      toast({
+        title: "Erro ao atualizar status",
+        description: "Ocorreu um erro ao tentar atualizar o status dos produtos.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Update select all checkbox state when products change
+  useEffect(() => {
+    if (selectedProducts.length === 0) {
+      setIsSelectAllChecked(false);
+    } else if (selectedProducts.length === currentProducts.length && currentProducts.length > 0) {
+      setIsSelectAllChecked(true);
+    }
+  }, [selectedProducts, currentProducts]);
 
   // Get unique categories for filter
   const categories = [...new Set(products.map(p => p.categories?.name).filter(Boolean))];
@@ -114,13 +204,28 @@ const ProductTable: React.FC<ProductTableProps> = ({
     }
   };
 
-  const getStockBadge = (product: any) => {
+  const getStockIndicator = (product: any) => {
     if (product.stock_quantity === 0) {
-      return <Badge variant="destructive">Sem estoque</Badge>;
-    } else if (product.stock_quantity <= product.min_stock_level) {
-      return <Badge variant="secondary" className="bg-warning/10 text-warning">Estoque baixo</Badge>;
+      return (
+        <div 
+          className="w-3 h-3 rounded-full bg-red-500" 
+          title="Sem estoque"
+        />
+      );
+    } else if (product.stock_quantity <= (product.min_stock_level || 5)) {
+      return (
+        <div 
+          className="w-3 h-3 rounded-full bg-yellow-500" 
+          title={`Estoque baixo (${product.stock_quantity} unidades)`}
+        />
+      );
     }
-    return <Badge variant="outline">Em estoque</Badge>;
+    return (
+      <div 
+        className="w-3 h-3 rounded-full bg-green-500" 
+        title={`Estoque adequado (${product.stock_quantity} unidades)`}
+      />
+    );
   };
 
   const formatPrice = (price: number) => {
@@ -201,6 +306,78 @@ const ProductTable: React.FC<ProductTableProps> = ({
         </CardContent>
       </Card>
 
+      {/* Bulk Actions Bar */}
+      {selectedProducts.length > 0 && (
+        <Card>
+          <CardContent className="py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <span className="text-sm font-medium">
+                  {selectedProducts.length} produto(s) selecionado(s)
+                </span>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleBulkToggleStatus(true)}
+                    className="h-8"
+                  >
+                    <Check className="mr-2 h-4 w-4" />
+                    Ativar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleBulkToggleStatus(false)}
+                    className="h-8"
+                  >
+                    <X className="mr-2 h-4 w-4" />
+                    Desativar
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8 text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground">
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Excluir
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Confirmar exclusão em massa</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Tem certeza que deseja excluir {selectedProducts.length} produto(s) selecionado(s)? 
+                          Esta ação não pode ser desfeita.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleBulkDelete}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Excluir Todos
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelectedProducts([]);
+                  setIsSelectAllChecked(false);
+                }}
+                className="h-8"
+              >
+                Cancelar Seleção
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Products Table */}
       <Card>
         <CardHeader>
@@ -220,6 +397,13 @@ const ProductTable: React.FC<ProductTableProps> = ({
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[50px]">
+                        <Checkbox
+                          checked={isSelectAllChecked}
+                          onCheckedChange={handleSelectAll}
+                          aria-label="Selecionar todos"
+                        />
+                      </TableHead>
                       <TableHead className="w-[100px]">Imagem</TableHead>
                       <TableHead>Produto</TableHead>
                       <TableHead>SKU</TableHead>
@@ -233,6 +417,13 @@ const ProductTable: React.FC<ProductTableProps> = ({
                   <TableBody>
                     {currentProducts.map((product) => (
                       <TableRow key={product.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedProducts.includes(product.id)}
+                            onCheckedChange={(checked) => handleSelectProduct(product.id, !!checked)}
+                            aria-label={`Selecionar ${product.name}`}
+                          />
+                        </TableCell>
                         <TableCell>
                           <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center">
                             {product.main_image_url || product.image_url ? (
@@ -273,9 +464,9 @@ const ProductTable: React.FC<ProductTableProps> = ({
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="space-y-1">
+                          <div className="flex items-center space-x-2">
                             <p className="text-sm font-medium">{product.stock_quantity}</p>
-                            {getStockBadge(product)}
+                            {getStockIndicator(product)}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -293,6 +484,13 @@ const ProductTable: React.FC<ProductTableProps> = ({
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                              <DropdownMenuItem asChild>
+                                <Link to={`/produto/${product.id}`} className="flex items-center">
+                                  <ExternalLink className="mr-2 h-4 w-4" />
+                                  Visualizar Produto
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => onEdit(product)}>
                                 <Edit className="mr-2 h-4 w-4" />
                                 Editar
