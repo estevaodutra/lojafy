@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { ImageZoomModal } from "@/components/ImageZoomModal";
 import {
   ChevronRight,
   Star,
@@ -230,7 +231,7 @@ const Produto = () => {
               <img
                 src={productImages[selectedImage]}
                 alt={product.name}
-                className="w-full h-96 lg:h-[500px] object-cover rounded-lg"
+                className="w-full h-96 lg:h-[500px] object-contain rounded-lg bg-accent/20"
               />
               {product.badge && (
                 <Badge className="absolute top-4 left-4">
@@ -242,13 +243,15 @@ const Produto = () => {
                   -{calculateDiscount()}% OFF
                 </Badge>
               )}
-              <Button
-                size="sm"
-                variant="secondary"
-                className="absolute bottom-4 right-4"
-              >
-                <ZoomIn className="h-4 w-4" />
-              </Button>
+              <ImageZoomModal images={productImages} initialIndex={selectedImage}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="absolute bottom-4 right-4"
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+              </ImageZoomModal>
             </div>
             
             {/* Thumbnail Images */}
