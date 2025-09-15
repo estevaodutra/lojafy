@@ -929,6 +929,7 @@ export type Database = {
           accent_color: string | null
           active: boolean
           benefits_config: Json | null
+          business_hours: string | null
           buy_button_color: string | null
           buy_button_text_color: string | null
           buy_now_button_color: string | null
@@ -937,12 +938,20 @@ export type Database = {
           cart_button_text_color: string | null
           checkout_button_color: string | null
           checkout_button_text_color: string | null
+          company_address: string | null
+          company_cnpj: string | null
+          company_email: string | null
+          company_phone: string | null
           continue_shopping_text_color: string | null
           created_at: string
+          facebook_url: string | null
+          footer_description: string | null
+          footer_developed_text: string | null
           header_background_color: string | null
           header_message: string | null
           header_message_color: string | null
           id: string
+          instagram_url: string | null
           logo_url: string | null
           order_highlight_bg_color: string | null
           order_summary_highlight_color: string | null
@@ -952,12 +961,15 @@ export type Database = {
           secondary_color: string | null
           security_text_color: string | null
           store_name: string | null
+          twitter_url: string | null
           updated_at: string
+          youtube_url: string | null
         }
         Insert: {
           accent_color?: string | null
           active?: boolean
           benefits_config?: Json | null
+          business_hours?: string | null
           buy_button_color?: string | null
           buy_button_text_color?: string | null
           buy_now_button_color?: string | null
@@ -966,12 +978,20 @@ export type Database = {
           cart_button_text_color?: string | null
           checkout_button_color?: string | null
           checkout_button_text_color?: string | null
+          company_address?: string | null
+          company_cnpj?: string | null
+          company_email?: string | null
+          company_phone?: string | null
           continue_shopping_text_color?: string | null
           created_at?: string
+          facebook_url?: string | null
+          footer_description?: string | null
+          footer_developed_text?: string | null
           header_background_color?: string | null
           header_message?: string | null
           header_message_color?: string | null
           id?: string
+          instagram_url?: string | null
           logo_url?: string | null
           order_highlight_bg_color?: string | null
           order_summary_highlight_color?: string | null
@@ -981,12 +1001,15 @@ export type Database = {
           secondary_color?: string | null
           security_text_color?: string | null
           store_name?: string | null
+          twitter_url?: string | null
           updated_at?: string
+          youtube_url?: string | null
         }
         Update: {
           accent_color?: string | null
           active?: boolean
           benefits_config?: Json | null
+          business_hours?: string | null
           buy_button_color?: string | null
           buy_button_text_color?: string | null
           buy_now_button_color?: string | null
@@ -995,12 +1018,20 @@ export type Database = {
           cart_button_text_color?: string | null
           checkout_button_color?: string | null
           checkout_button_text_color?: string | null
+          company_address?: string | null
+          company_cnpj?: string | null
+          company_email?: string | null
+          company_phone?: string | null
           continue_shopping_text_color?: string | null
           created_at?: string
+          facebook_url?: string | null
+          footer_description?: string | null
+          footer_developed_text?: string | null
           header_background_color?: string | null
           header_message?: string | null
           header_message_color?: string | null
           id?: string
+          instagram_url?: string | null
           logo_url?: string | null
           order_highlight_bg_color?: string | null
           order_summary_highlight_color?: string | null
@@ -1010,7 +1041,9 @@ export type Database = {
           secondary_color?: string | null
           security_text_color?: string | null
           store_name?: string | null
+          twitter_url?: string | null
           updated_at?: string
+          youtube_url?: string | null
         }
         Relationships: []
       }

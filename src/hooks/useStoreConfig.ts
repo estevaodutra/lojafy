@@ -27,6 +27,17 @@ interface StoreConfig {
   order_highlight_bg_color: string;
   security_text_color: string;
   continue_shopping_text_color: string;
+  footer_description: string | null;
+  company_cnpj: string | null;
+  company_address: string | null;
+  company_phone: string | null;
+  company_email: string | null;
+  business_hours: string | null;
+  instagram_url: string | null;
+  facebook_url: string | null;
+  twitter_url: string | null;
+  youtube_url: string | null;
+  footer_developed_text: string | null;
   active: boolean;
 }
 

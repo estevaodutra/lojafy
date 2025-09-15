@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { Palette, Image, Settings, Star, Package, Loader2, Save, ShoppingCart } from 'lucide-react';
+import { Palette, Image, Settings, Star, Package, Loader2, Save, ShoppingCart, Layout } from 'lucide-react';
 import { ColorPicker } from '@/components/admin/ColorPicker';
 import { LogoUpload } from '@/components/admin/LogoUpload';
 
@@ -39,6 +39,17 @@ interface StoreConfig {
   order_highlight_bg_color: string;
   security_text_color: string;
   continue_shopping_text_color: string;
+  footer_description: string | null;
+  company_cnpj: string | null;
+  company_address: string | null;
+  company_phone: string | null;
+  company_email: string | null;
+  business_hours: string | null;
+  instagram_url: string | null;
+  facebook_url: string | null;
+  twitter_url: string | null;
+  youtube_url: string | null;
+  footer_developed_text: string | null;
   active: boolean;
 }
 
@@ -148,13 +159,14 @@ const ConfiguracaoVisual = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="header">Header & Logo</TabsTrigger>
           <TabsTrigger value="cores">Cores Principais</TabsTrigger>
           <TabsTrigger value="botoes">Botões & Produtos</TabsTrigger>
           <TabsTrigger value="ecommerce">E-commerce</TabsTrigger>
           <TabsTrigger value="vantagens">Vantagens</TabsTrigger>
           <TabsTrigger value="resumo">Resumo Pedido</TabsTrigger>
+          <TabsTrigger value="footer">Footer</TabsTrigger>
         </TabsList>
 
         <TabsContent value="header" className="space-y-4">
@@ -555,6 +567,157 @@ const ConfiguracaoVisual = () => {
                 <Button 
                   onClick={handleSave} 
                   disabled={!hasChanges || updateConfigMutation.isPending}
+                >
+                  {updateConfigMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Salvar Configurações
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="footer" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Layout className="h-5 w-5" />
+                Configurações do Footer
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Company Information */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Informações da Empresa</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="footer_description">Descrição da Empresa</Label>
+                    <textarea
+                      id="footer_description"
+                      placeholder="Sua loja online de confiança..."
+                      className="min-h-[80px] w-full px-3 py-2 border border-input bg-background text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent resize-none"
+                      value={localConfig.footer_description || ''}
+                      onChange={(e) => handleLocalChange({ footer_description: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="company_cnpj">CNPJ</Label>
+                    <Input
+                      id="company_cnpj"
+                      placeholder="12.345.678/0001-90"
+                      value={localConfig.company_cnpj || ''}
+                      onChange={(e) => handleLocalChange({ company_cnpj: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="company_address">Endereço Completo</Label>
+                    <Input
+                      id="company_address"
+                      placeholder="Rua das Flores, 123 - Centro - São Paulo/SP"
+                      value={localConfig.company_address || ''}
+                      onChange={(e) => handleLocalChange({ company_address: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="company_phone">Telefone</Label>
+                    <Input
+                      id="company_phone"
+                      placeholder="(11) 99999-9999"
+                      value={localConfig.company_phone || ''}
+                      onChange={(e) => handleLocalChange({ company_phone: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="company_email">E-mail</Label>
+                    <Input
+                      id="company_email"
+                      type="email"
+                      placeholder="contato@suaempresa.com"
+                      value={localConfig.company_email || ''}
+                      onChange={(e) => handleLocalChange({ company_email: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="business_hours">Horário de Funcionamento</Label>
+                    <Input
+                      id="business_hours"
+                      placeholder="Seg-Sex: 8h às 18h | Sáb: 8h às 14h"
+                      value={localConfig.business_hours || ''}
+                      onChange={(e) => handleLocalChange({ business_hours: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Social Media */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Redes Sociais</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="facebook_url">Facebook URL</Label>
+                    <Input
+                      id="facebook_url"
+                      placeholder="https://facebook.com/suaempresa"
+                      value={localConfig.facebook_url || ''}
+                      onChange={(e) => handleLocalChange({ facebook_url: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="instagram_url">Instagram URL</Label>
+                    <Input
+                      id="instagram_url"
+                      placeholder="https://instagram.com/suaempresa"
+                      value={localConfig.instagram_url || ''}
+                      onChange={(e) => handleLocalChange({ instagram_url: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="twitter_url">Twitter/X URL</Label>
+                    <Input
+                      id="twitter_url"
+                      placeholder="https://twitter.com/suaempresa"
+                      value={localConfig.twitter_url || ''}
+                      onChange={(e) => handleLocalChange({ twitter_url: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="youtube_url">YouTube URL</Label>
+                    <Input
+                      id="youtube_url"
+                      placeholder="https://youtube.com/@suaempresa"
+                      value={localConfig.youtube_url || ''}
+                      onChange={(e) => handleLocalChange({ youtube_url: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Custom Texts */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Textos Personalizados</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="footer_developed_text">Texto "Desenvolvido por"</Label>
+                  <Input
+                    id="footer_developed_text"
+                    placeholder="Desenvolvido com ❤️ para você"
+                    value={localConfig.footer_developed_text || ''}
+                    onChange={(e) => handleLocalChange({ footer_developed_text: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button 
+                  onClick={handleSave}
+                  disabled={!hasChanges || updateConfigMutation.isPending}
+                  className="min-w-[150px]"
                 >
                   {updateConfigMutation.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
