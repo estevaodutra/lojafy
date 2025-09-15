@@ -4,8 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User, FileText, Download } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User, FileText, Download, Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface OrderItem {
   id: string;
@@ -67,6 +71,12 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
   const [statusHistory, setStatusHistory] = useState<OrderStatusHistory[]>([]);
   const [shippingFiles, setShippingFiles] = useState<ShippingFile[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const { toast } = useToast();
+  const { profile } = useAuth();
+
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
 
   useEffect(() => {
     if (orderId && isOpen) {
@@ -156,19 +166,92 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
         .from('shipping-files')
         .download(filePath);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error downloading file:', error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível baixar o arquivo.",
+          variant: "destructive"
+        });
+        return;
+      }
 
-      // Create download link
-      const url = URL.createObjectURL(data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Create blob URL and trigger download
+      const blob = new Blob([data]);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Sucesso",
+        description: "Arquivo baixado com sucesso.",
+      });
     } catch (error) {
-      console.error('Erro ao baixar arquivo:', error);
+      console.error('Error downloading file:', error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao baixar o arquivo.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!orderId || !isAdmin) return;
+
+    setIsUploading(true);
+    try {
+      // Generate unique filename
+      const fileExtension = file.name.split('.').pop();
+      const fileName = `admin_upload_${Date.now()}.${fileExtension}`;
+      const filePath = `${orderId}/${fileName}`;
+
+      // Upload file to Supabase Storage
+      const { data, error: uploadError } = await supabase.storage
+        .from('shipping-files')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Insert file record into database
+      const { error: dbError } = await supabase
+        .from('order_shipping_files')
+        .insert({
+          order_id: orderId,
+          file_name: file.name,
+          file_path: filePath,
+          file_size: file.size,
+        });
+
+      if (dbError) {
+        throw dbError;
+      }
+
+      toast({
+        title: "Sucesso",
+        description: "Arquivo enviado com sucesso.",
+      });
+
+      // Refresh shipping files
+      fetchShippingFiles();
+      setUploadFile(null);
+
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível enviar o arquivo.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -418,39 +501,99 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
             </Card>
 
             {/* Shipping Files */}
-            {shippingFiles.length > 0 && (
+            {(shippingFiles.length > 0 || isAdmin) && (
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Etiquetas de Envio
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      Etiquetas de Envio
+                    </div>
+                    {isAdmin && (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) setUploadFile(file);
+                          }}
+                          className="hidden"
+                          id="file-upload"
+                        />
+                        <Label
+                          htmlFor="file-upload"
+                          className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 py-2"
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Enviar Arquivo
+                        </Label>
+                      </div>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    {shippingFiles.map((file) => (
-                      <div key={file.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center justify-center w-10 h-10 bg-primary/10 rounded-lg">
-                            <FileText className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{file.file_name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {formatFileSize(file.file_size)} • Enviado em {formatDate(file.uploaded_at)}
-                            </p>
-                          </div>
+                  {uploadFile && isAdmin && (
+                    <div className="mb-4 p-3 border border-border rounded-lg bg-muted/50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          <span className="text-sm font-medium">{uploadFile.name}</span>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => downloadShippingFile(file.file_path, file.file_name)}
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Baixar
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleFileUpload(uploadFile)}
+                            disabled={isUploading}
+                          >
+                            {isUploading ? "Enviando..." : "Confirmar"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setUploadFile(null)}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
                       </div>
-                    ))}
+                    </div>
+                  )}
+                  
+                  <div className="space-y-3">
+                    {shippingFiles.length > 0 ? (
+                      shippingFiles.map((file) => (
+                        <div key={file.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center justify-center w-10 h-10 bg-primary/10 rounded-lg">
+                              <FileText className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{file.file_name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {formatFileSize(file.file_size)} • Enviado em {formatDate(file.uploaded_at)}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => downloadShippingFile(file.file_path, file.file_name)}
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Baixar
+                          </Button>
+                        </div>
+                      ))
+                    ) : !isAdmin ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Nenhuma etiqueta disponível para este pedido.
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Nenhuma etiqueta enviada ainda. Use o botão acima para fazer upload.
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -501,24 +644,25 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
             {statusHistory.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Histórico do Pedido</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Histórico do Pedido
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {statusHistory.map((history, index) => (
-                      <div key={history.id} className="flex items-start gap-3">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
-                          {getStatusIcon(history.status)}
+                    {statusHistory.map((item) => (
+                      <div key={item.id} className="flex items-start gap-3">
+                        <div className="flex items-center justify-center w-8 h-8 bg-primary/10 rounded-full mt-0.5">
+                          {getStatusIcon(item.status)}
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <p className="font-semibold">{getStatusLabel(history.status)}</p>
-                            <span className="text-sm text-muted-foreground">
-                              {formatDate(history.created_at)}
-                            </span>
+                            <p className="font-medium">{getStatusLabel(item.status)}</p>
+                            <p className="text-sm text-muted-foreground">{formatDate(item.created_at)}</p>
                           </div>
-                          {history.notes && (
-                            <p className="text-sm text-muted-foreground mt-1">{history.notes}</p>
+                          {item.notes && (
+                            <p className="text-sm text-muted-foreground mt-1">{item.notes}</p>
                           )}
                         </div>
                       </div>
@@ -528,21 +672,21 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
               </Card>
             )}
 
-            {/* Notes */}
+            {/* Order Notes */}
             {order.notes && (
               <Card>
                 <CardHeader>
                   <CardTitle>Observações</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">{order.notes}</p>
+                  <p className="text-sm">{order.notes}</p>
                 </CardContent>
               </Card>
             )}
           </div>
         ) : (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">Pedido não encontrado</p>
+            <p className="text-muted-foreground">Pedido não encontrado.</p>
           </div>
         )}
       </DialogContent>

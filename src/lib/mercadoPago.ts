@@ -19,6 +19,7 @@ export interface PixPaymentRequest {
 }
 
 export interface PixPaymentResponse {
+  order_id: string;
   payment_id: string;
   status: string;
   qr_code: string;
@@ -57,6 +58,7 @@ export async function createModernPixPayment(paymentData: PixPaymentRequest): Pr
 
     // Edge Function already processed the N8N array response
     return {
+      order_id: response.data.order_id,
       payment_id: response.data.payment_id,
       status: response.data.status,
       qr_code: response.data.qr_code,

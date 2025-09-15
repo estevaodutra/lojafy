@@ -226,7 +226,7 @@ const Checkout = () => {
       case 2:
         // If label method, only need shipping method selected
         if (isLabelMethod()) {
-          return selectedShippingMethod && (selectedShippingMethod.requires_file ? shippingFile : true);
+          return selectedShippingMethod && (selectedShippingMethod.requires_upload ? shippingFile : true);
         }
         // Regular method requires full address
         return selectedShippingMethod && formData.address && formData.number && 
@@ -451,6 +451,50 @@ const Checkout = () => {
       const response = await createModernPixPayment(paymentRequest);
       
       console.log('Modern PIX payment created:', response);
+      
+      // Upload shipping file if provided
+      if (shippingFile && shippingFile.file && response.order_id) {
+        try {
+          console.log('Uploading shipping file for order:', response.order_id);
+          
+          // Generate unique filename
+          const fileExtension = shippingFile.file.name.split('.').pop();
+          const fileName = `order_${response.order_id}_${Date.now()}.${fileExtension}`;
+          const filePath = `${response.order_id}/${fileName}`;
+
+          // Upload file to Supabase Storage
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('shipping-files')
+            .upload(filePath, shippingFile.file);
+
+          if (uploadError) {
+            console.error('Error uploading shipping file:', uploadError);
+            toast({
+              title: "Aviso",
+              description: "Pedido criado, mas houve erro no upload da etiqueta. Você pode fazer o upload depois.",
+              variant: "destructive",
+            });
+          } else {
+            // Insert file record into database
+            const { error: dbError } = await supabase
+              .from('order_shipping_files')
+              .insert({
+                order_id: response.order_id,
+                file_name: shippingFile.file.name,
+                file_path: filePath,
+                file_size: shippingFile.file.size,
+              });
+
+            if (dbError) {
+              console.error('Error saving shipping file record:', dbError);
+            } else {
+              console.log('Shipping file uploaded successfully');
+            }
+          }
+        } catch (fileError) {
+          console.error('Error processing shipping file:', fileError);
+        }
+      }
       
       // Open the PIX modal with the payment data
       setPixModalData({
