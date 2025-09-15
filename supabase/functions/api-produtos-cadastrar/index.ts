@@ -5,6 +5,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
 };
 
+// Helper function to validate and normalize UUID fields
+function normalizeUuid(value: any): string | null {
+  if (!value || value === "" || value === "null" || value === null || value === undefined) {
+    return null;
+  }
+  
+  const stringValue = String(value).trim();
+  if (stringValue === "") return null;
+  
+  // Basic UUID format validation
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(stringValue)) {
+    throw new Error(`Invalid UUID format: ${stringValue}`);
+  }
+  
+  return stringValue;
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -94,6 +112,25 @@ Deno.serve(async (req) => {
     const normalizedImagens = (imagens && imagens.length > 0) ? imagens.filter(img => img && img !== "" && img !== "null") : [];
     const normalizedEspecificacoes = especificacoes && Object.keys(especificacoes).length > 0 ? especificacoes : {};
 
+    // Normalize UUID fields with validation
+    let normalizedCategoriaId: string | null = null;
+    let normalizedSubcategoriaId: string | null = null;
+    
+    try {
+      normalizedCategoriaId = normalizeUuid(categoria_id);
+      normalizedSubcategoriaId = normalizeUuid(subcategoria_id);
+    } catch (error) {
+      console.error('[UUID_ERROR] Invalid UUID format:', error);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Formato de UUID inválido',
+          details: error.message,
+          received: { categoria_id, subcategoria_id }
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Validate required fields
     if (!nome || !preco) {
       return new Response(
@@ -127,19 +164,19 @@ Deno.serve(async (req) => {
     }
 
     // Validate subcategory belongs to category if both are provided
-    if (subcategoria_id && categoria_id) {
+    if (normalizedSubcategoriaId && normalizedCategoriaId) {
       const { data: subcategory, error: subcategoryError } = await supabase
         .from('subcategories')
         .select('category_id')
-        .eq('id', subcategoria_id)
+        .eq('id', normalizedSubcategoriaId)
         .eq('active', true)
         .single();
 
-      if (subcategoryError || subcategory?.category_id !== categoria_id) {
+      if (subcategoryError || subcategory?.category_id !== normalizedCategoriaId) {
         return new Response(
           JSON.stringify({ 
             error: 'Subcategoria não pertence à categoria especificada ou não existe',
-            received: { categoria_id, subcategoria_id }
+            received: { categoria_id: normalizedCategoriaId, subcategoria_id: normalizedSubcategoriaId }
           }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -156,8 +193,8 @@ Deno.serve(async (req) => {
       stock_quantity: estoque || 0,
       min_stock_level: nivel_minimo_estoque || 5,
       low_stock_alert: alerta_estoque_baixo || false,
-      category_id: categoria_id,
-      subcategory_id: subcategoria_id,
+      category_id: normalizedCategoriaId,
+      subcategory_id: normalizedSubcategoriaId,
       images: normalizedImagens,
       main_image_url: normalizedImagemPrincipal,
       brand: normalizedMarca,
@@ -187,7 +224,20 @@ Deno.serve(async (req) => {
       .single();
 
     if (productError) {
-      console.error('Error creating product:', productError);
+      console.error('[DB_ERROR] Error creating product:', productError);
+      
+      // Handle specific UUID error
+      if (productError.code === '22P02' && productError.message.includes('invalid input syntax for type uuid')) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Formato de UUID inválido nos campos categoria_id ou subcategoria_id',
+            details: 'UUIDs devem ter o formato: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx ou ser nulos',
+            received: { categoria_id: normalizedCategoriaId, subcategoria_id: normalizedSubcategoriaId }
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       return new Response(
         JSON.stringify({ 
           error: 'Erro ao criar produto',
