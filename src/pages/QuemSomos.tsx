@@ -1,10 +1,12 @@
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { useStoreConfig } from "@/hooks/useStoreConfig";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Users, Target, Heart, Award, Globe, Zap } from "lucide-react";
 
 const QuemSomos = () => {
+  const { config } = useStoreConfig();
   const values = [
     {
       icon: Heart,
@@ -66,7 +68,7 @@ const QuemSomos = () => {
             <h2 className="text-3xl font-bold text-foreground mb-6">Nossa História</h2>
             <div className="space-y-4 text-muted-foreground">
               <p>
-                Fundada em 2020, a EcoShop nasceu da paixão por tecnologia e do desejo 
+                Fundada em 2020, a {config?.store_name || "EcoShop"} nasceu da paixão por tecnologia e do desejo 
                 de democratizar o acesso aos melhores produtos eletrônicos do mercado.
               </p>
               <p>

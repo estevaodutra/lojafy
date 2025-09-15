@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { useStoreConfig } from "@/hooks/useStoreConfig";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,7 @@ import { ContactForm } from "@/types";
 
 const Contato = () => {
   const { toast } = useToast();
+  const { config } = useStoreConfig();
   const [formData, setFormData] = useState<ContactForm>({
     name: "",
     email: "",
@@ -119,7 +121,7 @@ const Contato = () => {
                   </div>
                   <div>
                     <p className="font-medium">Telefone</p>
-                    <p className="text-sm text-muted-foreground">(11) 99999-9999</p>
+                    <p className="text-sm text-muted-foreground">{config?.company_phone || "(11) 99999-9999"}</p>
                   </div>
                 </div>
 
@@ -129,7 +131,7 @@ const Contato = () => {
                   </div>
                   <div>
                     <p className="font-medium">Email</p>
-                    <p className="text-sm text-muted-foreground">contato@ecoshop.com</p>
+                    <p className="text-sm text-muted-foreground">{config?.company_email || "contato@exemplo.com"}</p>
                   </div>
                 </div>
 
@@ -140,8 +142,7 @@ const Contato = () => {
                   <div>
                     <p className="font-medium">Endereço</p>
                     <p className="text-sm text-muted-foreground">
-                      Rua das Flores, 123<br />
-                      Centro - São Paulo, SP
+                      {config?.company_address || "Rua das Flores, 123 - Centro - São Paulo, SP"}
                     </p>
                   </div>
                 </div>
@@ -153,8 +154,7 @@ const Contato = () => {
                   <div>
                     <p className="font-medium">Horário de Atendimento</p>
                     <p className="text-sm text-muted-foreground">
-                      Segunda a Sexta: 8h às 18h<br />
-                      Sábado: 8h às 12h
+                      {config?.business_hours || "Seg-Sex: 8h às 18h | Sáb: 8h às 14h"}
                     </p>
                   </div>
                 </div>

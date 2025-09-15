@@ -1,4 +1,5 @@
 import React from 'react';
+import { useStoreConfig } from '@/hooks/useStoreConfig';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -7,6 +8,7 @@ import { HelpCircle, MessageCircle, Mail, Phone, Clock, FileText, Truck, CreditC
 import { Link } from 'react-router-dom';
 
 const Help = () => {
+  const { config } = useStoreConfig();
   const faqItems = [
     {
       question: "Como posso rastrear meu pedido?",
@@ -46,15 +48,15 @@ const Help = () => {
     {
       icon: Phone,
       title: "Telefone",
-      description: "(11) 4000-1234",
-      time: "Seg-Sex: 8h às 18h",
+      description: config?.company_phone || "(11) 4000-1234",
+      time: config?.business_hours || "Seg-Sex: 8h às 18h",
       action: "Ligar Agora",
       variant: "outline" as const
     },
     {
       icon: Mail,
       title: "Email",
-      description: "contato@loja.com",
+      description: config?.company_email || "contato@loja.com",
       time: "Resposta em até 24h",
       action: "Enviar Email",
       variant: "outline" as const
