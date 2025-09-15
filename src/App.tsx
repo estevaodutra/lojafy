@@ -20,6 +20,7 @@ import PoliticaTroca from "./pages/PoliticaTroca";
 import TermosUso from "./pages/TermosUso";
 import FAQ from "./pages/FAQ";
 import RastrearPedido from "./pages/RastrearPedido";
+import RankingProdutos from "./pages/RankingProdutos";
 import CentralAjuda from "./pages/CentralAjuda";
 import Carrinho from "./pages/Carrinho";
 import NotFound from "./pages/NotFound";
@@ -87,6 +88,7 @@ const App = () => {
               <Route path="/termos-uso" element={<TermosUso />} />
               <Route path="/faq" element={<FAQ />} />
               <Route path="/rastrear-pedido" element={<RastrearPedido />} />
+              <Route path="/ranking-produtos" element={<RankingProdutos />} />
               <Route path="/central-ajuda" element={<CentralAjuda />} />
               <Route path="/carrinho" element={<Carrinho />} />
               <Route path="/auth" element={<Auth />} />
@@ -95,8 +97,8 @@ const App = () => {
               <Route path="/minha-conta" element={<CustomerLayout />}>
                 <Route index element={<CustomerDashboard />} />
                 <Route path="pedidos" element={<CustomerOrders />} />
-                
                 <Route path="favoritos" element={<CustomerFavorites />} />
+                <Route path="enderecos" element={<CustomerAddresses />} />
                 <Route path="configuracoes" element={<CustomerSettings />} />
                 <Route path="ajuda" element={<CustomerHelp />} />
               </Route>

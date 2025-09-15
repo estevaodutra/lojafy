@@ -1,4 +1,4 @@
-import { Search, User, Heart, ShoppingCart, Menu, LogOut, Settings, X } from "lucide-react";
+import { Search, User, Heart, ShoppingCart, Menu, LogOut, Settings, X, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link, useNavigate } from "react-router-dom";
@@ -227,6 +227,14 @@ const Header = () => {
                         Categorias
                       </Link>
                       <Link 
+                        to="/ranking-produtos" 
+                        className="flex items-center gap-2 py-2 text-foreground hover:text-primary transition-colors"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Trophy className="w-4 h-4" />
+                        Ranking
+                      </Link>
+                      <Link 
                         to="/contato" 
                         className="block py-2 text-foreground hover:text-primary transition-colors"
                         onClick={() => setMobileMenuOpen(false)}
@@ -342,6 +350,12 @@ const Header = () => {
           </Button>
           <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
             <Link to="/categorias">Categorias</Link>
+          </Button>
+          <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
+            <Link to="/ranking-produtos" className="flex items-center gap-1">
+              <Trophy className="w-4 h-4" />
+              Ranking
+            </Link>
           </Button>
           <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
             <Link to="/contato">Contato</Link>
