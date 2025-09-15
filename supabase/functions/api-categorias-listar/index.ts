@@ -14,6 +14,8 @@ Deno.serve(async (req) => {
   try {
     // Verify API key
     const apiKey = req.headers.get('x-api-key');
+    console.log('Received API key:', apiKey ? 'Present' : 'Missing');
+    
     if (!apiKey) {
       return new Response(
         JSON.stringify({ error: 'API key required in X-API-Key header' }),
@@ -70,7 +72,7 @@ Deno.serve(async (req) => {
         icon,
         color,
         image_url,
-        product_count,
+        COALESCE(product_count, 0) as product_count,
         active,
         created_at,
         updated_at
@@ -82,6 +84,7 @@ Deno.serve(async (req) => {
       query = query.eq('active', active === 'true');
     }
 
+    console.log('Executing categories query with filters:', { active });
     const { data: categories, error: categoriesError } = await query;
 
     if (categoriesError) {
@@ -95,24 +98,54 @@ Deno.serve(async (req) => {
       );
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        data: categories?.map(category => ({
-          id: category.id,
-          nome: category.name,
-          slug: category.slug,
-          icone: category.icon,
-          cor: category.color,
-          imagem_url: category.image_url,
-          total_produtos: category.product_count,
-          ativo: category.active,
-          criado_em: category.created_at,
-          atualizado_em: category.updated_at
-        })) || []
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.log(`Found ${categories?.length || 0} categories`);
+
+    // Validate categories data before processing
+    if (!categories) {
+      console.log('No categories returned from query');
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: []
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Process categories safely
+    try {
+      const processedCategories = categories.map(category => ({
+        id: category.id,
+        nome: category.name,
+        slug: category.slug,
+        icone: category.icon,
+        cor: category.color,
+        imagem_url: category.image_url,
+        total_produtos: Number(category.product_count) || 0,
+        ativo: category.active,
+        criado_em: category.created_at,
+        atualizado_em: category.updated_at
+      }));
+
+      console.log('Successfully processed categories data');
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: processedCategories
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (processingError) {
+      console.error('Error processing categories data:', processingError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Erro ao processar dados das categorias',
+          details: processingError.message 
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
   } catch (error) {
     console.error('Error in api-categorias-listar:', error);
