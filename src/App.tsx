@@ -56,15 +56,19 @@ const queryClient = new QueryClient({
   },
 });
 
-const App = () => {
+const AppContent = () => {
   useDocumentTitle();
-  
+  return null;
+};
+
+const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
       <AuthProvider>
         <FavoritesProvider>
           <CartProvider>
+          <AppContent />
           <Toaster />
           <Sonner />
           <BrowserRouter>
