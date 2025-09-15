@@ -52,7 +52,7 @@ export const OrderItem = ({ order }: OrderItemProps) => {
           {order.product_name}
         </h4>
         <p className="text-sm text-muted-foreground">
-          Cliente: <span className="font-medium">{order.customer_name}</span>
+          Cliente: <span className="font-medium">Cliente Anônimo</span>
         </p>
         <p className="text-xs text-muted-foreground">
           Pedido: {order.order_number}
