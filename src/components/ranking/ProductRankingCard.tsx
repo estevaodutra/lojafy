@@ -31,18 +31,6 @@ const getPositionIcon = (position: number) => {
   }
 };
 
-const getPositionBadgeVariant = (position: number) => {
-  switch (position) {
-    case 1:
-      return "default";
-    case 2:
-      return "secondary";
-    case 3:
-      return "outline";
-    default:
-      return "outline";
-  }
-};
 
 export const ProductRankingCard = ({ product, position }: ProductRankingCardProps) => {
   const [showDetails, setShowDetails] = useState(false);
@@ -59,7 +47,7 @@ export const ProductRankingCard = ({ product, position }: ProductRankingCardProp
         <div className="flex items-center gap-4">
           {/* Position */}
           <div className="flex flex-col items-center gap-1">
-            <Badge variant={getPositionBadgeVariant(position)} className="w-8 h-8 rounded-full flex items-center justify-center p-0">
+            <Badge className="w-8 h-8 rounded-full flex items-center justify-center p-0 bg-black text-white border-transparent">
               #{position}
             </Badge>
             {getPositionIcon(position)}
