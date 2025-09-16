@@ -5,12 +5,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2, Mail, Lock, User } from 'lucide-react';
+import lojafyLogo from '@/assets/lojafy-logo.png';
 
 const Auth = () => {
   const { user, loading, signIn, signUp } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [showEmailVerificationDialog, setShowEmailVerificationDialog] = useState(false);
   
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -40,7 +43,11 @@ const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
     
-    await signUp(signupEmail, signupPassword, firstName, lastName);
+    const result = await signUp(signupEmail, signupPassword, firstName, lastName);
+    
+    if (!result.error) {
+      setShowEmailVerificationDialog(true);
+    }
     
     setIsLoading(false);
   };
@@ -57,11 +64,11 @@ const Auth = () => {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-hero-gradient rounded-lg flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-2xl">E</span>
+          <div className="w-20 h-20 mx-auto mb-4 overflow-hidden rounded-lg bg-white shadow-sm border">
+            <img src={lojafyLogo} alt="Lojafy" className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground">EcoShop</h1>
-          <p className="text-muted-foreground mt-2">Sua loja online favorita</p>
+          <h1 className="text-3xl font-bold text-foreground">Lojafy</h1>
+          <p className="text-muted-foreground mt-2">Sua Loja Descomplicada</p>
         </div>
 
         <Card>
@@ -194,6 +201,22 @@ const Auth = () => {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={showEmailVerificationDialog} onOpenChange={setShowEmailVerificationDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Verifique seu email</AlertDialogTitle>
+            <AlertDialogDescription>
+              Enviamos um email de confirmação para você. Por favor, verifique sua caixa de entrada e clique no link para confirmar sua conta.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowEmailVerificationDialog(false)}>
+              Ok, vou verificar o e-mail
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

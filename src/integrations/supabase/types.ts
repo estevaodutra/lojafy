@@ -1315,6 +1315,15 @@ export type Database = {
         Args: { customer_user_id: string }
         Returns: string
       }
+      get_safe_order_data_for_ranking: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          created_at: string
+          id: string
+          status: string
+          total_amount: number
+        }[]
+      }
       is_admin_user: {
         Args: Record<PropertyKey, never>
         Returns: boolean

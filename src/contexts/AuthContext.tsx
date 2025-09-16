@@ -130,10 +130,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         last_name: lastName 
       });
 
-      toast({
-        title: "Cadastro realizado!",
-        description: "Verifique seu email para confirmar a conta.",
-      });
+      // Note: The toast will be replaced by a modal in the Auth component
       
       return { error: null };
     } catch (error) {
