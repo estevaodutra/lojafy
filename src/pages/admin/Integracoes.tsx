@@ -252,6 +252,118 @@ const endpoints = [
         atualizado_em: '2025-01-12T10:00:00Z'
       }
     }
+  },
+  {
+    title: 'Top 10 Produtos',
+    method: 'GET' as const,
+    url: '/functions/v1/api-top-produtos',
+    description: 'Retorna os produtos mais vendidos com métricas de vendas, preços médios e lucro. Baseado em dados demo dos últimos dias.',
+    queryParams: [
+      { name: 'limit', description: 'Número de produtos (máx: 50, padrão: 10)', example: '10' },
+      { name: 'period', description: 'Período de análise (7d ou 30d)', example: '7d' }
+    ],
+    responseExample: {
+      success: true,
+      data: [
+        {
+          id: 'prod123',
+          nome: 'Smartphone Samsung Galaxy',
+          imagem: 'https://loja.com/produtos/samsung.jpg',
+          imagem_principal: 'https://loja.com/produtos/samsung-main.jpg',
+          preco_custo: 800.00,
+          preco: 1200.00,
+          vendas_totais: 45,
+          preco_medio: 1150.00,
+          lucro_medio: 350.00,
+          dias_com_vendas: 6
+        }
+      ],
+      period: '7d',
+      total_products: 10
+    }
+  },
+  {
+    title: 'Pedidos Recentes',
+    method: 'GET' as const,
+    url: '/functions/v1/api-pedidos-recentes',
+    description: 'Retorna os pedidos mais recentes processados com detalhes dos produtos e cálculo de lucro.',
+    queryParams: [
+      { name: 'limit', description: 'Número de pedidos (máx: 100, padrão: 15)', example: '15' },
+      { name: 'status', description: 'Filtrar por status do pedido', example: 'confirmed' }
+    ],
+    responseExample: {
+      success: true,
+      data: [
+        {
+          id: 'order123-prod456',
+          numero_pedido: 'DEMO-1642098765-ABC123',
+          data_criacao: '2025-01-12T14:30:00Z',
+          status: 'confirmed',
+          valor_total: 299.90,
+          nome_cliente: 'Maria Silva',
+          nome_produto: 'Tênis Esportivo',
+          imagem_produto: 'https://loja.com/produtos/tenis.jpg',
+          preco_unitario: 149.95,
+          quantidade: 2,
+          lucro: 59.90
+        }
+      ],
+      total: 15
+    }
+  },
+  {
+    title: 'Cadastrar Pedido Demo',
+    method: 'POST' as const,
+    url: '/functions/v1/api-demo-pedidos-cadastrar',
+    description: 'Cria um novo pedido demo para simulação de vendas no ranking. Útil para testes e demonstrações.',
+    requestBody: {
+      demo_user_id: 'user123',
+      items: [
+        {
+          product_id: 'prod123',
+          quantity: 2,
+          unit_price: 149.95
+        }
+      ],
+      status: 'confirmed',
+      shipping_amount: 15.90,
+      tax_amount: 0
+    },
+    responseExample: {
+      success: true,
+      data: {
+        id: 'demo_order123',
+        numero_pedido: 'DEMO-1642098765-XYZ789',
+        demo_user_id: 'user123',
+        status: 'confirmed',
+        valor_total: 315.80,
+        valor_frete: 15.90,
+        valor_impostos: 0,
+        data_criacao: '2025-01-12T15:00:00Z',
+        items: 1
+      }
+    }
+  },
+  {
+    title: 'Cadastrar Usuário Demo',
+    method: 'POST' as const,
+    url: '/functions/v1/api-demo-usuarios-cadastrar',
+    description: 'Cria um novo usuário demo para usar nos pedidos de simulação.',
+    requestBody: {
+      first_name: 'João',
+      last_name: 'Santos',
+      email: 'joao.santos@email.com'
+    },
+    responseExample: {
+      success: true,
+      data: {
+        id: 'demo_user456',
+        primeiro_nome: 'João',
+        ultimo_nome: 'Santos',
+        email: 'joao.santos@email.com',
+        data_criacao: '2025-01-12T15:30:00Z'
+      }
+    }
   }
 ];
 
