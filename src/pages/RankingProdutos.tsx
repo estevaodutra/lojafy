@@ -3,22 +3,20 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Trophy, TrendingUp, Clock, Info } from "lucide-react";
+import { Trophy, TrendingUp, Clock } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useTopProducts } from "@/hooks/useTopProducts";
 import { useRecentOrders } from "@/hooks/useRecentOrders";
 import { ProductRankingCard } from "@/components/ranking/ProductRankingCard";
 import { OrderItem } from "@/components/ranking/OrderItem";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DemoDataToggle } from "@/components/admin/DemoDataToggle";
 
 const RankingProdutos = () => {
   useDocumentTitle("Ranking de Produtos");
   const [activeTab, setActiveTab] = useState("top-products");
-  const [useDemo, setUseDemo] = useState(true);
   
-  const { data: topProducts, isLoading: loadingProducts } = useTopProducts(useDemo);
-  const { data: recentOrders, isLoading: loadingOrders } = useRecentOrders(useDemo);
+  const { data: topProducts, isLoading: loadingProducts } = useTopProducts();
+  const { data: recentOrders, isLoading: loadingOrders } = useRecentOrders();
 
   return (
     <div className="min-h-screen bg-background">
@@ -34,8 +32,6 @@ const RankingProdutos = () => {
             Acompanhe os produtos mais vendidos da semana e os últimos pedidos processados em tempo real
           </p>
         </div>
-
-        <DemoDataToggle useDemo={useDemo} onToggle={setUseDemo} />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">

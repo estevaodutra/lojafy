@@ -86,12 +86,6 @@ export const OrderItem = ({ order }: OrderItemProps) => {
       {/* Pricing Info */}
       <div className="text-right min-w-[140px]">
         <div className="flex items-center justify-end gap-2 mb-1">
-          <span className="text-sm text-muted-foreground">Custo:</span>
-          <span className="text-sm font-medium">
-            {formatCurrency(order.cost_price)}
-          </span>
-        </div>
-        <div className="flex items-center justify-end gap-2 mb-1">
           <span className="text-sm text-muted-foreground">Venda:</span>
           <span className="text-sm font-medium">
             {formatCurrency(order.unit_price)}
