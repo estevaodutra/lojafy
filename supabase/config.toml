@@ -26,3 +26,15 @@ verify_jwt = false
 
 [functions.api-subcategorias-cadastrar]
 verify_jwt = false
+
+[functions.api-top-produtos]
+verify_jwt = false
+
+[functions.api-pedidos-recentes]
+verify_jwt = false
+
+[functions.api-demo-pedidos-cadastrar]
+verify_jwt = false
+
+[functions.api-demo-usuarios-cadastrar]
+verify_jwt = false
