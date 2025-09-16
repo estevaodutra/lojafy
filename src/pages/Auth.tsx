@@ -9,16 +9,20 @@ import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescript
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2, Mail, Lock, User } from 'lucide-react';
 import lojafyLogo from '@/assets/lojafy-logo.png';
-
 const Auth = () => {
-  const { user, loading, signIn, signUp } = useAuth();
+  const {
+    user,
+    loading,
+    signIn,
+    signUp
+  } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [showEmailVerificationDialog, setShowEmailVerificationDialog] = useState(false);
-  
+
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  
+
   // Signup form state
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
@@ -29,45 +33,33 @@ const Auth = () => {
   if (user && !loading) {
     return <Navigate to="/" replace />;
   }
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
     await signIn(loginEmail, loginPassword);
-    
     setIsLoading(false);
   };
-
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
     const result = await signUp(signupEmail, signupPassword, firstName, lastName);
-    
     if (!result.error) {
       setShowEmailVerificationDialog(true);
     }
-    
     setIsLoading(false);
   };
-
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
+    return <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+  return <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="w-20 h-20 mx-auto mb-4 overflow-hidden rounded-lg bg-white shadow-sm border">
             <img src={lojafyLogo} alt="Lojafy" className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground">Lojafy</h1>
+          
           <p className="text-muted-foreground mt-2">Sua Loja Descomplicada</p>
         </div>
 
@@ -91,15 +83,7 @@ const Auth = () => {
                     <Label htmlFor="login-email">Email</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="login-email"
-                        type="email"
-                        placeholder="seu@email.com"
-                        value={loginEmail}
-                        onChange={(e) => setLoginEmail(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
+                      <Input id="login-email" type="email" placeholder="seu@email.com" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} className="pl-10" required />
                     </div>
                   </div>
                   
@@ -107,15 +91,7 @@ const Auth = () => {
                     <Label htmlFor="login-password">Senha</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="login-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
+                      <Input id="login-password" type="password" placeholder="••••••••" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="pl-10" required />
                     </div>
                   </div>
                   
@@ -133,28 +109,13 @@ const Auth = () => {
                       <Label htmlFor="firstName">Nome</Label>
                       <div className="relative">
                         <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="firstName"
-                          type="text"
-                          placeholder="João"
-                          value={firstName}
-                          onChange={(e) => setFirstName(e.target.value)}
-                          className="pl-10"
-                          required
-                        />
+                        <Input id="firstName" type="text" placeholder="João" value={firstName} onChange={e => setFirstName(e.target.value)} className="pl-10" required />
                       </div>
                     </div>
                     
                     <div className="space-y-2">
                       <Label htmlFor="lastName">Sobrenome</Label>
-                      <Input
-                        id="lastName"
-                        type="text"
-                        placeholder="Silva"
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        required
-                      />
+                      <Input id="lastName" type="text" placeholder="Silva" value={lastName} onChange={e => setLastName(e.target.value)} required />
                     </div>
                   </div>
                   
@@ -162,15 +123,7 @@ const Auth = () => {
                     <Label htmlFor="signup-email">Email</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-email"
-                        type="email"
-                        placeholder="seu@email.com"
-                        value={signupEmail}
-                        onChange={(e) => setSignupEmail(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
+                      <Input id="signup-email" type="email" placeholder="seu@email.com" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} className="pl-10" required />
                     </div>
                   </div>
                   
@@ -178,16 +131,7 @@ const Auth = () => {
                     <Label htmlFor="signup-password">Senha</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={signupPassword}
-                        onChange={(e) => setSignupPassword(e.target.value)}
-                        className="pl-10"
-                        minLength={6}
-                        required
-                      />
+                      <Input id="signup-password" type="password" placeholder="••••••••" value={signupPassword} onChange={e => setSignupPassword(e.target.value)} className="pl-10" minLength={6} required />
                     </div>
                   </div>
                   
@@ -217,8 +161,6 @@ const Auth = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
-  );
+    </div>;
 };
-
 export default Auth;
