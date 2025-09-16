@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useRecentOrdersDemo } from './useRecentOrdersDemo';
 
 export interface RecentOrder {
   id: string;
@@ -13,10 +14,14 @@ export interface RecentOrder {
   unit_price: number;
   quantity: number;
   profit: number;
+  status?: string;
 }
 
-export const useRecentOrders = () => {
-  const query = useQuery({
+export const useRecentOrders = (useDemo: boolean = true) => {
+  // Use demo data by default for better user experience
+  const demoQuery = useRecentOrdersDemo();
+  
+  const realQuery = useQuery({
     queryKey: ['recent-orders'],
     queryFn: async (): Promise<RecentOrder[]> => {
       const { data, error } = await supabase
@@ -78,7 +83,8 @@ export const useRecentOrders = () => {
             cost_price: item.products.cost_price || 0,
             unit_price: item.unit_price,
             quantity: item.quantity,
-            profit: profit
+            profit: profit,
+            status: 'confirmed'
           });
         });
       });
@@ -87,7 +93,10 @@ export const useRecentOrders = () => {
     },
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 60 * 1000, // Refetch every minute
+    enabled: !useDemo, // Only run when not using demo data
   });
+
+  const query = useDemo ? demoQuery : realQuery;
 
   // Set up real-time subscription
   useEffect(() => {

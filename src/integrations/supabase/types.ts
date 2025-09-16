@@ -182,6 +182,125 @@ export type Database = {
         }
         Relationships: []
       }
+      demo_order_items: {
+        Row: {
+          created_at: string
+          demo_order_id: string
+          id: string
+          product_id: string
+          quantity: number
+          total_price: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          demo_order_id: string
+          id?: string
+          product_id: string
+          quantity: number
+          total_price: number
+          unit_price: number
+        }
+        Update: {
+          created_at?: string
+          demo_order_id?: string
+          id?: string
+          product_id?: string
+          quantity?: number
+          total_price?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demo_order_items_demo_order_id_fkey"
+            columns: ["demo_order_id"]
+            isOneToOne: false
+            referencedRelation: "demo_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demo_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      demo_orders: {
+        Row: {
+          created_at: string
+          demo_type: string
+          demo_user_id: string
+          id: string
+          order_number: string
+          shipping_amount: number | null
+          status: string
+          tax_amount: number | null
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          demo_type?: string
+          demo_user_id: string
+          id?: string
+          order_number: string
+          shipping_amount?: number | null
+          status?: string
+          tax_amount?: number | null
+          total_amount: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          demo_type?: string
+          demo_user_id?: string
+          id?: string
+          order_number?: string
+          shipping_amount?: number | null
+          status?: string
+          tax_amount?: number | null
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demo_orders_demo_user_id_fkey"
+            columns: ["demo_user_id"]
+            isOneToOne: false
+            referencedRelation: "demo_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      demo_users: {
+        Row: {
+          created_at: string
+          email: string
+          first_name: string
+          id: string
+          last_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          first_name: string
+          id?: string
+          last_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          first_name?: string
+          id?: string
+          last_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       favorites: {
         Row: {
           created_at: string

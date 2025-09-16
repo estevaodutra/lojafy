@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useTopProductsDemo } from './useTopProductsDemo';
 
 export interface TopProduct {
   id: string;
@@ -15,14 +14,11 @@ export interface TopProduct {
   days_with_sales: number;
 }
 
-export const useTopProducts = (useDemo: boolean = true) => {
-  // Use demo data by default for better user experience
-  const demoQuery = useTopProductsDemo();
-  
-  const realQuery = useQuery({
-    queryKey: ['top-products-real'],
+export const useTopProductsDemo = () => {
+  return useQuery({
+    queryKey: ['top-products-demo'],
     queryFn: async (): Promise<TopProduct[]> => {
-      // Query products with sales from last 7 days
+      // Query products with demo sales from last 7 days
       const { data, error } = await supabase
         .from('products')
         .select(`
@@ -32,20 +28,20 @@ export const useTopProducts = (useDemo: boolean = true) => {
           main_image_url,
           cost_price,
           price,
-          order_items!inner (
+          demo_order_items!inner (
             unit_price,
             quantity,
-            orders!inner (
+            demo_orders!inner (
               created_at,
               status
             )
           )
         `)
-        .gte('order_items.orders.created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-        .in('order_items.orders.status', ['confirmed', 'shipped', 'delivered', 'processing']);
+        .gte('demo_order_items.demo_orders.created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+        .eq('demo_order_items.demo_orders.status', 'confirmed');
       
       if (error) {
-        console.error('Error fetching top products:', error);
+        console.error('Error fetching demo top products:', error);
         throw error;
       }
 
@@ -73,20 +69,20 @@ export const useTopProducts = (useDemo: boolean = true) => {
         const stats = productStats.get(productId)!;
         const datesWithSales = new Set<string>();
         
-        product.order_items.forEach((item: any) => {
+        product.demo_order_items.forEach((item: any) => {
           stats.total_sales += item.quantity;
           
           // Track unique days with sales
-          const orderDate = new Date(item.orders.created_at).toDateString();
+          const orderDate = new Date(item.demo_orders.created_at).toDateString();
           datesWithSales.add(orderDate);
         });
         
         stats.days_with_sales = datesWithSales.size;
         
         // Calculate averages
-        const totalRevenue = product.order_items.reduce((sum: number, item: any) => 
+        const totalRevenue = product.demo_order_items.reduce((sum: number, item: any) => 
           sum + (item.unit_price * item.quantity), 0);
-        const totalItems = product.order_items.reduce((sum: number, item: any) => 
+        const totalItems = product.demo_order_items.reduce((sum: number, item: any) => 
           sum + item.quantity, 0);
           
         stats.avg_price = totalItems > 0 ? totalRevenue / totalItems : 0;
@@ -101,9 +97,5 @@ export const useTopProducts = (useDemo: boolean = true) => {
       return result;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
-    enabled: !useDemo, // Only run when not using demo data
   });
-
-  // Return demo data by default, real data when explicitly requested
-  return useDemo ? demoQuery : realQuery;
 };
