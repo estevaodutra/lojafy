@@ -34,7 +34,7 @@ export const DemoDataToggle = ({ useDemo, onToggle }: DemoDataToggleProps) => {
       <CardContent className="pt-0">
         <p className="text-sm text-muted-foreground">
           {useDemo 
-            ? "Exibindo dados de demonstração com produtos de alta margem (20-35%)" 
+            ? "Exibindo dados de demonstração com produtos de markup 50% e margem 35%" 
             : "Exibindo dados reais de vendas da loja"
           }
         </p>
