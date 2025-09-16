@@ -1311,6 +1311,10 @@ export type Database = {
         Args: { brand_name?: string; category_name?: string }
         Returns: string
       }
+      get_customer_display_name: {
+        Args: { customer_user_id: string }
+        Returns: string
+      }
       is_admin_user: {
         Args: Record<PropertyKey, never>
         Returns: boolean
