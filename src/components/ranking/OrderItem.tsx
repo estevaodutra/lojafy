@@ -16,6 +16,30 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
+const censorCustomerName = (name: string): string => {
+  if (!name || name === 'Cliente') return 'Cliente Anônimo';
+  
+  const parts = name.trim().split(' ');
+  if (parts.length === 1) {
+    // Nome único: "Maria" → "Mar**ia" 
+    const single = parts[0];
+    if (single.length <= 3) return single; // Nomes muito curtos não censura
+    return single.substring(0, 3) + '*'.repeat(single.length - 4) + single.slice(-1);
+  }
+  
+  // Múltiplas palavras: "Maria da Silva" → "Mar*****va"
+  const firstName = parts[0];
+  const lastName = parts[parts.length - 1];
+  
+  const firstCensored = firstName.length <= 3 ? firstName : 
+    firstName.substring(0, 3) + '*'.repeat(Math.max(3, firstName.length - 4));
+    
+  const lastCensored = lastName.length <= 2 ? lastName :
+    lastName.slice(-2);
+    
+  return firstCensored + lastCensored;
+};
+
 export const OrderItem = ({ order }: OrderItemProps) => {
   const relativeTime = useRelativeTime(order.created_at);
 
@@ -52,7 +76,7 @@ export const OrderItem = ({ order }: OrderItemProps) => {
           {order.product_name}
         </h4>
         <p className="text-sm text-muted-foreground">
-          Cliente: <span className="font-medium">Cliente Anônimo</span>
+          Cliente: <span className="font-medium">{censorCustomerName(order.customer_name)}</span>
         </p>
         <p className="text-xs text-muted-foreground">
           Pedido: {order.order_number}
