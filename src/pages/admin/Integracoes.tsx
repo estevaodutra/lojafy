@@ -364,6 +364,33 @@ const endpoints = [
         data_criacao: '2025-01-12T15:30:00Z'
       }
     }
+  },
+  {
+    title: 'Cadastrar Produto no Ranking',
+    method: 'POST' as const,
+    url: '/functions/v1/api-ranking-produto-cadastrar',
+    description: 'Permite cadastrar ou atualizar a posição de um produto no ranking com métricas customizadas. Ideal para gerenciamento externo via N8N.',
+    requestBody: {
+      "posicao": "1",
+      "sku": "SADE-016", 
+      "media_de_venda": 10.99,
+      "media_de_lucro": 4.99,
+      "vendas.dia": 6.3
+    },
+    responseExample: {
+      success: true,
+      data: {
+        id: 'ranking123',
+        produto_id: 'prod456',
+        produto_nome: 'Produto Exemplo',
+        sku: 'SADE-016',
+        posicao: 1,
+        media_de_venda: 10.99,
+        media_de_lucro: 4.99,
+        vendas_dia: 6.3,
+        atualizado_em: '2025-01-12T16:00:00Z'
+      }
+    }
   }
 ];
 

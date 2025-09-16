@@ -660,6 +660,50 @@ export type Database = {
           },
         ]
       }
+      product_ranking: {
+        Row: {
+          average_profit: number
+          average_sales_value: number
+          created_at: string
+          daily_sales: number
+          id: string
+          position: number
+          product_id: string | null
+          sku: string
+          updated_at: string
+        }
+        Insert: {
+          average_profit: number
+          average_sales_value: number
+          created_at?: string
+          daily_sales: number
+          id?: string
+          position: number
+          product_id?: string | null
+          sku: string
+          updated_at?: string
+        }
+        Update: {
+          average_profit?: number
+          average_sales_value?: number
+          created_at?: string
+          daily_sales?: number
+          id?: string
+          position?: number
+          product_id?: string | null
+          sku?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_ranking_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_variants: {
         Row: {
           active: boolean | null
