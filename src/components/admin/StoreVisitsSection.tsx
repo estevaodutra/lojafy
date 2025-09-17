@@ -7,30 +7,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { BarChart3, Calendar as CalendarIcon } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useStoreVisits, DateFilter, DateRange } from '@/hooks/useStoreVisits';
 
-type DateFilter = 'today' | 'yesterday' | '7days' | '30days' | 'custom';
-
-interface DateRange {
-  from: Date;
-  to: Date;
-}
-
-// Mock visits data - in real app, this would come from analytics
-const generateVisitsData = (days: number) => {
-  const data = [];
-  const today = new Date();
-  
-  for (let i = days - 1; i >= 0; i--) {
-    const date = subDays(today, i);
-    data.push({
-      date: format(date, 'dd/MM', { locale: ptBR }),
-      visits: Math.floor(Math.random() * 500) + 100,
-      fullDate: date
-    });
-  }
-  
-  return data;
-};
 
 export const StoreVisitsSection = () => {
   const [selectedFilter, setSelectedFilter] = useState<DateFilter>('7days');
@@ -40,27 +18,10 @@ export const StoreVisitsSection = () => {
   });
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
-  const getVisitsData = () => {
-    switch (selectedFilter) {
-      case 'today':
-        return generateVisitsData(1);
-      case 'yesterday':
-        return generateVisitsData(2).slice(0, 1);
-      case '7days':
-        return generateVisitsData(7);
-      case '30days':
-        return generateVisitsData(30);
-      case 'custom':
-        const diffTime = Math.abs(customDateRange.to.getTime() - customDateRange.from.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-        return generateVisitsData(Math.min(diffDays, 90)); // Limit to 90 days
-      default:
-        return generateVisitsData(7);
-    }
-  };
-
-  const visitsData = getVisitsData();
-  const totalVisits = visitsData.reduce((sum, item) => sum + item.visits, 0);
+  const { data: visitsResult, isLoading } = useStoreVisits(selectedFilter, customDateRange);
+  
+  const visitsData = visitsResult?.data || [];
+  const totalVisits = visitsResult?.total || 0;
 
   const handleDateRangeSelect = (range: any) => {
     if (range?.from && range?.to) {
@@ -173,24 +134,31 @@ export const StoreVisitsSection = () => {
           
           {/* Visits Chart */}
           <div className="h-[200px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={visitsData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip 
-                  formatter={(value) => [`${value}`, 'Visitas']}
-                  labelFormatter={(label) => `Data: ${label}`}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="visits" 
-                  stroke="hsl(var(--primary))" 
-                  strokeWidth={2}
-                  dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, r: 4 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-muted-foreground mt-2 text-sm">Carregando dados de visitas...</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={visitsData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip 
+                    formatter={(value) => [`${value}`, 'Visitas']}
+                    labelFormatter={(label) => `Data: ${label}`}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="visits" 
+                    stroke="hsl(var(--primary))" 
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, r: 4 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
       </CardContent>
