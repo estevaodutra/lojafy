@@ -31,13 +31,13 @@ const AdminSidebar = () => {
   const isActive = (path: string) => currentPath === path;
 
   return (
-    <Sidebar className="w-80">
+    <Sidebar className="w-60">
       <SidebarContent>
         <SidebarHeader className="p-4 border-b flex justify-center">
           <img 
             src={lojafyLogo} 
             alt="Lojafy" 
-            className="w-full h-16 object-contain"
+            className="w-72 h-20 object-contain"
           />
         </SidebarHeader>
         <SidebarGroup>
