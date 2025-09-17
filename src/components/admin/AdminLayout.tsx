@@ -31,7 +31,7 @@ const AdminSidebar = () => {
   const isActive = (path: string) => currentPath === path;
 
   return (
-    <Sidebar className="w-80">
+    <Sidebar className="w-40">
       <SidebarContent>
         <SidebarHeader className="p-4 border-b flex justify-center">
           <img 
