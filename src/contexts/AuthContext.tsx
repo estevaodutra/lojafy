@@ -10,6 +10,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error: any }>;
   isAdmin: boolean;
   profile: any | null;
 }
@@ -116,12 +117,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Send error event to N8N
         await sendAuthEvent('signup', email, undefined, 'error', { error: error.message });
         
+        // Translate common error messages to Portuguese
+        let errorMessage = error.message;
+        if (error.message.includes('User already registered')) {
+          errorMessage = 'Este email já está cadastrado. Tente fazer login ou use outro email.';
+        } else if (error.message.includes('Password should be at least')) {
+          errorMessage = 'A senha deve ter pelo menos 6 caracteres.';
+        } else if (error.message.includes('Invalid email')) {
+          errorMessage = 'Email inválido. Verifique o formato do email.';
+        }
+        
         toast({
           variant: "destructive",
           title: "Erro no cadastro",
-          description: error.message,
+          description: errorMessage,
         });
-        return { error };
+        return { error: { ...error, friendlyMessage: errorMessage } };
       }
 
       // Send successful signup event to N8N
@@ -149,12 +160,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Send error event to N8N
         await sendAuthEvent('login', email, undefined, 'error', { error: error.message });
         
+        // Translate common error messages to Portuguese
+        let errorMessage = error.message;
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = 'Email ou senha incorretos. Verifique suas credenciais.';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Email não confirmado. Verifique sua caixa de entrada.';
+        } else if (error.message.includes('Too many requests')) {
+          errorMessage = 'Muitas tentativas de login. Tente novamente em alguns minutos.';
+        }
+        
         toast({
           variant: "destructive",
           title: "Erro no login",
-          description: error.message,
+          description: errorMessage,
         });
-        return { error };
+        return { error: { ...error, friendlyMessage: errorMessage } };
       }
 
       // Send successful login event to N8N
@@ -163,6 +184,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       toast({
         title: "Login realizado!",
         description: "Bem-vindo de volta!",
+      });
+      
+      return { error: null };
+    } catch (error) {
+      return { error };
+    }
+  };
+
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth?reset=true`,
+      });
+      
+      if (error) {
+        // Translate error messages to Portuguese
+        let errorMessage = error.message;
+        if (error.message.includes('Invalid email')) {
+          errorMessage = 'Email inválido. Verifique o formato do email.';
+        }
+        
+        toast({
+          variant: "destructive",
+          title: "Erro ao recuperar senha",
+          description: errorMessage,
+        });
+        return { error: { ...error, friendlyMessage: errorMessage } };
+      }
+
+      toast({
+        title: "Email enviado!",
+        description: "Verifique sua caixa de entrada para redefinir sua senha.",
       });
       
       return { error: null };
@@ -192,6 +245,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signUp,
     signIn,
     signOut,
+    resetPassword,
     isAdmin,
     profile,
   };

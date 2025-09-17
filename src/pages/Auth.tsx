@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2, Mail, Lock, User } from 'lucide-react';
 import lojafyLogo from '@/assets/lojafy-logo-new.png';
@@ -14,10 +15,14 @@ const Auth = () => {
     user,
     loading,
     signIn,
-    signUp
+    signUp,
+    resetPassword
   } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [showEmailVerificationDialog, setShowEmailVerificationDialog] = useState(false);
+  const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [activeTab, setActiveTab] = useState('login');
 
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -45,6 +50,21 @@ const Auth = () => {
     const result = await signUp(signupEmail, signupPassword, firstName, lastName);
     if (!result.error) {
       setShowEmailVerificationDialog(true);
+    } else if (result.error.friendlyMessage && result.error.friendlyMessage.includes('já está cadastrado')) {
+      // If user already exists, switch to login tab and pre-fill email
+      setLoginEmail(signupEmail);
+      setActiveTab('login');
+    }
+    setIsLoading(false);
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    const result = await resetPassword(resetEmail);
+    if (!result.error) {
+      setShowResetPasswordDialog(false);
+      setResetEmail('');
     }
     setIsLoading(false);
   };
@@ -74,7 +94,7 @@ const Auth = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="login" className="w-full">
+            <Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="login">Entrar</TabsTrigger>
                 <TabsTrigger value="signup">Cadastrar</TabsTrigger>
@@ -96,6 +116,50 @@ const Auth = () => {
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input id="login-password" type="password" placeholder="••••••••" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="pl-10" required />
                     </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Dialog open={showResetPasswordDialog} onOpenChange={setShowResetPasswordDialog}>
+                      <DialogTrigger asChild>
+                        <Button variant="link" className="p-0 h-auto text-sm text-muted-foreground hover:text-primary">
+                          Esqueci minha senha
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                          <DialogTitle>Recuperar senha</DialogTitle>
+                          <DialogDescription>
+                            Digite seu email para receber instruções de recuperação de senha.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handleResetPassword} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="reset-email">Email</Label>
+                            <div className="relative">
+                              <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                id="reset-email"
+                                type="email"
+                                placeholder="seu@email.com"
+                                value={resetEmail}
+                                onChange={(e) => setResetEmail(e.target.value)}
+                                className="pl-10"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setShowResetPasswordDialog(false)}>
+                              Cancelar
+                            </Button>
+                            <Button type="submit" disabled={isLoading}>
+                              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                              Enviar
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                   
                   <Button type="submit" className="w-full" disabled={isLoading}>
