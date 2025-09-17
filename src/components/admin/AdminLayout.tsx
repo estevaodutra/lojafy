@@ -33,11 +33,11 @@ const AdminSidebar = () => {
   return (
     <Sidebar className="w-64">
       <SidebarContent>
-        <SidebarHeader className="p-4 border-b">
+        <SidebarHeader className="p-4 border-b flex justify-center">
           <img 
             src={lojafyLogo} 
             alt="Lojafy" 
-            className="w-28 h-8 object-contain"
+            className="w-48 h-14 object-contain"
           />
         </SidebarHeader>
         <SidebarGroup>
