@@ -4,6 +4,7 @@ import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGrou
 import { BarChart3, Package, ShoppingCart, Users, Settings, Home, Image, Globe, Star, MessageSquare, Mail, Palette, Truck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
+import lojafyLogo from '@/assets/lojafy-logo-new.png';
 
 const adminMenuItems = [
   { title: 'Dashboard', url: '/admin', icon: BarChart3 },
@@ -116,11 +117,20 @@ const AdminLayout: React.FC = () => {
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AdminSidebar />
-        <main className="flex-1 p-6">
-          <div className="mb-6">
+        <main className="flex-1">
+          <header className="flex items-center justify-between p-6 border-b bg-background">
+            <div className="flex items-center">
+              <img 
+                src={lojafyLogo} 
+                alt="Lojafy" 
+                className="w-32 h-10 object-contain"
+              />
+            </div>
             <SidebarTrigger className="md:hidden" />
+          </header>
+          <div className="p-6">
+            <Outlet />
           </div>
-          <Outlet />
         </main>
       </div>
     </SidebarProvider>
