@@ -37,7 +37,7 @@ const AdminSidebar = () => {
           <img 
             src={lojafyLogo} 
             alt="Lojafy" 
-            className="w-80 h-20 object-contain"
+            className="w-full h-16 object-contain"
           />
         </SidebarHeader>
         <SidebarGroup>
