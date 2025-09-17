@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, Outlet, Navigate } from 'react-router-dom';
-import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { BarChart3, Package, ShoppingCart, Users, Settings, Home, Image, Globe, Star, MessageSquare, Mail, Palette, Truck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
@@ -33,6 +33,13 @@ const AdminSidebar = () => {
   return (
     <Sidebar className="w-64">
       <SidebarContent>
+        <SidebarHeader className="p-4 border-b">
+          <img 
+            src={lojafyLogo} 
+            alt="Lojafy" 
+            className="w-28 h-8 object-contain"
+          />
+        </SidebarHeader>
         <SidebarGroup>
           <SidebarGroupLabel>Administração</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -118,14 +125,7 @@ const AdminLayout: React.FC = () => {
       <div className="min-h-screen flex w-full">
         <AdminSidebar />
         <main className="flex-1">
-          <header className="flex items-center justify-between p-6 border-b bg-background">
-            <div className="flex items-center">
-              <img 
-                src={lojafyLogo} 
-                alt="Lojafy" 
-                className="w-32 h-10 object-contain"
-              />
-            </div>
+          <header className="flex items-center justify-end p-6 border-b bg-background">
             <SidebarTrigger className="md:hidden" />
           </header>
           <div className="p-6">
