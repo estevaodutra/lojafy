@@ -11,6 +11,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: any }>;
+  resendConfirmationEmail: (email: string) => Promise<{ error: any }>;
   isAdmin: boolean;
   profile: any | null;
 }
@@ -165,7 +166,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (error.message.includes('Invalid login credentials')) {
           errorMessage = 'Email ou senha incorretos. Verifique suas credenciais.';
         } else if (error.message.includes('Email not confirmed')) {
-          errorMessage = 'Email não confirmado. Verifique sua caixa de entrada.';
+          errorMessage = 'Email não confirmado. Verifique sua caixa de entrada e confirme seu email antes de fazer login.';
         } else if (error.message.includes('Too many requests')) {
           errorMessage = 'Muitas tentativas de login. Tente novamente em alguns minutos.';
         }
@@ -175,7 +176,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           title: "Erro no login",
           description: errorMessage,
         });
-        return { error: { ...error, friendlyMessage: errorMessage } };
+        return { error: { ...error, friendlyMessage: errorMessage, needsEmailConfirmation: error.message.includes('Email not confirmed') } };
       }
 
       // Send successful login event to N8N
@@ -224,6 +225,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const resendConfirmationEmail = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`
+        }
+      });
+      
+      if (error) {
+        let errorMessage = error.message;
+        if (error.message.includes('Invalid email')) {
+          errorMessage = 'Email inválido. Verifique o formato do email.';
+        } else if (error.message.includes('Email rate limit exceeded')) {
+          errorMessage = 'Limite de emails excedido. Aguarde alguns minutos antes de tentar novamente.';
+        }
+        
+        toast({
+          variant: "destructive",
+          title: "Erro ao reenviar confirmação",
+          description: errorMessage,
+        });
+        return { error: { ...error, friendlyMessage: errorMessage } };
+      }
+
+      toast({
+        title: "Email reenviado!",
+        description: "Verifique sua caixa de entrada para confirmar seu email.",
+      });
+      
+      return { error: null };
+    } catch (error) {
+      return { error };
+    }
+  };
+
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
@@ -246,6 +284,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signIn,
     signOut,
     resetPassword,
+    resendConfirmationEmail,
     isAdmin,
     profile,
   };

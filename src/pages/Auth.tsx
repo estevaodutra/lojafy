@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2, Mail, Lock, User } from 'lucide-react';
+import { Loader2, Mail, Lock, User, RefreshCw } from 'lucide-react';
 import lojafyLogo from '@/assets/lojafy-logo-new.png';
 const Auth = () => {
   const {
@@ -16,12 +16,15 @@ const Auth = () => {
     loading,
     signIn,
     signUp,
-    resetPassword
+    resetPassword,
+    resendConfirmationEmail
   } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [showEmailVerificationDialog, setShowEmailVerificationDialog] = useState(false);
   const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
+  const [showEmailNotConfirmedDialog, setShowEmailNotConfirmedDialog] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState('');
   const [activeTab, setActiveTab] = useState('login');
 
   // Login form state
@@ -41,7 +44,14 @@ const Auth = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    await signIn(loginEmail, loginPassword);
+    const result = await signIn(loginEmail, loginPassword);
+    
+    // Check if login failed due to unconfirmed email
+    if (result.error && result.error.needsEmailConfirmation) {
+      setUnconfirmedEmail(loginEmail);
+      setShowEmailNotConfirmedDialog(true);
+    }
+    
     setIsLoading(false);
   };
   const handleSignup = async (e: React.FormEvent) => {
@@ -65,6 +75,16 @@ const Auth = () => {
     if (!result.error) {
       setShowResetPasswordDialog(false);
       setResetEmail('');
+    }
+    setIsLoading(false);
+  };
+
+  const handleResendConfirmation = async () => {
+    setIsLoading(true);
+    const result = await resendConfirmationEmail(unconfirmedEmail);
+    if (!result.error) {
+      setShowEmailNotConfirmedDialog(false);
+      setShowEmailVerificationDialog(true);
     }
     setIsLoading(false);
   };
@@ -225,6 +245,27 @@ const Auth = () => {
             <AlertDialogAction onClick={() => setShowEmailVerificationDialog(false)}>
               Ok, vou verificar o e-mail
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showEmailNotConfirmedDialog} onOpenChange={setShowEmailNotConfirmedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Email não confirmado</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você precisa confirmar seu email antes de fazer login. Verifique sua caixa de entrada ou clique no botão abaixo para reenviar o email de confirmação.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowEmailNotConfirmedDialog(false)}>
+              Fechar
+            </Button>
+            <Button onClick={handleResendConfirmation} disabled={isLoading}>
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Reenviar confirmação
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
