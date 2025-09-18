@@ -1,6 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 
-export type UserRole = 'super_admin' | 'supplier' | 'reseller' | 'customer';
+export type UserRole = 'super_admin' | 'admin' | 'supplier' | 'reseller' | 'customer';
 
 export const useUserRole = () => {
   const { user, profile } = useAuth();

@@ -360,6 +360,66 @@ export type Database = {
         }
         Relationships: []
       }
+      financial_transactions: {
+        Row: {
+          amount: number
+          available_at: string | null
+          created_at: string | null
+          description: string | null
+          fee_amount: number | null
+          id: string
+          net_amount: number
+          order_id: string | null
+          processed_at: string | null
+          status: string
+          transaction_type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          available_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          fee_amount?: number | null
+          id?: string
+          net_amount: number
+          order_id?: string | null
+          processed_at?: string | null
+          status?: string
+          transaction_type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          available_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          fee_amount?: number | null
+          id?: string
+          net_amount?: number
+          order_id?: string | null
+          processed_at?: string | null
+          status?: string
+          transaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       homepage_categories: {
         Row: {
           active: boolean
@@ -455,6 +515,53 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      notifications: {
+        Row: {
+          action_label: string | null
+          action_url: string | null
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          message: string
+          metadata: Json | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          action_label?: string | null
+          action_url?: string | null
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          metadata?: Json | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          action_label?: string | null
+          action_url?: string | null
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          metadata?: Json | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       order_items: {
         Row: {
@@ -660,6 +767,51 @@ export type Database = {
           },
         ]
       }
+      platform_settings: {
+        Row: {
+          auto_withdrawal_enabled: boolean | null
+          auto_withdrawal_frequency: string | null
+          created_at: string | null
+          gateway_fee_percentage: number | null
+          guarantee_period_days: number | null
+          id: string
+          platform_fee_type: string | null
+          platform_fee_value: number | null
+          reseller_withdrawal_fee_type: string | null
+          reseller_withdrawal_fee_value: number | null
+          updated_at: string | null
+          withdrawal_processing_days: number | null
+        }
+        Insert: {
+          auto_withdrawal_enabled?: boolean | null
+          auto_withdrawal_frequency?: string | null
+          created_at?: string | null
+          gateway_fee_percentage?: number | null
+          guarantee_period_days?: number | null
+          id?: string
+          platform_fee_type?: string | null
+          platform_fee_value?: number | null
+          reseller_withdrawal_fee_type?: string | null
+          reseller_withdrawal_fee_value?: number | null
+          updated_at?: string | null
+          withdrawal_processing_days?: number | null
+        }
+        Update: {
+          auto_withdrawal_enabled?: boolean | null
+          auto_withdrawal_frequency?: string | null
+          created_at?: string | null
+          gateway_fee_percentage?: number | null
+          guarantee_period_days?: number | null
+          id?: string
+          platform_fee_type?: string | null
+          platform_fee_value?: number | null
+          reseller_withdrawal_fee_type?: string | null
+          reseller_withdrawal_fee_value?: number | null
+          updated_at?: string | null
+          withdrawal_processing_days?: number | null
+        }
+        Relationships: []
+      }
       product_ranking: {
         Row: {
           average_profit: number
@@ -782,6 +934,7 @@ export type Database = {
           specifications: Json | null
           stock_quantity: number | null
           subcategory_id: string | null
+          supplier_id: string | null
           updated_at: string
           weight: number | null
           width: number | null
@@ -813,6 +966,7 @@ export type Database = {
           specifications?: Json | null
           stock_quantity?: number | null
           subcategory_id?: string | null
+          supplier_id?: string | null
           updated_at?: string
           weight?: number | null
           width?: number | null
@@ -844,6 +998,7 @@ export type Database = {
           specifications?: Json | null
           stock_quantity?: number | null
           subcategory_id?: string | null
+          supplier_id?: string | null
           updated_at?: string
           weight?: number | null
           width?: number | null
@@ -863,42 +1018,64 @@ export type Database = {
             referencedRelation: "categories"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "products_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
         ]
       }
       profiles: {
         Row: {
           avatar_url: string | null
+          business_address: string | null
+          business_cnpj: string | null
+          business_name: string | null
           cpf: string | null
           created_at: string
           first_name: string | null
           id: string
+          is_active: boolean | null
           last_name: string | null
           phone: string | null
           role: Database["public"]["Enums"]["app_role"]
+          subdomain: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           avatar_url?: string | null
+          business_address?: string | null
+          business_cnpj?: string | null
+          business_name?: string | null
           cpf?: string | null
           created_at?: string
           first_name?: string | null
           id?: string
+          is_active?: boolean | null
           last_name?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
+          subdomain?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           avatar_url?: string | null
+          business_address?: string | null
+          business_cnpj?: string | null
+          business_name?: string | null
           cpf?: string | null
           created_at?: string
           first_name?: string | null
           id?: string
+          is_active?: boolean | null
           last_name?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
+          subdomain?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -1324,13 +1501,17 @@ export type Database = {
           total_amount: number
         }[]
       }
+      has_role: {
+        Args: { user_role: Database["public"]["Enums"]["app_role"] }
+        Returns: boolean
+      }
       is_admin_user: {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
     }
     Enums: {
-      app_role: "customer" | "admin" | "super_admin"
+      app_role: "customer" | "admin" | "super_admin" | "supplier" | "reseller"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1458,7 +1639,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["customer", "admin", "super_admin"],
+      app_role: ["customer", "admin", "super_admin", "supplier", "reseller"],
     },
   },
 } as const

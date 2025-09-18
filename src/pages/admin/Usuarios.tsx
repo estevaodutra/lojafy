@@ -25,13 +25,13 @@ const Usuarios = () => {
     }
   });
 
-  const updateUserRole = async (userId: string, newRole: 'customer' | 'reseller' | 'supplier' | 'admin' | 'super_admin') => {
+  const updateUserRole = async (userId: string, newRole: string) => {
     setUpdatingUsers(prev => [...prev, userId]);
     
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ role: newRole })
+        .update({ role: newRole as 'customer' | 'admin' | 'super_admin' | 'supplier' | 'reseller' })
         .eq('user_id', userId);
 
       if (error) throw error;
