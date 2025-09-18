@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserRole } from "@/hooks/useUserRole";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
@@ -14,7 +15,8 @@ import { useStoreConfig } from '@/hooks/useStoreConfig';
 const Header = () => {
   const { favoritesCount } = useFavorites();
   const { itemsCount } = useCart();
-  const { user, signOut, profile, isAdmin } = useAuth();
+  const { user, signOut, profile } = useAuth();
+  const { role, isSuperAdmin, isSupplier, isReseller } = useUserRole();
   const { config } = useStoreConfig();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
@@ -26,6 +28,36 @@ const Header = () => {
       navigate(`/busca?q=${encodeURIComponent(searchTerm.trim())}`);
       setSearchTerm("");
       setMobileMenuOpen(false);
+    }
+  };
+
+  const getPanelRoute = () => {
+    switch (role) {
+      case 'super_admin':
+        return '/super-admin';
+      case 'admin':
+        return '/admin';
+      case 'supplier':
+        return '/supplier';
+      case 'reseller':
+        return '/reseller';
+      default:
+        return '/minha-conta';
+    }
+  };
+
+  const getPanelName = () => {
+    switch (role) {
+      case 'super_admin':
+        return 'Painel Super Admin';
+      case 'admin':
+        return 'Painel Admin';
+      case 'supplier':
+        return 'Painel Fornecedor';
+      case 'reseller':
+        return 'Painel Revendedor';
+      default:
+        return 'Minha Conta';
     }
   };
   
@@ -107,11 +139,11 @@ const Header = () => {
                       Minha Conta
                     </Link>
                   </DropdownMenuItem>
-                  {isAdmin && (
+                  {role !== 'customer' && (
                     <DropdownMenuItem asChild>
-                      <Link to="/admin" className="w-full">
+                      <Link to={getPanelRoute()} className="w-full">
                         <Settings className="mr-2 h-4 w-4" />
-                        Painel Admin
+                        {getPanelName()}
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -268,14 +300,14 @@ const Header = () => {
                             <User className="inline mr-2 h-4 w-4" />
                             Minha Conta
                           </Link>
-                          {isAdmin && (
+                          {role !== 'customer' && (
                             <Link 
-                              to="/admin" 
+                              to={getPanelRoute()} 
                               className="block py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors"
                               onClick={() => setMobileMenuOpen(false)}
                             >
                               <Settings className="inline mr-2 h-4 w-4" />
-                              Painel Admin
+                              {getPanelName()}
                             </Link>
                           )}
                           <button 

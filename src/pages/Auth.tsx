@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 import { Loader2, Mail, Lock, User, RefreshCw } from 'lucide-react';
 import lojafyLogo from '@/assets/lojafy-logo-new.png';
 const Auth = () => {
@@ -19,6 +20,9 @@ const Auth = () => {
     resetPassword,
     resendConfirmationEmail
   } = useAuth();
+  
+  // Use the auth redirect hook
+  useAuthRedirect();
   const [isLoading, setIsLoading] = useState(false);
   const [showEmailVerificationDialog, setShowEmailVerificationDialog] = useState(false);
   const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
@@ -37,9 +41,13 @@ const Auth = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
 
-  // Redirect if already logged in
-  if (user && !loading) {
-    return <Navigate to="/" replace />;
+  // Show loading while checking authentication
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
   }
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

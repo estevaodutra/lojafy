@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 interface AuthContextType {
   user: User | null;
@@ -63,6 +64,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               .single();
             
             setProfile(profileData);
+            
+            // Redirect based on role after profile is loaded
+            if (profileData?.role && event === 'SIGNED_IN') {
+              setTimeout(() => {
+                redirectToPanel(profileData.role);
+              }, 100);
+            }
           }, 0);
         } else {
           setProfile(null);
@@ -95,6 +103,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
     } catch (error) {
       console.error('Failed to send auth event:', error);
+    }
+  };
+
+  const redirectToPanel = (role: string) => {
+    // Only redirect if we're currently on auth or home page
+    const currentPath = window.location.pathname;
+    if (currentPath === '/auth' || currentPath === '/') {
+      switch (role) {
+        case 'super_admin':
+          window.location.href = '/super-admin';
+          break;
+        case 'admin':
+          window.location.href = '/admin';
+          break;
+        case 'supplier':
+          window.location.href = '/supplier';
+          break;
+        case 'reseller':
+          window.location.href = '/reseller';
+          break;
+        default:
+          window.location.href = '/';
+          break;
+      }
     }
   };
 
