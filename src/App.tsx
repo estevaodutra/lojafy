@@ -32,7 +32,11 @@ import CustomerAddresses from "./pages/customer/Addresses";
 import CustomerFavorites from "./pages/customer/Favorites";
 import CustomerSettings from "./pages/customer/Settings";
 import CustomerHelp from "./pages/customer/Help";
+import { RoleBasedRoute } from "./components/auth/RoleBasedRoute";
 import AdminLayout from "./components/admin/AdminLayout";
+import { SupplierLayout } from "./components/layouts/SupplierLayout";
+import { ResellerLayout } from "./components/layouts/ResellerLayout";
+import { SuperAdminLayout } from "./components/layouts/SuperAdminLayout";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminProducts from "./pages/admin/Products";
 import AdminBanners from "./pages/admin/Banners";
@@ -45,6 +49,19 @@ import Depoimentos from "./pages/admin/Depoimentos";
 import NewsletterConfig from "./pages/admin/NewsletterConfig";
 import ConfiguracaoVisual from "./pages/admin/ConfiguracaoVisual";
 import Frete from "./pages/admin/Frete";
+import SupplierDashboard from "./pages/supplier/Dashboard";
+import SupplierProducts from "./pages/supplier/Products";
+import SupplierInventory from "./pages/supplier/Inventory";
+import SupplierSales from "./pages/supplier/Sales";
+import SupplierReports from "./pages/supplier/Reports";
+import ResellerDashboard from "./pages/reseller/Dashboard";
+import ResellerSales from "./pages/reseller/Sales";
+import ResellerClients from "./pages/reseller/Clients";
+import ResellerCommissions from "./pages/reseller/Commissions";
+import ResellerGoals from "./pages/reseller/Goals";
+import SuperAdminDashboard from "./pages/admin/Dashboard";
+import Usuarios from "./pages/admin/Usuarios";
+import Plataforma from "./pages/admin/Plataforma";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -104,7 +121,14 @@ const App = () => {
               </Route>
               
               {/* Admin Panel Routes */}
-              <Route path="/admin" element={<AdminLayout />}>
+              <Route
+                path="/admin"
+                element={
+                  <RoleBasedRoute allowedRoles={['admin', 'super_admin']}>
+                    <AdminLayout />
+                  </RoleBasedRoute>
+                }
+              >
                 <Route index element={<AdminDashboard />} />
                 <Route path="produtos" element={<AdminProducts />} />
                 <Route path="categorias" element={<AdminCategorias />} />
@@ -117,6 +141,63 @@ const App = () => {
                 <Route path="depoimentos" element={<Depoimentos />} />
                 <Route path="newsletter-config" element={<NewsletterConfig />} />
                 <Route path="frete" element={<Frete />} />
+              </Route>
+
+              {/* Super Admin Panel Routes */}
+              <Route
+                path="/super-admin"
+                element={
+                  <RoleBasedRoute allowedRoles={['super_admin']}>
+                    <SuperAdminLayout />
+                  </RoleBasedRoute>
+                }
+              >
+                <Route index element={<SuperAdminDashboard />} />
+                <Route path="usuarios" element={<Usuarios />} />
+                <Route path="plataforma" element={<Plataforma />} />
+                <Route path="produtos" element={<AdminProducts />} />
+                <Route path="categorias" element={<AdminCategorias />} />
+                <Route path="pedidos" element={<AdminOrders />} />
+                <Route path="clientes" element={<AdminCustomers />} />
+                <Route path="homepage" element={<HomepageManagement />} />
+                <Route path="configuracao-visual" element={<ConfiguracaoVisual />} />
+                <Route path="banners" element={<AdminBanners />} />
+                <Route path="depoimentos" element={<Depoimentos />} />
+                <Route path="newsletter-config" element={<NewsletterConfig />} />
+                <Route path="frete" element={<Frete />} />
+                <Route path="integracoes" element={<IntegracaoPage />} />
+              </Route>
+
+              {/* Supplier Panel Routes */}
+              <Route
+                path="/supplier"
+                element={
+                  <RoleBasedRoute allowedRoles={['supplier']}>
+                    <SupplierLayout />
+                  </RoleBasedRoute>
+                }
+              >
+                <Route index element={<SupplierDashboard />} />
+                <Route path="produtos" element={<SupplierProducts />} />
+                <Route path="estoque" element={<SupplierInventory />} />
+                <Route path="vendas" element={<SupplierSales />} />
+                <Route path="relatorios" element={<SupplierReports />} />
+              </Route>
+
+              {/* Reseller Panel Routes */}
+              <Route
+                path="/reseller"
+                element={
+                  <RoleBasedRoute allowedRoles={['reseller']}>
+                    <ResellerLayout />
+                  </RoleBasedRoute>
+                }
+              >
+                <Route index element={<ResellerDashboard />} />
+                <Route path="vendas" element={<ResellerSales />} />
+                <Route path="clientes" element={<ResellerClients />} />
+                <Route path="comissoes" element={<ResellerCommissions />} />
+                <Route path="metas" element={<ResellerGoals />} />
               </Route>
               
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
