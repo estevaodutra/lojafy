@@ -5,7 +5,7 @@ import {
   Package, 
   BarChart3, 
   TrendingUp,
-  Inventory,
+  Warehouse,
   Store
 } from 'lucide-react';
 import {
@@ -35,7 +35,7 @@ const supplierMenuItems = [
   {
     title: 'Estoque',
     url: '/supplier/estoque',
-    icon: Inventory,
+    icon: Warehouse,
   },
   {
     title: 'Vendas',

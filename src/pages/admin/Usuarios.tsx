@@ -25,7 +25,7 @@ const Usuarios = () => {
     }
   });
 
-  const updateUserRole = async (userId: string, newRole: string) => {
+  const updateUserRole = async (userId: string, newRole: 'customer' | 'reseller' | 'supplier' | 'admin' | 'super_admin') => {
     setUpdatingUsers(prev => [...prev, userId]);
     
     try {
@@ -129,8 +129,8 @@ const Usuarios = () => {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={user.is_active ? 'default' : 'secondary'}>
-                      {user.is_active ? 'Ativo' : 'Inativo'}
+                    <Badge variant="default">
+                      Ativo
                     </Badge>
                   </TableCell>
                   <TableCell>
