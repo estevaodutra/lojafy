@@ -198,17 +198,12 @@ const Header = () => {
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-80 p-0">
-                <SheetHeader className="border-b p-4">
-                  <div className="flex items-center justify-between">
-                    <SheetTitle className="text-lg font-bold">Menu</SheetTitle>
-                    <SheetClose className="rounded-sm opacity-70 transition-opacity hover:opacity-100">
-                      <X className="h-4 w-4" />
-                    </SheetClose>
-                  </div>
+              <SheetContent side="right" className="w-80 p-0 flex flex-col max-h-screen">
+                <SheetHeader className="border-b p-4 flex-shrink-0">
+                  <SheetTitle className="text-lg font-bold">Menu</SheetTitle>
                 </SheetHeader>
                 
-                <div className="flex flex-col h-full">
+                <div className="flex flex-col flex-1 overflow-y-auto">
                   {/* Mobile Search */}
                   <div className="p-4 border-b">
                     <form onSubmit={handleSearch} className="relative">
