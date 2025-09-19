@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import ProductDeleteDialog from './ProductDeleteDialog';
 
 interface ProductTableProps {
   products: any[];
@@ -84,17 +85,81 @@ const ProductTable: React.FC<ProductTableProps> = ({
 
   const handleBulkDelete = async () => {
     try {
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .in('id', selectedProducts);
+      // Check which products have dependencies
+      const dependencyChecks = await Promise.all(
+        selectedProducts.map(async (productId) => {
+          const hasDependencies = await checkProductDependencies(productId);
+          return { productId, hasDependencies };
+        })
+      );
 
-      if (error) throw error;
+      const deletableProducts = dependencyChecks
+        .filter(check => !check.hasDependencies)
+        .map(check => check.productId);
+      
+      const nonDeletableProducts = dependencyChecks
+        .filter(check => check.hasDependencies)
+        .map(check => check.productId);
 
-      toast({
-        title: "Produtos excluídos",
-        description: `${selectedProducts.length} produto(s) removido(s) com sucesso.`,
-      });
+      let successCount = 0;
+      let errorCount = 0;
+
+      // Delete products without dependencies
+      if (deletableProducts.length > 0) {
+        const { error } = await supabase
+          .from('products')
+          .delete()
+          .in('id', deletableProducts);
+
+        if (error) {
+          console.error('Error deleting products:', error);
+          errorCount = deletableProducts.length;
+        } else {
+          successCount = deletableProducts.length;
+        }
+      }
+
+      // Deactivate products with dependencies
+      if (nonDeletableProducts.length > 0) {
+        const { error } = await supabase
+          .from('products')
+          .update({ 
+            active: false,
+            updated_at: new Date().toISOString()
+          })
+          .in('id', nonDeletableProducts);
+
+        if (error) {
+          console.error('Error deactivating products:', error);
+          errorCount += nonDeletableProducts.length;
+        }
+      }
+
+      // Show result summary
+      if (successCount > 0 && nonDeletableProducts.length > 0) {
+        toast({
+          title: "Operação concluída",
+          description: `${successCount} produto(s) excluído(s) e ${nonDeletableProducts.length} produto(s) desativado(s) (possuem pedidos associados).`,
+        });
+      } else if (successCount > 0) {
+        toast({
+          title: "Produtos excluídos",
+          description: `${successCount} produto(s) removido(s) com sucesso.`,
+        });
+      } else if (nonDeletableProducts.length > 0) {
+        toast({
+          title: "Produtos desativados",
+          description: `${nonDeletableProducts.length} produto(s) foram desativados pois possuem pedidos associados.`,
+        });
+      }
+
+      if (errorCount > 0) {
+        toast({
+          title: "Alguns produtos não foram processados",
+          description: `${errorCount} produto(s) não puderam ser processados devido a erros.`,
+          variant: "destructive",
+        });
+      }
 
       setSelectedProducts([]);
       setIsSelectAllChecked(false);
@@ -102,8 +167,8 @@ const ProductTable: React.FC<ProductTableProps> = ({
     } catch (error) {
       console.error('Error bulk deleting products:', error);
       toast({
-        title: "Erro ao excluir produtos",
-        description: "Ocorreu um erro ao tentar excluir os produtos selecionados.",
+        title: "Erro ao processar produtos",
+        description: "Ocorreu um erro ao tentar processar os produtos selecionados.",
         variant: "destructive",
       });
     }
@@ -151,6 +216,22 @@ const ProductTable: React.FC<ProductTableProps> = ({
   // Get unique categories for filter
   const categories = [...new Set(products.map(p => p.categories?.name).filter(Boolean))];
 
+  const checkProductDependencies = async (productId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('order_items')
+        .select('id')
+        .eq('product_id', productId)
+        .limit(1);
+
+      if (error) throw error;
+      return data && data.length > 0;
+    } catch (error) {
+      console.error('Error checking product dependencies:', error);
+      return false;
+    }
+  };
+
   const handleDeleteProduct = async (productId: string, productName: string) => {
     try {
       const { error } = await supabase
@@ -158,7 +239,19 @@ const ProductTable: React.FC<ProductTableProps> = ({
         .delete()
         .eq('id', productId);
 
-      if (error) throw error;
+      if (error) {
+        // Check if it's a foreign key constraint error
+        if (error.message.includes('violates foreign key constraint') || 
+            error.message.includes('order_items_product_id_fkey')) {
+          toast({
+            title: "Não foi possível excluir o produto",
+            description: `O produto "${productName}" possui pedidos associados e não pode ser excluído. Você pode desativá-lo no menu de ações.`,
+            variant: "destructive",
+          });
+          return;
+        }
+        throw error;
+      }
 
       toast({
         title: "Produto excluído",
@@ -338,15 +431,19 @@ const ProductTable: React.FC<ProductTableProps> = ({
                     <AlertDialogTrigger asChild>
                       <Button variant="outline" size="sm" className="h-8 text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground">
                         <Trash2 className="mr-2 h-4 w-4" />
-                        Excluir
+                        Processar
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Confirmar exclusão em massa</AlertDialogTitle>
+                        <AlertDialogTitle>Processar produtos selecionados</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Tem certeza que deseja excluir {selectedProducts.length} produto(s) selecionado(s)? 
-                          Esta ação não pode ser desfeita.
+                          Tem certeza que deseja processar {selectedProducts.length} produto(s) selecionado(s)? 
+                          <br />
+                          <br />
+                          <strong>Produtos sem pedidos associados:</strong> Serão excluídos permanentemente.
+                          <br />
+                          <strong>Produtos com pedidos associados:</strong> Serão desativados para preservar o histórico.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -355,7 +452,7 @@ const ProductTable: React.FC<ProductTableProps> = ({
                           onClick={handleBulkDelete}
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                          Excluir Todos
+                          Processar Todos
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -509,35 +606,11 @@ const ProductTable: React.FC<ProductTableProps> = ({
                                 {product.active ? 'Desativar' : 'Ativar'}
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <DropdownMenuItem 
-                                    className="text-destructive focus:text-destructive"
-                                    onSelect={(e) => e.preventDefault()}
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Excluir
-                                  </DropdownMenuItem>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Tem certeza que deseja excluir o produto "{product.name}"? 
-                                      Esta ação não pode ser desfeita.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDeleteProduct(product.id, product.name)}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    >
-                                      Excluir
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                                <ProductDeleteDialog
+                                  product={product}
+                                  onDelete={handleDeleteProduct}
+                                  onDeactivate={handleToggleStatus}
+                                />
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
