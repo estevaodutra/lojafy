@@ -216,12 +216,12 @@ const Produto = () => {
       
       <main className="container mx-auto px-4 py-8">
         {/* Breadcrumb */}
-        <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-6">
-          <Link to="/" className="hover:text-primary">Início</Link>
-          <ChevronRight className="h-4 w-4" />
-          <Link to="/categorias" className="hover:text-primary">Categorias</Link>
-          <ChevronRight className="h-4 w-4" />
-          <span className="text-foreground">{product.name}</span>
+        <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-6 overflow-hidden">
+          <Link to="/" className="hover:text-primary whitespace-nowrap">Início</Link>
+          <ChevronRight className="h-4 w-4 flex-shrink-0" />
+          <Link to="/categorias" className="hover:text-primary whitespace-nowrap">Categorias</Link>
+          <ChevronRight className="h-4 w-4 flex-shrink-0" />
+          <span className="text-foreground truncate">{product.name}</span>
         </nav>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12 mb-12">
@@ -277,11 +277,11 @@ const Produto = () => {
           {/* Product Information */}
           <div className="space-y-6">
             <div>
-              <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-                {product.name}
+              <h1 className="text-2xl md:text-3xl font-bold mb-2 line-clamp-2 flex items-start gap-3">
+                <span className="line-clamp-2">{product.name}</span>
                 {product.high_rotation && (
                   <span 
-                    className="text-orange-500 text-2xl" 
+                    className="text-orange-500 text-2xl flex-shrink-0" 
                     title="Produto de Alta Rotatividade - Pode haver atraso no envio devido à alta demanda"
                   >
                     ⚠️

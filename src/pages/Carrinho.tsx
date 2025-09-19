@@ -132,7 +132,7 @@ const Carrinho = () => {
       <main className="min-h-screen bg-background">
         <div className="container mx-auto px-4 py-8">
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
             <div className="flex items-center space-x-4">
               <Button variant="ghost" size="sm" asChild>
                 <Link to="/">
@@ -141,44 +141,12 @@ const Carrinho = () => {
                 </Link>
               </Button>
               <div>
-                <h1 className="text-3xl font-bold text-foreground">Meu Carrinho</h1>
+                <h1 className="text-2xl md:text-3xl font-bold text-foreground">Meu Carrinho</h1>
                 <p className="text-muted-foreground">
                   {itemsCount} {itemsCount === 1 ? 'item' : 'itens'} no carrinho
                 </p>
               </div>
             </div>
-            {items.length > 0 && (
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0 sm:space-x-2">
-                <div className="flex space-x-2">
-                  <Button 
-                    variant="outline" 
-                    onClick={handleSyncPrices}
-                    disabled={isUpdatingPrices}
-                  >
-                    {isUpdatingPrices ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                        Atualizando...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Atualizar preços
-                      </>
-                    )}
-                  </Button>
-                  <Button variant="outline" onClick={handleClearCart}>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Limpar Carrinho
-                  </Button>
-                </div>
-                {lastSyncTime && (
-                  <div className="text-sm text-muted-foreground">
-                    Última atualização: {formatLastSync()}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
@@ -274,6 +242,47 @@ const Carrinho = () => {
                 </Card>
               ))}
             </div>
+
+            {/* Cart Actions */}
+            {items.length > 0 && (
+              <div className="lg:col-span-2 mt-6">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button 
+                          variant="outline" 
+                          onClick={handleSyncPrices}
+                          disabled={isUpdatingPrices}
+                          size="sm"
+                        >
+                          {isUpdatingPrices ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                              Atualizando...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="w-4 h-4 mr-2" />
+                              Atualizar Preços
+                            </>
+                          )}
+                        </Button>
+                        <Button variant="outline" onClick={handleClearCart} size="sm">
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Limpar Carrinho
+                        </Button>
+                      </div>
+                      {lastSyncTime && (
+                        <div className="text-sm text-muted-foreground">
+                          Última atualização: {formatLastSync()}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
             {/* Order Summary */}
             <div className="lg:col-span-1">
