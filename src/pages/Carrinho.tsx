@@ -181,64 +181,71 @@ const Carrinho = () => {
             )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
             {/* Cart Items */}
             <div className="lg:col-span-2 space-y-4">
               {items.map((item) => (
                 <Card key={item.productId} className="overflow-hidden">
-                  <CardContent className="p-6">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
-                      {/* Product Image */}
-                      <div className="flex-shrink-0">
-                        <img
-                          src={item.productImage}
-                          alt={item.productName}
-                          className="w-24 h-24 object-cover rounded-lg bg-muted"
-                        />
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="flex flex-col space-y-4">
+                      {/* Product Image & Info Row */}
+                      <div className="flex items-start space-x-4">
+                        <div className="flex-shrink-0">
+                          <img
+                            src={item.productImage}
+                            alt={item.productName}
+                            className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-lg bg-muted"
+                          />
+                        </div>
+
+                        {/* Product Info */}
+                        <div className="flex-grow space-y-2">
+                          <Link 
+                            to={`/produto/${item.productId}`}
+                            className="block hover:text-primary transition-colors"
+                          >
+                            <h3 className="font-semibold text-base sm:text-lg line-clamp-2">{item.productName}</h3>
+                          </Link>
+                          
+                          {item.variants && Object.keys(item.variants).length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {Object.entries(item.variants).map(([key, value]) => (
+                                <Badge key={key} variant="secondary" className="text-xs">
+                                  {key}: {value}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+
+                          <p className="text-xl sm:text-2xl font-bold text-primary">
+                            {formatPrice(item.price)}
+                          </p>
+                        </div>
                       </div>
 
-                      {/* Product Info */}
-                      <div className="flex-grow space-y-2">
-                        <Link 
-                          to={`/produto/${item.productId}`}
-                          className="block hover:text-primary transition-colors"
-                        >
-                          <h3 className="font-semibold text-lg">{item.productName}</h3>
-                        </Link>
-                        
-                        {item.variants && Object.keys(item.variants).length > 0 && (
-                          <div className="flex flex-wrap gap-2">
-                            {Object.entries(item.variants).map(([key, value]) => (
-                              <Badge key={key} variant="secondary" className="text-xs">
-                                {key}: {value}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-
-                        <p className="text-2xl font-bold text-primary">
-                          {formatPrice(item.price)}
-                        </p>
-                      </div>
+                      {/* Controls & Total Row */}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
 
                       {/* Quantity Controls */}
-                      <div className="flex flex-col items-center space-y-4">
-                        <div className="flex items-center space-x-3 bg-muted rounded-lg p-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+                        <div className="flex items-center space-x-1 bg-muted rounded-lg p-1">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleQuantityChange(item.productId, item.quantity - 1)}
                             disabled={item.quantity <= 1}
+                            className="h-10 w-10"
                           >
                             <Minus className="w-4 h-4" />
                           </Button>
-                          <span className="w-12 text-center font-medium">
+                          <span className="w-16 text-center font-medium text-lg">
                             {item.quantity}
                           </span>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleQuantityChange(item.productId, item.quantity + 1)}
+                            className="h-10 w-10"
                           >
                             <Plus className="w-4 h-4" />
                           </Button>
@@ -248,17 +255,19 @@ const Carrinho = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleRemoveItem(item.productId, item.productName)}
-                          className="text-destructive hover:text-destructive"
+                          className="text-destructive hover:text-destructive h-10 px-4 w-full sm:w-auto"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          <span className="sm:hidden">Remover</span>
                         </Button>
                       </div>
 
-                      {/* Item Total */}
-                      <div className="text-right">
-                        <p className="text-xl font-bold">
-                          {formatPrice(item.price * item.quantity)}
-                        </p>
+                        {/* Item Total */}
+                        <div className="text-center sm:text-right">
+                          <p className="text-lg sm:text-xl font-bold">
+                            Total: {formatPrice(item.price * item.quantity)}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </CardContent>

@@ -89,12 +89,12 @@ const ProductCard = ({ product }: ProductCardProps) => {
             <img
               src={product.main_image_url || product.image_url || '/placeholder.svg'}
               alt={product.name}
-              className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+              className="w-full h-40 sm:h-48 object-cover group-hover:scale-105 transition-transform duration-300"
             />
             {product.badge && (
               <Badge 
                 variant={getBadgeVariant(product.badge)}
-                className="absolute top-3 left-3"
+                className="absolute top-2 left-2 text-xs"
               >
                 {product.badge}
               </Badge>
@@ -102,19 +102,19 @@ const ProductCard = ({ product }: ProductCardProps) => {
             <Button
               variant="ghost"
               size="sm"
-              className="absolute top-3 right-3 bg-white/80 hover:bg-white"
+              className="absolute top-2 right-2 bg-white/80 hover:bg-white h-8 w-8 p-0"
               onClick={handleFavoriteClick}
             >
               <Heart className={`h-4 w-4 ${isFavorite(product.id) ? 'fill-red-500 text-red-500' : ''}`} />
             </Button>
           </div>
 
-          <div className="p-4 space-y-3 flex-1 flex flex-col">
-            <h3 className="font-semibold text-foreground line-clamp-2 flex items-center gap-2">
-              {product.name}
+          <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 flex-1 flex flex-col">
+            <h3 className="font-semibold text-sm sm:text-base text-foreground line-clamp-2 flex items-start gap-2">
+              <span className="flex-1">{product.name}</span>
               {product.high_rotation && (
                 <span 
-                  className="text-orange-500 text-base" 
+                  className="text-orange-500 text-sm flex-shrink-0" 
                   title="Produto de Alta Rotatividade - Pode haver atraso no envio devido à alta demanda"
                 >
                   ⚠️
@@ -127,7 +127,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
                 {[...Array(5)].map((_, i) => (
                   <Star 
                     key={i}
-                    className={`h-4 w-4 ${
+                    className={`h-3 w-3 sm:h-4 sm:w-4 ${
                       i < Math.floor(Number(product.rating || 0)) 
                         ? 'fill-yellow-400 text-yellow-400' 
                         : 'text-gray-300'
@@ -135,38 +135,38 @@ const ProductCard = ({ product }: ProductCardProps) => {
                   />
                 ))}
               </div>
-              <span className="text-sm text-muted-foreground">
+              <span className="text-xs sm:text-sm text-muted-foreground">
                 ({product.review_count || 0})
               </span>
             </div>
 
             <div className="space-y-1 mt-auto">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-1">
                 {product.original_price ? (
                   <>
-                    <span className="text-sm text-muted-foreground line-through">
+                    <span className="text-xs sm:text-sm text-muted-foreground line-through">
                       De: {formatPrice(Number(product.price))}
                     </span>
-                    <span className="text-2xl font-bold text-foreground">
+                    <span className="text-lg sm:text-xl font-bold text-foreground">
                       Por: {formatPrice(Number(product.original_price))}
                     </span>
                   </>
                 ) : (
-                  <span className="text-2xl font-bold text-foreground">
+                  <span className="text-lg sm:text-xl font-bold text-foreground">
                     {formatPrice(Number(product.price))}
                   </span>
                 )}
               </div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 ou 10x de {formatPrice(Number(product.original_price || product.price) / 10)}
               </p>
             </div>
           </div>
         </Link>
 
-        <div className="p-4 pt-0">
+        <div className="p-3 sm:p-4 pt-0">
           <Link to={`/produto/${product.id}`}>
-            <Button className="w-full btn-cart">
+            <Button className="w-full btn-cart h-10 text-sm">
               Comprar
             </Button>
           </Link>

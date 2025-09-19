@@ -224,22 +224,22 @@ const Produto = () => {
           <span className="text-foreground">{product.name}</span>
         </nav>
 
-        <div className="grid lg:grid-cols-2 gap-12 mb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12 mb-12">
           {/* Product Images */}
           <div className="space-y-4">
             <div className="relative">
               <img
                 src={productImages[selectedImage]}
                 alt={product.name}
-                className="w-full h-96 lg:h-[500px] object-contain rounded-lg bg-accent/20"
+                className="w-full h-64 sm:h-80 md:h-96 lg:h-[500px] object-contain rounded-lg bg-accent/20"
               />
               {product.badge && (
-                <Badge className="absolute top-4 left-4">
+                <Badge className="absolute top-2 sm:top-4 left-2 sm:left-4 text-xs sm:text-sm">
                   {product.badge}
                 </Badge>
               )}
               {calculateDiscount() > 0 && (
-                <Badge className="absolute top-4 right-4 bg-red-500 text-white">
+                <Badge className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-red-500 text-white text-xs sm:text-sm">
                   -{calculateDiscount()}% OFF
                 </Badge>
               )}
@@ -247,7 +247,7 @@ const Produto = () => {
                 <Button
                   size="sm"
                   variant="secondary"
-                  className="absolute bottom-4 right-4"
+                  className="absolute bottom-2 sm:bottom-4 right-2 sm:right-4 h-8 w-8 sm:h-10 sm:w-10 p-0"
                 >
                   <ZoomIn className="h-4 w-4" />
                 </Button>
@@ -255,12 +255,12 @@ const Produto = () => {
             </div>
             
             {/* Thumbnail Images */}
-            <div className="flex gap-2 overflow-x-auto">
+            <div className="flex gap-2 overflow-x-auto pb-2">
               {productImages.map((image, index) => (
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
-                  className={`flex-shrink-0 w-20 h-20 rounded-lg border-2 overflow-hidden ${
+                  className={`flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg border-2 overflow-hidden ${
                     selectedImage === index ? 'border-primary' : 'border-border'
                   }`}
                 >
@@ -395,79 +395,83 @@ const Produto = () => {
 
             {/* Quantity and Actions */}
             <div className="space-y-4">
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                 <label className="font-medium">Quantidade:</label>
-                <div className="flex items-center border rounded-lg">
+                <div className="flex items-center border rounded-lg w-fit">
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
                     disabled={quantity <= 1}
+                    className="h-10 w-10"
                   >
                     <Minus className="h-4 w-4" />
                   </Button>
-                  <span className="px-4 py-2 min-w-[60px] text-center">{quantity}</span>
+                  <span className="px-4 py-2 min-w-[60px] text-center text-lg">{quantity}</span>
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => setQuantity(quantity + 1)}
+                    className="h-10 w-10"
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <Button
                   size="lg"
-                  className="flex-1 btn-cart"
+                  className="flex-1 btn-cart h-12"
                   onClick={handleAddToCart}
                   disabled={(product.stock_quantity || 0) <= 0}
                 >
                   <ShoppingCart className="h-5 w-5 mr-2" />
-                  Adicionar ao Carrinho
+                  <span className="text-sm sm:text-base">Adicionar ao Carrinho</span>
                 </Button>
                 <Button
                   size="lg"
                   variant="outline"
                   onClick={handleAddToWishlist}
-                  className={isFavorite(product.id) ? "text-destructive border-destructive" : ""}
+                  className={`h-12 w-12 sm:w-auto ${isFavorite(product.id) ? "text-destructive border-destructive" : ""}`}
                 >
                   <Heart className={`h-5 w-5 ${isFavorite(product.id) ? 'fill-current' : ''}`} />
+                  <span className="hidden sm:inline ml-2">Favoritos</span>
                 </Button>
-                <Button size="lg" variant="outline">
+                <Button size="lg" variant="outline" className="h-12 w-12 sm:w-auto">
                   <Share2 className="h-5 w-5" />
+                  <span className="hidden sm:inline ml-2">Compartilhar</span>
                 </Button>
               </div>
 
               <Button 
                 size="lg" 
-                className="w-full btn-buy-now" 
+                className="w-full btn-buy-now h-12" 
                 onClick={handleBuyNow}
                 disabled={(product.stock_quantity || 0) <= 0}
               >
-                Comprar Agora
+                <span className="text-base font-semibold">Comprar Agora</span>
               </Button>
             </div>
 
             {/* Benefits */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="flex items-center gap-2 p-3 bg-accent rounded-lg">
-                <Truck className="h-5 w-5 text-primary" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="flex items-center gap-3 p-4 bg-accent rounded-lg">
+                <Truck className="h-6 w-6 text-primary flex-shrink-0" />
                 <div>
                   <p className="text-sm font-medium">Frete Grátis</p>
                   <p className="text-xs text-muted-foreground">Acima de R$ 199</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 p-3 bg-accent rounded-lg">
-                <Shield className="h-5 w-5 text-primary" />
+              <div className="flex items-center gap-3 p-4 bg-accent rounded-lg">
+                <Shield className="h-6 w-6 text-primary flex-shrink-0" />
                 <div>
                   <p className="text-sm font-medium">Garantia</p>
                   <p className="text-xs text-muted-foreground">12 meses</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 p-3 bg-accent rounded-lg">
-                <RotateCcw className="h-5 w-5 text-primary" />
+              <div className="flex items-center gap-3 p-4 bg-accent rounded-lg">
+                <RotateCcw className="h-6 w-6 text-primary flex-shrink-0" />
                 <div>
                   <p className="text-sm font-medium">Troca Fácil</p>
                   <p className="text-xs text-muted-foreground">30 dias</p>

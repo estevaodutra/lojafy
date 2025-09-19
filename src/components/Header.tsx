@@ -93,22 +93,22 @@ const Header = () => {
             </span>
           </Link>
 
-          {/* Search Bar - Hidden on mobile */}
-          <div className="hidden md:flex flex-1 max-w-2xl mx-8">
+          {/* Search Bar - Always visible */}
+          <div className="flex flex-1 max-w-2xl mx-4 md:mx-8">
             <form onSubmit={handleSearch} className="relative w-full">
               <Input
                 type="text"
                 placeholder="Buscar produtos..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-4 pr-12 py-3 w-full rounded-lg border-border"
+                className="pl-4 pr-12 py-2 md:py-3 w-full rounded-lg border-border text-sm md:text-base"
               />
               <Button 
                 type="submit"
                 size="sm" 
-                className="absolute right-1 top-1 h-8 px-3 bg-primary hover:bg-primary/90"
+                className="absolute right-1 top-1 h-6 md:h-8 px-2 md:px-3 bg-primary hover:bg-primary/90"
               >
-                <Search className="h-4 w-4" />
+                <Search className="h-3 w-3 md:h-4 md:w-4" />
               </Button>
             </form>
           </div>
@@ -116,18 +116,18 @@ const Header = () => {
           {/* Actions */}
           <div className="flex items-center space-x-2">
 
-            {/* User Account */}
+            {/* User Account - Now visible on mobile too */}
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="hidden sm:flex flex-col items-center p-2">
-                    <Avatar className="h-5 w-5">
+                  <Button variant="ghost" size="sm" className="flex flex-col items-center p-1 sm:p-2 min-w-[44px]">
+                    <Avatar className="h-4 w-4 sm:h-5 sm:w-5">
                       <AvatarImage src={profile?.avatar_url} />
-                      <AvatarFallback>
+                      <AvatarFallback className="text-xs">
                         {profile?.first_name?.[0]}{profile?.last_name?.[0]}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="text-xs">
+                    <span className="text-xs hidden sm:block">
                       {profile?.first_name ? `${profile.first_name}` : 'Conta'}
                     </span>
                   </Button>
@@ -155,21 +155,21 @@ const Header = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button variant="ghost" size="sm" className="hidden sm:flex flex-col items-center p-2" asChild>
+              <Button variant="ghost" size="sm" className="flex flex-col items-center p-1 sm:p-2 min-w-[44px]" asChild>
                 <Link to="/auth">
-                  <User className="h-5 w-5" />
-                  <span className="text-xs">Entrar</span>
+                  <User className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <span className="text-xs hidden sm:block">Entrar</span>
                 </Link>
               </Button>
             )}
 
-            {/* Favorites */}
-            <Button variant="ghost" size="sm" className="hidden sm:flex flex-col items-center p-2 relative" asChild>
+            {/* Favorites - Now visible on mobile too */}
+            <Button variant="ghost" size="sm" className="flex flex-col items-center p-1 sm:p-2 relative min-w-[44px]" asChild>
               <Link to="/favoritos">
-                <Heart className="h-5 w-5" />
-                <span className="text-xs">Favoritos</span>
+                <Heart className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="text-xs hidden sm:block">Favoritos</span>
                 {favoritesCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
                     {favoritesCount}
                   </span>
                 )}
@@ -177,12 +177,12 @@ const Header = () => {
             </Button>
 
             {/* Cart */}
-            <Button variant="ghost" size="sm" className="flex flex-col items-center p-2 relative" asChild>
+            <Button variant="ghost" size="sm" className="flex flex-col items-center p-1 sm:p-2 relative min-w-[44px]" asChild>
               <Link to="/carrinho">
-                <ShoppingCart className="h-5 w-5" />
-                <span className="text-xs">Carrinho</span>
+                <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="text-xs hidden sm:block">Carrinho</span>
                 {itemsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
                     {itemsCount}
                   </span>
                 )}
