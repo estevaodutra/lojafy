@@ -52,6 +52,11 @@ const superAdminMenuItems = [
     url: '/super-admin/plataforma',
     icon: Shield,
   },
+  {
+    title: 'Integrações',
+    url: '/super-admin/integracoes',
+    icon: Settings,
+  },
 ];
 
 const designMenuItems = [
