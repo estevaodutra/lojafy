@@ -29,7 +29,7 @@ import {
 const superAdminMenuItems = [
   {
     title: 'Dashboard',
-    url: '/super-admin/dashboard',
+    url: '/super-admin',
     icon: LayoutDashboard,
   },
   {
@@ -39,12 +39,12 @@ const superAdminMenuItems = [
   },
   {
     title: 'Produtos',
-    url: '/super-admin/products',
+    url: '/super-admin/produtos',
     icon: Package,
   },
   {
     title: 'Pedidos',
-    url: '/super-admin/orders',
+    url: '/super-admin/pedidos',
     icon: ShoppingCart,
   },
   {
