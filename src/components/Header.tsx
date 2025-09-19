@@ -88,13 +88,13 @@ const Header = () => {
                 <span className="text-white font-bold text-xl">E</span>
               </div>
             )}
-            <span className="text-2xl font-bold text-foreground">
+            <span className="hidden md:block text-2xl font-bold text-foreground">
               {config?.store_name || 'EcoShop'}
             </span>
           </Link>
 
-          {/* Search Bar - Always visible */}
-          <div className="flex flex-1 max-w-2xl mx-4 md:mx-8">
+          {/* Search Bar - Desktop only */}
+          <div className="hidden md:flex flex-1 max-w-2xl mx-4 md:mx-8">
             <form onSubmit={handleSearch} className="relative w-full">
               <Input
                 type="text"
@@ -113,10 +113,10 @@ const Header = () => {
             </form>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center space-x-2">
+          {/* Actions - Desktop only */}
+          <div className="hidden md:flex items-center space-x-2">
 
-            {/* User Account - Now visible on mobile too */}
+            {/* User Account */}
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -163,7 +163,7 @@ const Header = () => {
               </Button>
             )}
 
-            {/* Favorites - Now visible on mobile too */}
+            {/* Favorites */}
             <Button variant="ghost" size="sm" className="flex flex-col items-center p-1 sm:p-2 relative min-w-[44px]" asChild>
               <Link to="/favoritos">
                 <Heart className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -188,11 +188,13 @@ const Header = () => {
                 )}
               </Link>
             </Button>
+          </div>
 
-            {/* Mobile Menu */}
+          {/* Mobile Menu - Only hamburger visible on mobile */}
+          <div className="md:hidden">
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" className="md:hidden">
+                <Button variant="ghost" size="sm">
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
@@ -276,8 +278,38 @@ const Header = () => {
                     </div>
                   </nav>
 
-                  {/* User Section */}
+                  {/* Quick Actions - Favorites & Cart */}
                   <div className="border-t p-4">
+                    <div className="flex gap-4 mb-4">
+                      <Link 
+                        to="/favoritos" 
+                        className="flex-1 flex items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors relative"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Heart className="h-4 w-4 mr-2" />
+                        <span className="text-sm">Favoritos</span>
+                        {favoritesCount > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                            {favoritesCount}
+                          </span>
+                        )}
+                      </Link>
+                      <Link 
+                        to="/carrinho" 
+                        className="flex-1 flex items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors relative"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        <span className="text-sm">Carrinho</span>
+                        {itemsCount > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                            {itemsCount}
+                          </span>
+                        )}
+                      </Link>
+                    </div>
+
+                    {/* User Section */}
                     {user ? (
                       <div className="space-y-3">
                         <div className="flex items-center space-x-3 p-2">
@@ -332,41 +364,12 @@ const Header = () => {
                         Entrar
                       </Link>
                     )}
-
-                    {/* Actions */}
-                    <div className="flex gap-4 mt-4">
-                      <Link 
-                        to="/favoritos" 
-                        className="flex-1 flex items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors relative"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        <Heart className="h-4 w-4 mr-2" />
-                        <span className="text-sm">Favoritos</span>
-                        {favoritesCount > 0 && (
-                          <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                            {favoritesCount}
-                          </span>
-                        )}
-                      </Link>
-                      <Link 
-                        to="/carrinho" 
-                        className="flex-1 flex items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors relative"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                        <span className="text-sm">Carrinho</span>
-                        {itemsCount > 0 && (
-                          <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                            {itemsCount}
-                          </span>
-                        )}
-                      </Link>
-                    </div>
                   </div>
                 </div>
               </SheetContent>
             </Sheet>
           </div>
+
         </div>
 
         {/* Navigation Menu */}

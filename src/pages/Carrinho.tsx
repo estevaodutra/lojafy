@@ -196,7 +196,7 @@ const Carrinho = () => {
 
                       {/* Quantity Controls */}
                       <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
-                        <div className="flex items-center space-x-1 bg-muted rounded-lg p-1">
+                        <div className="flex items-center justify-center sm:justify-start space-x-1 bg-muted rounded-lg p-1">
                           <Button
                             variant="ghost"
                             size="sm"
