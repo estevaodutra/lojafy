@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
     const active = url.searchParams.get('active');
     console.log('[PARAMS] Query parameters:', { active });
 
-    // Build query
+    // Build categories query
     console.log('[QUERY] Building categories query');
     let query = supabase
       .from('categories')
@@ -157,6 +157,33 @@ Deno.serve(async (req) => {
 
     console.log(`[QUERY] Found ${categories?.length || 0} categories`);
 
+    // Build subcategories query
+    console.log('[QUERY] Building subcategories query');
+    const { data: subcategories, error: subcategoriesError } = await supabase
+      .from('subcategories')
+      .select(`
+        id,
+        name,
+        slug,
+        category_id
+      `)
+      .eq('active', true)
+      .order('name');
+
+    if (subcategoriesError) {
+      console.error('[QUERY] Error fetching subcategories:', subcategoriesError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Erro ao buscar subcategorias',
+          code: 'QUERY_ERROR',
+          details: subcategoriesError.message 
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`[QUERY] Found ${subcategories?.length || 0} subcategories`);
+
     // Validate categories data before processing
     if (!categories) {
       console.log('[RESULT] No categories returned from query');
@@ -172,8 +199,27 @@ Deno.serve(async (req) => {
     // Process categories safely
     console.log('[PROCESS] Processing categories data');
     try {
+      // Create a map of subcategories by category_id
+      const subcategoriesMap = new Map();
+      if (subcategories) {
+        subcategories.forEach(sub => {
+          if (!subcategoriesMap.has(sub.category_id)) {
+            subcategoriesMap.set(sub.category_id, []);
+          }
+          subcategoriesMap.get(sub.category_id).push({
+            id: sub.id,
+            nome: sub.name,
+            slug: sub.slug
+          });
+        });
+      }
+
       const processedCategories = categories.map((category, index) => {
         console.log(`[PROCESS] Processing category ${index + 1}/${categories.length}: ${category.name}`);
+        
+        // Get subcategories for this category
+        const categorySubcategories = subcategoriesMap.get(category.id) || [];
+        
         return {
           id: category.id,
           nome: category.name,
@@ -183,6 +229,7 @@ Deno.serve(async (req) => {
           imagem_url: category.image_url,
           total_produtos: Number(category.product_count) || 0,
           ativo: Boolean(category.active),
+          subcategorias: categorySubcategories,
           criado_em: category.created_at,
           atualizado_em: category.updated_at
         };
