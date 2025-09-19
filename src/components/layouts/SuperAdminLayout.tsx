@@ -29,27 +29,27 @@ import {
 const superAdminMenuItems = [
   {
     title: 'Dashboard',
-    url: '/admin/dashboard',
+    url: '/super-admin/dashboard',
     icon: LayoutDashboard,
   },
   {
     title: 'Usuários',
-    url: '/admin/usuarios',
+    url: '/super-admin/usuarios',
     icon: Users,
   },
   {
     title: 'Produtos',
-    url: '/admin/products',
+    url: '/super-admin/products',
     icon: Package,
   },
   {
     title: 'Pedidos',
-    url: '/admin/orders',
+    url: '/super-admin/orders',
     icon: ShoppingCart,
   },
   {
     title: 'Plataforma',
-    url: '/admin/plataforma',
+    url: '/super-admin/plataforma',
     icon: Shield,
   },
 ];
@@ -57,22 +57,22 @@ const superAdminMenuItems = [
 const designMenuItems = [
   {
     title: 'Homepage',
-    url: '/admin/homepage',
+    url: '/super-admin/homepage',
     icon: Store,
   },
   {
     title: 'Visual',
-    url: '/admin/configuracao-visual',
+    url: '/super-admin/configuracao-visual',
     icon: Palette,
   },
   {
     title: 'Banners',
-    url: '/admin/banners',
+    url: '/super-admin/banners',
     icon: Megaphone,
   },
   {
     title: 'Categorias',
-    url: '/admin/categorias',
+    url: '/super-admin/categorias',
     icon: Package,
   },
 ];
