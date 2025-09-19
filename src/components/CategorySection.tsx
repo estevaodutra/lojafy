@@ -117,24 +117,24 @@ const CategorySection = () => {
 
   return (
     <section className="py-16 bg-muted/30">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 max-w-full">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
             Outras Categorias
           </h2>
-          <p className="text-lg text-muted-foreground">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Explore mais opções disponíveis
           </p>
         </div>
 
         {isLoading ? (
           <div className="flex justify-center">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6 max-w-4xl">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6 max-w-full">
               {Array.from({ length: 8 }).map((_, i) => (
               <Card key={i} className="border-border bg-card">
-                <CardContent className="p-6 flex flex-col items-center text-center space-y-3">
-                  <Skeleton className="w-16 h-16 rounded-full" />
-                  <Skeleton className="h-4 w-20" />
+                <CardContent className="p-4 md:p-6 flex flex-col items-center text-center space-y-3">
+                  <Skeleton className="w-12 h-12 md:w-16 md:h-16 rounded-full" />
+                  <Skeleton className="h-4 w-16 md:w-20" />
                 </CardContent>
               </Card>
               ))}
@@ -146,27 +146,27 @@ const CategorySection = () => {
             <p className="text-muted-foreground">Cadastre categorias para exibi-las aqui.</p>
           </div>
         ) : (
-          <div className="flex justify-center">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6 max-w-4xl">
+          <div className="flex justify-center overflow-hidden">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6 max-w-full w-full">
               {categories.map((category) => {
               const IconComponent = iconMap[category.name] || iconMap.default;
               const colorClass = colorMap[category.name] || colorMap.default;
               
               return (
-                <Link key={category.id} to={`/categorias/${category.slug}`}>
+                <Link key={category.id} to={`/categorias/${category.slug}`} className="min-w-0">
                   <Card 
-                    className="group hover:shadow-card-hover transition-all duration-300 cursor-pointer border-border bg-card"
+                    className="group hover:shadow-card-hover transition-all duration-300 cursor-pointer border-border bg-card h-full"
                   >
-                    <CardContent className="p-6 flex flex-col items-center text-center space-y-3">
-                      <div className={`w-16 h-16 ${colorClass} rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
-                        <IconComponent className="h-8 w-8 text-white" />
+                    <CardContent className="p-4 md:p-6 flex flex-col items-center text-center space-y-2 md:space-y-3">
+                      <div className={`w-12 h-12 md:w-16 md:h-16 ${colorClass} rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
+                        <IconComponent className="h-6 w-6 md:h-8 md:w-8 text-white" />
                       </div>
-                      <h3 className="font-medium text-foreground text-sm">
+                      <h3 className="font-medium text-foreground text-xs md:text-sm truncate w-full">
                         {category.name}
                       </h3>
                       {(category.real_product_count || 0) > 0 && (
                         <p className="text-xs text-muted-foreground">
-                          {category.real_product_count} produtos
+                          {category.real_product_count} produto{category.real_product_count !== 1 ? 's' : ''}
                         </p>
                       )}
                     </CardContent>

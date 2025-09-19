@@ -123,8 +123,8 @@ const Hero = () => {
         </div>
 
         {/* Decorative Elements */}
-        <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-bl from-white/10 to-transparent rounded-full -translate-y-36 translate-x-36"></div>
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-white/5 to-transparent rounded-full translate-y-48 -translate-x-48"></div>
+        <div className="absolute top-0 right-0 w-32 h-32 md:w-72 md:h-72 bg-gradient-to-bl from-white/10 to-transparent rounded-full -translate-y-16 translate-x-16 md:-translate-y-36 md:translate-x-36"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 md:w-96 md:h-96 bg-gradient-to-tr from-white/5 to-transparent rounded-full translate-y-24 -translate-x-24 md:translate-y-48 md:-translate-x-48"></div>
       </section>
     );
   }
@@ -205,8 +205,8 @@ const Hero = () => {
       </Carousel>
 
       {/* Decorative Elements */}
-      <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-bl from-white/10 to-transparent rounded-full -translate-y-36 translate-x-36"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-white/5 to-transparent rounded-full translate-y-48 -translate-x-48"></div>
+      <div className="absolute top-0 right-0 w-32 h-32 md:w-72 md:h-72 bg-gradient-to-bl from-white/10 to-transparent rounded-full -translate-y-16 translate-x-16 md:-translate-y-36 md:translate-x-36"></div>
+      <div className="absolute bottom-0 left-0 w-48 h-48 md:w-96 md:h-96 bg-gradient-to-tr from-white/5 to-transparent rounded-full translate-y-24 -translate-x-24 md:translate-y-48 md:-translate-x-48"></div>
     </section>
   );
 };

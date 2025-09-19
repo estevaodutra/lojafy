@@ -130,18 +130,18 @@ const Carrinho = () => {
     <>
       <Header />
       <main className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-8 max-w-full">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" asChild>
+            <div className="flex items-center space-x-4 min-w-0">
+              <Button variant="ghost" size="sm" asChild className="flex-shrink-0">
                 <Link to="/">
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Voltar
                 </Link>
               </Button>
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-foreground">Meu Carrinho</h1>
+              <div className="min-w-0">
+                <h1 className="text-2xl md:text-3xl font-bold text-foreground truncate">Meu Carrinho</h1>
                 <p className="text-muted-foreground">
                   {itemsCount} {itemsCount === 1 ? 'item' : 'itens'} no carrinho
                 </p>
@@ -157,35 +157,35 @@ const Carrinho = () => {
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex flex-col space-y-4">
                       {/* Product Image & Info Row */}
-                      <div className="flex items-start space-x-4">
+                      <div className="flex items-start space-x-4 min-w-0">
                         <div className="flex-shrink-0">
                           <img
                             src={item.productImage}
                             alt={item.productName}
-                            className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-lg bg-muted"
+                            className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 object-cover rounded-lg bg-muted"
                           />
                         </div>
 
                         {/* Product Info */}
-                        <div className="flex-grow space-y-2">
+                        <div className="flex-grow space-y-2 min-w-0">
                           <Link 
                             to={`/produto/${item.productId}`}
                             className="block hover:text-primary transition-colors"
                           >
-                            <h3 className="font-semibold text-base sm:text-lg line-clamp-2">{item.productName}</h3>
+                            <h3 className="font-semibold text-sm sm:text-base md:text-lg line-clamp-2">{item.productName}</h3>
                           </Link>
                           
                           {item.variants && Object.keys(item.variants).length > 0 && (
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-1 sm:gap-2">
                               {Object.entries(item.variants).map(([key, value]) => (
-                                <Badge key={key} variant="secondary" className="text-xs">
+                                <Badge key={key} variant="secondary" className="text-xs truncate max-w-full">
                                   {key}: {value}
                                 </Badge>
                               ))}
                             </div>
                           )}
 
-                          <p className="text-xl sm:text-2xl font-bold text-primary">
+                          <p className="text-lg sm:text-xl md:text-2xl font-bold text-primary">
                             {formatPrice(item.price)}
                           </p>
                         </div>

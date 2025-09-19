@@ -82,10 +82,10 @@ const ProductCard = ({ product }: ProductCardProps) => {
   };
 
   return (
-    <Card className="group hover:shadow-card-hover transition-all duration-300 border-border overflow-hidden h-full">
+    <Card className="group hover:shadow-card-hover transition-all duration-300 border-border overflow-hidden h-full max-w-full">
       <CardContent className="p-0 h-full flex flex-col">
         <Link to={`/produto/${product.id}`} className="flex-1 flex flex-col">
-          <div className="relative">
+          <div className="relative overflow-hidden">
             <img
               src={product.main_image_url || product.image_url || '/placeholder.svg'}
               alt={product.name}
@@ -94,7 +94,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
             {product.badge && (
               <Badge 
                 variant={getBadgeVariant(product.badge)}
-                className="absolute top-2 left-2 text-xs"
+                className="absolute top-2 left-2 text-xs max-w-[calc(100%-4rem)]"
               >
                 {product.badge}
               </Badge>
@@ -102,16 +102,16 @@ const ProductCard = ({ product }: ProductCardProps) => {
             <Button
               variant="ghost"
               size="sm"
-              className="absolute top-2 right-2 bg-white/80 hover:bg-white h-8 w-8 p-0"
+              className="absolute top-2 right-2 bg-white/80 hover:bg-white h-8 w-8 p-0 flex-shrink-0"
               onClick={handleFavoriteClick}
             >
               <Heart className={`h-4 w-4 ${isFavorite(product.id) ? 'fill-red-500 text-red-500' : ''}`} />
             </Button>
           </div>
 
-          <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 flex-1 flex flex-col">
-            <h3 className="font-semibold text-sm sm:text-base text-foreground line-clamp-2 flex items-start gap-2">
-              <span className="flex-1">{product.name}</span>
+          <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 flex-1 flex flex-col min-w-0">
+            <h3 className="font-semibold text-sm sm:text-base text-foreground line-clamp-2 flex items-start gap-2 min-w-0">
+              <span className="flex-1 min-w-0">{product.name}</span>
               {product.high_rotation && (
                 <span 
                   className="text-orange-500 text-sm flex-shrink-0" 

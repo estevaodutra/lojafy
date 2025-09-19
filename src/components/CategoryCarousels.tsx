@@ -134,7 +134,7 @@ const CategoryCarousels = () => {
 
   return (
     <section className="py-16 bg-background">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 max-w-full overflow-hidden">
         <div className="space-y-16">
           {categories.map((category) => {
             if (!category) return null;
@@ -144,17 +144,17 @@ const CategoryCarousels = () => {
             if (products.length === 0) return null;
 
             return (
-              <div key={category.id} className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
+              <div key={category.id} className="space-y-6 max-w-full">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 min-w-0">
+                  <div className="min-w-0">
+                    <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2 truncate">
                       {category.name}
                     </h2>
-                    <p className="text-lg text-muted-foreground">
+                    <p className="text-base sm:text-lg text-muted-foreground">
                       Descubra os melhores produtos desta categoria
                     </p>
                   </div>
-                  <Link to={`/categorias/${category.slug}`}>
+                  <Link to={`/categorias/${category.slug}`} className="flex-shrink-0">
                     <Button variant="outline" className="gap-2">
                       Ver todos
                       <ChevronRight className="h-4 w-4" />
@@ -162,23 +162,25 @@ const CategoryCarousels = () => {
                   </Link>
                 </div>
 
-                <Carousel
-                  opts={{
-                    align: "start",
-                    loop: false,
-                  }}
-                  className="w-full"
-                >
-                  <CarouselContent className="-ml-2 md:-ml-4">
-                    {products.map((product) => (
-                      <CarouselItem key={product.id} className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
-                        <ProductCard product={product} />
-                      </CarouselItem>
-                    ))}
-                  </CarouselContent>
-                  <CarouselPrevious className="hidden md:flex" />
-                  <CarouselNext className="hidden md:flex" />
-                </Carousel>
+                <div className="overflow-hidden max-w-full">
+                  <Carousel
+                    opts={{
+                      align: "start",
+                      loop: false,
+                    }}
+                    className="w-full"
+                  >
+                    <CarouselContent className="-ml-2 md:-ml-4">
+                      {products.map((product) => (
+                        <CarouselItem key={product.id} className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3 xl:basis-1/4 min-w-0">
+                          <ProductCard product={product} />
+                        </CarouselItem>
+                      ))}
+                    </CarouselContent>
+                    <CarouselPrevious className="hidden md:flex left-2" />
+                    <CarouselNext className="hidden md:flex right-2" />
+                  </Carousel>
+                </div>
               </div>
             );
           })}
