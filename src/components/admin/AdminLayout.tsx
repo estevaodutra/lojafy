@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation, Outlet, Navigate } from 'react-router-dom';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { BarChart3, Package, ShoppingCart, Users, Settings, Home, Image, Globe, Star, MessageSquare, Mail, Palette, Truck } from 'lucide-react';
+import { BarChart3, Package, ShoppingCart, Users, Settings, Home, Image, Globe, Star, MessageSquare, Mail, Palette, Truck, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import lojafyLogo from '@/assets/lojafy-logo-new.png';
@@ -26,9 +26,15 @@ const designMenuItems = [
 
 const AdminSidebar = () => {
   const location = useLocation();
+  const { signOut } = useAuth();
   const currentPath = location.pathname;
 
   const isActive = (path: string) => currentPath === path;
+
+  const handleLogout = async () => {
+    await signOut();
+    window.location.href = '/';
+  };
 
   return (
     <Sidebar className="w-60">
@@ -91,6 +97,14 @@ const AdminSidebar = () => {
                     <Home className="mr-2 h-4 w-4" />
                     <span>Voltar à Loja</span>
                   </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <button onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Sair</span>
+                  </button>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

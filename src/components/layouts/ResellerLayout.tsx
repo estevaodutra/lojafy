@@ -6,7 +6,8 @@ import {
   BarChart3, 
   DollarSign,
   Users,
-  Store
+  Store,
+  LogOut
 } from 'lucide-react';
 import {
   Sidebar,
@@ -20,6 +21,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
+import { useAuth } from '@/contexts/AuthContext';
 
 const resellerMenuItems = [
   {
@@ -52,7 +54,13 @@ const resellerMenuItems = [
 const ResellerSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const currentPath = location.pathname;
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/');
+  };
 
   return (
     <Sidebar className="border-r">
@@ -90,6 +98,14 @@ const ResellerSidebar = () => {
                   <button onClick={() => navigate('/')}>
                     <Store className="mr-2 h-4 w-4" />
                     <span>Ver Loja</span>
+                  </button>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <button onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Sair</span>
                   </button>
                 </SidebarMenuButton>
               </SidebarMenuItem>

@@ -110,23 +110,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Only redirect if we're currently on auth or home page
     const currentPath = window.location.pathname;
     if (currentPath === '/auth' || currentPath === '/') {
-      switch (role) {
-        case 'super_admin':
-          window.location.href = '/super-admin';
-          break;
-        case 'admin':
-          window.location.href = '/admin';
-          break;
-        case 'supplier':
-          window.location.href = '/supplier';
-          break;
-        case 'reseller':
-          window.location.href = '/reseller';
-          break;
-        default:
-          window.location.href = '/';
-          break;
-      }
+      // Use setTimeout to avoid potential navigation issues
+      setTimeout(() => {
+        switch (role) {
+          case 'super_admin':
+            window.location.replace('/super-admin');
+            break;
+          case 'admin':
+            window.location.replace('/admin');
+            break;
+          case 'supplier':
+            window.location.replace('/supplier');
+            break;
+          case 'reseller':
+            window.location.replace('/reseller');
+            break;
+          default:
+            window.location.replace('/');
+            break;
+        }
+      }, 100);
     }
   };
 

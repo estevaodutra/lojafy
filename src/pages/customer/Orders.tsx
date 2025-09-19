@@ -6,6 +6,7 @@ import { Package, Eye, Truck, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import OrderDetailsModal from '@/components/OrderDetailsModal';
+import { Link } from 'react-router-dom';
 
 interface OrderItem {
   id: string;
@@ -225,7 +226,7 @@ const Orders = () => {
               Você ainda não realizou nenhum pedido. Que tal começar a explorar nossa loja?
             </p>
             <Button asChild>
-              <a href="/">Começar a Comprar</a>
+              <Link to="/">Começar a Comprar</Link>
             </Button>
           </CardContent>
         </Card>
