@@ -21,6 +21,7 @@ import { PixPaymentModal } from '@/components/PixPaymentModal';
 import { createModernPixPayment, PixPaymentRequest } from '@/lib/mercadoPago';
 import { ShoppingCart, CreditCard, Truck, Shield, AlertTriangle } from "lucide-react";
 import { ShippingMethodSelector } from "@/components/ShippingMethodSelector";
+import { HighRotationAlert } from '@/components/HighRotationAlert';
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -46,6 +47,7 @@ const Checkout = () => {
     paymentId: string;
     amount: number;
   } | null>(null);
+  const [showHighRotationAlert, setShowHighRotationAlert] = useState(false);
 
   // Check if cart is empty and redirect
   useEffect(() => {
@@ -416,6 +418,33 @@ const Checkout = () => {
       return;
     }
 
+    // Check if there are high rotation products in cart
+    const hasHighRotationProducts = await checkHighRotationProducts();
+    if (hasHighRotationProducts) {
+      setShowHighRotationAlert(true);
+      return;
+    }
+
+    await processPixPayment();
+  };
+
+  const checkHighRotationProducts = async (): Promise<boolean> => {
+    try {
+      const productIds = cartItems.map(item => item.productId);
+      
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, high_rotation')
+        .in('id', productIds);
+      
+      return products?.some(product => product.high_rotation) || false;
+    } catch (error) {
+      console.error('Error checking high rotation products:', error);
+      return false;
+    }
+  };
+
+  const processPixPayment = async () => {
     setIsProcessingPayment(true);
 
     try {
@@ -1042,6 +1071,16 @@ const Checkout = () => {
           onPaymentConfirmed={handlePixPaymentConfirmed}
         />
       )}
+
+      {/* High Rotation Alert Modal */}
+      <HighRotationAlert
+        isOpen={showHighRotationAlert}
+        onClose={() => setShowHighRotationAlert(false)}
+        onConfirm={() => {
+          setShowHighRotationAlert(false);
+          processPixPayment();
+        }}
+      />
     </div>
   );
 };

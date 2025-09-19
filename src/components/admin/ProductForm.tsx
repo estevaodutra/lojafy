@@ -35,6 +35,7 @@ const productSchema = z.object({
   stock_quantity: z.coerce.number().min(0, 'Estoque não pode ser negativo'),
   min_stock_level: z.coerce.number().min(1, 'Estoque mínimo deve ser pelo menos 1'),
   low_stock_alert: z.boolean().default(false),
+  high_rotation: z.boolean().default(false),
   // Dimensions
   height: z.coerce.number().positive('Altura deve ser positiva').optional(),
   width: z.coerce.number().positive('Largura deve ser positiva').optional(),
@@ -124,6 +125,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       stock_quantity: product?.stock_quantity || 0,
       min_stock_level: product?.min_stock_level || 5,
       low_stock_alert: product?.low_stock_alert ?? false,
+      high_rotation: product?.high_rotation ?? false,
       height: product?.height || undefined,
       width: product?.width || undefined,
       length: product?.length || undefined,
@@ -201,6 +203,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         stock_quantity: data.stock_quantity,
         min_stock_level: data.min_stock_level,
         low_stock_alert: data.low_stock_alert,
+        high_rotation: data.high_rotation,
         height: dimensions.height || null,
         width: dimensions.width || null,
         length: dimensions.length || null,
@@ -898,6 +901,31 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
               <FormField
                 control={form.control}
                 name="featured"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <FormLabel>Produto de Alta Rotatividade</FormLabel>
+                <FormDescription>
+                  Produto com alta demanda que requer aviso especial no checkout
+                </FormDescription>
+              </div>
+              <FormField
+                control={form.control}
+                name="high_rotation"
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>

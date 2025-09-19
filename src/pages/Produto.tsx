@@ -277,7 +277,17 @@ const Produto = () => {
           {/* Product Information */}
           <div className="space-y-6">
             <div>
-              <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
+              <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+                {product.name}
+                {product.high_rotation && (
+                  <span 
+                    className="text-orange-500 text-2xl" 
+                    title="Produto de Alta Rotatividade - Pode haver atraso no envio devido à alta demanda"
+                  >
+                    ⚠️
+                  </span>
+                )}
+              </h1>
               {product.brand && (
                 <p className="text-muted-foreground">Marca: {product.brand}</p>
               )}

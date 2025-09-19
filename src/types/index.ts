@@ -24,6 +24,7 @@ export interface Product {
   images: string[];
   reviews: Review[];
   variants?: ProductVariant[];
+  highRotation?: boolean;
 }
 
 export interface Review {
@@ -118,6 +119,7 @@ export interface OrderItem {
   price: number;
   quantity: number;
   variants?: Record<string, string>;
+  highRotation?: boolean;
 }
 
 export interface FAQItem {

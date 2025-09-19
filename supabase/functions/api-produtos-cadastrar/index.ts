@@ -98,7 +98,8 @@ Deno.serve(async (req) => {
       altura,
       comprimento,
       produto_destaque,
-      badge
+      badge,
+      alta_rotatividade
     } = body;
 
     // Normalize data
@@ -205,6 +206,7 @@ Deno.serve(async (req) => {
       length: comprimento,
       featured: produto_destaque || false,
       badge: normalizedBadge,
+      high_rotation: alta_rotatividade || false,
       active: true
     };
 
@@ -274,6 +276,7 @@ Deno.serve(async (req) => {
           marca: product.brand,
           produto_destaque: product.featured,
           badge: product.badge,
+          alta_rotatividade: product.high_rotation,
           imagens: product.images,
           imagem_principal: product.main_image_url,
           especificacoes: product.specifications,

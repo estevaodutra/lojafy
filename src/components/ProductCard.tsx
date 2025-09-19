@@ -23,6 +23,7 @@ interface ProductCardProps {
     category_id?: string;
     brand?: string;
     images?: string[];
+    high_rotation?: boolean;
   };
 }
 
@@ -109,8 +110,16 @@ const ProductCard = ({ product }: ProductCardProps) => {
           </div>
 
           <div className="p-4 space-y-3 flex-1 flex flex-col">
-            <h3 className="font-semibold text-foreground line-clamp-2">
+            <h3 className="font-semibold text-foreground line-clamp-2 flex items-center gap-2">
               {product.name}
+              {product.high_rotation && (
+                <span 
+                  className="text-orange-500 text-base" 
+                  title="Produto de Alta Rotatividade - Pode haver atraso no envio devido à alta demanda"
+                >
+                  ⚠️
+                </span>
+              )}
             </h3>
             
             <div className="flex items-center gap-1">

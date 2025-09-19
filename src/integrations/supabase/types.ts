@@ -918,6 +918,7 @@ export type Database = {
           featured: boolean | null
           gtin_ean13: string | null
           height: number | null
+          high_rotation: boolean | null
           id: string
           image_url: string | null
           images: string[] | null
@@ -950,6 +951,7 @@ export type Database = {
           featured?: boolean | null
           gtin_ean13?: string | null
           height?: number | null
+          high_rotation?: boolean | null
           id?: string
           image_url?: string | null
           images?: string[] | null
@@ -982,6 +984,7 @@ export type Database = {
           featured?: boolean | null
           gtin_ean13?: string | null
           height?: number | null
+          high_rotation?: boolean | null
           id?: string
           image_url?: string | null
           images?: string[] | null

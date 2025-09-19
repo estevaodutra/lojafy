@@ -80,6 +80,7 @@ Deno.serve(async (req) => {
         gtin_ean13,
         brand,
         active,
+        high_rotation,
         created_at,
         updated_at,
         categories:category_id(id, name, slug)
@@ -135,6 +136,7 @@ Deno.serve(async (req) => {
           gtin: product.gtin_ean13,
           marca: product.brand,
           ativo: product.active,
+          alta_rotatividade: product.high_rotation,
           categoria: product.categories,
           criado_em: product.created_at,
           atualizado_em: product.updated_at
