@@ -12,7 +12,7 @@ const endpoints = [
     title: 'Cadastrar Produto',
     method: 'POST' as const,
     url: '/functions/v1/api-produtos-cadastrar',
-    description: 'Cria um novo produto no sistema com suporte completo a preços promocionais, controle de estoque e dimensões. SKU e GTIN são gerados automaticamente se não fornecidos. Peso deve ser informado em quilogramas (kg). IMPORTANTE: Sequências \\r\\n na descrição são automaticamente convertidas em quebras de linha.',
+    description: 'Cria um novo produto no sistema com suporte completo a preços promocionais, controle de estoque e dimensões. SKU e GTIN são gerados automaticamente se não fornecidos. Peso deve ser informado em quilogramas (kg). O campo alta_rotatividade indica produtos com alta demanda. IMPORTANTE: Sequências \\r\\n na descrição são automaticamente convertidas em quebras de linha.',
     requestBody: {
       nome: 'Colete Postural Coluna Cervical Hérnia De Disco Cinta Leve Discreta Correção Postura Costas Corretor Feminino Masculino',
       descricao: 'Modelo\\r\\nPeitoral: 75-100cm Altura: 155-180cm\\r\\n\\r\\nEste colete é uma simples forma para corrigir e melhorar a postura, e ajudar aliviar as dores nos ombros e nas costas.\\r\\n\\r\\nBenefícios:\\r\\n\\r\\n* Alívio da dor muscular. Mantém o equilíbrio gravidade do corpo, reduz a carga sobre os músculos, corrige más posturas e alivia dores de pescoço e ombros, e até mesmo dores de cabeça.',
@@ -28,6 +28,7 @@ const endpoints = [
       subcategoria_id: '36ab7b10-cad6-4d21-8a41-525695f77ba5',
       marca: '',
       produto_destaque: false,
+      alta_rotatividade: false,
       badge: '',
       imagem_principal: null,
       imagens: null,
@@ -62,6 +63,7 @@ const endpoints = [
         subcategoria_id: '36ab7b10-cad6-4d21-8a41-525695f77ba5',
         marca: null,
         produto_destaque: false,
+        high_rotation: false,
         badge: null,
         imagens: [],
         imagem_principal: null,
@@ -86,7 +88,7 @@ const endpoints = [
     title: 'Listar Produtos',
     method: 'GET' as const,
     url: '/functions/v1/api-produtos-listar',
-    description: 'Retorna a lista de produtos com paginação e filtros opcionais.',
+    description: 'Retorna a lista de produtos com paginação e filtros opcionais. O campo high_rotation indica produtos com alta rotatividade.',
     queryParams: [
       { name: 'page', description: 'Página (padrão: 1)', example: '1' },
       { name: 'limit', description: 'Itens por página (máx: 100, padrão: 50)', example: '20' },
@@ -108,6 +110,7 @@ const endpoints = [
           gtin: '7891234567890',
           marca: 'Nike',
           ativo: true,
+          high_rotation: false,
           categoria: { id: 'cat123', name: 'Calçados', slug: 'calcados' },
           criado_em: '2025-01-12T10:00:00Z',
           atualizado_em: '2025-01-12T10:00:00Z'
