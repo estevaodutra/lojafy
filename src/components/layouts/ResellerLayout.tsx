@@ -7,7 +7,9 @@ import {
   DollarSign,
   Users,
   Store,
-  LogOut
+  LogOut,
+  Package,
+  Target
 } from 'lucide-react';
 import {
   Sidebar,
@@ -30,6 +32,16 @@ const resellerMenuItems = [
     icon: LayoutDashboard,
   },
   {
+    title: 'Catálogo',
+    url: '/reseller/catalogo',
+    icon: Package,
+  },
+  {
+    title: 'Minha Loja',
+    url: '/reseller/loja',
+    icon: Store,
+  },
+  {
     title: 'Vendas',
     url: '/reseller/vendas',
     icon: ShoppingCart,
@@ -43,6 +55,11 @@ const resellerMenuItems = [
     title: 'Clientes',
     url: '/reseller/clientes',
     icon: Users,
+  },
+  {
+    title: 'Metas',
+    url: '/reseller/metas',
+    icon: Target,
   },
   {
     title: 'Relatórios',

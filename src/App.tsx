@@ -194,10 +194,13 @@ const App = () => {
                 }
               >
                 <Route index element={<ResellerDashboard />} />
+                <Route path="catalogo" element={<ResellerCatalog />} />
+                <Route path="loja" element={<ResellerStoreEditor />} />
                 <Route path="vendas" element={<ResellerSales />} />
                 <Route path="clientes" element={<ResellerClients />} />
                 <Route path="comissoes" element={<ResellerCommissions />} />
                 <Route path="metas" element={<ResellerGoals />} />
+                <Route path="relatorios" element={<ResellerReports />} />
               </Route>
               
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
