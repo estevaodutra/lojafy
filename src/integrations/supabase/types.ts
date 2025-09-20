@@ -1084,6 +1084,134 @@ export type Database = {
         }
         Relationships: []
       }
+      reseller_products: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          custom_description: string | null
+          custom_price: number | null
+          id: string
+          position: number | null
+          product_id: string
+          reseller_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          custom_description?: string | null
+          custom_price?: number | null
+          id?: string
+          position?: number | null
+          product_id: string
+          reseller_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          custom_description?: string | null
+          custom_price?: number | null
+          id?: string
+          position?: number | null
+          product_id?: string
+          reseller_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reseller_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reseller_products_reseller_id_fkey"
+            columns: ["reseller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      reseller_stores: {
+        Row: {
+          accent_color: string | null
+          active: boolean | null
+          banner_image_url: string | null
+          banner_subtitle: string | null
+          banner_title: string | null
+          contact_address: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string | null
+          id: string
+          logo_url: string | null
+          payment_methods: Json | null
+          policies: Json | null
+          primary_color: string | null
+          reseller_id: string
+          secondary_color: string | null
+          store_name: string
+          store_slug: string | null
+          updated_at: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          accent_color?: string | null
+          active?: boolean | null
+          banner_image_url?: string | null
+          banner_subtitle?: string | null
+          banner_title?: string | null
+          contact_address?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          logo_url?: string | null
+          payment_methods?: Json | null
+          policies?: Json | null
+          primary_color?: string | null
+          reseller_id: string
+          secondary_color?: string | null
+          store_name: string
+          store_slug?: string | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          accent_color?: string | null
+          active?: boolean | null
+          banner_image_url?: string | null
+          banner_subtitle?: string | null
+          banner_title?: string | null
+          contact_address?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          logo_url?: string | null
+          payment_methods?: Json | null
+          policies?: Json | null
+          primary_color?: string | null
+          reseller_id?: string
+          secondary_color?: string | null
+          store_name?: string
+          store_slug?: string | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reseller_stores_reseller_id_fkey"
+            columns: ["reseller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       reviews: {
         Row: {
           comment: string | null
