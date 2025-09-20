@@ -2,30 +2,50 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { Search, Filter, Plus, Calculator, Package, Star, TrendingUp, Check } from 'lucide-react';
-import { useResellerCatalog } from '@/hooks/useResellerCatalog';
+import { 
+  Search, 
+  Filter, 
+  Package, 
+  Calculator, 
+  Plus, 
+  Minus,
+  TrendingUp,
+  DollarSign,
+  Star,
+  ShoppingCart,
+  ArrowUpDown,
+  Check
+} from 'lucide-react';
 import { useCategories } from '@/hooks/useCategories';
+import { useResellerCatalog } from '@/hooks/useResellerCatalog';
 import { useResellerStore } from '@/hooks/useResellerStore';
+import { ProductCalculatorModal } from '@/components/reseller/ProductCalculatorModal';
 
 const ResellerCatalog = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [priceRange, setPriceRange] = useState('all');
-  const [marginCost, setMarginCost] = useState('');
-  const [marginPercent, setMarginPercent] = useState('');
-  const [finalPrice, setFinalPrice] = useState('');
-
   const { toast } = useToast();
+  
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('all');
+  const [priceRange, setPriceRange] = useState('all');
+  const [sortBy, setSortBy] = useState('name');
+  const [costPrice, setCostPrice] = useState('');
+  const [marginPercent, setMarginPercent] = useState('30');
+  const [calculatedPrice, setCalculatedPrice] = useState<number | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+
   const { data: categories = [], isLoading: categoriesLoading } = useCategories();
   
   const {
     products,
     isLoading,
     error,
+    filters,
     applyFilters,
     calculateMargin,
     calculatePrice,
@@ -36,85 +56,84 @@ const ResellerCatalog = () => {
   const { addProduct, removeProduct } = useResellerStore();
 
   const stats = getProductStats();
-  const priceRanges = [
-    { value: "all", label: "Todos os preços" },
-    { value: "0-500", label: "Até R$ 500" },
-    { value: "500-1000", label: "R$ 500 - R$ 1.000" },
-    { value: "1000-2000", label: "R$ 1.000 - R$ 2.000" },
-    { value: "2000+", label: "Acima de R$ 2.000" }
-  ];
 
   const getMarginColor = (margin: number) => {
-    if (margin >= 50) return "text-green-600 bg-green-50";
-    if (margin >= 30) return "text-blue-600 bg-blue-50";
-    return "text-orange-600 bg-orange-50";
+    if (margin >= 30) return 'text-green-600';
+    if (margin >= 15) return 'text-yellow-600';
+    return 'text-red-600';
   };
 
   const getStockColor = (stock: number) => {
-    if (stock > 20) return "text-green-600";
-    if (stock > 5) return "text-orange-600";
-    return "text-red-600";
+    if (stock > 20) return 'text-green-600';
+    if (stock > 5) return 'text-yellow-600';
+    return 'text-red-600';
   };
 
   const handleSearch = (value: string) => {
-    setSearchTerm(value);
+    setSearch(value);
     applyFilters({
-      search: value,
-      category: selectedCategory === 'all' ? undefined : selectedCategory,
-      ...parsePriceRange(priceRange)
+      ...filters,
+      search: value
     });
   };
 
   const handleCategoryChange = (value: string) => {
-    setSelectedCategory(value);
+    setCategory(value);
     applyFilters({
-      search: searchTerm,
-      category: value === 'all' ? undefined : value,
-      ...parsePriceRange(priceRange)
-    });
-  };
-
-  const handlePriceRangeChange = (value: string) => {
-    setPriceRange(value);
-    applyFilters({
-      search: searchTerm,
-      category: selectedCategory === 'all' ? undefined : selectedCategory,
-      ...parsePriceRange(value)
+      ...filters,
+      category: value === 'all' ? undefined : value
     });
   };
 
   const parsePriceRange = (range: string) => {
     switch (range) {
-      case '0-500':
-        return { priceMin: 0, priceMax: 500 };
+      case '0-100':
+        return { min: 0, max: 100 };
+      case '100-500':
+        return { min: 100, max: 500 };
       case '500-1000':
-        return { priceMin: 500, priceMax: 1000 };
-      case '1000-2000':
-        return { priceMin: 1000, priceMax: 2000 };
-      case '2000+':
-        return { priceMin: 2000 };
+        return { min: 500, max: 1000 };
+      case '1000+':
+        return { min: 1000, max: undefined };
       default:
-        return {};
+        return { min: undefined, max: undefined };
     }
   };
 
-  const handleAddToStore = async (productId: string) => {
+  const handlePriceRangeChange = (range: string) => {
+    setPriceRange(range);
+    const { min, max } = parsePriceRange(range);
+    applyFilters({
+      ...filters,
+      priceMin: min,
+      priceMax: max
+    });
+  };
+
+  const handleSortChange = (sort: string) => {
+    setSortBy(sort);
+    applyFilters({
+      ...filters,
+      sortBy: sort
+    });
+  };
+
+  const handleAddToStore = async (productId: string, customPrice?: number) => {
     try {
       const product = products.find(p => p.id === productId);
       if (!product) return;
       
-      const suggestedPrice = getSuggestedPrice(product);
-      await addProduct(productId, suggestedPrice);
-      
+      const price = customPrice || getSuggestedPrice(product);
+      await addProduct(productId, price);
       toast({
-        title: "Produto adicionado",
-        description: `${product.name} foi adicionado à sua loja`
+        title: "Produto adicionado!",
+        description: `${product.name} foi adicionado à sua loja.`,
       });
     } catch (error) {
       toast({
         title: "Erro",
-        description: "Não foi possível adicionar o produto à loja",
-        variant: "destructive"
+        description: "Não foi possível adicionar o produto à loja.",
+        variant: "destructive",
       });
     }
   };
@@ -125,29 +144,33 @@ const ResellerCatalog = () => {
       if (!product) return;
       
       await removeProduct(productId);
-      
       toast({
-        title: "Produto removido",
-        description: `${product.name} foi removido da sua loja`
+        title: "Produto removido!",
+        description: `${product.name} foi removido da sua loja.`,
       });
     } catch (error) {
       toast({
         title: "Erro",
-        description: "Não foi possível remover o produto da loja",
-        variant: "destructive"
+        description: "Não foi possível remover o produto da loja.",
+        variant: "destructive",
       });
     }
   };
 
+  const handleOpenCalculator = (product: any) => {
+    setSelectedProduct(product);
+    setIsCalculatorOpen(true);
+  };
+
   const calculateMarginPrice = () => {
-    const cost = parseFloat(marginCost);
-    const percent = parseFloat(marginPercent);
+    const cost = parseFloat(costPrice);
+    const margin = parseFloat(marginPercent);
     
-    if (cost && percent) {
-      const calculatedPrice = calculatePrice(cost, percent);
-      setFinalPrice(calculatedPrice.toFixed(2));
+    if (cost && margin) {
+      const calculated = calculatePrice(cost, margin);
+      setCalculatedPrice(calculated);
     } else {
-      setFinalPrice('');
+      setCalculatedPrice(null);
     }
   };
 
@@ -179,12 +202,12 @@ const ResellerCatalog = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Na Minha Loja</CardTitle>
-            <Plus className="h-4 w-4 text-green-600" />
+            <ShoppingCart className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.inMyStore}</div>
             <p className="text-xs text-muted-foreground">
-              produtos ativos
+              produtos na loja
             </p>
           </CardContent>
         </Card>
@@ -195,9 +218,9 @@ const ResellerCatalog = () => {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{Math.round(stats.averageMargin)}%</div>
+            <div className="text-2xl font-bold">{Math.round(stats.averageMargin || 0)}%</div>
             <p className="text-xs text-muted-foreground">
-              margem média
+              dos produtos
             </p>
           </CardContent>
         </Card>
@@ -210,7 +233,7 @@ const ResellerCatalog = () => {
           <CardContent>
             <div className="text-2xl font-bold">{stats.highRotation}</div>
             <p className="text-xs text-muted-foreground">
-              produtos em destaque
+              produtos destacados
             </p>
           </CardContent>
         </Card>
@@ -219,46 +242,75 @@ const ResellerCatalog = () => {
       {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle>Filtros</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filtros e Ordenação
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
+        <CardContent className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Buscar produtos por nome ou SKU..."
-                  value={searchTerm}
+                  value={search}
                   onChange={(e) => handleSearch(e.target.value)}
                   className="pl-10"
                 />
               </div>
             </div>
-            <Select value={selectedCategory} onValueChange={handleCategoryChange}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="Categoria" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as categorias</SelectItem>
-                {categories.map(category => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={priceRange} onValueChange={handlePriceRangeChange}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="Faixa de Preço" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os preços</SelectItem>
-                <SelectItem value="0-500">Até R$ 500</SelectItem>
-                <SelectItem value="500-1000">R$ 500 - R$ 1.000</SelectItem>
-                <SelectItem value="1000-2000">R$ 1.000 - R$ 2.000</SelectItem>
-                <SelectItem value="2000+">Acima de R$ 2.000</SelectItem>
-              </SelectContent>
-            </Select>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="categoryFilter">Categoria</Label>
+              <Select value={category} onValueChange={handleCategoryChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas as categorias" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as categorias</SelectItem>
+                  {categories?.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Label htmlFor="priceFilter">Faixa de Preço</Label>
+              <Select value={priceRange} onValueChange={handlePriceRangeChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas as faixas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as faixas</SelectItem>
+                  <SelectItem value="0-100">Até R$ 100</SelectItem>
+                  <SelectItem value="100-500">R$ 100 - R$ 500</SelectItem>
+                  <SelectItem value="500-1000">R$ 500 - R$ 1.000</SelectItem>
+                  <SelectItem value="1000+">Acima de R$ 1.000</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="sortFilter">Ordenar por</Label>
+              <Select value={sortBy} onValueChange={handleSortChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Nome A-Z" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Nome A-Z</SelectItem>
+                  <SelectItem value="price_asc">Menor preço</SelectItem>
+                  <SelectItem value="price_desc">Maior preço</SelectItem>
+                  <SelectItem value="high_rotation">Alto giro primeiro</SelectItem>
+                  <SelectItem value="recent">Mais recentes</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -269,16 +321,16 @@ const ResellerCatalog = () => {
           {Array.from({ length: 6 }).map((_, i) => (
             <Card key={i}>
               <CardHeader className="pb-2">
-                <Skeleton className="w-full h-48 rounded-lg" />
+                <div className="w-full h-48 bg-muted rounded-lg animate-pulse" />
               </CardHeader>
               <CardContent className="space-y-4">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
+                <div className="h-4 bg-muted rounded animate-pulse" />
+                <div className="h-4 bg-muted rounded animate-pulse w-1/2" />
                 <div className="grid grid-cols-2 gap-4">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
+                  <div className="h-4 bg-muted rounded animate-pulse" />
+                  <div className="h-4 bg-muted rounded animate-pulse" />
                 </div>
-                <Skeleton className="h-8 w-full" />
+                <div className="h-8 bg-muted rounded animate-pulse" />
               </CardContent>
             </Card>
           ))}
@@ -292,7 +344,11 @@ const ResellerCatalog = () => {
       ) : products.length === 0 ? (
         <Card>
           <CardContent className="text-center py-8">
-            <p className="text-muted-foreground">Nenhum produto encontrado</p>
+            <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="font-medium mb-2">Nenhum produto encontrado</h3>
+            <p className="text-sm text-muted-foreground">
+              Tente ajustar os filtros para encontrar produtos
+            </p>
           </CardContent>
         </Card>
       ) : (
@@ -302,109 +358,107 @@ const ResellerCatalog = () => {
             const margin = product.cost_price ? calculateMargin(product.cost_price, suggestedPrice) : 0;
             
             return (
-            <Card key={product.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-2">
-                <div className="relative">
-                  <img 
-                    src={product.main_image_url || product.image_url || "/api/placeholder/300/300"} 
-                    alt={product.name}
-                    className="w-full h-48 object-cover rounded-lg"
-                  />
-                  {product.high_rotation && (
-                    <Badge className="absolute top-2 left-2 bg-orange-500 hover:bg-orange-600">
-                      <Star className="h-3 w-3 mr-1" />
-                      Alto Giro
-                    </Badge>
-                  )}
-                  {product.isInMyStore && (
-                    <Badge className="absolute top-2 right-2 bg-green-500 hover:bg-green-600">
-                      <Check className="h-3 w-3 mr-1" />
-                      Na Loja
-                    </Badge>
-                  )}
-                  <Badge 
-                    variant="secondary" 
-                    className="absolute bottom-2 right-2"
-                  >
-                    {product.category?.name || 'Sem categoria'}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <CardTitle className="text-lg line-clamp-2">{product.name}</CardTitle>
-                  <CardDescription>
-                    {product.brand} • SKU: {product.sku}
-                  </CardDescription>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">Custo</p>
-                    <p className="font-medium">
-                      {product.cost_price ? `R$ ${product.cost_price.toLocaleString()}` : 'N/A'}
-                    </p>
+              <Card key={product.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-2">
+                  <div className="relative">
+                    <img 
+                      src={product.main_image_url || product.image_url || "/api/placeholder/300/300"} 
+                      alt={product.name}
+                      className="w-full h-48 object-cover rounded-lg"
+                    />
+                    {product.high_rotation && (
+                      <Badge className="absolute top-2 left-2 bg-orange-500 hover:bg-orange-600">
+                        <Star className="h-3 w-3 mr-1" />
+                        Alto Giro
+                      </Badge>
+                    )}
+                    {product.isInMyStore && (
+                      <Badge className="absolute top-2 right-2 bg-green-500 hover:bg-green-600">
+                        <Check className="h-3 w-3 mr-1" />
+                        Na Loja
+                      </Badge>
+                    )}
                   </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div>
-                    <p className="text-muted-foreground">
-                      {product.isInMyStore ? 'Meu Preço' : 'Preço Sugerido'}
-                    </p>
-                    <p className="font-medium">
-                      R$ {(product.isInMyStore && product.myStorePrice ? product.myStorePrice : suggestedPrice).toLocaleString()}
-                    </p>
+                    <CardTitle className="text-lg line-clamp-2">{product.name}</CardTitle>
+                    <CardDescription>
+                      {product.brand} • SKU: {product.sku}
+                    </CardDescription>
                   </div>
-                </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Badge className={getMarginColor(margin)}>
-                      {Math.round(margin)}% margem
-                    </Badge>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Custo</p>
+                      <p className="font-medium">
+                        {product.cost_price ? `R$ ${product.cost_price.toFixed(2)}` : 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">
+                        {product.isInMyStore ? 'Meu Preço' : 'Preço Sugerido'}
+                      </p>
+                      <p className="font-medium">
+                        R$ {(product.isInMyStore && product.myStorePrice ? product.myStorePrice : suggestedPrice).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="outline" className={getMarginColor(margin)}>
+                        {Math.round(margin)}% margem
+                      </Badge>
+                    </div>
                     <span className={`text-sm ${getStockColor(product.stock_quantity)}`}>
                       {product.stock_quantity} em estoque
                     </span>
                   </div>
-                  {product.rating && (
-                    <div className="flex items-center space-x-1">
-                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                      <span className="text-sm">{product.rating}</span>
-                    </div>
-                  )}
-                </div>
 
-                <div className="flex space-x-2">
-                  {product.isInMyStore ? (
-                    <Button 
+                  <div className="flex space-x-2">
+                    {product.isInMyStore ? (
+                      <Button 
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => handleRemoveFromStore(product.id)}
+                      >
+                        <Minus className="h-4 w-4 mr-1" />
+                        Remover
+                      </Button>
+                    ) : (
+                      <Button 
+                        className="flex-1"
+                        onClick={() => handleAddToStore(product.id)}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Adicionar
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
                       variant="outline"
                       className="flex-1"
-                      onClick={() => handleRemoveFromStore(product.id)}
+                      onClick={() => handleOpenCalculator(product)}
                     >
-                      Remover da Loja
+                      <Calculator className="h-4 w-4 mr-1" />
+                      Calcular
                     </Button>
-                  ) : (
-                     <Button 
-                       className="flex-1"
-                       onClick={() => handleAddToStore(product.id)}
-                     >
-                       <Plus className="h-4 w-4 mr-2" />
-                       Adicionar à Loja
-                     </Button>
-                   )}
-                   <Button variant="outline" size="icon">
-                     <Calculator className="h-4 w-4" />
-                   </Button>
-                 </div>
-               </CardContent>
-             </Card>
-           );
-         })}
-         </div>
-       )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
-       {/* Margin Calculator */}
+      {/* Global Margin Calculator */}
       <Card>
         <CardHeader>
-          <CardTitle>Calculadora de Margem</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Calculator className="h-5 w-5" />
+            Calculadora de Margem Global
+          </CardTitle>
           <CardDescription>
             Calcule sua margem de lucro e preço final
           </CardDescription>
@@ -412,41 +466,70 @@ const ResellerCatalog = () => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="text-sm font-medium">Preço de Custo</label>
+              <Label htmlFor="costPrice">Preço de Custo (R$)</Label>
               <Input 
+                id="costPrice"
                 type="number" 
-                placeholder="R$ 0,00" 
-                value={marginCost}
-                onChange={(e) => setMarginCost(e.target.value)}
+                step="0.01"
+                placeholder="0.00" 
+                value={costPrice}
+                onChange={(e) => setCostPrice(e.target.value)}
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Margem Desejada (%)</label>
+              <Label htmlFor="marginPercent">Margem Desejada (%)</Label>
               <Input 
+                id="marginPercent"
                 type="number" 
-                placeholder="30%" 
+                step="1"
+                placeholder="30" 
                 value={marginPercent}
                 onChange={(e) => setMarginPercent(e.target.value)}
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Preço Final</label>
+              <Label htmlFor="finalPrice">Preço Final (R$)</Label>
               <Input 
+                id="finalPrice"
                 type="number" 
-                placeholder="R$ 0,00" 
-                value={finalPrice}
+                placeholder="0.00" 
+                value={calculatedPrice?.toFixed(2) || ''}
                 disabled 
               />
             </div>
             <div className="flex items-end">
-              <Button className="w-full" onClick={calculateMarginPrice}>
+              <Button 
+                className="w-full" 
+                onClick={calculateMarginPrice}
+                disabled={!costPrice || !marginPercent}
+              >
                 <Calculator className="h-4 w-4 mr-2" />
                 Calcular
               </Button>
             </div>
           </div>
+          {calculatedPrice && (
+            <div className="mt-4 p-4 bg-muted rounded-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Lucro:</span>
+                <span className="text-lg font-bold text-green-600">
+                  R$ {(calculatedPrice - parseFloat(costPrice)).toFixed(2)}
+                </span>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      <ProductCalculatorModal
+        product={selectedProduct}
+        isOpen={isCalculatorOpen}
+        onClose={() => {
+          setIsCalculatorOpen(false);
+          setSelectedProduct(null);
+        }}
+        onAddToStore={handleAddToStore}
+      />
     </div>
   );
 };

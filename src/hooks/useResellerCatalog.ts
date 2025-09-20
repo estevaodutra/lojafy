@@ -36,6 +36,7 @@ export interface CatalogFilters {
   priceMax?: number;
   highRotationOnly?: boolean;
   inStock?: boolean;
+  sortBy?: string;
 }
 
 export const useResellerCatalog = () => {
@@ -57,8 +58,7 @@ export const useResellerCatalog = () => {
           *,
           category:categories(id, name)
         `)
-        .eq('active', true)
-        .order('created_at', { ascending: false });
+        .eq('active', true);
 
       // Apply filters
       const filtersToApply = currentFilters || filters;
@@ -85,6 +85,28 @@ export const useResellerCatalog = () => {
       
       if (filtersToApply.inStock) {
         query = query.gt('stock_quantity', 0);
+      }
+
+      // Apply sorting
+      const sortBy = filtersToApply.sortBy || 'name';
+      switch (sortBy) {
+        case 'name':
+          query = query.order('name', { ascending: true });
+          break;
+        case 'price_asc':
+          query = query.order('price', { ascending: true });
+          break;
+        case 'price_desc':
+          query = query.order('price', { ascending: false });
+          break;
+        case 'high_rotation':
+          query = query.order('high_rotation', { ascending: false }).order('name', { ascending: true });
+          break;
+        case 'recent':
+          query = query.order('created_at', { ascending: false });
+          break;
+        default:
+          query = query.order('name', { ascending: true });
       }
 
       const { data, error } = await query;

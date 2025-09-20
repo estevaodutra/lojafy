@@ -9,6 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { ColorPicker } from '@/components/admin/ColorPicker';
 import { LogoUpload } from '@/components/admin/LogoUpload';
+import { useResellerStore } from '@/hooks/useResellerStore';
+import { useToast } from '@/hooks/use-toast';
 import { 
   Store, 
   Palette, 
@@ -20,57 +22,41 @@ import {
   Save,
   Smartphone,
   Monitor,
-  Tablet
+  Tablet,
+  Edit,
+  Loader2
 } from 'lucide-react';
 
 const ResellerStoreEditor = () => {
+  const { toast } = useToast();
+  const { 
+    store, 
+    products, 
+    isLoading, 
+    createOrUpdateStore, 
+    updateProductStatus, 
+    updateProductPrice 
+  } = useResellerStore();
+
   const [storeConfig, setStoreConfig] = useState({
-    name: 'Minha Loja Tech',
-    slug: 'loja-tech-pro',
-    logo: null,
-    primaryColor: '#000000',
-    secondaryColor: '#f3f4f6',
-    accentColor: '#3b82f6',
-    bannerTitle: 'Tecnologia de Ponta',
-    bannerSubtitle: 'Os melhores produtos com preços incríveis',
-    bannerImage: null,
-    phone: '(11) 99999-9999',
-    email: 'contato@lojatechpro.com',
-    address: 'São Paulo, SP',
-    whatsapp: '5511999999999'
+    name: store?.store_name || 'Minha Loja',
+    slug: store?.store_slug || '',
+    logo: store?.logo_url || null,
+    primaryColor: store?.primary_color || '#000000',
+    secondaryColor: store?.secondary_color || '#f3f4f6',
+    accentColor: store?.accent_color || '#3b82f6',
+    bannerTitle: store?.banner_title || 'Bem-vindos à nossa loja',
+    bannerSubtitle: store?.banner_subtitle || 'Os melhores produtos com preços especiais',
+    bannerImage: store?.banner_image_url || null,
+    phone: store?.contact_phone || '',
+    email: store?.contact_email || '',
+    address: store?.contact_address || '',
+    whatsapp: store?.whatsapp || ''
   });
 
-  const [activeProducts, setActiveProducts] = useState([
-    {
-      id: 1,
-      name: "Smartphone Galaxy Pro Max",
-      image: "/api/placeholder/300/300",
-      originalPrice: 1499,
-      myPrice: 1399,
-      active: true,
-      position: 1
-    },
-    {
-      id: 2,
-      name: "Notebook Gaming Ultra 16GB", 
-      image: "/api/placeholder/300/300",
-      originalPrice: 2899,
-      myPrice: 2799,
-      active: true,
-      position: 2
-    },
-    {
-      id: 3,
-      name: "Headphone Wireless Premium",
-      image: "/api/placeholder/300/300",
-      originalPrice: 299,
-      myPrice: 279,
-      active: false,
-      position: 3
-    }
-  ]);
-
   const [previewDevice, setPreviewDevice] = useState('desktop');
+  const [editingPrice, setEditingPrice] = useState<string | null>(null);
+  const [newPrice, setNewPrice] = useState('');
 
   const handleColorChange = (colorType: string, color: string) => {
     setStoreConfig(prev => ({
@@ -79,14 +65,88 @@ const ResellerStoreEditor = () => {
     }));
   };
 
-  const toggleProductActive = (productId: number) => {
-    setActiveProducts(prev =>
-      prev.map(product =>
-        product.id === productId
-          ? { ...product, active: !product.active }
-          : product
-      )
-    );
+  const toggleProductActive = async (productId: string) => {
+    try {
+      const product = products.find(p => p.id === productId);
+      if (!product) return;
+      
+      await updateProductStatus(product.id, !product.active);
+      toast({
+        title: product.active ? "Produto desativado" : "Produto ativado",
+        description: `${product.product?.name} foi ${product.active ? 'removido da' : 'adicionado à'} loja.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o produto.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePriceEdit = (productId: string, currentPrice: number) => {
+    setEditingPrice(productId);
+    setNewPrice(currentPrice.toString());
+  };
+
+  const handlePriceSave = async (productId: string) => {
+    try {
+      const price = parseFloat(newPrice);
+      if (isNaN(price) || price <= 0) {
+        toast({
+          title: "Erro",
+          description: "Preço inválido",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      await updateProductPrice(productId, price);
+      setEditingPrice(null);
+      setNewPrice('');
+      
+      toast({
+        title: "Preço atualizado!",
+        description: "O preço do produto foi atualizado com sucesso.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o preço.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveStore = async () => {
+    try {
+      await createOrUpdateStore({
+        store_name: storeConfig.name,
+        store_slug: storeConfig.slug,
+        logo_url: storeConfig.logo,
+        primary_color: storeConfig.primaryColor,
+        secondary_color: storeConfig.secondaryColor,
+        accent_color: storeConfig.accentColor,
+        banner_title: storeConfig.bannerTitle,
+        banner_subtitle: storeConfig.bannerSubtitle,
+        banner_image_url: storeConfig.bannerImage,
+        contact_phone: storeConfig.phone,
+        contact_email: storeConfig.email,
+        contact_address: storeConfig.address,
+        whatsapp: storeConfig.whatsapp,
+      });
+      
+      toast({
+        title: "Loja salva!",
+        description: "As configurações da sua loja foram salvas com sucesso.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar as configurações.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getDeviceIcon = (device: string) => {
@@ -112,8 +172,12 @@ const ResellerStoreEditor = () => {
             <Eye className="h-4 w-4 mr-2" />
             Preview
           </Button>
-          <Button>
-            <Save className="h-4 w-4 mr-2" />
+          <Button onClick={handleSaveStore} disabled={isLoading}>
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
             Salvar Alterações
           </Button>
         </div>
@@ -241,44 +305,86 @@ const ResellerStoreEditor = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {activeProducts.map((product) => (
-                      <div 
-                        key={product.id}
-                        className="flex items-center justify-between p-4 border rounded-lg"
-                      >
-                        <div className="flex items-center space-x-4">
-                          <img 
-                            src={product.image}
-                            alt={product.name}
-                            className="h-16 w-16 object-cover rounded-lg"
-                          />
-                          <div>
-                            <h4 className="font-medium">{product.name}</h4>
-                            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                              <span>Preço sugerido: R$ {product.originalPrice}</span>
-                              <span>•</span>
-                              <span>Meu preço: R$ {product.myPrice}</span>
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin" />
+                    </div>
+                  ) : products.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="font-medium mb-2">Nenhum produto na loja</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Vá para o catálogo e adicione alguns produtos à sua loja.
+                      </p>
+                      <Button variant="outline">
+                        <Package className="h-4 w-4 mr-2" />
+                        Ir para o Catálogo
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {products.map((resellerProduct) => (
+                        <div 
+                          key={resellerProduct.id}
+                          className="flex items-center justify-between p-4 border rounded-lg"
+                        >
+                          <div className="flex items-center space-x-4">
+                            <img 
+                              src={resellerProduct.product?.main_image_url || '/api/placeholder/300/300'}
+                              alt={resellerProduct.product?.name || 'Produto'}
+                              className="h-16 w-16 object-cover rounded-lg"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium truncate">{resellerProduct.product?.name}</h4>
+                              <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                                <span>Preço sugerido: R$ {resellerProduct.product?.price?.toFixed(2)}</span>
+                                <span>•</span>
+                                {editingPrice === resellerProduct.id ? (
+                                  <div className="flex items-center gap-2">
+                                    <span>Meu preço: R$</span>
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={newPrice}
+                                      onChange={(e) => setNewPrice(e.target.value)}
+                                      className="w-24 h-6 text-sm"
+                                    />
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline"
+                                      onClick={() => handlePriceSave(resellerProduct.id)}
+                                    >
+                                      <Save className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <span>Meu preço: R$ {resellerProduct.custom_price?.toFixed(2)}</span>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handlePriceEdit(resellerProduct.id, resellerProduct.custom_price || 0)}
+                                    >
+                                      <Edit className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
+                          <div className="flex items-center space-x-4">
+                            <Badge variant={resellerProduct.active ? "default" : "secondary"}>
+                              {resellerProduct.active ? "Ativo" : "Inativo"}
+                            </Badge>
+                            <Switch
+                              checked={resellerProduct.active}
+                              onCheckedChange={() => toggleProductActive(resellerProduct.id)}
+                            />
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-4">
-                          <Badge variant={product.active ? "default" : "secondary"}>
-                            {product.active ? "Ativo" : "Inativo"}
-                          </Badge>
-                          <Switch
-                            checked={product.active}
-                            onCheckedChange={() => toggleProductActive(product.id)}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <Button variant="outline" className="w-full mt-4">
-                    <Package className="h-4 w-4 mr-2" />
-                    Adicionar Mais Produtos
-                  </Button>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -455,11 +561,11 @@ const ResellerStoreEditor = () => {
                 </div>
                 <div className="p-4 space-y-4">
                   <div className="grid grid-cols-2 gap-2">
-                    {activeProducts.filter(p => p.active).slice(0, 4).map((product) => (
-                      <div key={product.id} className="text-center">
+                    {products.filter(p => p.active).slice(0, 4).map((resellerProduct) => (
+                      <div key={resellerProduct.id} className="text-center">
                         <div className="h-16 bg-muted rounded mb-2"></div>
-                        <p className="text-xs font-medium truncate">{product.name}</p>
-                        <p className="text-xs text-green-600">R$ {product.myPrice}</p>
+                        <p className="text-xs font-medium truncate">{resellerProduct.product?.name}</p>
+                        <p className="text-xs text-green-600">R$ {resellerProduct.custom_price?.toFixed(2)}</p>
                       </div>
                     ))}
                   </div>
