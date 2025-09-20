@@ -4,77 +4,38 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Filter, Plus, Calculator, Package, Star, TrendingUp } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+import { Search, Filter, Plus, Calculator, Package, Star, TrendingUp, Check } from 'lucide-react';
+import { useResellerCatalog } from '@/hooks/useResellerCatalog';
+import { useCategories } from '@/hooks/useCategories';
+import { useResellerStore } from '@/hooks/useResellerStore';
 
 const ResellerCatalog = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [priceRange, setPriceRange] = useState('all');
+  const [marginCost, setMarginCost] = useState('');
+  const [marginPercent, setMarginPercent] = useState('');
+  const [finalPrice, setFinalPrice] = useState('');
 
-  const products = [
-    {
-      id: 1,
-      name: "Smartphone Galaxy Pro Max",
-      image: "/api/placeholder/300/300",
-      cost: 1200,
-      suggestedPrice: 1499,
-      margin: 24.9,
-      category: "Eletrônicos",
-      brand: "TechBrand",
-      stock: 45,
-      rating: 4.8,
-      sales: 234,
-      highRotation: true,
-      sku: "ELTR-GALX-001"
-    },
-    {
-      id: 2,
-      name: "Notebook Gaming Ultra 16GB",
-      image: "/api/placeholder/300/300", 
-      cost: 2200,
-      suggestedPrice: 2899,
-      margin: 31.8,
-      category: "Informática",
-      brand: "GameTech",
-      stock: 12,
-      rating: 4.9,
-      sales: 156,
-      highRotation: true,
-      sku: "INFO-GAME-002"
-    },
-    {
-      id: 3,
-      name: "Headphone Wireless Premium",
-      image: "/api/placeholder/300/300",
-      cost: 150,
-      suggestedPrice: 299,
-      margin: 99.3,
-      category: "Áudio",
-      brand: "SoundMax",
-      stock: 78,
-      rating: 4.6,
-      sales: 89,
-      highRotation: false,
-      sku: "AUDIO-PREM-003"
-    },
-    {
-      id: 4,
-      name: "Smartwatch Fitness Pro",
-      image: "/api/placeholder/300/300",
-      cost: 180,
-      suggestedPrice: 349,
-      margin: 93.9,
-      category: "Wearables",
-      brand: "FitTech",
-      stock: 34,
-      rating: 4.7,
-      sales: 67,
-      highRotation: false,
-      sku: "WEAR-FITP-004"
-    }
-  ];
+  const { toast } = useToast();
+  const { data: categories = [], isLoading: categoriesLoading } = useCategories();
+  
+  const {
+    products,
+    isLoading,
+    error,
+    applyFilters,
+    calculateMargin,
+    calculatePrice,
+    getSuggestedPrice,
+    getProductStats
+  } = useResellerCatalog();
 
-  const categories = ["Todos", "Eletrônicos", "Informática", "Áudio", "Wearables"];
+  const { addProduct, removeProduct } = useResellerStore();
+
+  const stats = getProductStats();
   const priceRanges = [
     { value: "all", label: "Todos os preços" },
     { value: "0-500", label: "Até R$ 500" },
@@ -95,6 +56,101 @@ const ResellerCatalog = () => {
     return "text-red-600";
   };
 
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+    applyFilters({
+      search: value,
+      category: selectedCategory === 'all' ? undefined : selectedCategory,
+      ...parsePriceRange(priceRange)
+    });
+  };
+
+  const handleCategoryChange = (value: string) => {
+    setSelectedCategory(value);
+    applyFilters({
+      search: searchTerm,
+      category: value === 'all' ? undefined : value,
+      ...parsePriceRange(priceRange)
+    });
+  };
+
+  const handlePriceRangeChange = (value: string) => {
+    setPriceRange(value);
+    applyFilters({
+      search: searchTerm,
+      category: selectedCategory === 'all' ? undefined : selectedCategory,
+      ...parsePriceRange(value)
+    });
+  };
+
+  const parsePriceRange = (range: string) => {
+    switch (range) {
+      case '0-500':
+        return { priceMin: 0, priceMax: 500 };
+      case '500-1000':
+        return { priceMin: 500, priceMax: 1000 };
+      case '1000-2000':
+        return { priceMin: 1000, priceMax: 2000 };
+      case '2000+':
+        return { priceMin: 2000 };
+      default:
+        return {};
+    }
+  };
+
+  const handleAddToStore = async (productId: string) => {
+    try {
+      const product = products.find(p => p.id === productId);
+      if (!product) return;
+      
+      const suggestedPrice = getSuggestedPrice(product);
+      await addProduct(productId, suggestedPrice);
+      
+      toast({
+        title: "Produto adicionado",
+        description: `${product.name} foi adicionado à sua loja`
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível adicionar o produto à loja",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRemoveFromStore = async (productId: string) => {
+    try {
+      const product = products.find(p => p.id === productId);
+      if (!product) return;
+      
+      await removeProduct(productId);
+      
+      toast({
+        title: "Produto removido",
+        description: `${product.name} foi removido da sua loja`
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível remover o produto da loja",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const calculateMarginPrice = () => {
+    const cost = parseFloat(marginCost);
+    const percent = parseFloat(marginPercent);
+    
+    if (cost && percent) {
+      const calculatedPrice = calculatePrice(cost, percent);
+      setFinalPrice(calculatedPrice.toFixed(2));
+    } else {
+      setFinalPrice('');
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -113,9 +169,9 @@ const ResellerCatalog = () => {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1.247</div>
+            <div className="text-2xl font-bold">{stats.totalProducts}</div>
             <p className="text-xs text-muted-foreground">
-              +23 novos esta semana
+              produtos disponíveis
             </p>
           </CardContent>
         </Card>
@@ -126,7 +182,7 @@ const ResellerCatalog = () => {
             <Plus className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">87</div>
+            <div className="text-2xl font-bold">{stats.inMyStore}</div>
             <p className="text-xs text-muted-foreground">
               produtos ativos
             </p>
@@ -139,9 +195,9 @@ const ResellerCatalog = () => {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">42%</div>
+            <div className="text-2xl font-bold">{Math.round(stats.averageMargin)}%</div>
             <p className="text-xs text-muted-foreground">
-              nos produtos ativos
+              margem média
             </p>
           </CardContent>
         </Card>
@@ -152,7 +208,7 @@ const ResellerCatalog = () => {
             <Star className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">156</div>
+            <div className="text-2xl font-bold">{stats.highRotation}</div>
             <p className="text-xs text-muted-foreground">
               produtos em destaque
             </p>
@@ -173,33 +229,34 @@ const ResellerCatalog = () => {
                 <Input
                   placeholder="Buscar produtos por nome ou SKU..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => handleSearch(e.target.value)}
                   className="pl-10"
                 />
               </div>
             </div>
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <Select value={selectedCategory} onValueChange={handleCategoryChange}>
               <SelectTrigger className="w-full md:w-48">
                 <SelectValue placeholder="Categoria" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">Todas as categorias</SelectItem>
                 {categories.map(category => (
-                  <SelectItem key={category} value={category.toLowerCase()}>
-                    {category}
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Select value={priceRange} onValueChange={setPriceRange}>
+            <Select value={priceRange} onValueChange={handlePriceRangeChange}>
               <SelectTrigger className="w-full md:w-48">
                 <SelectValue placeholder="Faixa de Preço" />
               </SelectTrigger>
               <SelectContent>
-                {priceRanges.map(range => (
-                  <SelectItem key={range.value} value={range.value}>
-                    {range.label}
-                  </SelectItem>
-                ))}
+                <SelectItem value="all">Todos os preços</SelectItem>
+                <SelectItem value="0-500">Até R$ 500</SelectItem>
+                <SelectItem value="500-1000">R$ 500 - R$ 1.000</SelectItem>
+                <SelectItem value="1000-2000">R$ 1.000 - R$ 2.000</SelectItem>
+                <SelectItem value="2000+">Acima de R$ 2.000</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -207,83 +264,144 @@ const ResellerCatalog = () => {
       </Card>
 
       {/* Products Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {products.map((product) => (
-          <Card key={product.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-2">
-              <div className="relative">
-                <img 
-                  src={product.image} 
-                  alt={product.name}
-                  className="w-full h-48 object-cover rounded-lg"
-                />
-                {product.highRotation && (
-                  <Badge className="absolute top-2 left-2 bg-orange-500 hover:bg-orange-600">
-                    <Star className="h-3 w-3 mr-1" />
-                    Alto Giro
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="pb-2">
+                <Skeleton className="w-full h-48 rounded-lg" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+                <div className="grid grid-cols-2 gap-4">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-full" />
+                </div>
+                <Skeleton className="h-8 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : error ? (
+        <Card>
+          <CardContent className="text-center py-8">
+            <p className="text-muted-foreground">Erro ao carregar produtos: {error}</p>
+          </CardContent>
+        </Card>
+      ) : products.length === 0 ? (
+        <Card>
+          <CardContent className="text-center py-8">
+            <p className="text-muted-foreground">Nenhum produto encontrado</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {products.map((product) => {
+            const suggestedPrice = getSuggestedPrice(product);
+            const margin = product.cost_price ? calculateMargin(product.cost_price, suggestedPrice) : 0;
+            
+            return (
+            <Card key={product.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-2">
+                <div className="relative">
+                  <img 
+                    src={product.main_image_url || product.image_url || "/api/placeholder/300/300"} 
+                    alt={product.name}
+                    className="w-full h-48 object-cover rounded-lg"
+                  />
+                  {product.high_rotation && (
+                    <Badge className="absolute top-2 left-2 bg-orange-500 hover:bg-orange-600">
+                      <Star className="h-3 w-3 mr-1" />
+                      Alto Giro
+                    </Badge>
+                  )}
+                  {product.isInMyStore && (
+                    <Badge className="absolute top-2 right-2 bg-green-500 hover:bg-green-600">
+                      <Check className="h-3 w-3 mr-1" />
+                      Na Loja
+                    </Badge>
+                  )}
+                  <Badge 
+                    variant="secondary" 
+                    className="absolute bottom-2 right-2"
+                  >
+                    {product.category?.name || 'Sem categoria'}
                   </Badge>
-                )}
-                <Badge 
-                  variant="secondary" 
-                  className="absolute top-2 right-2"
-                >
-                  {product.category}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <CardTitle className="text-lg line-clamp-2">{product.name}</CardTitle>
-                <CardDescription>
-                  {product.brand} • SKU: {product.sku}
-                </CardDescription>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 text-sm">
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div>
-                  <p className="text-muted-foreground">Custo</p>
-                  <p className="font-medium">R$ {product.cost.toLocaleString()}</p>
+                  <CardTitle className="text-lg line-clamp-2">{product.name}</CardTitle>
+                  <CardDescription>
+                    {product.brand} • SKU: {product.sku}
+                  </CardDescription>
                 </div>
-                <div>
-                  <p className="text-muted-foreground">Preço Sugerido</p>
-                  <p className="font-medium">R$ {product.suggestedPrice.toLocaleString()}</p>
+
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">Custo</p>
+                    <p className="font-medium">
+                      {product.cost_price ? `R$ ${product.cost_price.toLocaleString()}` : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">
+                      {product.isInMyStore ? 'Meu Preço' : 'Preço Sugerido'}
+                    </p>
+                    <p className="font-medium">
+                      R$ {(product.isInMyStore && product.myStorePrice ? product.myStorePrice : suggestedPrice).toLocaleString()}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Badge className={getMarginColor(product.margin)}>
-                    {product.margin}% margem
-                  </Badge>
-                  <span className={`text-sm ${getStockColor(product.stock)}`}>
-                    {product.stock} em estoque
-                  </span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Badge className={getMarginColor(margin)}>
+                      {Math.round(margin)}% margem
+                    </Badge>
+                    <span className={`text-sm ${getStockColor(product.stock_quantity)}`}>
+                      {product.stock_quantity} em estoque
+                    </span>
+                  </div>
+                  {product.rating && (
+                    <div className="flex items-center space-x-1">
+                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <span className="text-sm">{product.rating}</span>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center space-x-1">
-                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                  <span className="text-sm">{product.rating}</span>
-                </div>
-              </div>
 
-              <div className="text-sm text-muted-foreground">
-                {product.sales} vendas no último mês
-              </div>
+                <div className="flex space-x-2">
+                  {product.isInMyStore ? (
+                    <Button 
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => handleRemoveFromStore(product.id)}
+                    >
+                      Remover da Loja
+                    </Button>
+                  ) : (
+                     <Button 
+                       className="flex-1"
+                       onClick={() => handleAddToStore(product.id)}
+                     >
+                       <Plus className="h-4 w-4 mr-2" />
+                       Adicionar à Loja
+                     </Button>
+                   )}
+                   <Button variant="outline" size="icon">
+                     <Calculator className="h-4 w-4" />
+                   </Button>
+                 </div>
+               </CardContent>
+             </Card>
+           );
+         })}
+         </div>
+       )}
 
-              <div className="flex space-x-2">
-                <Button className="flex-1">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Adicionar à Loja
-                </Button>
-                <Button variant="outline" size="icon">
-                  <Calculator className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Margin Calculator */}
+       {/* Margin Calculator */}
       <Card>
         <CardHeader>
           <CardTitle>Calculadora de Margem</CardTitle>
@@ -295,18 +413,33 @@ const ResellerCatalog = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="text-sm font-medium">Preço de Custo</label>
-              <Input type="number" placeholder="R$ 0,00" />
+              <Input 
+                type="number" 
+                placeholder="R$ 0,00" 
+                value={marginCost}
+                onChange={(e) => setMarginCost(e.target.value)}
+              />
             </div>
             <div>
               <label className="text-sm font-medium">Margem Desejada (%)</label>
-              <Input type="number" placeholder="30%" />
+              <Input 
+                type="number" 
+                placeholder="30%" 
+                value={marginPercent}
+                onChange={(e) => setMarginPercent(e.target.value)}
+              />
             </div>
             <div>
               <label className="text-sm font-medium">Preço Final</label>
-              <Input type="number" placeholder="R$ 0,00" disabled />
+              <Input 
+                type="number" 
+                placeholder="R$ 0,00" 
+                value={finalPrice}
+                disabled 
+              />
             </div>
             <div className="flex items-end">
-              <Button className="w-full">
+              <Button className="w-full" onClick={calculateMarginPrice}>
                 <Calculator className="h-4 w-4 mr-2" />
                 Calcular
               </Button>
