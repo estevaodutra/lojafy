@@ -197,6 +197,7 @@ const App = () => {
                 }
               >
                 <Route index element={<ResellerDashboard />} />
+                <Route path="dashboard" element={<ResellerDashboard />} />
                 <Route path="catalogo" element={<ResellerCatalog />} />
                 <Route path="loja" element={<ResellerStoreEditor />} />
                 <Route path="vendas" element={<ResellerSales />} />
