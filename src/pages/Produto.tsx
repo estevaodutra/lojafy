@@ -381,6 +381,24 @@ const Produto = () => {
                     </div>
                   </div>
                 )}
+                
+                {/* High Rotation Warning */}
+                {product.high_rotation && (
+                  <div className="col-span-2 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <span className="text-orange-500 text-lg">⚠️</span>
+                      <div className="flex-1 space-y-1">
+                        <h4 className="font-semibold text-orange-700 dark:text-orange-400 text-sm">
+                          Alta Rotatividade
+                        </h4>
+                        <div className="text-xs text-orange-600 dark:text-orange-300 space-y-1">
+                          <p>Este produto está marcado como de <strong>Alta Rotatividade</strong>.</p>
+                          <p>Devido à alta demanda, podem ocorrer atrasos no envio e não há garantia imediata de disponibilidade.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
