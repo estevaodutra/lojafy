@@ -85,11 +85,11 @@ const ProductCard = ({ product }: ProductCardProps) => {
     <Card className="group hover:shadow-card-hover transition-all duration-300 border-border overflow-hidden h-full max-w-full">
       <CardContent className="p-0 h-full flex flex-col">
         <Link to={`/produto/${product.id}`} className="flex-1 flex flex-col">
-          <div className="relative overflow-hidden">
+          <div className="relative overflow-hidden bg-muted/20 aspect-square">
             <img
               src={product.main_image_url || product.image_url || '/placeholder.svg'}
               alt={product.name}
-              className="w-full h-40 sm:h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+              className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300 p-2"
             />
             {product.badge && (
               <Badge 
