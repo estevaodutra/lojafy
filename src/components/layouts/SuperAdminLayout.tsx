@@ -149,7 +149,7 @@ const SuperAdminSidebar = () => {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <button onClick={() => navigate('/')}>
+                  <button onClick={() => navigate('/?view=store')}>
                     <Store className="mr-2 h-4 w-4" />
                     <span>Ver Loja</span>
                   </button>

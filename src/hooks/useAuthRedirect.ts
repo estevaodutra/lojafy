@@ -14,6 +14,10 @@ export const useAuthRedirect = () => {
     const currentPath = location.pathname;
     if (currentPath !== '/auth' && currentPath !== '/') return;
 
+    // Don't redirect if user is viewing store intentionally
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get('view') === 'store') return;
+
     // Redirect based on role
     switch (role) {
       case 'super_admin':
@@ -37,5 +41,5 @@ export const useAuthRedirect = () => {
       default:
         break;
     }
-  }, [role, isAuthenticated, navigate, location.pathname]);
+  }, [role, isAuthenticated, navigate, location.pathname, location.search]);
 };
