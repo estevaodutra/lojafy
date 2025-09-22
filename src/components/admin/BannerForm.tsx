@@ -43,12 +43,16 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
     active: true
   });
   
+  const [imageOnly, setImageOnly] = useState(false);
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Reset form when banner changes or dialog opens/closes
   useEffect(() => {
     if (banner) {
+      const isImageOnlyBanner = !banner.title && !banner.subtitle && !banner.description && !banner.button_text;
+      setImageOnly(isImageOnlyBanner);
       setFormData({
         title: banner.title,
         subtitle: banner.subtitle || '',
@@ -60,6 +64,7 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
         active: banner.active
       });
     } else {
+      setImageOnly(false);
       setFormData({
         title: '',
         subtitle: '',
@@ -152,10 +157,10 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.title.trim()) {
+    if (!imageOnly && !formData.title.trim()) {
       toast({
         title: "Erro de validação",
-        description: "O título é obrigatório.",
+        description: "O título é obrigatório para banners com texto.",
         variant: "destructive",
       });
       return;
@@ -170,7 +175,14 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
       return;
     }
 
-    const dataToSubmit = formData;
+    const dataToSubmit = imageOnly ? {
+      ...formData,
+      title: '',
+      subtitle: '',
+      description: '',
+      button_text: '',
+      button_link: ''
+    } : formData;
 
     if (banner) {
       updateBannerMutation.mutate(dataToSubmit);
@@ -198,37 +210,67 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="title">Título *</Label>
-              <Input
-                id="title"
-                value={formData.title}
-                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Digite o título do banner"
-                required
+            <div className="flex items-center space-x-2 p-4 bg-muted/50 rounded-lg">
+              <Switch
+                id="image-only"
+                checked={imageOnly}
+                onCheckedChange={(checked) => {
+                  setImageOnly(checked);
+                  if (checked) {
+                    setFormData(prev => ({
+                      ...prev,
+                      title: '',
+                      subtitle: '',
+                      description: '',
+                      button_text: '',
+                      button_link: ''
+                    }));
+                  }
+                }}
               />
+              <Label htmlFor="image-only" className="font-medium">
+                Banner somente com imagem
+              </Label>
+              <p className="text-sm text-muted-foreground ml-2">
+                Oculta todos os textos e botões, mostrando apenas a imagem
+              </p>
             </div>
 
-            <div>
-              <Label htmlFor="subtitle">Subtítulo</Label>
-              <Input
-                id="subtitle"
-                value={formData.subtitle}
-                onChange={(e) => setFormData(prev => ({ ...prev, subtitle: e.target.value }))}
-                placeholder="Digite o subtítulo (opcional)"
-              />
-            </div>
+            {!imageOnly && (
+              <>
+                <div>
+                  <Label htmlFor="title">Título *</Label>
+                  <Input
+                    id="title"
+                    value={formData.title}
+                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Digite o título do banner"
+                    required
+                  />
+                </div>
 
-            <div>
-              <Label htmlFor="description">Descrição</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Digite a descrição do banner (opcional)"
-                rows={3}
-              />
-            </div>
+                <div>
+                  <Label htmlFor="subtitle">Subtítulo</Label>
+                  <Input
+                    id="subtitle"
+                    value={formData.subtitle}
+                    onChange={(e) => setFormData(prev => ({ ...prev, subtitle: e.target.value }))}
+                    placeholder="Digite o subtítulo (opcional)"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="description">Descrição</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Digite a descrição do banner (opcional)"
+                    rows={3}
+                  />
+                </div>
+              </>
+            )}
 
             <div>
               <Label>Imagem do Banner *</Label>
@@ -238,27 +280,29 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="button_text">Texto do Botão</Label>
-                <Input
-                  id="button_text"
-                  value={formData.button_text}
-                  onChange={(e) => setFormData(prev => ({ ...prev, button_text: e.target.value }))}
-                  placeholder="Ex: Comprar Agora"
-                />
-              </div>
+            {!imageOnly && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="button_text">Texto do Botão</Label>
+                  <Input
+                    id="button_text"
+                    value={formData.button_text}
+                    onChange={(e) => setFormData(prev => ({ ...prev, button_text: e.target.value }))}
+                    placeholder="Ex: Comprar Agora"
+                  />
+                </div>
 
-              <div>
-                <Label htmlFor="button_link">Link do Botão</Label>
-                <Input
-                  id="button_link"
-                  value={formData.button_link}
-                  onChange={(e) => setFormData(prev => ({ ...prev, button_link: e.target.value }))}
-                  placeholder="/promocoes"
-                />
+                <div>
+                  <Label htmlFor="button_link">Link do Botão</Label>
+                  <Input
+                    id="button_link"
+                    value={formData.button_link}
+                    onChange={(e) => setFormData(prev => ({ ...prev, button_link: e.target.value }))}
+                    placeholder="/promocoes"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>

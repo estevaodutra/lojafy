@@ -64,6 +64,22 @@ const Hero = () => {
 
   if (displayBanners.length === 1) {
     const banner = displayBanners[0];
+    const isImageOnly = !banner.title && !banner.subtitle && !banner.description && !banner.button_text;
+    
+    if (isImageOnly) {
+      return (
+        <section className="relative overflow-hidden">
+          <div className="w-full h-[50vh] md:h-[60vh] lg:h-[70vh]">
+            <img
+              src={banner.image_url}
+              alt="Banner"
+              className="w-full h-full object-cover"
+            />
+          </div>
+        </section>
+      );
+    }
+    
     return (
       <section className="relative bg-hero-gradient text-white overflow-hidden">
         <div className="container mx-auto px-4 py-20">
@@ -140,60 +156,78 @@ const Hero = () => {
         ]}
       >
         <CarouselContent>
-          {displayBanners.map((banner) => (
-            <CarouselItem key={banner.id}>
-              <div className="container mx-auto px-4 py-20">
-                <div className="grid md:grid-cols-2 gap-12 items-center">
-                  <div className="space-y-6">
-                    <h1 className="text-4xl md:text-6xl font-bold leading-tight">
-                      {banner.title}
-                      {banner.subtitle && (
-                        <>
-                          <br />
-                          <span className="text-yellow-300">{banner.subtitle}</span>
-                        </>
-                      )}
-                    </h1>
-                    {banner.description && (
-                      <p className="text-xl md:text-2xl text-blue-100">
-                        {banner.description}
-                      </p>
-                    )}
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      {banner.button_text && banner.button_link && (
-                        <Link to={banner.button_link}>
-                          <Button 
-                            size="lg"
-                            className="bg-white text-primary hover:bg-gray-100 font-semibold text-lg px-8 py-4"
-                          >
-                            {banner.button_text}
-                          </Button>
-                        </Link>
-                      )}
-                      <Link to="/promocoes">
-                        <Button 
-                          variant="outline"
-                          size="lg"
-                          className="border-white text-white hover:bg-white hover:text-primary font-semibold text-lg px-8 py-4"
-                        >
-                          Ver Ofertas
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                  
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-2xl"></div>
+          {displayBanners.map((banner) => {
+            const isImageOnly = !banner.title && !banner.subtitle && !banner.description && !banner.button_text;
+            
+            if (isImageOnly) {
+              return (
+                <CarouselItem key={banner.id}>
+                  <div className="w-full h-[50vh] md:h-[60vh] lg:h-[70vh]">
                     <img
                       src={banner.image_url}
-                      alt={banner.title}
-                      className="w-full h-auto rounded-2xl shadow-2xl"
+                      alt="Banner"
+                      className="w-full h-full object-cover"
                     />
                   </div>
+                </CarouselItem>
+              );
+            }
+            
+            return (
+              <CarouselItem key={banner.id}>
+                <div className="container mx-auto px-4 py-20">
+                  <div className="grid md:grid-cols-2 gap-12 items-center">
+                    <div className="space-y-6">
+                      <h1 className="text-4xl md:text-6xl font-bold leading-tight">
+                        {banner.title}
+                        {banner.subtitle && (
+                          <>
+                            <br />
+                            <span className="text-yellow-300">{banner.subtitle}</span>
+                          </>
+                        )}
+                      </h1>
+                      {banner.description && (
+                        <p className="text-xl md:text-2xl text-blue-100">
+                          {banner.description}
+                        </p>
+                      )}
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        {banner.button_text && banner.button_link && (
+                          <Link to={banner.button_link}>
+                            <Button 
+                              size="lg"
+                              className="bg-white text-primary hover:bg-gray-100 font-semibold text-lg px-8 py-4"
+                            >
+                              {banner.button_text}
+                            </Button>
+                          </Link>
+                        )}
+                        <Link to="/promocoes">
+                          <Button 
+                            variant="outline"
+                            size="lg"
+                            className="border-white text-white hover:bg-white hover:text-primary font-semibold text-lg px-8 py-4"
+                          >
+                            Ver Ofertas
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                    
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-2xl"></div>
+                      <img
+                        src={banner.image_url}
+                        alt={banner.title}
+                        className="w-full h-auto rounded-2xl shadow-2xl"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </CarouselItem>
-          ))}
+              </CarouselItem>
+            );
+          })}
         </CarouselContent>
         
         {displayBanners.length > 1 && (
