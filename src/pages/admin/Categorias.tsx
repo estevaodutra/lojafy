@@ -64,17 +64,25 @@ const Categorias = () => {
     },
   });
 
-  // Fetch available categories
+  // Fetch available categories with product count
   const { data: availableCategories = [] } = useQuery({
-    queryKey: ['available-categories'],
+    queryKey: ['available-categories-with-count'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('categories')
-        .select('*')
+        .select(`
+          *,
+          product_count:products(count)
+        `)
         .eq('active', true);
       
       if (error) throw error;
-      return data;
+      
+      // Transform the data to include product_count as a number
+      return data?.map(category => ({
+        ...category,
+        product_count: category.product_count?.[0]?.count || 0
+      })) || [];
     },
   });
 
@@ -398,7 +406,9 @@ const AddCategoryForm = ({
   const [isFeatured, setIsFeatured] = useState(false);
 
   const featuredCategoryIds = featuredCategories.map(fc => fc.category_id);
-  const availableOptions = availableCategories.filter(cat => !featuredCategoryIds.includes(cat.id));
+  const availableOptions = availableCategories.filter(cat => 
+    !featuredCategoryIds.includes(cat.id) && cat.product_count >= 5
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -411,35 +421,51 @@ const AddCategoryForm = ({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="category">Categoria</Label>
-        <Select value={selectedCategory} onValueChange={setSelectedCategory} required>
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione uma categoria" />
-          </SelectTrigger>
-          <SelectContent>
-            {availableOptions.map((category) => (
-              <SelectItem key={category.id} value={category.id}>
-                {category.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <p className="text-sm text-muted-foreground mb-2">
+          Apenas categorias com 5 ou mais produtos podem ser adicionadas à homepage
+        </p>
+        {availableOptions.length === 0 ? (
+          <div className="p-4 bg-muted rounded-md">
+            <p className="text-sm text-muted-foreground">
+              Nenhuma categoria disponível com pelo menos 5 produtos. 
+              Adicione mais produtos às categorias existentes para poder incluí-las na homepage.
+            </p>
+          </div>
+        ) : (
+          <Select value={selectedCategory} onValueChange={setSelectedCategory} required>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione uma categoria" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableOptions.map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name} ({category.product_count} produtos)
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
-      <div className="flex items-center space-x-2">
-        <Switch
-          id="featured"
-          checked={isFeatured}
-          onCheckedChange={setIsFeatured}
-        />
-        <Label htmlFor="featured">Destaque Principal</Label>
-      </div>
+      {availableOptions.length > 0 && (
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="featured"
+            checked={isFeatured}
+            onCheckedChange={setIsFeatured}
+          />
+          <Label htmlFor="featured">Destaque Principal</Label>
+        </div>
+      )}
 
-      <div className="flex justify-end gap-2">
-        <Button type="submit" disabled={!selectedCategory || isLoading}>
-          {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Adicionar
-        </Button>
-      </div>
+      {availableOptions.length > 0 && (
+        <div className="flex justify-end gap-2">
+          <Button type="submit" disabled={!selectedCategory || isLoading}>
+            {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Adicionar
+          </Button>
+        </div>
+      )}
     </form>
   );
 };

@@ -141,7 +141,7 @@ const CategoryCarousels = () => {
             
             const products = categoryProducts[category.id] || [];
             
-            if (products.length === 0) return null;
+            if (products.length < 5) return null;
 
             return (
               <div key={category.id} className="space-y-6 max-w-full">
