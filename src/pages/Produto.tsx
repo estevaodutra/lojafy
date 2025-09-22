@@ -393,7 +393,7 @@ const Produto = () => {
                         </h4>
                         <div className="text-xs text-orange-600 dark:text-orange-300 space-y-1">
                           <p>Este produto está marcado como de <strong>Alta Rotatividade</strong>.</p>
-                          <p>Devido à alta demanda, podem ocorrer atrasos no envio e não há garantia imediata de disponibilidade.</p>
+                          <p>Devido ao grande volume de vendas, pode ocorrer atrasos no envio e não há garantia imediata de disponibilidade, em caso de cancelamento o reembolso é integral em até 7 dias úteis.</p>
                         </div>
                       </div>
                     </div>
