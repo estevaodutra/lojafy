@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface PublicStoreData {
   id: string;
+  reseller_id: string;
   store_name: string;
   store_slug: string;
   logo_url?: string;
@@ -16,7 +17,11 @@ export interface PublicStoreData {
   contact_email?: string;
   contact_address?: string;
   whatsapp?: string;
+  payment_methods?: any;
+  policies?: any;
   active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface PublicResellerProduct {

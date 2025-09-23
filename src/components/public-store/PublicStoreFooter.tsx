@@ -1,0 +1,121 @@
+import { Phone, Mail, MapPin, MessageCircle, Instagram, Facebook } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { PublicStoreData } from "@/hooks/usePublicStore";
+
+interface PublicStoreFooterProps {
+  store: PublicStoreData;
+}
+
+const PublicStoreFooter = ({ store }: PublicStoreFooterProps) => {
+  const handleWhatsAppContact = () => {
+    if (store.whatsapp) {
+      const message = encodeURIComponent(`Olá! Vi sua loja online e gostaria de mais informações.`);
+      window.open(`https://wa.me/55${store.whatsapp.replace(/\D/g, '')}?text=${message}`, '_blank');
+    }
+  };
+
+  return (
+    <footer 
+      className="bg-background border-t py-12"
+      style={{
+        backgroundColor: store.secondary_color || '#f3f4f6'
+      }}
+    >
+      <div className="container mx-auto px-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Store Info */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-3">
+              {store.logo_url && (
+                <img 
+                  src={store.logo_url} 
+                  alt={store.store_name}
+                  className="h-12 w-auto"
+                />
+              )}
+              <h3 className="text-xl font-bold">{store.store_name}</h3>
+            </div>
+            <p className="text-muted-foreground">
+              Sua loja online de confiança com os melhores produtos e preços especiais.
+            </p>
+            
+            {/* Payment Methods */}
+            <div className="space-y-2">
+              <h4 className="font-semibold text-sm">Formas de Pagamento:</h4>
+              <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                {store.payment_methods?.pix && <span>PIX</span>}
+                {store.payment_methods?.credit_card && <span>• Cartão de Crédito</span>}
+                {store.payment_methods?.debit_card && <span>• Cartão de Débito</span>}
+              </div>
+            </div>
+          </div>
+
+          {/* Contact Info */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Contato</h3>
+            <div className="space-y-3">
+              {store.contact_phone && (
+                <div className="flex items-center space-x-3">
+                  <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <span className="text-sm">{store.contact_phone}</span>
+                </div>
+              )}
+              {store.contact_email && (
+                <div className="flex items-center space-x-3">
+                  <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <span className="text-sm">{store.contact_email}</span>
+                </div>
+              )}
+              {store.contact_address && (
+                <div className="flex items-start space-x-3">
+                  <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">{store.contact_address}</span>
+                </div>
+              )}
+              {store.whatsapp && (
+                <Button 
+                  onClick={handleWhatsAppContact}
+                  className="mt-4 text-white"
+                  style={{ backgroundColor: store.accent_color }}
+                >
+                  <MessageCircle className="mr-2 h-4 w-4" />
+                  Falar no WhatsApp
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Policies */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Informações</h3>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              {store.policies?.returns && (
+                <p><strong>Trocas e Devoluções:</strong> {store.policies.returns}</p>
+              )}
+              {store.policies?.shipping && (
+                <p><strong>Entrega:</strong> {store.policies.shipping}</p>
+              )}
+              {store.policies?.warranty && (
+                <p><strong>Garantia:</strong> {store.policies.warranty}</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Bar */}
+        <div className="border-t mt-8 pt-8 text-center">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-sm text-muted-foreground">
+              © {new Date().getFullYear()} {store.store_name}. Todos os direitos reservados.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Loja online powered by Lojafy
+            </p>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+};
+
+export default PublicStoreFooter;
