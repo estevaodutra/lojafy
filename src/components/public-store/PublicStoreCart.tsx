@@ -58,7 +58,7 @@ const PublicStoreCart = () => {
 
   const handleCheckout = () => {
     if (items.length === 0) return;
-    navigate('/checkout');
+    navigate(`/loja/${store.store_slug}/checkout`);
   };
 
   const handleSyncPrices = async () => {

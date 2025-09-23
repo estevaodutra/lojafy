@@ -23,7 +23,12 @@ import { ShoppingCart, CreditCard, Truck, Shield, AlertTriangle } from "lucide-r
 import { ShippingMethodSelector } from "@/components/ShippingMethodSelector";
 import { HighRotationAlert } from '@/components/HighRotationAlert';
 
-const Checkout = () => {
+interface CheckoutProps {
+  showHeader?: boolean;
+  showFooter?: boolean;
+}
+
+const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { items: cartItems, clearCart } = useCart();
@@ -573,7 +578,7 @@ const Checkout = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      {showHeader && <Header />}
       
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
@@ -1057,7 +1062,7 @@ const Checkout = () => {
         </div>
        </main>
       
-      <Footer />
+      {showFooter && <Footer />}
 
       {/* PIX Payment Modal */}
       {pixModalData && (

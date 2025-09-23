@@ -70,6 +70,7 @@ import PublicStoreProducts from "./pages/PublicStoreProducts";
 import PublicStoreCategories from "./pages/PublicStoreCategories";
 import PublicStoreFavorites from "./pages/PublicStoreFavorites";
 import PublicStoreCart from "./pages/PublicStoreCart";
+import PublicStoreCheckout from "./pages/PublicStoreCheckout";
 import PublicStoreSearch from "./pages/PublicStoreSearch";
 import SuperAdminDashboard from "./pages/admin/Dashboard";
 import Usuarios from "./pages/admin/Usuarios";
@@ -266,6 +267,14 @@ const App = () => {
                 element={
                   <PublicStoreProviderRoute>
                     <PublicStoreCart />
+                  </PublicStoreProviderRoute>
+                }
+              />
+              <Route
+                path="/loja/:slug/checkout"
+                element={
+                  <PublicStoreProviderRoute>
+                    <PublicStoreCheckout />
                   </PublicStoreProviderRoute>
                 }
               />
