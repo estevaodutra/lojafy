@@ -74,7 +74,9 @@ const PublicStoreCategoryCarousels = ({ resellerId, storeSlug }: PublicStoreCate
                 className="w-full"
               >
                 <CarouselContent>
-                  {category.products.map((resellerProduct: PublicStoreProductData) => {
+                  {category.products
+                    .filter((rp: PublicStoreProductData) => rp.product && rp.product.id && rp.product.name)
+                    .map((resellerProduct: PublicStoreProductData) => {
                     const product = resellerProduct.product;
                     const displayPrice = resellerProduct.custom_price || product.price;
                     

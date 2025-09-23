@@ -36,7 +36,7 @@ export const usePublicStoreProducts = (resellerId?: string) => {
         .from('reseller_products')
         .select(`
           *,
-          product:products(
+          product:products!inner(
             id,
             name,
             price,
@@ -52,6 +52,7 @@ export const usePublicStoreProducts = (resellerId?: string) => {
         `)
         .eq('reseller_id', resellerId)
         .eq('active', true)
+        .eq('product.active', true)
         .order('position', { ascending: true });
 
       if (error) throw error;
@@ -71,7 +72,7 @@ export const usePublicStoreFeaturedProducts = (resellerId?: string) => {
         .from('reseller_products')
         .select(`
           *,
-          product:products(
+          product:products!inner(
             id,
             name,
             price,
@@ -87,6 +88,7 @@ export const usePublicStoreFeaturedProducts = (resellerId?: string) => {
         `)
         .eq('reseller_id', resellerId)
         .eq('active', true)
+        .eq('product.active', true)
         .eq('product.featured', true)
         .order('position', { ascending: true })
         .limit(4);
@@ -133,7 +135,7 @@ export const usePublicStoreCategories = (resellerId?: string) => {
             .from('reseller_products')
             .select(`
               *,
-              product:products(
+              product:products!inner(
                 id,
                 name,
                 price,
@@ -147,6 +149,7 @@ export const usePublicStoreCategories = (resellerId?: string) => {
             `)
             .eq('reseller_id', resellerId)
             .eq('active', true)
+            .eq('product.active', true)
             .eq('product.category_id', category.id)
             .order('position', { ascending: true })
             .limit(8);
