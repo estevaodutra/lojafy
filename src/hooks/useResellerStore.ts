@@ -79,15 +79,39 @@ export const useResellerStore = () => {
       const { data, error } = await supabase
         .from('reseller_products')
         .select(`
-          *,
-          product:products(*)
+          id,
+          reseller_id,
+          product_id,
+          active,
+          custom_price,
+          custom_description,
+          position,
+          created_at,
+          updated_at,
+          products!reseller_products_product_id_fkey (
+            id,
+            name,
+            price,
+            sku,
+            main_image_url,
+            image_url,
+            brand,
+            description,
+            active
+          )
         `)
         .eq('reseller_id', user.id)
         .order('position', { ascending: true });
 
       if (error) throw error;
       
-      setProducts(data || []);
+      // Transform the data to match expected structure
+      const transformedData = data?.map(item => ({
+        ...item,
+        product: item.products
+      })) || [];
+      
+      setProducts(transformedData);
     } catch (err: any) {
       setError(err.message);
       console.error('Error fetching reseller products:', err);
@@ -163,14 +187,38 @@ export const useResellerStore = () => {
           position: products.length + 1
         })
         .select(`
-          *,
-          product:products(*)
+          id,
+          reseller_id,
+          product_id,
+          active,
+          custom_price,
+          custom_description,
+          position,
+          created_at,
+          updated_at,
+          products!reseller_products_product_id_fkey (
+            id,
+            name,
+            price,
+            sku,
+            main_image_url,
+            image_url,
+            brand,
+            description,
+            active
+          )
         `)
         .single();
 
       if (error) throw error;
       
-      setProducts(prev => [...prev, data]);
+      // Transform the data to match expected structure
+      const transformedItem = {
+        ...data,
+        product: data.products
+      };
+      
+      setProducts(prev => [...prev, transformedItem]);
       toast.success('Produto adicionado à sua loja!');
     } catch (err: any) {
       setError(err.message);
@@ -207,15 +255,39 @@ export const useResellerStore = () => {
         .update({ active })
         .eq('id', id)
         .select(`
-          *,
-          product:products(*)
+          id,
+          reseller_id,
+          product_id,
+          active,
+          custom_price,
+          custom_description,
+          position,
+          created_at,
+          updated_at,
+          products!reseller_products_product_id_fkey (
+            id,
+            name,
+            price,
+            sku,
+            main_image_url,
+            image_url,
+            brand,
+            description,
+            active
+          )
         `)
         .single();
 
       if (error) throw error;
       
+      // Transform the data to match expected structure
+      const transformedItem = {
+        ...data,
+        product: data.products
+      };
+      
       setProducts(prev => 
-        prev.map(p => p.id === id ? data : p)
+        prev.map(p => p.id === id ? transformedItem : p)
       );
       
       toast.success(`Produto ${active ? 'ativado' : 'desativado'} com sucesso!`);
@@ -233,15 +305,39 @@ export const useResellerStore = () => {
         .update({ custom_price: customPrice })
         .eq('id', id)
         .select(`
-          *,
-          product:products(*)
+          id,
+          reseller_id,
+          product_id,
+          active,
+          custom_price,
+          custom_description,
+          position,
+          created_at,
+          updated_at,
+          products!reseller_products_product_id_fkey (
+            id,
+            name,
+            price,
+            sku,
+            main_image_url,
+            image_url,
+            brand,
+            description,
+            active
+          )
         `)
         .single();
 
       if (error) throw error;
       
+      // Transform the data to match expected structure
+      const transformedItem = {
+        ...data,
+        product: data.products
+      };
+      
       setProducts(prev => 
-        prev.map(p => p.id === id ? data : p)
+        prev.map(p => p.id === id ? transformedItem : p)
       );
       
       toast.success('Preço atualizado com sucesso!');

@@ -103,10 +103,12 @@ const ResellerProducts = () => {
   };
 
   // Filter products based on search term
-  const filteredProducts = products.filter(product =>
-    product.product?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.product?.sku?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = products.filter(product => {
+    const productName = product.product?.name || '';
+    const productSku = product.product?.sku || '';
+    return productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           productSku.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   // Calculate stats
   const activeProducts = products.filter(p => p.active).length;
@@ -238,10 +240,10 @@ const ResellerProducts = () => {
                         )}
                       </div>
                       
-                      <div className="flex-1 min-w-0">
+                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between mb-2">
                           <h4 className="font-semibold text-base line-clamp-2">
-                            {product.product?.name}
+                            {product.product?.name || `Produto não encontrado (ID: ${product.product_id})`}
                           </h4>
                         <Badge 
                           variant={product.active ? "default" : "secondary"}
@@ -250,6 +252,15 @@ const ResellerProducts = () => {
                           {product.active ? "Ativo" : "Inativo"}
                         </Badge>
                         </div>
+                        
+                        {!product.product && (
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-2 mb-3">
+                            <p className="text-sm text-yellow-700">
+                              ⚠️ Este produto não está mais disponível no catálogo. 
+                              Considere removê-lo da sua loja.
+                            </p>
+                          </div>
+                        )}
                         
                         {product.product?.sku && (
                           <p className="text-sm text-muted-foreground mb-3">
