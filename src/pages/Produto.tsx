@@ -22,12 +22,15 @@ import {
   Share2,
   ZoomIn,
   Package,
-  Info
+  Info,
+  Store
 } from "lucide-react";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { useCart } from "@/contexts/CartContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useProductStores } from "@/hooks/useProductStores";
+import { ProductStoresModal } from "@/components/ProductStoresModal";
 
 const Produto = () => {
   const { id } = useParams();
@@ -38,6 +41,7 @@ const Produto = () => {
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState("");
+  const [showStoresModal, setShowStoresModal] = useState(false);
 
   // Fetch product from Supabase
   const { data: product, isLoading } = useQuery({
@@ -77,6 +81,9 @@ const Produto = () => {
     },
     enabled: !!product?.category_id
   });
+
+  // Fetch stores that sell this product
+  const { data: productStores = [], isLoading: isLoadingStores } = useProductStores(product?.id);
 
   if (isLoading) {
     return (
@@ -470,6 +477,23 @@ const Produto = () => {
               >
                 <span className="text-base font-semibold">Comprar Agora</span>
               </Button>
+
+              {/* View in Other Stores Button */}
+              {productStores.length > 0 && (
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full h-12 flex items-center justify-center gap-2"
+                  onClick={() => setShowStoresModal(true)}
+                  disabled={isLoadingStores}
+                >
+                  <Store className="h-5 w-5" />
+                  <span className="text-base">Ver em outras lojas</span>
+                  <Badge variant="secondary" className="ml-2 text-xs">
+                    {productStores.length}
+                  </Badge>
+                </Button>
+              )}
             </div>
 
             {/* Benefits */}
@@ -589,6 +613,15 @@ const Produto = () => {
           </section>
         )}
       </main>
+
+      {/* Product Stores Modal */}
+      <ProductStoresModal
+        open={showStoresModal}
+        onOpenChange={setShowStoresModal}
+        stores={productStores}
+        productName={product.name}
+        isLoading={isLoadingStores}
+      />
 
       <Footer />
     </div>
