@@ -32,14 +32,15 @@ import { useQuery } from "@tanstack/react-query";
 interface ProdutoProps {
   showHeader?: boolean;
   showFooter?: boolean;
+  storeSlug?: string;
 }
 
-const Produto = ({ showHeader = true, showFooter = true }: ProdutoProps) => {
+const Produto = ({ showHeader = true, showFooter = true, storeSlug }: ProdutoProps) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
-  const { addItem } = useCart();
+  const { addItem, setStoreSlug } = useCart();
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState("");
@@ -148,6 +149,11 @@ const Produto = ({ showHeader = true, showFooter = true }: ProdutoProps) => {
     : [product.main_image_url || product.image_url || '/placeholder.svg'];
 
   const handleAddToCart = () => {
+    // Set store context if this product is from a public store
+    if (storeSlug) {
+      setStoreSlug(storeSlug);
+    }
+    
     const cartItem = {
       productId: product.id,
       productName: product.name,
@@ -198,6 +204,11 @@ const Produto = ({ showHeader = true, showFooter = true }: ProdutoProps) => {
   };
 
   const handleBuyNow = () => {
+    // Set store context if this product is from a public store
+    if (storeSlug) {
+      setStoreSlug(storeSlug);
+    }
+    
     const cartItem = {
       productId: product.id,
       productName: product.name,
@@ -212,7 +223,13 @@ const Produto = ({ showHeader = true, showFooter = true }: ProdutoProps) => {
       title: "Produto adicionado ao carrinho!",
       description: `${quantity}x ${product.name}`,
     });
-    navigate('/carrinho');
+    
+    // Navigate to appropriate cart page
+    if (storeSlug) {
+      navigate(`/loja/${storeSlug}/carrinho`);
+    } else {
+      navigate('/carrinho');
+    }
   };
 
 

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useFavorites } from "@/contexts/FavoritesContext";
+import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
 import { usePublicStoreContext } from "@/hooks/usePublicStoreContext";
 import {
@@ -16,6 +17,7 @@ import {
 const PublicStoreFavorites = () => {
   const { store } = usePublicStoreContext();
   const { favorites, removeFromFavorites, clearFavorites } = useFavorites();
+  const { addItem, setStoreSlug } = useCart();
   const { toast } = useToast();
 
   const formatPrice = (price: number) => {
@@ -25,10 +27,22 @@ const PublicStoreFavorites = () => {
     }).format(price);
   };
 
-  const handleAddToCart = (productName: string) => {
+  const handleAddToCart = (product: any) => {
+    // Set store context
+    setStoreSlug(store.store_slug);
+    
+    const cartItem = {
+      productId: product.id,
+      productName: product.name,
+      productImage: product.image,
+      price: Number(product.price),
+      quantity: 1,
+    };
+    
+    addItem(cartItem);
     toast({
       title: "Produto adicionado ao carrinho!",
-      description: productName,
+      description: product.name,
     });
   };
 
@@ -153,7 +167,7 @@ const PublicStoreFavorites = () => {
                   <Button
                     size="sm"
                     className="flex-1"
-                    onClick={() => handleAddToCart(product.name)}
+                    onClick={() => handleAddToCart(product)}
                     disabled={!product.inStock}
                     style={{ backgroundColor: store.accent_color }}
                   >

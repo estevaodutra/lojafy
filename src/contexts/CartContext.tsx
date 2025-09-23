@@ -15,6 +15,8 @@ interface CartContextType {
   syncPrices: () => Promise<{ updated: boolean; updatedItems: string[]; removedItems: string[] }>;
   isUpdatingPrices: boolean;
   lastSyncTime: Date | null;
+  storeSlug: string | null;
+  setStoreSlug: (slug: string | null) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -35,6 +37,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   const [items, setItems] = useState<OrderItem[]>([]);
   const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const [storeSlug, setStoreSlugState] = useState<string | null>(null);
 
   const syncPricesInternal = async (cartItems: OrderItem[] = items) => {
     if (cartItems.length === 0) return { updated: false, updatedItems: [], removedItems: [] };
@@ -108,6 +111,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   useEffect(() => {
     const loadCartAndSync = async () => {
       const savedCart = localStorage.getItem('cart');
+      const savedStoreSlug = localStorage.getItem('cartStoreSlug');
+      
+      if (savedStoreSlug) {
+        setStoreSlugState(savedStoreSlug);
+      }
+      
       if (savedCart) {
         try {
           const parsedCart = JSON.parse(savedCart);
@@ -140,6 +149,19 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('cart', JSON.stringify(items));
   }, [items]);
+
+  // Save storeSlug to localStorage whenever it changes
+  useEffect(() => {
+    if (storeSlug) {
+      localStorage.setItem('cartStoreSlug', storeSlug);
+    } else {
+      localStorage.removeItem('cartStoreSlug');
+    }
+  }, [storeSlug]);
+
+  const setStoreSlug = (slug: string | null) => {
+    setStoreSlugState(slug);
+  };
 
   const addItem = (item: OrderItem) => {
     console.log('➕ Adding item to cart:', {
@@ -194,6 +216,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
   const clearCart = () => {
     setItems([]);
+    setStoreSlug(null);
   };
 
   const isInCart = (productId: string) => {
@@ -230,6 +253,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     syncPrices,
     isUpdatingPrices,
     lastSyncTime,
+    storeSlug,
+    setStoreSlug,
   };
 
   return (

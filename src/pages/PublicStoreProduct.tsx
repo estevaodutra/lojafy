@@ -50,7 +50,7 @@ const PublicStoreProduct = () => {
       } as React.CSSProperties}
     >
       <PublicStoreHeader store={store} />
-      <Produto showHeader={false} showFooter={false} />
+      <Produto showHeader={false} showFooter={false} storeSlug={store.store_slug} />
       <PublicStoreFooter store={store} />
     </div>
   );

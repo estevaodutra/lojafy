@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,9 +11,17 @@ import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
 
 const Carrinho = () => {
-  const { items, itemsCount, totalPrice, updateQuantity, removeItem, clearCart, syncPrices, isUpdatingPrices, lastSyncTime } = useCart();
+  const { items, itemsCount, totalPrice, updateQuantity, removeItem, clearCart, syncPrices, isUpdatingPrices, lastSyncTime, storeSlug } = useCart();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Redirect to public store cart if there's a store context
+  useEffect(() => {
+    if (storeSlug && items.length > 0) {
+      console.log('🔄 Redirecting to public store cart:', storeSlug);
+      navigate(`/loja/${storeSlug}/carrinho`, { replace: true });
+    }
+  }, [storeSlug, items.length, navigate]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
