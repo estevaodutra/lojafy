@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useResellerStore } from '@/hooks/useResellerStore';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -15,7 +16,8 @@ import {
   Search,
   Filter,
   TrendingUp,
-  Eye
+  Eye,
+  Trash2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -26,7 +28,8 @@ const ResellerProducts = () => {
     products, 
     isLoading, 
     updateProductStatus, 
-    updateProductPrice 
+    updateProductPrice,
+    removeProduct 
   } = useResellerStore();
 
   const [editingPrice, setEditingPrice] = useState<string | null>(null);
@@ -78,6 +81,22 @@ const ResellerProducts = () => {
       toast({
         title: "Erro",
         description: "Não foi possível atualizar o preço.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRemoveProduct = async (productId: string, productName: string) => {
+    try {
+      await removeProduct(productId);
+      toast({
+        title: "Produto removido",
+        description: `${productName} foi removido da sua loja.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível remover o produto.",
         variant: "destructive",
       });
     }
@@ -224,9 +243,12 @@ const ResellerProducts = () => {
                           <h4 className="font-semibold text-base line-clamp-2">
                             {product.product?.name}
                           </h4>
-                          <Badge variant={product.active ? "default" : "secondary"}>
-                            {product.active ? "Ativo" : "Inativo"}
-                          </Badge>
+                        <Badge 
+                          variant={product.active ? "default" : "secondary"}
+                          className={product.active ? "bg-green-100 text-green-800 hover:bg-green-100 border-green-200" : ""}
+                        >
+                          {product.active ? "Ativo" : "Inativo"}
+                        </Badge>
                         </div>
                         
                         {product.product?.sku && (
@@ -298,6 +320,37 @@ const ResellerProducts = () => {
                         >
                           {product.active ? "Desativar" : "Ativar"}
                         </Button>
+                        
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="text-xs px-3"
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Remover
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Remover produto da loja</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja remover "{product.product?.name}" da sua loja? 
+                                Esta ação não pode ser desfeita, mas você pode adicionar o produto novamente depois.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleRemoveProduct(product.product_id, product.product?.name || "este produto")}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Remover
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </div>
                   </Card>
