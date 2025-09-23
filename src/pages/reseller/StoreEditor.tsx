@@ -160,8 +160,8 @@ const ResellerStoreEditor = () => {
   };
 
   const storeUrl = storeConfig.storeSlug 
-    ? `https://loja.exemplo.com/${storeConfig.storeSlug}` 
-    : 'https://loja.exemplo.com/minha-loja';
+    ? `${window.location.origin}/loja/${storeConfig.storeSlug}` 
+    : `${window.location.origin}/loja/minha-loja`;
 
   return (
     <div className="space-y-6">
@@ -447,9 +447,9 @@ const ResellerStoreEditor = () => {
                           onChange={(e) => handleColorChange('storeSlug', e.target.value)}
                           className="font-mono"
                         />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Será: loja.com/{storeConfig.storeSlug}
-                        </p>
+                         <p className="text-xs text-muted-foreground mt-1">
+                           Será: {window.location.host}/loja/{storeConfig.storeSlug || 'sua-loja'}
+                         </p>
                       </div>
                     </div>
                     

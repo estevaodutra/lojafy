@@ -62,6 +62,7 @@ import ResellerGoals from "./pages/reseller/Goals";
 import ResellerReports from "./pages/reseller/Reports";
 import ResellerCatalog from "./pages/reseller/Catalog";
 import ResellerStoreEditor from "./pages/reseller/StoreEditor";
+import PublicStore from "./pages/PublicStore";
 import SuperAdminDashboard from "./pages/admin/Dashboard";
 import Usuarios from "./pages/admin/Usuarios";
 import Plataforma from "./pages/admin/Plataforma";
@@ -206,6 +207,10 @@ const App = () => {
                 <Route path="metas" element={<ResellerGoals />} />
                 <Route path="relatorios" element={<ResellerReports />} />
               </Route>
+              
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              {/* Public Store Route */}
+              <Route path="/loja/:slug" element={<PublicStore />} />
               
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
