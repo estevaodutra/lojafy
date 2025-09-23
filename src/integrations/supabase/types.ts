@@ -1619,6 +1619,10 @@ export type Database = {
         Args: { brand_name?: string; category_name?: string }
         Returns: string
       }
+      generate_unique_store_slug: {
+        Args: { store_id_param?: string; store_name_param: string }
+        Returns: string
+      }
       get_customer_display_name: {
         Args: { customer_user_id: string }
         Returns: string
