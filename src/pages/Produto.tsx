@@ -29,7 +29,12 @@ import { useCart } from "@/contexts/CartContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
-const Produto = () => {
+interface ProdutoProps {
+  showHeader?: boolean;
+  showFooter?: boolean;
+}
+
+const Produto = ({ showHeader = true, showFooter = true }: ProdutoProps) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -82,7 +87,7 @@ const Produto = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
+        {showHeader && <Header />}
         <main className="container mx-auto px-4 py-8">
           <div className="animate-pulse space-y-6">
             <div className="h-6 bg-gray-200 rounded w-1/2"></div>
@@ -104,7 +109,7 @@ const Produto = () => {
             </div>
           </div>
         </main>
-        <Footer />
+        {showFooter && <Footer />}
       </div>
     );
   }
@@ -112,7 +117,7 @@ const Produto = () => {
   if (!product) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
+        {showHeader && <Header />}
         <main className="container mx-auto px-4 py-8">
           <div className="text-center">
             <h1 className="text-2xl font-bold mb-4">Produto não encontrado</h1>
@@ -121,7 +126,7 @@ const Produto = () => {
             </Link>
           </div>
         </main>
-        <Footer />
+        {showFooter && <Footer />}
       </div>
     );
   }
@@ -213,7 +218,7 @@ const Produto = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      {showHeader && <Header />}
       
       <main className="container mx-auto px-4 py-8">
         {/* Breadcrumb */}
@@ -592,8 +597,7 @@ const Produto = () => {
         )}
       </main>
 
-
-      <Footer />
+      {showFooter && <Footer />}
     </div>
   );
 };
