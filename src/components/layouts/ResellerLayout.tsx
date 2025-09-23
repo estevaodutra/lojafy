@@ -37,6 +37,11 @@ const resellerMenuItems = [
     icon: Package,
   },
   {
+    title: 'Meus Produtos',
+    url: '/reseller/produtos',
+    icon: Package,
+  },
+  {
     title: 'Minha Loja',
     url: '/reseller/loja',
     icon: Store,

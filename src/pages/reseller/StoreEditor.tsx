@@ -17,7 +17,6 @@ import { QRCodeGenerator } from '@/components/reseller/QRCodeGenerator';
 import { 
   Store, 
   Palette, 
-  Package, 
   Settings, 
   Eye, 
   ExternalLink,
@@ -26,22 +25,15 @@ import {
   Smartphone,
   Monitor,
   Tablet,
-  Edit,
-  Loader2,
-  Check,
-  X,
-  Pencil
+  Loader2
 } from 'lucide-react';
 
 const ResellerStoreEditor = () => {
   const { toast } = useToast();
   const { 
     store, 
-    products, 
     isLoading, 
-    createOrUpdateStore, 
-    updateProductStatus, 
-    updateProductPrice 
+    createOrUpdateStore
   } = useResellerStore();
 
   const [storeConfig, setStoreConfig] = useState({
@@ -83,8 +75,6 @@ const ResellerStoreEditor = () => {
 
   const [activeTab, setActiveTab] = useState('visual');
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
-  const [editingPrice, setEditingPrice] = useState<string | null>(null);
-  const [newPrice, setNewPrice] = useState<string>('');
   const [showPreview, setShowPreview] = useState(false);
 
   const handleColorChange = (colorType: string, color: string) => {
@@ -92,56 +82,6 @@ const ResellerStoreEditor = () => {
       ...prev,
       [colorType]: color
     }));
-  };
-
-  const toggleProductActive = async (productId: string, newStatus: boolean) => {
-    try {
-      await updateProductStatus(productId, newStatus);
-      toast({
-        title: newStatus ? "Produto ativado" : "Produto desativado",
-        description: `Produto foi ${newStatus ? 'adicionado à' : 'removido da'} loja.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível atualizar o produto.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handlePriceEdit = (productId: string, currentPrice: string) => {
-    setEditingPrice(productId);
-    setNewPrice(currentPrice);
-  };
-
-  const handlePriceSave = async (productId: string) => {
-    try {
-      const price = parseFloat(newPrice);
-      if (isNaN(price) || price <= 0) {
-        toast({
-          title: "Erro",
-          description: "Preço inválido",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      await updateProductPrice(productId, price);
-      setEditingPrice(null);
-      setNewPrice('');
-      
-      toast({
-        title: "Preço atualizado!",
-        description: "O preço do produto foi atualizado com sucesso.",
-      });
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível atualizar o preço.",
-        variant: "destructive",
-      });
-    }
   };
 
   const handleSaveStore = async () => {
@@ -191,7 +131,7 @@ const ResellerStoreEditor = () => {
         <div>
           <h1 className="text-3xl font-bold">Editor da Minha Loja</h1>
           <p className="text-muted-foreground">
-            Personalize sua loja e gerencie seus produtos
+            Personalize sua loja online
           </p>
         </div>
         <div className="flex space-x-2">
@@ -220,14 +160,10 @@ const ResellerStoreEditor = () => {
           {/* Editor Panel */}
           <div className="flex-1 space-y-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="visual">
                   <Palette className="h-4 w-4 mr-2" />
                   Visual
-                </TabsTrigger>
-                <TabsTrigger value="products">
-                  <Package className="h-4 w-4 mr-2" />
-                  Produtos
                 </TabsTrigger>
                 <TabsTrigger value="config">
                   <Settings className="h-4 w-4 mr-2" />
@@ -319,123 +255,6 @@ const ResellerStoreEditor = () => {
                           />
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Products Tab */}
-              <TabsContent value="products" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Produtos da Loja</CardTitle>
-                    <CardDescription>
-                      Gerencie os produtos ativos na sua loja
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {products.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <p>Nenhum produto adicionado à sua loja ainda.</p>
-                          <p className="text-sm mt-1">Vá para o Catálogo para adicionar produtos.</p>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 gap-4">
-                          {products.map((product) => (
-                            <Card key={product.id} className="p-4">
-                              <div className="flex items-start gap-4">
-                                <div className="w-20 h-20 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
-                                  {product.product?.main_image_url ? (
-                                    <img 
-                                      src={product.product.main_image_url} 
-                                      alt={product.product.name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full bg-gradient-to-br from-muted to-muted-foreground/20 flex items-center justify-center">
-                                      <span className="text-xs text-muted-foreground">Sem foto</span>
-                                    </div>
-                                  )}
-                                </div>
-                                
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="font-semibold text-base mb-2 line-clamp-2">
-                                    {product.product?.name}
-                                  </h4>
-                                  
-                                  <div className="grid grid-cols-2 gap-4 text-sm mb-3">
-                                    <div>
-                                      <span className="text-muted-foreground">Preço Original:</span>
-                                      <p className="font-medium">
-                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.product?.price || 0)}
-                                      </p>
-                                    </div>
-                                    <div>
-                                      <span className="text-muted-foreground">Seu Preço:</span>
-                                      {editingPrice === product.id ? (
-                                        <div className="flex gap-1 mt-1">
-                                          <Input
-                                            type="number"
-                                            step="0.01"
-                                            value={newPrice}
-                                            onChange={(e) => setNewPrice(e.target.value)}
-                                            className="h-8 text-sm"
-                                            placeholder="0,00"
-                                          />
-                                          <Button
-                                            size="sm"
-                                            onClick={() => handlePriceSave(product.id)}
-                                            className="h-8 px-2"
-                                          >
-                                            <Check className="h-3 w-3" />
-                                          </Button>
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => setEditingPrice(null)}
-                                            className="h-8 px-2"
-                                          >
-                                            <X className="h-3 w-3" />
-                                          </Button>
-                                        </div>
-                                      ) : (
-                                        <div className="flex items-center gap-2 mt-1">
-                                          <p className="font-bold text-primary">
-                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.custom_price || 0)}
-                                          </p>
-                                          <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => handlePriceEdit(product.id, product.custom_price?.toString() || '')}
-                                            className="h-6 w-6 p-0"
-                                          >
-                                            <Pencil className="h-3 w-3" />
-                                          </Button>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                                
-                                <div className="flex flex-col gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant={product.active ? "default" : "outline"}
-                                    onClick={() => toggleProductActive(product.id, !product.active)}
-                                    className="text-xs px-3"
-                                  >
-                                    {product.active ? "✅ Ativo" : "❌ Inativo"}
-                                  </Button>
-                                  <Badge variant={product.active ? "default" : "secondary"} className="text-xs text-center">
-                                    {product.active ? "Visível" : "Oculto"}
-                                  </Badge>
-                                </div>
-                              </div>
-                            </Card>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -583,7 +402,7 @@ const ResellerStoreEditor = () => {
                   </div>
                 </div>
 
-                {/* Produtos simulados */}
+                {/* Produtos de exemplo para preview */}
                 <div className="p-6">
                   <h2 
                     className="text-xl font-semibold mb-4"
@@ -592,27 +411,21 @@ const ResellerStoreEditor = () => {
                     Produtos em Destaque
                   </h2>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {products.slice(0, 6).map((product, i) => (
-                      <div key={product.id} className="border rounded-lg p-3 bg-background">
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                      <div key={i} className="border rounded-lg p-3 bg-background">
                         <div className="aspect-square bg-muted rounded mb-2 overflow-hidden">
-                          {product.product?.main_image_url ? (
-                            <img 
-                              src={product.product.main_image_url} 
-                              alt={product.product.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-muted to-muted-foreground/20"></div>
-                          )}
+                          <div className="w-full h-full bg-gradient-to-br from-muted to-muted-foreground/20 flex items-center justify-center">
+                            <span className="text-xs text-muted-foreground">Produto</span>
+                          </div>
                         </div>
-                        <h3 className="font-medium text-sm mb-1 line-clamp-2">
-                          {product.product?.name || `Produto ${i + 1}`}
+                        <h3 className="font-medium text-sm mb-1">
+                          Produto Exemplo {i}
                         </h3>
                         <p 
                           className="font-bold text-sm"
                           style={{ color: storeConfig.accentColor || '#3b82f6' }}
                         >
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.custom_price || 99.90)}
+                          R$ {(99.90 + i * 10).toFixed(2)}
                         </p>
                       </div>
                     ))}

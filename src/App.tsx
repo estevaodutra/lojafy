@@ -61,6 +61,7 @@ import ResellerCommissions from "./pages/reseller/Commissions";
 import ResellerGoals from "./pages/reseller/Goals";
 import ResellerReports from "./pages/reseller/Reports";
 import ResellerCatalog from "./pages/reseller/Catalog";
+import ResellerProducts from "./pages/reseller/Products";
 import ResellerStoreEditor from "./pages/reseller/StoreEditor";
 import PublicStore from "./pages/PublicStore";
 import PublicStoreProduct from "./pages/PublicStoreProduct";
@@ -206,6 +207,7 @@ const App = () => {
                 <Route index element={<ResellerDashboard />} />
                 <Route path="dashboard" element={<ResellerDashboard />} />
                 <Route path="catalogo" element={<ResellerCatalog />} />
+                <Route path="produtos" element={<ResellerProducts />} />
                 <Route path="loja" element={<ResellerStoreEditor />} />
                 <Route path="vendas" element={<ResellerSales />} />
                 <Route path="clientes" element={<ResellerClients />} />
