@@ -66,6 +66,8 @@ import ResellerStoreEditor from "./pages/reseller/StoreEditor";
 import PublicStore from "./pages/PublicStore";
 import PublicStoreProduct from "./pages/PublicStoreProduct";
 import PublicStoreCategory from "./pages/PublicStoreCategory";
+import PublicStoreProducts from "./pages/PublicStoreProducts";
+import PublicStoreCategories from "./pages/PublicStoreCategories";
 import PublicStoreFavorites from "./pages/PublicStoreFavorites";
 import PublicStoreCart from "./pages/PublicStoreCart";
 import PublicStoreSearch from "./pages/PublicStoreSearch";
@@ -219,6 +221,22 @@ const App = () => {
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               {/* Public Store Routes */}
               <Route path="/loja/:slug" element={<PublicStore />} />
+              <Route
+                path="/loja/:slug/produtos"
+                element={
+                  <PublicStoreProviderRoute>
+                    <PublicStoreProducts />
+                  </PublicStoreProviderRoute>
+                }
+              />
+              <Route
+                path="/loja/:slug/categorias"
+                element={
+                  <PublicStoreProviderRoute>
+                    <PublicStoreCategories />
+                  </PublicStoreProviderRoute>
+                }
+              />
               <Route
                 path="/loja/:slug/produto/:id"
                 element={

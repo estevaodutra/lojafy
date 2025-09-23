@@ -147,9 +147,27 @@ const PublicStoreHeader = ({ store }: PublicStoreHeaderProps) => {
                     </form>
                   </div>
 
-                  {/* Quick Actions */}
+                  {/* Navigation Links */}
                   <div className="border-t p-4">
-                    <div className="flex gap-4 mb-4">
+                    <div className="space-y-2 mb-4">
+                      <Link 
+                        to={`/loja/${store.store_slug}/produtos`}
+                        className="flex items-center py-3 px-4 text-left hover:bg-muted transition-colors rounded-lg"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <span className="text-sm font-medium">Todos os Produtos</span>
+                      </Link>
+                      <Link 
+                        to={`/loja/${store.store_slug}/categorias`}
+                        className="flex items-center py-3 px-4 text-left hover:bg-muted transition-colors rounded-lg"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <span className="text-sm font-medium">Categorias</span>
+                      </Link>
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="flex gap-4 mb-4 pt-4 border-t">
                        <Link 
                          to={`/loja/${store.store_slug}/favoritos`}
                         className="flex-1 flex items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors"
