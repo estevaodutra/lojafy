@@ -71,6 +71,7 @@ import PublicStoreSearch from "./pages/PublicStoreSearch";
 import SuperAdminDashboard from "./pages/admin/Dashboard";
 import Usuarios from "./pages/admin/Usuarios";
 import Plataforma from "./pages/admin/Plataforma";
+import PublicStoreProviderRoute from "./components/public-store/PublicStoreProviderRoute";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -216,11 +217,46 @@ const App = () => {
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               {/* Public Store Routes */}
               <Route path="/loja/:slug" element={<PublicStore />} />
-              <Route path="/loja/:slug/produto/:id" element={<PublicStoreProduct />} />
-              <Route path="/loja/:slug/categoria/:slug" element={<PublicStoreCategory />} />
-              <Route path="/loja/:slug/favoritos" element={<PublicStoreFavorites />} />
-              <Route path="/loja/:slug/carrinho" element={<PublicStoreCart />} />
-              <Route path="/loja/:slug/busca" element={<PublicStoreSearch />} />
+              <Route
+                path="/loja/:slug/produto/:id"
+                element={
+                  <PublicStoreProviderRoute>
+                    <PublicStoreProduct />
+                  </PublicStoreProviderRoute>
+                }
+              />
+              <Route
+                path="/loja/:slug/categoria/:slug"
+                element={
+                  <PublicStoreProviderRoute>
+                    <PublicStoreCategory />
+                  </PublicStoreProviderRoute>
+                }
+              />
+              <Route
+                path="/loja/:slug/favoritos"
+                element={
+                  <PublicStoreProviderRoute>
+                    <PublicStoreFavorites />
+                  </PublicStoreProviderRoute>
+                }
+              />
+              <Route
+                path="/loja/:slug/carrinho"
+                element={
+                  <PublicStoreProviderRoute>
+                    <PublicStoreCart />
+                  </PublicStoreProviderRoute>
+                }
+              />
+              <Route
+                path="/loja/:slug/busca"
+                element={
+                  <PublicStoreProviderRoute>
+                    <PublicStoreSearch />
+                  </PublicStoreProviderRoute>
+                }
+              />
               
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
