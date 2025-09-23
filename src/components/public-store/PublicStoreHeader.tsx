@@ -41,7 +41,7 @@ const PublicStoreHeader = ({ store }: PublicStoreHeaderProps) => {
           {/* Back Button & Logo */}
           <div className="flex items-center space-x-4">
             <Button variant="ghost" size="sm" asChild>
-              <Link to="/">
+              <Link to={`/loja/${store.store_slug}`}>
                 <ArrowLeft className="h-4 w-4 mr-1" />
                 <span className="hidden sm:inline">Voltar</span>
               </Link>

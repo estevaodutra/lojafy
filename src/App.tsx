@@ -226,7 +226,7 @@ const App = () => {
                 }
               />
               <Route
-                path="/loja/:slug/categoria/:slug"
+                path="/loja/:slug/categoria/:categorySlug"
                 element={
                   <PublicStoreProviderRoute>
                     <PublicStoreCategory />

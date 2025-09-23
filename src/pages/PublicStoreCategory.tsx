@@ -7,11 +7,11 @@ import PublicStoreProductCard from "@/components/PublicStoreProductCard";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const PublicStoreCategory = () => {
-  const { slug } = useParams<{ slug: string }>();
+  const { categorySlug } = useParams<{ categorySlug: string }>();
   const { store } = usePublicStoreContext();
   const { data: categories = [], isLoading } = usePublicStoreCategories(store.reseller_id);
   
-  const category = categories.find(cat => cat.slug === slug);
+  const category = categories.find(cat => cat.slug === categorySlug);
 
   if (isLoading) {
     return (

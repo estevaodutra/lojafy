@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,20 +45,41 @@ const ResellerStoreEditor = () => {
   } = useResellerStore();
 
   const [storeConfig, setStoreConfig] = useState({
-    storeName: store?.store_name || 'Minha Loja',
-    storeSlug: store?.store_slug || '',
-    logoUrl: store?.logo_url || null,
-    primaryColor: store?.primary_color || '#000000',
-    secondaryColor: store?.secondary_color || '#f3f4f6',
-    accentColor: store?.accent_color || '#3b82f6',
-    bannerTitle: store?.banner_title || 'Bem-vindos à nossa loja',
-    bannerSubtitle: store?.banner_subtitle || 'Os melhores produtos com preços especiais',
-    bannerImageUrl: store?.banner_image_url || null,
-    contactPhone: store?.contact_phone || '',
-    contactEmail: store?.contact_email || '',
-    contactAddress: store?.contact_address || '',
-    whatsapp: store?.whatsapp || ''
+    storeName: 'Minha Loja',
+    storeSlug: '',
+    logoUrl: null,
+    primaryColor: '#000000',
+    secondaryColor: '#f3f4f6',
+    accentColor: '#3b82f6',
+    bannerTitle: 'Bem-vindos à nossa loja',
+    bannerSubtitle: 'Os melhores produtos com preços especiais',
+    bannerImageUrl: null,
+    contactPhone: '',
+    contactEmail: '',
+    contactAddress: '',
+    whatsapp: ''
   });
+
+  // Sync storeConfig with loaded store data
+  useEffect(() => {
+    if (store) {
+      setStoreConfig({
+        storeName: store.store_name || 'Minha Loja',
+        storeSlug: store.store_slug || '',
+        logoUrl: store.logo_url || null,
+        primaryColor: store.primary_color || '#000000',
+        secondaryColor: store.secondary_color || '#f3f4f6',
+        accentColor: store.accent_color || '#3b82f6',
+        bannerTitle: store.banner_title || 'Bem-vindos à nossa loja',
+        bannerSubtitle: store.banner_subtitle || 'Os melhores produtos com preços especiais',
+        bannerImageUrl: store.banner_image_url || null,
+        contactPhone: store.contact_phone || '',
+        contactEmail: store.contact_email || '',
+        contactAddress: store.contact_address || '',
+        whatsapp: store.whatsapp || ''
+      });
+    }
+  }, [store]);
 
   const [activeTab, setActiveTab] = useState('visual');
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
