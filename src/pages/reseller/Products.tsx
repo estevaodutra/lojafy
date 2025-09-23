@@ -17,7 +17,8 @@ import {
   Filter,
   TrendingUp,
   Eye,
-  Trash2
+  Trash2,
+  ExternalLink
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -26,6 +27,7 @@ const ResellerProducts = () => {
   const navigate = useNavigate();
   const { 
     products, 
+    store,
     isLoading, 
     updateProductStatus, 
     updateProductPrice,
@@ -331,6 +333,24 @@ const ResellerProducts = () => {
                         >
                           {product.active ? "Desativar" : "Ativar"}
                         </Button>
+                        
+                        {product.active && product.product && store?.store_slug && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            asChild
+                            className="text-xs px-3"
+                          >
+                            <a 
+                              href={`/loja/${store.store_slug}/produto/${product.product_id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <ExternalLink className="h-3 w-3 mr-1" />
+                              Ver na Loja
+                            </a>
+                          </Button>
+                        )}
                         
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
