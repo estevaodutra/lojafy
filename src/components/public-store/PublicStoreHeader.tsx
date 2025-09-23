@@ -97,7 +97,7 @@ const PublicStoreHeader = ({ store }: PublicStoreHeaderProps) => {
 
             {/* Favorites */}
             <Button variant="ghost" size="sm" className="flex flex-col items-center p-1 sm:p-2 min-w-[44px]" asChild>
-              <Link to="/favoritos">
+              <Link to={`/loja/${store.store_slug}/favoritos`}>
                 <Heart className="h-4 w-4 sm:h-5 sm:w-5" />
                 <span className="text-xs hidden sm:block">Favoritos</span>
               </Link>
@@ -105,7 +105,7 @@ const PublicStoreHeader = ({ store }: PublicStoreHeaderProps) => {
 
             {/* Cart */}
             <Button variant="ghost" size="sm" className="flex flex-col items-center p-1 sm:p-2 min-w-[44px]" asChild>
-              <Link to="/carrinho">
+              <Link to={`/loja/${store.store_slug}/carrinho`}>
                 <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
                 <span className="text-xs hidden sm:block">Carrinho</span>
               </Link>
@@ -150,16 +150,16 @@ const PublicStoreHeader = ({ store }: PublicStoreHeaderProps) => {
                   {/* Quick Actions */}
                   <div className="border-t p-4">
                     <div className="flex gap-4 mb-4">
-                      <Link 
-                        to="/favoritos" 
+                       <Link 
+                         to={`/loja/${store.store_slug}/favoritos`}
                         className="flex-1 flex items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors"
                         onClick={() => setMobileMenuOpen(false)}
                       >
                         <Heart className="h-4 w-4 mr-2" />
                         <span className="text-sm">Favoritos</span>
                       </Link>
-                      <Link 
-                        to="/carrinho" 
+                       <Link 
+                         to={`/loja/${store.store_slug}/carrinho`}
                         className="flex-1 flex items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors"
                         onClick={() => setMobileMenuOpen(false)}
                       >

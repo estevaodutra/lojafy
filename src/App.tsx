@@ -63,6 +63,11 @@ import ResellerReports from "./pages/reseller/Reports";
 import ResellerCatalog from "./pages/reseller/Catalog";
 import ResellerStoreEditor from "./pages/reseller/StoreEditor";
 import PublicStore from "./pages/PublicStore";
+import PublicStoreProduct from "./pages/PublicStoreProduct";
+import PublicStoreCategory from "./pages/PublicStoreCategory";
+import PublicStoreFavorites from "./pages/PublicStoreFavorites";
+import PublicStoreCart from "./pages/PublicStoreCart";
+import PublicStoreSearch from "./pages/PublicStoreSearch";
 import SuperAdminDashboard from "./pages/admin/Dashboard";
 import Usuarios from "./pages/admin/Usuarios";
 import Plataforma from "./pages/admin/Plataforma";
@@ -209,8 +214,13 @@ const App = () => {
               </Route>
               
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              {/* Public Store Route */}
+              {/* Public Store Routes */}
               <Route path="/loja/:slug" element={<PublicStore />} />
+              <Route path="/loja/:slug/produto/:id" element={<PublicStoreProduct />} />
+              <Route path="/loja/:slug/categoria/:slug" element={<PublicStoreCategory />} />
+              <Route path="/loja/:slug/favoritos" element={<PublicStoreFavorites />} />
+              <Route path="/loja/:slug/carrinho" element={<PublicStoreCart />} />
+              <Route path="/loja/:slug/busca" element={<PublicStoreSearch />} />
               
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

@@ -1,12 +1,13 @@
-import ProductCard from "@/components/ProductCard";
+import PublicStoreProductCard from "@/components/PublicStoreProductCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePublicStoreFeaturedProducts, PublicStoreProductData } from "@/hooks/usePublicStoreProducts";
 
 interface PublicStoreProductGridProps {
   resellerId: string;
+  storeSlug: string;
 }
 
-const PublicStoreProductGrid = ({ resellerId }: PublicStoreProductGridProps) => {
+const PublicStoreProductGrid = ({ resellerId, storeSlug }: PublicStoreProductGridProps) => {
   const { data: featuredProducts = [], isLoading } = usePublicStoreFeaturedProducts(resellerId);
 
   if (isLoading) {
@@ -49,13 +50,14 @@ const PublicStoreProductGrid = ({ resellerId }: PublicStoreProductGridProps) => 
             const displayPrice = resellerProduct.custom_price || product.price;
             
             return (
-              <ProductCard
-                key={resellerProduct.id}
-                product={{
-                  ...product,
-                  price: displayPrice
-                }}
-              />
+            <PublicStoreProductCard
+              key={resellerProduct.id}
+              product={{
+                ...product,
+                price: displayPrice
+              }}
+              storeSlug={storeSlug}
+            />
             );
           })}
         </div>

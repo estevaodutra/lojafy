@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Skeleton } from "@/components/ui/skeleton";
-import ProductCard from "@/components/ProductCard";
+import PublicStoreProductCard from "@/components/PublicStoreProductCard";
 import { ArrowRight } from "lucide-react";
 import { usePublicStoreCategories, PublicStoreProductData } from "@/hooks/usePublicStoreProducts";
 
@@ -81,11 +81,12 @@ const PublicStoreCategoryCarousels = ({ resellerId, storeSlug }: PublicStoreCate
                     return (
                       <CarouselItem key={resellerProduct.id} className="md:basis-1/2 lg:basis-1/4">
                         <div className="p-1">
-                          <ProductCard
+                          <PublicStoreProductCard
                             product={{
                               ...product,
                               price: displayPrice
                             }}
+                            storeSlug={storeSlug}
                           />
                         </div>
                       </CarouselItem>
