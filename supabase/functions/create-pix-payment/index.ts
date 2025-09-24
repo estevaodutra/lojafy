@@ -41,25 +41,41 @@ serve(async (req) => {
     
     // Get authorization header
     const authHeader = req.headers.get('authorization');
+    console.log('Authorization header presente:', !!authHeader);
+    
     if (!authHeader) {
-      console.error('No authorization header');
+      console.error('No authorization header provided');
       return new Response(
         JSON.stringify({ error: 'Authorization required' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Verify user authentication
+    // Extract and validate token format
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    console.log('Token format válido:', token.length > 0 && token !== authHeader);
+    
+    // Since JWT verification is disabled, we'll use the anon client to verify
+    const anonSupabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    );
+    
+    const { data: { user }, error: authError } = await anonSupabase.auth.getUser(token);
     
     if (authError || !user) {
       console.error('Authentication error:', authError);
+      console.log('Token recebido (primeiros 20 chars):', token.substring(0, 20) + '...');
       return new Response(
-        JSON.stringify({ error: 'Invalid authentication' }),
+        JSON.stringify({ 
+          error: 'Invalid authentication', 
+          details: authError?.message || 'User not found' 
+        }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    console.log('Usuário autenticado com sucesso:', user.id);
 
     const { amount, description, payer, orderItems, shippingAddress }: PixPaymentRequest = await req.json();
     

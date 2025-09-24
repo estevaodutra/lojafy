@@ -1,5 +1,8 @@
 project_id = "bbrmjrjorcgsgeztzbsr"
 
+[functions.create-pix-payment]
+verify_jwt = false
+
 [functions.webhook-mercadopago]
 verify_jwt = false
 
