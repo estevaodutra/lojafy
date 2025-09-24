@@ -39,45 +39,37 @@ serve(async (req) => {
   try {
     console.log('Iniciando criação de pagamento PIX');
     
-    // Get authorization header
-    const authHeader = req.headers.get('authorization');
-    console.log('Authorization header presente:', !!authHeader);
-    
-    if (!authHeader) {
-      console.error('No authorization header provided');
-      return new Response(
-        JSON.stringify({ error: 'Authorization required' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Extract and validate token format
-    const token = authHeader.replace('Bearer ', '');
-    console.log('Token format válido:', token.length > 0 && token !== authHeader);
-    
-    // Since JWT verification is disabled, we'll use the anon client to verify
-    const anonSupabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    );
-    
-    const { data: { user }, error: authError } = await anonSupabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      console.error('Authentication error:', authError);
-      console.log('Token recebido (primeiros 20 chars):', token.substring(0, 20) + '...');
-      return new Response(
-        JSON.stringify({ 
-          error: 'Invalid authentication', 
-          details: authError?.message || 'User not found' 
-        }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    console.log('Usuário autenticado com sucesso:', user.id);
-
     const { amount, description, payer, orderItems, shippingAddress }: PixPaymentRequest = await req.json();
+    
+    // Since verify_jwt = false, we don't require authentication but try to get user if available
+    let user = null;
+    let userId = null;
+    
+    const authHeader = req.headers.get('authorization');
+    if (authHeader) {
+      try {
+        const token = authHeader.replace('Bearer ', '');
+        const anonSupabase = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+        );
+        
+        const { data: { user: authUser }, error: authError } = await anonSupabase.auth.getUser(token);
+        if (!authError && authUser) {
+          user = authUser;
+          userId = authUser.id;
+          console.log('Usuário autenticado:', userId);
+        }
+      } catch (authError) {
+        console.log('Authentication optional, continuing without user:', authError);
+      }
+    }
+    
+    // Generate fallback user ID if no authentication
+    if (!userId) {
+      userId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.log('Usando ID de usuário temporário:', userId);
+    }
     
     console.log('Dados recebidos:', { amount, description, payer: { ...payer, cpf: '***' } });
 
@@ -91,17 +83,22 @@ serve(async (req) => {
     }
 
     // Generate unique external reference
-    const externalReference = `order_${Date.now()}_${user.id.substring(0, 8)}`;
+    const externalReference = `order_${Date.now()}_${userId.substring(0, 8)}`;
     
-    // Fetch complete user profile data
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
+    // Fetch complete user profile data (only if authenticated)
+    let profileData = null;
+    if (user) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
 
-    if (profileError) {
-      console.error('Error fetching user profile:', profileError);
+      if (profileError) {
+        console.log('User profile not found, continuing without profile data:', profileError.message);
+      } else {
+        profileData = profile;
+      }
     }
 
     // Fetch complete product information
@@ -169,7 +166,7 @@ serve(async (req) => {
         quantidade_itens: orderItems?.length || 0
       },
       cliente: {
-        user_id: user.id,
+        user_id: userId,
         nome_completo: `${payer.firstName || ''} ${payer.lastName || ''}`.trim(),
         email: payer.email,
         telefone: profileData?.phone || '',
@@ -197,26 +194,76 @@ serve(async (req) => {
       cliente: { ...n8nPayload.cliente, cpf: '***' } 
     });
 
-    // Send to N8N webhook
-    const n8nResponse = await fetch('https://n8n-n8n.nuwfic.easypanel.host/webhook/gerar_pix', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(n8nPayload),
-    });
+    // Send to N8N webhook with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-    const n8nResult = await n8nResponse.json();
-    console.log('Resposta N8N:', { status: n8nResponse.status, data: n8nResult });
+    let n8nResult: any;
 
-    if (!n8nResponse.ok) {
-      console.error('N8N webhook error:', n8nResult);
+    try {
+      const n8nResponse = await fetch('https://n8n-n8n.nuwfic.easypanel.host/webhook-test/gerar_pix', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(n8nPayload),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      console.log('N8N Response Status:', n8nResponse.status);
+      console.log('N8N Response Headers:', Object.fromEntries(n8nResponse.headers.entries()));
+
+      const responseText = await n8nResponse.text();
+      console.log('N8N Raw Response:', responseText);
+
+      try {
+        n8nResult = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse N8N response as JSON:', parseError);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Invalid response from PIX service', 
+            details: 'Response is not valid JSON',
+            rawResponse: responseText.substring(0, 200)
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log('N8N Parsed Response:', n8nResult);
+
+      if (!n8nResponse.ok) {
+        console.error('N8N webhook error. Status:', n8nResponse.status);
+        console.error('N8N error response:', n8nResult);
+        return new Response(
+          JSON.stringify({ 
+            error: 'PIX generation failed', 
+            details: n8nResult?.message || n8nResult?.error || `N8N returned status ${n8nResponse.status}`,
+            status: n8nResponse.status
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      console.error('Error calling N8N webhook:', fetchError);
+      
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        return new Response(
+          JSON.stringify({ error: 'PIX service timeout', details: 'Request to N8N webhook timed out after 30 seconds' }),
+          { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       return new Response(
         JSON.stringify({ 
-          error: 'PIX generation failed', 
-          details: n8nResult.message || 'N8N webhook error' 
+          error: 'PIX service unavailable', 
+          details: fetchError instanceof Error ? fetchError.message : String(fetchError)
         }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -248,21 +295,27 @@ serve(async (req) => {
     console.log('Generated order number:', orderNumber);
 
     // Create order in database with N8N response data
+    const orderInsertData: any = {
+      order_number: orderNumber,
+      total_amount: amount,
+      payment_method: 'pix',
+      payment_status: 'pending',
+      status: 'pending',
+      payment_id: pixData.paymentId || externalReference,
+      pix_qr_code: pixData.qrCodeCopyPaste,
+      pix_qr_code_base64: pixData.qrCodeBase64,
+      shipping_address: shippingAddress,
+      external_reference: externalReference
+    };
+
+    // Only add user_id if we have an authenticated user
+    if (user) {
+      orderInsertData.user_id = user.id;
+    }
+
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
-      .insert({
-        user_id: user.id,
-        order_number: orderNumber,
-        total_amount: amount,
-        payment_method: 'pix',
-        payment_status: 'pending',
-        status: 'pending',
-        payment_id: pixData.paymentId || externalReference,
-        pix_qr_code: pixData.qrCodeCopyPaste,
-        pix_qr_code_base64: pixData.qrCodeBase64,
-        shipping_address: shippingAddress,
-        external_reference: externalReference
-      })
+      .insert(orderInsertData)
       .select()
       .single();
 
