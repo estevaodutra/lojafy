@@ -546,11 +546,51 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
 
     } catch (error) {
       console.error('Error creating modern PIX:', error);
+      
+      // Melhor tratamento de erro para diferentes cenários
+      let errorTitle = "Erro ao gerar PIX";
+      let errorDescription = "Tente novamente em alguns instantes.";
+      let showRetryButton = true;
+      
+      if (error instanceof Error) {
+        // Log detalhes do erro para debugging
+        console.error('Detalhes do erro PIX:', {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        });
+        
+        // Tratar erros específicos do webhook
+        if (error.message.includes('Webhook N8N não está ativo') || error.message.includes('WEBHOOK_NOT_REGISTERED')) {
+          errorTitle = "Webhook N8N não está ativo";
+          errorDescription = "O sistema de pagamento PIX não está configurado. Entre em contato com o administrador.";
+          showRetryButton = false;
+        } else if (error.message.includes('timeout') || error.message.includes('PIX_SERVICE_TIMEOUT')) {
+          errorTitle = "Timeout do serviço";
+          errorDescription = "O serviço de PIX demorou para responder. Tente novamente.";
+        } else if (error.message.includes('PIX service unavailable') || error.message.includes('503')) {
+          errorTitle = "Serviço indisponível";
+          errorDescription = "O serviço de PIX está temporariamente indisponível. Tente novamente em alguns minutos.";
+        } else {
+          errorDescription = error.message;
+        }
+      }
+      
       toast({
-        title: "Erro ao gerar PIX",
-        description: error instanceof Error ? error.message : "Tente novamente em alguns instantes.",
+        title: errorTitle,
+        description: errorDescription,
         variant: "destructive",
       });
+      
+      // Mostrar botão de retry se apropriado
+      if (showRetryButton) {
+        setTimeout(() => {
+          toast({
+            title: "💡 Dica",
+            description: "Você pode tentar gerar o PIX novamente clicando no botão de pagamento.",
+          });
+        }, 3000);
+      }
     } finally {
       setIsProcessingPayment(false);
     }

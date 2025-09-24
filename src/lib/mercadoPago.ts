@@ -51,7 +51,27 @@ export async function createModernPixPayment(paymentData: PixPaymentRequest): Pr
 
     if (response.error) {
       console.error('Error creating PIX payment:', response.error);
-      throw new Error(response.error.message || 'Failed to create PIX payment');
+      
+      // Melhor tratamento de erros do Edge Function
+      if (response.error.message) {
+        // Tentar fazer parse do corpo do erro para obter informações detalhadas
+        try {
+          const errorBody = JSON.parse(response.error.message);
+          
+          if (errorBody.code === 'WEBHOOK_NOT_REGISTERED') {
+            throw new Error(`Webhook N8N não está ativo: ${errorBody.message}`);
+          } else if (errorBody.error) {
+            throw new Error(errorBody.error);
+          }
+        } catch (parseError) {
+          // Se não conseguir fazer parse, usar a mensagem original
+          console.log('Erro não é JSON válido, usando mensagem original');
+        }
+        
+        throw new Error(response.error.message);
+      }
+      
+      throw new Error('Failed to create PIX payment');
     }
 
     console.log('PIX payment created successfully:', response.data);
@@ -69,6 +89,12 @@ export async function createModernPixPayment(paymentData: PixPaymentRequest): Pr
 
   } catch (error) {
     console.error('Error creating PIX payment:', error);
+    
+    // Log detalhes completos do erro para debugging
+    if (error.details) {
+      console.error('Error details:', error.details);
+    }
+    
     throw error;
   }
 }

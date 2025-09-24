@@ -49,19 +49,17 @@ serve(async (req) => {
     if (authHeader) {
       try {
         const token = authHeader.replace('Bearer ', '');
-        const anonSupabase = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-        );
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
         
-        const { data: { user: authUser }, error: authError } = await anonSupabase.auth.getUser(token);
         if (!authError && authUser) {
           user = authUser;
           userId = authUser.id;
           console.log('Usuário autenticado:', userId);
+        } else {
+          console.log('Token inválido ou usuário não encontrado, continuando sem autenticação');
         }
       } catch (authError) {
-        console.log('Authentication optional, continuing without user:', authError);
+        console.log('Erro na autenticação, continuando sem autenticação:', authError);
       }
     }
     
@@ -194,77 +192,120 @@ serve(async (req) => {
       cliente: { ...n8nPayload.cliente, cpf: '***' } 
     });
 
-    // Send to N8N webhook with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
+    // URLs do webhook N8N (configuráveis via secrets)
+    const primaryWebhookUrl = Deno.env.get('N8N_WEBHOOK_URL') || 'https://n8n-n8n.nuwfic.easypanel.host/webhook/gerar_pix';
+    const testWebhookUrl = Deno.env.get('N8N_WEBHOOK_TEST_URL') || 'https://n8n-n8n.nuwfic.easypanel.host/webhook-test/gerar_pix';
+    
+    console.log('Primary webhook URL:', primaryWebhookUrl);
+    console.log('Test webhook URL:', testWebhookUrl);
+    
     let n8nResult: any;
-
+    let lastError = null;
+    
+    // Tentativa 1: Webhook de produção
     try {
-      const n8nResponse = await fetch('https://n8n-n8n.nuwfic.easypanel.host/webhook-test/gerar_pix', {
+      console.log('Tentando webhook de produção...');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      
+      const n8nResponse = await fetch(primaryWebhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(n8nPayload),
-        signal: controller.signal,
+        signal: controller.signal
       });
 
       clearTimeout(timeoutId);
 
-      console.log('N8N Response Status:', n8nResponse.status);
-      console.log('N8N Response Headers:', Object.fromEntries(n8nResponse.headers.entries()));
+      console.log('N8N Response Status (Primary):', n8nResponse.status);
+      console.log('N8N Response Headers (Primary):', Object.fromEntries(n8nResponse.headers.entries()));
 
       const responseText = await n8nResponse.text();
-      console.log('N8N Raw Response:', responseText);
-
+      console.log('N8N Raw Response (Primary):', responseText);
+      
       try {
         n8nResult = JSON.parse(responseText);
+        console.log('N8N Parsed Response (Primary):', n8nResult);
       } catch (parseError) {
-        console.error('Failed to parse N8N response as JSON:', parseError);
-        return new Response(
-          JSON.stringify({ 
-            error: 'Invalid response from PIX service', 
-            details: 'Response is not valid JSON',
-            rawResponse: responseText.substring(0, 200)
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        console.error('Erro ao fazer parse da resposta do N8N (Primary):', parseError);
+        throw new Error('N8N retornou resposta inválida');
       }
 
-      console.log('N8N Parsed Response:', n8nResult);
-
-      if (!n8nResponse.ok) {
-        console.error('N8N webhook error. Status:', n8nResponse.status);
-        console.error('N8N error response:', n8nResult);
-        return new Response(
-          JSON.stringify({ 
-            error: 'PIX generation failed', 
-            details: n8nResult?.message || n8nResult?.error || `N8N returned status ${n8nResponse.status}`,
-            status: n8nResponse.status
-          }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      console.error('Error calling N8N webhook:', fetchError);
-      
-      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-        return new Response(
-          JSON.stringify({ error: 'PIX service timeout', details: 'Request to N8N webhook timed out after 30 seconds' }),
-          { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      // Se foi sucesso, seguir em frente
+      if (n8nResponse.ok) {
+        console.log('Webhook de produção respondeu com sucesso');
+      } else if (n8nResponse.status === 404 && (n8nResult.message?.includes('not registered') || n8nResult.code === 404)) {
+        // Webhook não registrado, tentar o de teste
+        console.log('Webhook de produção não registrado, tentando webhook de teste...');
+        throw new Error('WEBHOOK_NOT_REGISTERED');
+      } else {
+        // Outro erro, não tentar fallback
+        console.error('N8N webhook error (Primary). Status:', n8nResponse.status);
+        console.error('N8N error response (Primary):', n8nResult);
+        throw new Error(`N8N webhook failed with status ${n8nResponse.status}`);
       }
       
-      return new Response(
-        JSON.stringify({ 
-          error: 'PIX service unavailable', 
-          details: fetchError instanceof Error ? fetchError.message : String(fetchError)
-        }),
-        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    } catch (error) {
+      lastError = error;
+      console.log('Erro no webhook primário:', error instanceof Error ? error.message : String(error));
+      
+      // Se foi erro de webhook não registrado, tentar o de teste
+      if (error instanceof Error && error.message === 'WEBHOOK_NOT_REGISTERED') {
+        try {
+          console.log('Tentando webhook de teste...');
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000);
+          
+          const n8nResponse = await fetch(testWebhookUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(n8nPayload),
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+
+          console.log('N8N Response Status (Test):', n8nResponse.status);
+          console.log('N8N Response Headers (Test):', Object.fromEntries(n8nResponse.headers.entries()));
+
+          const responseText = await n8nResponse.text();
+          console.log('N8N Raw Response (Test):', responseText);
+          
+          try {
+            n8nResult = JSON.parse(responseText);
+            console.log('N8N Parsed Response (Test):', n8nResult);
+          } catch (parseError) {
+            console.error('Erro ao fazer parse da resposta do N8N (Test):', parseError);
+            throw new Error('N8N retornou resposta inválida');
+          }
+
+          if (!n8nResponse.ok) {
+            if (n8nResponse.status === 404 && (n8nResult.message?.includes('not registered') || n8nResult.code === 404)) {
+              // Ambos webhooks não estão registrados
+              throw new Error('WEBHOOK_NOT_REGISTERED');
+            } else {
+              console.error('N8N webhook error (Test). Status:', n8nResponse.status);
+              console.error('N8N error response (Test):', n8nResult);
+              throw new Error(`N8N webhook failed with status ${n8nResponse.status}`);
+            }
+          } else {
+            console.log('Webhook de teste respondeu com sucesso');
+          }
+          
+        } catch (testError) {
+          console.error('Erro também no webhook de teste:', testError instanceof Error ? testError.message : String(testError));
+          throw testError;
+        }
+      } else if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('PIX_SERVICE_TIMEOUT');
+      } else {
+        // Outro tipo de erro, não tentar fallback
+        throw error;
+      }
     }
 
     // N8N returns an array, extract the first PIX data
@@ -371,9 +412,47 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in create-pix-payment:', error);
+    
+    // Mapear erros específicos para códigos mais informativos
+    if (error instanceof Error && error.message === 'WEBHOOK_NOT_REGISTERED') {
+      return new Response(
+        JSON.stringify({ 
+          code: 'WEBHOOK_NOT_REGISTERED',
+          error: 'Webhook do N8N não está ativo',
+          message: 'O webhook do N8N não está registrado ou ativo. Ative o workflow no N8N ou clique em "Execute workflow" para testar.',
+          hint: 'Verifique se o workflow está ativo no N8N ou execute manualmente para teste.'
+        }),
+        { 
+          status: 502, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+    
+    if (error instanceof Error && error.message === 'PIX_SERVICE_TIMEOUT') {
+      return new Response(
+        JSON.stringify({ 
+          code: 'PIX_SERVICE_TIMEOUT',
+          error: 'Timeout do serviço PIX',
+          message: 'A requisição para o N8N excedeu o tempo limite de 30 segundos.',
+          hint: 'Tente novamente em alguns instantes.'
+        }),
+        { 
+          status: 504, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+    
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error instanceof Error ? error.message : String(error) }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: 'Falha na criação do pagamento PIX', 
+        details: error instanceof Error ? error.message : String(error)
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });
