@@ -7,7 +7,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import OrderDetailsModal from '@/components/OrderDetailsModal';
 import { Link } from 'react-router-dom';
-
 interface OrderItem {
   id: string;
   quantity: number;
@@ -15,7 +14,6 @@ interface OrderItem {
   total_price: number;
   product_snapshot: any;
 }
-
 interface Order {
   id: string;
   order_number: string;
@@ -26,22 +24,22 @@ interface Order {
   tracking_number?: string;
   order_items: OrderItem[];
 }
-
 const Orders = () => {
-  const { user } = useAuth();
+  const {
+    user
+  } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
   useEffect(() => {
     const fetchOrders = async () => {
       if (!user) return;
-
       try {
-        const { data, error } = await supabase
-          .from('orders')
-          .select(`
+        const {
+          data,
+          error
+        } = await supabase.from('orders').select(`
             id,
             order_number,
             status,
@@ -56,10 +54,9 @@ const Orders = () => {
               total_price,
               product_snapshot
             )
-          `)
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-
+          `).eq('user_id', user.id).order('created_at', {
+          ascending: false
+        });
         if (error) throw error;
         setOrders(data || []);
       } catch (error) {
@@ -68,50 +65,61 @@ const Orders = () => {
         setLoading(false);
       }
     };
-
     fetchOrders();
   }, [user]);
-
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pending': return <Clock className="h-4 w-4" />;
-      case 'processing': return <Package className="h-4 w-4" />;
-      case 'shipped': return <Truck className="h-4 w-4" />;
-      case 'delivered': return <CheckCircle className="h-4 w-4" />;
-      case 'cancelled': return <XCircle className="h-4 w-4" />;
-      default: return <Package className="h-4 w-4" />;
+      case 'pending':
+        return <Clock className="h-4 w-4" />;
+      case 'processing':
+        return <Package className="h-4 w-4" />;
+      case 'shipped':
+        return <Truck className="h-4 w-4" />;
+      case 'delivered':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'cancelled':
+        return <XCircle className="h-4 w-4" />;
+      default:
+        return <Package className="h-4 w-4" />;
     }
   };
-
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'pending': return 'Aguardando pagamento';
-      case 'processing': return 'Processando';
-      case 'shipped': return 'Enviado';
-      case 'delivered': return 'Entregue';
-      case 'cancelled': return 'Cancelado';
-      default: return 'Desconhecido';
+      case 'pending':
+        return 'Aguardando pagamento';
+      case 'processing':
+        return 'Processando';
+      case 'shipped':
+        return 'Enviado';
+      case 'delivered':
+        return 'Entregue';
+      case 'cancelled':
+        return 'Cancelado';
+      default:
+        return 'Desconhecido';
     }
   };
-
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case 'delivered': return 'default';
-      case 'shipped': return 'secondary';
-      case 'processing': return 'outline';
-      case 'pending': return 'outline';
-      case 'cancelled': return 'destructive';
-      default: return 'outline';
+      case 'delivered':
+        return 'default';
+      case 'shipped':
+        return 'secondary';
+      case 'processing':
+        return 'outline';
+      case 'pending':
+        return 'outline';
+      case 'cancelled':
+        return 'destructive';
+      default:
+        return 'outline';
     }
   };
-
   const handleViewDetails = (orderId: string) => {
     setSelectedOrderId(orderId);
     setIsModalOpen(true);
   };
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Meus Pedidos</h1>
         <p className="text-muted-foreground mt-2">
@@ -119,15 +127,11 @@ const Orders = () => {
         </p>
       </div>
 
-      {loading ? (
-        <div className="text-center py-12">
+      {loading ? <div className="text-center py-12">
           <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
           <p className="text-muted-foreground mt-2">Carregando pedidos...</p>
-        </div>
-      ) : orders.length > 0 ? (
-        <div className="space-y-4">
-          {orders.map((order) => (
-            <Card key={order.id}>
+        </div> : orders.length > 0 ? <div className="space-y-4">
+          {orders.map(order => <Card key={order.id}>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
@@ -146,9 +150,8 @@ const Orders = () => {
                 {/* Products */}
                 <div className="space-y-2">
                   {order.order_items.map((item, index) => {
-                    const productName = item.product_snapshot?.name || 'Produto';
-                    return (
-                      <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+              const productName = item.product_snapshot?.name || 'Produto';
+              return <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                         <div>
                           <p className="font-medium">{productName}</p>
                           <p className="text-sm text-muted-foreground">
@@ -158,9 +161,8 @@ const Orders = () => {
                         <span className="font-semibold">
                           R$ {Number(item.total_price).toFixed(2)}
                         </span>
-                      </div>
-                    );
-                  })}
+                      </div>;
+            })}
                 </div>
 
                 {/* Order Summary */}
@@ -174,26 +176,18 @@ const Orders = () => {
                 </div>
 
                 {/* Payment Status */}
-                {order.payment_status && (
-                  <div className={`p-3 rounded-lg ${
-                    order.payment_status === 'paid' 
-                      ? 'bg-success/10 text-success-foreground' 
-                      : 'bg-warning/10 text-warning-foreground'
-                  }`}>
-                    <p className="text-sm font-medium">
+                {order.payment_status && <div className={`p-3 rounded-lg ${order.payment_status === 'paid' ? 'bg-success/10 text-success-foreground' : 'bg-warning/10 text-warning-foreground'}`}>
+                    <p className="text-sm font-medium text-zinc-950">
                       {order.payment_status === 'paid' ? '✅ Pagamento confirmado' : '⏱️ Aguardando pagamento'}
                     </p>
-                  </div>
-                )}
+                  </div>}
 
                 {/* Tracking Info */}
-                {order.tracking_number && (
-                  <div className="bg-secondary/50 p-3 rounded-lg">
+                {order.tracking_number && <div className="bg-secondary/50 p-3 rounded-lg">
                     <p className="text-sm font-medium text-secondary-foreground">
                       📦 Código de rastreamento: {order.tracking_number}
                     </p>
-                  </div>
-                )}
+                  </div>}
 
                 {/* Actions */}
                 <div className="flex items-center space-x-2 pt-2">
@@ -201,24 +195,17 @@ const Orders = () => {
                     <Eye className="h-4 w-4 mr-2" />
                     Ver detalhes
                   </Button>
-                  {order.tracking_number && (
-                    <Button variant="outline" size="sm">
+                  {order.tracking_number && <Button variant="outline" size="sm">
                       <Truck className="h-4 w-4 mr-2" />
                       Rastrear pedido
-                    </Button>
-                  )}
-                  {order.status === 'delivered' && (
-                    <Button variant="outline" size="sm">
+                    </Button>}
+                  {order.status === 'delivered' && <Button variant="outline" size="sm">
                       Avaliar produtos
-                    </Button>
-                  )}
+                    </Button>}
                 </div>
               </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <Card>
+            </Card>)}
+        </div> : <Card>
           <CardContent className="text-center py-12">
             <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-xl font-semibold mb-2">Nenhum pedido encontrado</h3>
@@ -229,19 +216,12 @@ const Orders = () => {
               <Link to="/">Começar a Comprar</Link>
             </Button>
           </CardContent>
-        </Card>
-      )}
+        </Card>}
 
-      <OrderDetailsModal
-        orderId={selectedOrderId}
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setSelectedOrderId(null);
-        }}
-      />
-    </div>
-  );
+      <OrderDetailsModal orderId={selectedOrderId} isOpen={isModalOpen} onClose={() => {
+      setIsModalOpen(false);
+      setSelectedOrderId(null);
+    }} />
+    </div>;
 };
-
 export default Orders;
