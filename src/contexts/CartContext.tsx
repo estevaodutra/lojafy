@@ -107,7 +107,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     }
   };
 
-  // Load cart from localStorage on mount and auto-sync prices
+  // Load cart from localStorage on mount and auto-sync prices (debounced)
   useEffect(() => {
     const loadCartAndSync = async () => {
       const savedCart = localStorage.getItem('cart');
@@ -131,10 +131,15 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
           
           setItems(sanitizedCart);
           
-          // Auto-sync prices if we have items
+          // Auto-sync prices if we have items (debounced to avoid excessive calls)
           if (sanitizedCart.length > 0) {
             console.log('🔄 Auto-syncing prices on cart load...');
-            await syncPricesInternal(sanitizedCart);
+            // Use a timeout to debounce multiple rapid loads
+            const timeoutId = setTimeout(() => {
+              syncPricesInternal(sanitizedCart);
+            }, 1000);
+            
+            return () => clearTimeout(timeoutId);
           }
         } catch (error) {
           console.error('❌ Error loading cart from localStorage:', error);

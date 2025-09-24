@@ -33,28 +33,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
+        console.log('🚀 Auth state change:', event, session?.user?.id);
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Send auth events to N8N for specific events
+        // Send auth events to N8N for specific events (no setTimeout needed)
         if (session?.user?.email) {
           switch (event) {
             case 'SIGNED_IN':
-              // This is handled in the signIn function for password login
-              // But we also catch token refresh logins here
-              setTimeout(() => sendAuthEvent('token_refresh_login', session.user.email!, session.user.id), 100);
+              sendAuthEvent('token_refresh_login', session.user.email!, session.user.id);
               break;
             case 'TOKEN_REFRESHED':
-              setTimeout(() => sendAuthEvent('token_refreshed', session.user.email!, session.user.id), 100);
+              sendAuthEvent('token_refreshed', session.user.email!, session.user.id);
               break;
             case 'SIGNED_OUT':
-              setTimeout(() => sendAuthEvent('logout', session.user.email!, session.user.id), 100);
+              sendAuthEvent('logout', session.user.email!, session.user.id);
               break;
           }
         }
         
-        // Fetch profile when user logs in
+        // Fetch profile when user logs in (defer to avoid deadlock)
         if (session?.user) {
           setTimeout(async () => {
             const { data: profileData } = await supabase
@@ -64,13 +63,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               .single();
             
             setProfile(profileData);
-            
-            // Redirect based on role after profile is loaded
-            if (profileData?.role && event === 'SIGNED_IN') {
-              setTimeout(() => {
-                redirectToPanel(profileData.role);
-              }, 100);
-            }
           }, 0);
         } else {
           setProfile(null);
@@ -106,32 +98,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const redirectToPanel = (role: string) => {
-    // Only redirect if we're currently on auth or home page
-    const currentPath = window.location.pathname;
-    if (currentPath === '/auth' || currentPath === '/') {
-      // Use setTimeout to avoid potential navigation issues
-      setTimeout(() => {
-        switch (role) {
-          case 'super_admin':
-            window.location.replace('/super-admin');
-            break;
-          case 'admin':
-            window.location.replace('/admin');
-            break;
-          case 'supplier':
-            window.location.replace('/supplier');
-            break;
-          case 'reseller':
-            window.location.replace('/reseller');
-            break;
-          default:
-            window.location.replace('/');
-            break;
-        }
-      }, 100);
-    }
-  };
 
   const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
     try {
