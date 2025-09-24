@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
     const normalizedMarca = marca === "" ? null : marca;
     const normalizedBadge = badge === "" ? null : badge;
     const normalizedImagemPrincipal = imagem_principal === "" || imagem_principal === "null" ? null : imagem_principal;
-    const normalizedImagens = (imagens && imagens.length > 0) ? imagens.filter(img => img && img !== "" && img !== "null") : [];
+    const normalizedImagens = (imagens && imagens.length > 0) ? imagens.filter((img: string) => img && img !== "" && img !== "null") : [];
     const normalizedEspecificacoes = especificacoes && Object.keys(especificacoes).length > 0 ? especificacoes : {};
 
     // Normalize UUID fields with validation
@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Formato de UUID inválido',
-          details: error.message,
+          details: error instanceof Error ? error.message : String(error),
           received: { categoria_id, subcategoria_id }
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

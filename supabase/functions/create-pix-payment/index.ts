@@ -105,7 +105,7 @@ serve(async (req) => {
     }
 
     // Fetch complete product information
-    let completeProducts = [];
+    let completeProducts: any[] = [];
     if (orderItems && orderItems.length > 0) {
       const productIds = orderItems.map(item => item.productId);
       
@@ -319,7 +319,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in create-pix-payment:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
+      JSON.stringify({ error: 'Internal server error', details: error instanceof Error ? error.message : String(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

@@ -251,7 +251,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ 
           error: 'Erro ao processar dados das categorias',
           code: 'PROCESSING_ERROR',
-          details: processingError.message 
+          details: processingError instanceof Error ? processingError.message : String(processingError) 
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -263,7 +263,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ 
         error: 'Internal server error',
         code: 'FATAL_ERROR',
-        details: error.message
+        details: error instanceof Error ? error.message : String(error)
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

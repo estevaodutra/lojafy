@@ -50,7 +50,8 @@ serve(async (req) => {
     console.log('Processing payment ID:', paymentId);
 
     // Find order by payment_id
-    const { data: orderData, error: orderError } = await supabase
+    let orderData: any = null;
+    const { data: orderResult, error: orderError } = await supabase
       .from('orders')
       .select('*')
       .eq('payment_id', paymentId)
@@ -63,6 +64,8 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    orderData = orderResult;
 
     if (!orderData) {
       // Try fallback search by external_reference if provided
@@ -182,7 +185,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error processing N8N webhook:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
+      JSON.stringify({ error: 'Internal server error', details: error instanceof Error ? error.message : String(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

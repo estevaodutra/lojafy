@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
           data_criacao: order.created_at,
           status: order.status,
           valor_total: order.total_amount,
-          nome_cliente: `${order.demo_users.first_name} ${order.demo_users.last_name}`,
+          nome_cliente: `${(order.demo_users as any)?.first_name || ''} ${(order.demo_users as any)?.last_name || ''}`.trim(),
           nome_produto: item.products.name,
           imagem_produto: item.products.image_url || item.products.main_image_url,
           preco_unitario: item.unit_price,
