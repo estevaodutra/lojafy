@@ -157,16 +157,8 @@ const Footer = () => {
             <h5 className="font-medium text-foreground mb-4">Formas de Pagamento</h5>
             <div className="flex flex-wrap justify-center gap-4">
               <div className="flex items-center gap-2 bg-card p-3 rounded-lg border">
-                <CreditCard className="h-5 w-5 text-blue-600" />
-                <span className="text-sm text-muted-foreground">Cartão de Crédito</span>
-              </div>
-              <div className="flex items-center gap-2 bg-card p-3 rounded-lg border">
                 <CreditCard className="h-5 w-5 text-green-600" />
                 <span className="text-sm text-muted-foreground">PIX</span>
-              </div>
-              <div className="flex items-center gap-2 bg-card p-3 rounded-lg border">
-                <CreditCard className="h-5 w-5 text-orange-600" />
-                <span className="text-sm text-muted-foreground">Boleto</span>
               </div>
             </div>
           </div>
