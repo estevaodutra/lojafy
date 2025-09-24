@@ -175,8 +175,7 @@ const Footer = () => {
           <div className="text-center text-sm text-muted-foreground">
             <p>© 2024 {config?.store_name || "EcoShop"}. Todos os direitos reservados.</p>
             <p className="mt-1">
-              {config?.company_cnpj && `CNPJ: ${config.company_cnpj} | `}
-              <span className="ml-1">{config?.footer_developed_text || "Desenvolvido com ❤️ para você"}</span>
+              <span>{config?.footer_developed_text || "Desenvolvido com ❤️ para você"}</span>
             </p>
           </div>
         </div>
