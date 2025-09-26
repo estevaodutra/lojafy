@@ -1,5 +1,5 @@
 import React from 'react';
-import { EnhancedImageUpload } from './EnhancedImageUpload';
+import { SimpleImageUpload } from './SimpleImageUpload';
 import { IMAGE_DIMENSIONS } from '@/constants/imageDimensions';
 
 interface BannerUploadProps {
@@ -14,11 +14,12 @@ export const BannerUpload: React.FC<BannerUploadProps> = ({
   const bannerDimensions = IMAGE_DIMENSIONS.BANNER;
 
   return (
-    <EnhancedImageUpload
+    <SimpleImageUpload
       onImageUploaded={onImageUploaded}
       currentImage={currentImage}
-      uploadType="banner"
-      maxSizeMB={10}
+      accept="image/*"
+      dimensions={bannerDimensions}
+      aspectRatio={bannerDimensions.aspectRatio}
     />
   );
 };

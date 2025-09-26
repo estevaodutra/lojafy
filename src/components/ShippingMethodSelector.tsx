@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Truck, Clock, Gift, MapPin, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { EnhancedShippingFileUpload } from "@/components/EnhancedShippingFileUpload";
+import { ShippingFileUpload } from "@/components/ShippingFileUpload";
 import { validateCep } from "@/lib/cep";
 
 interface ShippingMethod {
@@ -239,7 +239,7 @@ export function ShippingMethodSelector({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <EnhancedShippingFileUpload
+            <ShippingFileUpload
               onFileUploaded={handleFileUpload}
               maxSizeMB={selectedMethod.max_file_size_mb}
               required={selectedMethod.requires_upload}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { EnhancedImageUpload } from './EnhancedImageUpload';
+import { SimpleImageUpload } from './SimpleImageUpload';
 import { IMAGE_DIMENSIONS } from '@/constants/imageDimensions';
 
 interface TestimonialAvatarUploadProps {
@@ -14,11 +14,12 @@ export const TestimonialAvatarUpload: React.FC<TestimonialAvatarUploadProps> = (
   const avatarDimensions = IMAGE_DIMENSIONS.TESTIMONIAL_AVATAR;
 
   return (
-    <EnhancedImageUpload
+    <SimpleImageUpload
       onImageUploaded={onImageUploaded}
       currentImage={currentImage}
-      uploadType="testimonial"
-      maxSizeMB={3}
+      accept="image/*"
+      dimensions={avatarDimensions}
+      aspectRatio={avatarDimensions.aspectRatio}
     />
   );
 };
