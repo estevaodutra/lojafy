@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { FavoritesProvider } from "@/contexts/FavoritesContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ImpersonationBanner } from "@/components/admin/ImpersonationBanner";
 import Index from "./pages/Index";
 import Categorias from "./pages/Categorias";
 import Promocoes from "./pages/Promocoes";
@@ -105,6 +106,7 @@ const App = () => {
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <ImpersonationBanner />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/categorias" element={<Categorias />} />

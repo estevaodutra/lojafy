@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { ImpersonationButton } from '@/components/admin/ImpersonationButton';
+import { UserRole } from '@/hooks/useUserRole';
 
 const Usuarios = () => {
   const { toast } = useToast();
@@ -113,7 +115,8 @@ const Usuarios = () => {
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Cadastro</TableHead>
-                <TableHead>Ações</TableHead>
+                <TableHead>Alterar Role</TableHead>
+                <TableHead>Acessar Painel</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -153,6 +156,14 @@ const Usuarios = () => {
                         <SelectItem value="super_admin">Super Admin</SelectItem>
                       </SelectContent>
                     </Select>
+                  </TableCell>
+                  <TableCell>
+                    <ImpersonationButton
+                      userId={user.user_id}
+                      userRole={user.role as UserRole}
+                      userName={`${user.first_name} ${user.last_name}`.trim() || 'Usuário'}
+                      disabled={updatingUsers.includes(user.user_id)}
+                    />
                   </TableCell>
                 </TableRow>
               ))}
