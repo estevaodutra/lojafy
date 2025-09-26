@@ -1636,6 +1636,24 @@ export type Database = {
           last_name: string
         }[]
       }
+      get_safe_demo_user_data_for_ranking: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          created_at: string
+          first_name: string
+          id: string
+          last_name: string
+        }[]
+      }
+      get_safe_order_data_for_public_ranking: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          created_at: string
+          id: string
+          status: string
+          total_amount: number
+        }[]
+      }
       get_safe_order_data_for_ranking: {
         Args: Record<PropertyKey, never>
         Returns: {
