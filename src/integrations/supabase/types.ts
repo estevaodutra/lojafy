@@ -1627,6 +1627,15 @@ export type Database = {
         Args: { customer_user_id: string }
         Returns: string
       }
+      get_safe_demo_user_data: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          created_at: string
+          first_name: string
+          id: string
+          last_name: string
+        }[]
+      }
       get_safe_order_data_for_ranking: {
         Args: Record<PropertyKey, never>
         Returns: {
