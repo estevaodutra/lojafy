@@ -20,6 +20,7 @@ interface Order {
   total_amount: number;
   created_at: string;
   user_id: string;
+  has_shipping_file: boolean;
   profiles: {
     first_name: string;
     last_name: string;
@@ -45,7 +46,7 @@ const AdminOrders = () => {
       // Get orders first
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select('*')
+        .select('*, has_shipping_file')
         .order('created_at', { ascending: false });
 
       if (ordersError) throw ordersError;
@@ -203,36 +204,48 @@ const AdminOrders = () => {
                 <TableHead>Data</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Pagamento</TableHead>
+                <TableHead>Etiqueta</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
-                    Carregando pedidos...
-                  </TableCell>
-                </TableRow>
+                 <TableRow>
+                   <TableCell colSpan={8} className="text-center py-8">
+                     Carregando pedidos...
+                   </TableCell>
+                 </TableRow>
               ) : filteredOrders.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
-                    Nenhum pedido encontrado
-                  </TableCell>
-                </TableRow>
+                 <TableRow>
+                   <TableCell colSpan={8} className="text-center py-8">
+                     Nenhum pedido encontrado
+                   </TableCell>
+                 </TableRow>
               ) : (
                 filteredOrders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium">{order.order_number}</TableCell>
-                    <TableCell>
-                      {order.profiles.first_name} {order.profiles.last_name}
-                    </TableCell>
-                    <TableCell>
-                      {format(new Date(order.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(order.status)}</TableCell>
-                    <TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
-                    <TableCell>R$ {order.total_amount.toFixed(2)}</TableCell>
+                   <TableRow key={order.id}>
+                     <TableCell className="font-medium">{order.order_number}</TableCell>
+                     <TableCell>
+                       {order.profiles.first_name} {order.profiles.last_name}
+                     </TableCell>
+                     <TableCell>
+                       {format(new Date(order.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                     </TableCell>
+                     <TableCell>{getStatusBadge(order.status)}</TableCell>
+                     <TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
+                     <TableCell>
+                       {order.has_shipping_file ? (
+                         <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
+                           📄 Enviada
+                         </Badge>
+                       ) : (
+                         <Badge variant="outline">
+                           📄 Pendente
+                         </Badge>
+                       )}
+                     </TableCell>
+                     <TableCell>R$ {order.total_amount.toFixed(2)}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button

@@ -22,6 +22,7 @@ interface Order {
   total_amount: number;
   created_at: string;
   tracking_number?: string;
+  has_shipping_file?: boolean;
   order_items: OrderItem[];
 }
 const Orders = () => {
@@ -45,6 +46,7 @@ const Orders = () => {
             total_amount,
             created_at,
             tracking_number,
+            has_shipping_file,
             order_items (
               id,
               quantity,
@@ -184,6 +186,13 @@ const Orders = () => {
                 {order.tracking_number && <div className="bg-secondary/50 p-3 rounded-lg">
                     <p className="text-sm font-medium text-secondary-foreground">
                       📦 Código de rastreamento: {order.tracking_number}
+                    </p>
+                  </div>}
+
+                {/* Shipping Label Info */}
+                {order.has_shipping_file && <div className="bg-green-50 border border-green-200 p-3 rounded-lg">
+                    <p className="text-sm font-medium text-green-800">
+                      📄 Etiqueta de envio disponível - Confira os detalhes do pedido
                     </p>
                   </div>}
 
