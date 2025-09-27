@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useAuth } from '@/contexts/AuthContext';
+import { useEffectiveUser } from '@/hooks/useEffectiveUser';
 import { Package, MapPin, Heart, Clock, Truck, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -17,13 +17,13 @@ interface Order {
 }
 
 const Dashboard = () => {
-  const { user, profile } = useAuth();
+  const { effectiveUserId, effectiveProfile } = useEffectiveUser();
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchRecentOrders = async () => {
-      if (!user) return;
+      if (!effectiveUserId) return;
 
       try {
         const { data, error } = await supabase
@@ -36,7 +36,7 @@ const Dashboard = () => {
             created_at,
             order_items (id)
           `)
-          .eq('user_id', user.id)
+          .eq('user_id', effectiveUserId)
           .order('created_at', { ascending: false })
           .limit(3);
 
@@ -50,7 +50,7 @@ const Dashboard = () => {
     };
 
     fetchRecentOrders();
-  }, [user]);
+  }, [effectiveUserId]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -83,7 +83,7 @@ const Dashboard = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-foreground">
-          Olá, {profile?.first_name || 'Cliente'}! 👋
+          Olá, {effectiveProfile?.first_name || 'Cliente'}! 👋
         </h1>
         <p className="text-muted-foreground mt-2">
           Bem-vindo ao seu painel pessoal. Aqui você pode acompanhar seus pedidos e gerenciar sua conta.

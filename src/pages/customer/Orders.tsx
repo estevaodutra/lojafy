@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Package, Eye, Truck, CheckCircle, Clock, XCircle } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useEffectiveUser } from '@/hooks/useEffectiveUser';
 import { supabase } from '@/integrations/supabase/client';
 import OrderDetailsModal from '@/components/OrderDetailsModal';
 import { Link } from 'react-router-dom';
@@ -25,16 +25,14 @@ interface Order {
   order_items: OrderItem[];
 }
 const Orders = () => {
-  const {
-    user
-  } = useAuth();
+  const { effectiveUserId } = useEffectiveUser();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   useEffect(() => {
     const fetchOrders = async () => {
-      if (!user) return;
+      if (!effectiveUserId) return;
       try {
         const {
           data,
@@ -54,7 +52,7 @@ const Orders = () => {
               total_price,
               product_snapshot
             )
-          `).eq('user_id', user.id).order('created_at', {
+          `).eq('user_id', effectiveUserId).order('created_at', {
           ascending: false
         });
         if (error) throw error;
@@ -66,7 +64,7 @@ const Orders = () => {
       }
     };
     fetchOrders();
-  }, [user]);
+  }, [effectiveUserId]);
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending':

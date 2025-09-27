@@ -11,13 +11,14 @@ interface ImpersonationData {
   targetUserId: string;
   targetRole: UserRole;
   targetUserName?: string;
+  targetProfile?: any;
 }
 
 export const useImpersonation = () => {
   const [isImpersonating, setIsImpersonating] = useState(false);
   const [impersonationData, setImpersonationData] = useState<ImpersonationData | null>(null);
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { setImpersonationData: setAuthImpersonationData } = useAuth();
   const { toast } = useToast();
 
   // Check if currently impersonating on mount
@@ -28,12 +29,16 @@ export const useImpersonation = () => {
         const data = JSON.parse(storedData) as ImpersonationData;
         setIsImpersonating(true);
         setImpersonationData(data);
+        // Also update auth context on mount
+        if (setAuthImpersonationData) {
+          setAuthImpersonationData(data);
+        }
       } catch (error) {
         console.error('Error parsing impersonation data:', error);
         sessionStorage.removeItem('impersonation_data');
       }
     }
-  }, []);
+  }, [setAuthImpersonationData]);
 
   // Get redirect path based on user role
   const getRedirectPathByRole = (role: UserRole): string => {
@@ -87,18 +92,35 @@ export const useImpersonation = () => {
         throw new Error('Cannot impersonate another super admin');
       }
 
+      // Get target user profile
+      const { data: targetProfile, error: targetProfileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', targetUserId)
+        .single();
+
+      if (targetProfileError) {
+        console.warn('Could not fetch target user profile:', targetProfileError);
+      }
+
       // Store impersonation data
       const impersonationInfo: ImpersonationData = {
         originalUserId: user.id,
         originalRole: profile.role as UserRole,
         targetUserId,
         targetRole,
-        targetUserName
+        targetUserName,
+        targetProfile
       };
 
       sessionStorage.setItem('impersonation_data', JSON.stringify(impersonationInfo));
       setIsImpersonating(true);
       setImpersonationData(impersonationInfo);
+
+      // Update auth context with impersonation data
+      if (setAuthImpersonationData) {
+        setAuthImpersonationData(impersonationInfo);
+      }
 
       // Redirect to appropriate dashboard
       const redirectPath = getRedirectPathByRole(targetRole);
@@ -117,13 +139,18 @@ export const useImpersonation = () => {
         variant: "destructive",
       });
     }
-  }, [navigate, toast]);
+  }, [navigate, toast, setAuthImpersonationData]);
 
   // Stop impersonation
   const stopImpersonation = useCallback(() => {
     sessionStorage.removeItem('impersonation_data');
     setIsImpersonating(false);
     setImpersonationData(null);
+    
+    // Update auth context
+    if (setAuthImpersonationData) {
+      setAuthImpersonationData(null);
+    }
     
     // Redirect back to super admin panel
     navigate('/super-admin');
@@ -132,7 +159,7 @@ export const useImpersonation = () => {
       title: "Impersonação finalizada",
       description: "Você voltou ao painel de super admin",
     });
-  }, [navigate, toast]);
+  }, [navigate, toast, setAuthImpersonationData]);
 
   // Initialize impersonation check
   React.useEffect(() => {

@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useEffectiveUser } from '@/hooks/useEffectiveUser';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -34,7 +35,8 @@ interface Address {
 }
 
 const Settings = () => {
-  const { user, signOut } = useAuth();
+  const { effectiveUserId, originalUser } = useEffectiveUser();
+  const { signOut } = useAuth();
   const { toast } = useToast();
   const [profile, setProfile] = useState<Profile>({
     first_name: '',
@@ -68,16 +70,16 @@ const Settings = () => {
   useEffect(() => {
     fetchProfile();
     fetchAddresses();
-  }, [user]);
+  }, [effectiveUserId]);
 
   const fetchProfile = async () => {
-    if (!user) return;
+    if (!effectiveUserId) return;
 
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('first_name, last_name, phone, cpf')
-        .eq('user_id', user.id)
+        .eq('user_id', effectiveUserId)
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
@@ -93,14 +95,14 @@ const Settings = () => {
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!effectiveUserId) return;
 
     setUpdating(true);
     try {
       const { error } = await supabase
         .from('profiles')
         .upsert({
-          user_id: user.id,
+          user_id: effectiveUserId,
           ...profile
         });
 
@@ -143,13 +145,13 @@ const Settings = () => {
   };
 
   const fetchAddresses = async () => {
-    if (!user) return;
+    if (!effectiveUserId) return;
 
     try {
       const { data, error } = await supabase
         .from('addresses')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', effectiveUserId)
         .order('is_default', { ascending: false });
 
       if (error) throw error;
@@ -189,12 +191,12 @@ const Settings = () => {
 
   const handleAddressSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!effectiveUserId) return;
 
     try {
       const addressData = {
         ...addressForm,
-        user_id: user.id
+        user_id: effectiveUserId
       };
 
       if (editingAddress) {
@@ -552,7 +554,7 @@ const Settings = () => {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Email</Label>
-              <Input value={user?.email || ''} disabled />
+              <Input value={originalUser?.email || ''} disabled />
               <p className="text-sm text-muted-foreground">
                 Para alterar seu email, entre em contato com o suporte
               </p>

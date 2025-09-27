@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MapPin, Plus, Edit, Trash2 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useEffectiveUser } from '@/hooks/useEffectiveUser';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -25,7 +25,7 @@ interface Address {
 }
 
 const Addresses = () => {
-  const { user } = useAuth();
+  const { effectiveUserId } = useEffectiveUser();
   const { toast } = useToast();
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,16 +45,16 @@ const Addresses = () => {
 
   useEffect(() => {
     fetchAddresses();
-  }, [user]);
+  }, [effectiveUserId]);
 
   const fetchAddresses = async () => {
-    if (!user) return;
+    if (!effectiveUserId) return;
 
     try {
       const { data, error } = await supabase
         .from('addresses')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', effectiveUserId)
         .order('is_default', { ascending: false });
 
       if (error) throw error;
@@ -68,12 +68,12 @@ const Addresses = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!effectiveUserId) return;
 
     try {
       const addressData = {
         ...formData,
-        user_id: user.id
+        user_id: effectiveUserId
       };
 
       if (editingAddress) {

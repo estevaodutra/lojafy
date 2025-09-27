@@ -4,6 +4,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
+interface ImpersonationData {
+  originalUserId: string;
+  originalRole: string;
+  targetUserId: string;
+  targetRole: string;
+  targetUserName?: string;
+  targetProfile?: any;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -15,6 +24,10 @@ interface AuthContextType {
   resendConfirmationEmail: (email: string) => Promise<{ error: any }>;
   isAdmin: boolean;
   profile: any | null;
+  impersonationData: ImpersonationData | null;
+  setImpersonationData: (data: ImpersonationData | null) => void;
+  getEffectiveUserId: () => string | null;
+  getEffectiveProfile: () => any;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,6 +41,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any | null>(null);
+  const [impersonationData, setImpersonationData] = useState<ImpersonationData | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -275,6 +289,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Functions to get effective user data (considering impersonation)
+  const getEffectiveUserId = (): string | null => {
+    return impersonationData?.targetUserId || user?.id || null;
+  };
+
+  const getEffectiveProfile = () => {
+    return impersonationData?.targetProfile || profile;
+  };
+
+  // Initialize impersonation data from sessionStorage on mount
+  useEffect(() => {
+    const storedData = sessionStorage.getItem('impersonation_data');
+    if (storedData) {
+      try {
+        const data = JSON.parse(storedData) as ImpersonationData;
+        setImpersonationData(data);
+      } catch (error) {
+        console.error('Error parsing impersonation data:', error);
+        sessionStorage.removeItem('impersonation_data');
+      }
+    }
+  }, []);
+
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
 
   const value: AuthContextType = {
@@ -288,6 +325,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     resendConfirmationEmail,
     isAdmin,
     profile,
+    impersonationData,
+    setImpersonationData,
+    getEffectiveUserId,
+    getEffectiveProfile,
   };
 
   return (
