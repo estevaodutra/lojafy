@@ -32,8 +32,10 @@ const ResellerStoreEditor = () => {
   const { toast } = useToast();
   const { 
     store, 
+    products,
     isLoading, 
-    createOrUpdateStore
+    createOrUpdateStore,
+    updateAllProductsMargin
   } = useResellerStore();
 
   const [storeConfig, setStoreConfig] = useState({
@@ -49,8 +51,11 @@ const ResellerStoreEditor = () => {
     contactPhone: '',
     contactEmail: '',
     contactAddress: '',
-    whatsapp: ''
+    whatsapp: '',
+    defaultMargin: 30
   });
+  
+  const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
 
   // Sync storeConfig with loaded store data
   useEffect(() => {
@@ -68,7 +73,8 @@ const ResellerStoreEditor = () => {
         contactPhone: store.contact_phone || '',
         contactEmail: store.contact_email || '',
         contactAddress: store.contact_address || '',
-        whatsapp: store.whatsapp || ''
+        whatsapp: store.whatsapp || '',
+        defaultMargin: 30
       });
     }
   }, [store]);
@@ -81,6 +87,13 @@ const ResellerStoreEditor = () => {
     setStoreConfig(prev => ({
       ...prev,
       [colorType]: color
+    }));
+  };
+
+  const handleNumberChange = (field: string, value: number) => {
+    setStoreConfig(prev => ({
+      ...prev,
+      [field]: value
     }));
   };
 
@@ -112,6 +125,36 @@ const ResellerStoreEditor = () => {
         description: "Não foi possível salvar as configurações.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleApplyMarginToAll = async () => {
+    if (!storeConfig.defaultMargin || storeConfig.defaultMargin <= 0) {
+      toast({
+        title: "Erro",
+        description: "Informe uma margem válida (maior que 0%)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUpdatingPrices(true);
+    
+    try {
+      await updateAllProductsMargin(storeConfig.defaultMargin);
+      
+      toast({
+        title: "Preços atualizados!",
+        description: `Margem de ${storeConfig.defaultMargin}% aplicada a todos os produtos.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar os preços.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingPrices(false);
     }
   };
 
@@ -329,6 +372,56 @@ const ResellerStoreEditor = () => {
                         onChange={(e) => handleColorChange('whatsapp', e.target.value)}
                         placeholder="5511999999999"
                       />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Configuração de Preços</CardTitle>
+                    <CardDescription>
+                      Configure a margem de lucro padrão para todos os produtos
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="defaultMargin">Margem de Lucro Padrão (%)</Label>
+                        <Input
+                          id="defaultMargin"
+                          type="number"
+                          min="0"
+                          max="1000"
+                          value={storeConfig.defaultMargin}
+                          onChange={(e) => handleNumberChange('defaultMargin', Number(e.target.value))}
+                          placeholder="30"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Margem que será aplicada sobre o preço original dos produtos
+                        </p>
+                      </div>
+                      <div className="flex flex-col justify-end">
+                        <Button 
+                          onClick={handleApplyMarginToAll}
+                          disabled={isUpdatingPrices || !products.length}
+                          variant="outline"
+                        >
+                          {isUpdatingPrices ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : null}
+                          Aplicar a todos os produtos ({products.length})
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-muted rounded-lg">
+                      <h4 className="font-medium mb-2">Como funciona:</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1">
+                        <li>• A margem é calculada sobre o preço original do produto</li>
+                        <li>• Exemplo: Produto R$ 100 + 30% = R$ 130</li>
+                        <li>• Todos os preços customizados serão sobrescritos</li>
+                        <li>• Esta ação não pode ser desfeita</li>
+                      </ul>
                     </div>
                   </CardContent>
                 </Card>

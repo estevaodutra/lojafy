@@ -380,6 +380,57 @@ export const useResellerStore = () => {
     }
   };
 
+  const updateAllProductsMargin = async (marginPercentage: number) => {
+    if (!user?.id) return;
+
+    try {
+      // Get all products with their original prices
+      const { data: productsData, error: fetchError } = await supabase
+        .from('reseller_products')
+        .select(`
+          id,
+          product_id,
+          products!reseller_products_product_id_fkey (
+            price
+          )
+        `)
+        .eq('reseller_id', user.id);
+
+      if (fetchError) throw fetchError;
+
+      // Calculate new prices and prepare updates
+      const updates = productsData?.map(item => {
+        const originalPrice = item.products?.price || 0;
+        const newPrice = originalPrice * (1 + marginPercentage / 100);
+        
+        return {
+          id: item.id,
+          custom_price: Math.round(newPrice * 100) / 100 // Round to 2 decimal places
+        };
+      }) || [];
+
+      // Batch update all products
+      const updatePromises = updates.map(update => 
+        supabase
+          .from('reseller_products')
+          .update({ custom_price: update.custom_price })
+          .eq('id', update.id)
+      );
+
+      await Promise.all(updatePromises);
+
+      // Refresh products data
+      await fetchProducts();
+      
+      toast.success(`Margem de ${marginPercentage}% aplicada a ${updates.length} produtos!`);
+    } catch (err: any) {
+      setError(err.message);
+      toast.error('Erro ao atualizar preços: ' + err.message);
+      console.error('Error updating all product prices:', err);
+      throw err;
+    }
+  };
+
   useEffect(() => {
     if (user?.id) {
       fetchStore();
@@ -399,6 +450,7 @@ export const useResellerStore = () => {
     removeProduct,
     updateProductStatus,
     updateProductPrice,
+    updateAllProductsMargin,
     refetch: () => {
       fetchStore();
       fetchProducts();
