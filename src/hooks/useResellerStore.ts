@@ -97,7 +97,15 @@ export const useResellerStore = () => {
             image_url,
             brand,
             description,
-            active
+            active,
+            category_id,
+            categories!products_category_id_fkey (
+              id,
+              name,
+              slug,
+              icon,
+              color
+            )
           )
         `)
         .eq('reseller_id', user.id)
@@ -205,7 +213,15 @@ export const useResellerStore = () => {
             image_url,
             brand,
             description,
-            active
+            active,
+            category_id,
+            categories!products_category_id_fkey (
+              id,
+              name,
+              slug,
+              icon,
+              color
+            )
           )
         `)
         .single();
@@ -273,7 +289,15 @@ export const useResellerStore = () => {
             image_url,
             brand,
             description,
-            active
+            active,
+            category_id,
+            categories!products_category_id_fkey (
+              id,
+              name,
+              slug,
+              icon,
+              color
+            )
           )
         `)
         .single();
@@ -323,7 +347,15 @@ export const useResellerStore = () => {
             image_url,
             brand,
             description,
-            active
+            active,
+            category_id,
+            categories!products_category_id_fkey (
+              id,
+              name,
+              slug,
+              icon,
+              color
+            )
           )
         `)
         .single();
