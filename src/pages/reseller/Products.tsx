@@ -244,7 +244,7 @@ const ResellerProducts = () => {
                       
                        <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between mb-2">
-                          <h4 className="font-semibold text-base line-clamp-2">
+                          <h4 className="font-semibold text-base line-clamp-2 break-words overflow-hidden">
                             {product.product?.name || `Produto não encontrado (ID: ${product.product_id})`}
                           </h4>
                         <Badge 
