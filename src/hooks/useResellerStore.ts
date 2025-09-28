@@ -21,6 +21,7 @@ export interface ResellerStore {
   whatsapp?: string;
   payment_methods: any;
   policies: any;
+  default_margin?: number;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -146,6 +147,7 @@ export const useResellerStore = () => {
         whatsapp: storeData.whatsapp,
         payment_methods: storeData.payment_methods,
         policies: storeData.policies,
+        default_margin: storeData.default_margin,
         active: storeData.active,
         reseller_id: user.id,
         updated_at: new Date().toISOString()

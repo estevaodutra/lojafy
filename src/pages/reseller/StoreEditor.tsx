@@ -74,7 +74,7 @@ const ResellerStoreEditor = () => {
         contactEmail: store.contact_email || '',
         contactAddress: store.contact_address || '',
         whatsapp: store.whatsapp || '',
-        defaultMargin: 30
+        defaultMargin: store.default_margin || 30
       });
     }
   }, [store]);
@@ -113,6 +113,7 @@ const ResellerStoreEditor = () => {
         contact_email: storeConfig.contactEmail,
         contact_address: storeConfig.contactAddress,
         whatsapp: storeConfig.whatsapp,
+        default_margin: storeConfig.defaultMargin,
       });
       
       toast({

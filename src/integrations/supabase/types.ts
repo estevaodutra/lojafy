@@ -1146,6 +1146,7 @@ export type Database = {
           contact_email: string | null
           contact_phone: string | null
           created_at: string | null
+          default_margin: number | null
           id: string
           logo_url: string | null
           payment_methods: Json | null
@@ -1168,6 +1169,7 @@ export type Database = {
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          default_margin?: number | null
           id?: string
           logo_url?: string | null
           payment_methods?: Json | null
@@ -1190,6 +1192,7 @@ export type Database = {
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          default_margin?: number | null
           id?: string
           logo_url?: string | null
           payment_methods?: Json | null
