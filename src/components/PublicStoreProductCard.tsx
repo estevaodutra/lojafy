@@ -111,7 +111,7 @@ const PublicStoreProductCard = ({ product, storeSlug }: PublicStoreProductCardPr
           </div>
 
           <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 flex-1 flex flex-col min-w-0">
-            <h3 className="font-semibold text-sm sm:text-base text-foreground line-clamp-2 flex items-start gap-2 min-w-0">
+            <h3 className="font-semibold text-sm sm:text-base text-foreground line-clamp-2 break-words flex items-start gap-2 min-w-0">
               <span className="flex-1 min-w-0">{product.name}</span>
               {product.high_rotation && (
                 <span 
