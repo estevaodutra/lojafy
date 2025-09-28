@@ -163,8 +163,12 @@ export const usePublicStoreCategories = (resellerId?: string) => {
         })
       );
 
-      // Filter categories with at least 5 products
-      return categoriesWithProducts.filter(cat => cat.products.length >= 5);
+      // For reseller stores, show categories with at least 1 product
+      // For main store, show categories with at least 5 products  
+      return categoriesWithProducts.filter(cat => {
+        const minProducts = resellerId ? 1 : 5;
+        return cat.products.length >= minProducts;
+      });
     },
     enabled: !!resellerId,
   });
