@@ -73,7 +73,7 @@ const PublicStoreCategoryCarousels = ({ resellerId, storeSlug }: PublicStoreCate
                 }}
                 className="w-full"
               >
-                <CarouselContent>
+                <CarouselContent className="-ml-2 md:-ml-4">
                   {category.products
                     .filter((rp: PublicStoreProductData) => rp.product && rp.product.id && rp.product.name)
                     .map((resellerProduct: PublicStoreProductData) => {
@@ -81,22 +81,20 @@ const PublicStoreCategoryCarousels = ({ resellerId, storeSlug }: PublicStoreCate
                     const displayPrice = resellerProduct.custom_price || product.price;
                     
                     return (
-                      <CarouselItem key={resellerProduct.id} className="md:basis-1/2 lg:basis-1/4">
-                        <div className="p-1">
-                          <PublicStoreProductCard
-                            product={{
-                              ...product,
-                              price: displayPrice
-                            }}
-                            storeSlug={storeSlug}
-                          />
-                        </div>
+                      <CarouselItem key={resellerProduct.id} className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3 xl:basis-1/4 min-w-0">
+                        <PublicStoreProductCard
+                          product={{
+                            ...product,
+                            price: displayPrice
+                          }}
+                          storeSlug={storeSlug}
+                        />
                       </CarouselItem>
                     );
                   })}
                 </CarouselContent>
-                <CarouselPrevious className="hidden md:flex" />
-                <CarouselNext className="hidden md:flex" />
+                <CarouselPrevious className="hidden md:flex left-2" />
+                <CarouselNext className="hidden md:flex right-2" />
               </Carousel>
             </div>
           ))}
