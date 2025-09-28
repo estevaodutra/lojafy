@@ -134,13 +134,8 @@ serve(async (req) => {
       }
     }
 
-    // Use EdgeRuntime.waitUntil to handle background processing
-    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
-      EdgeRuntime.waitUntil(updateProductsInBackground())
-    } else {
-      // Fallback for local development
-      updateProductsInBackground()
-    }
+    // Start background process without EdgeRuntime dependency
+    updateProductsInBackground()
 
     // Return immediate response
     return new Response(
@@ -162,7 +157,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message || 'Internal server error' 
+        error: error instanceof Error ? error.message : 'Internal server error' 
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -18,11 +18,11 @@ interface PlatformSettings {
 }
 
 interface UpdatePlatformSettingsParams {
-  platform_fee_value: number;
-  platform_fee_type: 'percentage' | 'fixed';
-  gateway_fee_percentage: number;
-  reseller_withdrawal_fee_value: number;
-  reseller_withdrawal_fee_type: 'percentage' | 'fixed';
+  platform_fee_value?: number;
+  platform_fee_type?: 'percentage' | 'fixed';
+  gateway_fee_percentage?: number;
+  reseller_withdrawal_fee_value?: number;
+  reseller_withdrawal_fee_type?: 'percentage' | 'fixed';
   recalculate_prices?: boolean;
 }
 
@@ -51,10 +51,15 @@ export const usePlatformSettings = () => {
     mutationFn: async (params: UpdatePlatformSettingsParams) => {
       const { recalculate_prices, ...updateData } = params;
       
+      // Filter out undefined values
+      const filteredUpdateData = Object.fromEntries(
+        Object.entries(updateData).filter(([_, value]) => value !== undefined)
+      );
+      
       // Update platform settings
       const { data, error } = await supabase
         .from('platform_settings')
-        .update(updateData)
+        .update(filteredUpdateData)
         .eq('id', settings?.id)
         .select()
         .single();
@@ -62,12 +67,12 @@ export const usePlatformSettings = () => {
       if (error) throw error;
 
       // If recalculate_prices is true, trigger the recalculation
-      if (recalculate_prices) {
+      if (recalculate_prices && settings) {
         const { error: recalcError } = await supabase.functions.invoke('recalculate-product-prices', {
           body: { 
-            platform_fee_value: updateData.platform_fee_value,
-            platform_fee_type: updateData.platform_fee_type,
-            gateway_fee_percentage: updateData.gateway_fee_percentage
+            platform_fee_value: updateData.platform_fee_value ?? settings.platform_fee_value,
+            platform_fee_type: updateData.platform_fee_type ?? settings.platform_fee_type,
+            gateway_fee_percentage: updateData.gateway_fee_percentage ?? settings.gateway_fee_percentage
           }
         });
 

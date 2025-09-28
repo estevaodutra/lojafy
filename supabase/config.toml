@@ -44,3 +44,9 @@ verify_jwt = false
 
 [functions.api-ranking-produto-cadastrar]
 verify_jwt = false
+
+[functions.get-mercado-pago-token]
+verify_jwt = false
+
+[functions.recalculate-product-prices]
+verify_jwt = false
