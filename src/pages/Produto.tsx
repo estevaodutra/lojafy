@@ -240,9 +240,9 @@ const Produto = ({ showHeader = true, showFooter = true, storeSlug }: ProdutoPro
       <main className="container mx-auto px-4 py-8">
         {/* Breadcrumb */}
         <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-6 overflow-hidden">
-          <Link to="/" className="hover:text-primary whitespace-nowrap">Início</Link>
+          <Link to={storeSlug ? `/loja/${storeSlug}` : "/"} className="hover:text-primary whitespace-nowrap">Início</Link>
           <ChevronRight className="h-4 w-4 flex-shrink-0" />
-          <Link to="/categorias" className="hover:text-primary whitespace-nowrap">Categorias</Link>
+          <Link to={storeSlug ? `/loja/${storeSlug}/categorias` : "/categorias"} className="hover:text-primary whitespace-nowrap">Categorias</Link>
           <ChevronRight className="h-4 w-4 flex-shrink-0" />
           <span className="text-foreground truncate">{product.name}</span>
         </nav>
