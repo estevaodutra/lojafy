@@ -10,6 +10,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { BannerUpload } from './BannerUpload';
+import { MobileBannerUpload } from './MobileBannerUpload';
 
 interface Banner {
   id: string;
@@ -17,6 +18,8 @@ interface Banner {
   subtitle?: string;
   description?: string;
   image_url: string;
+  mobile_image_url?: string;
+  mobile_height?: number;
   button_text?: string;
   button_link?: string;
   position: number;
@@ -37,6 +40,8 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
     subtitle: '',
     description: '',
     image_url: '',
+    mobile_image_url: '',
+    mobile_height: 50,
     button_text: '',
     button_link: '',
     position: 1,
@@ -58,6 +63,8 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
         subtitle: banner.subtitle || '',
         description: banner.description || '',
         image_url: banner.image_url,
+        mobile_image_url: banner.mobile_image_url || '',
+        mobile_height: banner.mobile_height || 50,
         button_text: banner.button_text || '',
         button_link: banner.button_link || '',
         position: banner.position,
@@ -70,6 +77,8 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
         subtitle: '',
         description: '',
         image_url: '',
+        mobile_image_url: '',
+        mobile_height: 50,
         button_text: '',
         button_link: '',
         position: getNextAvailablePosition(),
@@ -195,6 +204,10 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
     setFormData(prev => ({ ...prev, image_url: url }));
   };
 
+  const handleMobileImageUploaded = (url: string) => {
+    setFormData(prev => ({ ...prev, mobile_image_url: url }));
+  };
+
   const availablePositions = getAvailablePositions();
   const isPositionDisabled = formData.active && !availablePositions.includes(formData.position) && 
     (!banner || banner.position !== formData.position);
@@ -278,6 +291,37 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
                 onImageUploaded={handleImageUploaded}
                 currentImage={formData.image_url}
               />
+            </div>
+
+            <div className="space-y-4 border-t pt-4">
+              <h3 className="text-lg font-medium">Configurações Mobile</h3>
+              
+              <div className="space-y-2">
+                <Label>Imagem para Mobile (Opcional)</Label>
+                <p className="text-sm text-muted-foreground">
+                  Imagem otimizada para dispositivos móveis. Se não fornecida, será usada a imagem principal.
+                </p>
+                <MobileBannerUpload
+                  onImageUploaded={handleMobileImageUploaded}
+                  currentImage={formData.mobile_image_url}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="mobile_height">Altura Mobile (vh)</Label>
+                <p className="text-sm text-muted-foreground">
+                  Altura do banner em dispositivos móveis: {formData.mobile_height}vh
+                </p>
+                <input
+                  type="range"
+                  id="mobile_height"
+                  min="30"
+                  max="80"
+                  value={formData.mobile_height}
+                  onChange={(e) => setFormData(prev => ({ ...prev, mobile_height: parseInt(e.target.value) }))}
+                  className="w-full"
+                />
+              </div>
             </div>
 
             {!imageOnly && (

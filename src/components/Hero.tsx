@@ -13,6 +13,8 @@ interface Banner {
   subtitle?: string;
   description?: string;
   image_url: string;
+  mobile_image_url?: string;
+  mobile_height?: number;
   button_text?: string;
   button_link?: string;
   position: number;
@@ -35,12 +37,14 @@ const Hero = () => {
   });
 
   // Fallback to default banner if no banners are configured
-  const defaultBanner = {
+  const defaultBanner: Banner = {
     id: 'default',
     title: 'Ofertas da',
     subtitle: 'Semana',
     description: 'Descontos imperdíveis em produtos selecionados',
     image_url: heroBanner,
+    mobile_image_url: undefined,
+    mobile_height: 50,
     button_text: 'Comprar Agora',
     button_link: '/promocoes',
     position: 1,
@@ -67,14 +71,24 @@ const Hero = () => {
     const isImageOnly = !banner.title && !banner.subtitle && !banner.description && !banner.button_text;
     
     if (isImageOnly) {
+      const mobileHeight = banner.mobile_height || 50;
+      
       return (
         <section className="relative overflow-hidden">
-          <div className="w-full h-[50vh] md:h-[60vh] lg:h-[70vh]">
-            <img
-              src={banner.image_url}
-              alt="Banner"
-              className="w-full h-full object-cover"
-            />
+          <div className={`w-full h-[${mobileHeight}vh] md:h-[60vh] lg:h-[70vh]`}>
+            <picture>
+              {banner.mobile_image_url && (
+                <source 
+                  media="(max-width: 768px)" 
+                  srcSet={banner.mobile_image_url} 
+                />
+              )}
+              <img
+                src={banner.image_url}
+                alt="Banner"
+                className="w-full h-full object-cover"
+              />
+            </picture>
           </div>
         </section>
       );
@@ -129,11 +143,19 @@ const Hero = () => {
             
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-2xl"></div>
-              <img
-                src={banner.image_url}
-                alt={banner.title}
-                className="w-full h-auto rounded-2xl shadow-2xl"
-              />
+              <picture>
+                {banner.mobile_image_url && (
+                  <source 
+                    media="(max-width: 768px)" 
+                    srcSet={banner.mobile_image_url} 
+                  />
+                )}
+                <img
+                  src={banner.image_url}
+                  alt={banner.title}
+                  className="w-full h-auto rounded-2xl shadow-2xl"
+                />
+              </picture>
             </div>
           </div>
         </div>
@@ -160,14 +182,24 @@ const Hero = () => {
             const isImageOnly = !banner.title && !banner.subtitle && !banner.description && !banner.button_text;
             
             if (isImageOnly) {
+              const mobileHeight = banner.mobile_height || 50;
+              
               return (
                 <CarouselItem key={banner.id}>
-                  <div className="w-full h-[50vh] md:h-[60vh] lg:h-[70vh]">
-                    <img
-                      src={banner.image_url}
-                      alt="Banner"
-                      className="w-full h-full object-cover"
-                    />
+                  <div className={`w-full h-[${mobileHeight}vh] md:h-[60vh] lg:h-[70vh]`}>
+                    <picture>
+                      {banner.mobile_image_url && (
+                        <source 
+                          media="(max-width: 768px)" 
+                          srcSet={banner.mobile_image_url} 
+                        />
+                      )}
+                      <img
+                        src={banner.image_url}
+                        alt="Banner"
+                        className="w-full h-full object-cover"
+                      />
+                    </picture>
                   </div>
                 </CarouselItem>
               );
@@ -217,11 +249,19 @@ const Hero = () => {
                     
                     <div className="relative">
                       <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-2xl"></div>
-                      <img
-                        src={banner.image_url}
-                        alt={banner.title}
-                        className="w-full h-auto rounded-2xl shadow-2xl"
-                      />
+                      <picture>
+                        {banner.mobile_image_url && (
+                          <source 
+                            media="(max-width: 768px)" 
+                            srcSet={banner.mobile_image_url} 
+                          />
+                        )}
+                        <img
+                          src={banner.image_url}
+                          alt={banner.title}
+                          className="w-full h-auto rounded-2xl shadow-2xl"
+                        />
+                      </picture>
                     </div>
                   </div>
                 </div>

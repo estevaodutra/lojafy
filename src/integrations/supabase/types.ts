@@ -110,6 +110,8 @@ export type Database = {
           description: string | null
           id: string
           image_url: string
+          mobile_height: number | null
+          mobile_image_url: string | null
           position: number
           subtitle: string | null
           title: string
@@ -123,6 +125,8 @@ export type Database = {
           description?: string | null
           id?: string
           image_url: string
+          mobile_height?: number | null
+          mobile_image_url?: string | null
           position?: number
           subtitle?: string | null
           title: string
@@ -136,6 +140,8 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string
+          mobile_height?: number | null
+          mobile_image_url?: string | null
           position?: number
           subtitle?: string | null
           title?: string
