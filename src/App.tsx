@@ -109,10 +109,10 @@ const App = () => {
       <AuthProvider>
         <FavoritesProvider>
           <CartProvider>
-          <AppContent />
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <AppContent />
             <ImpersonationBanner />
             <Routes>
               <Route path="/" element={<Index />} />
