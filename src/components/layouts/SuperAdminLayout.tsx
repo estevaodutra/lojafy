@@ -12,7 +12,8 @@ import {
   Shield,
   Palette,
   Megaphone,
-  LogOut
+  LogOut,
+  Truck
 } from 'lucide-react';
 import {
   Sidebar,
@@ -48,6 +49,11 @@ const superAdminMenuItems = [
     title: 'Pedidos',
     url: '/super-admin/pedidos',
     icon: ShoppingCart,
+  },
+  {
+    title: 'Frete',
+    url: '/super-admin/frete',
+    icon: Truck,
   },
   {
     title: 'Plataforma',
