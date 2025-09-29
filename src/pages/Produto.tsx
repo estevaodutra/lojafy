@@ -392,22 +392,22 @@ const Produto = ({
               <div className="flex items-center gap-3 p-4 bg-accent rounded-lg">
                 <Truck className="h-6 w-6 text-primary flex-shrink-0" />
                 <div>
-                  <p className="text-sm font-medium">Frete Grátis</p>
-                  <p className="text-xs text-muted-foreground">Acima de R$ 199</p>
+                  <p className="text-sm font-medium">Envio em 24hrs</p>
+                  
                 </div>
               </div>
               <div className="flex items-center gap-3 p-4 bg-accent rounded-lg">
                 <Shield className="h-6 w-6 text-primary flex-shrink-0" />
                 <div>
                   <p className="text-sm font-medium">Garantia</p>
-                  <p className="text-xs text-muted-foreground">12 meses</p>
+                  
                 </div>
               </div>
               <div className="flex items-center gap-3 p-4 bg-accent rounded-lg">
                 <RotateCcw className="h-6 w-6 text-primary flex-shrink-0" />
                 <div>
                   <p className="text-sm font-medium">Troca Fácil</p>
-                  <p className="text-xs text-muted-foreground">30 dias</p>
+                  
                 </div>
               </div>
             </div>
