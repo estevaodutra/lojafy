@@ -9,104 +9,101 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
-
 const Carrinho = () => {
-  const { items, itemsCount, totalPrice, updateQuantity, removeItem, clearCart, syncPrices, isUpdatingPrices, lastSyncTime, storeSlug } = useCart();
-  const { toast } = useToast();
+  const {
+    items,
+    itemsCount,
+    totalPrice,
+    updateQuantity,
+    removeItem,
+    clearCart,
+    syncPrices,
+    isUpdatingPrices,
+    lastSyncTime,
+    storeSlug
+  } = useCart();
+  const {
+    toast
+  } = useToast();
   const navigate = useNavigate();
 
   // Redirect to public store cart if there's a store context
   useEffect(() => {
     if (storeSlug && items.length > 0) {
       console.log('🔄 Redirecting to public store cart:', storeSlug);
-      navigate(`/loja/${storeSlug}/carrinho`, { replace: true });
+      navigate(`/loja/${storeSlug}/carrinho`, {
+        replace: true
+      });
     }
   }, [storeSlug, items.length, navigate]);
-
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
     }).format(price);
   };
-
   const formatLastSync = () => {
     if (!lastSyncTime) return null;
-    
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - lastSyncTime.getTime()) / (1000 * 60));
-    
     if (diffInMinutes === 0) return 'Agora mesmo';
     if (diffInMinutes === 1) return 'Há 1 minuto';
     if (diffInMinutes < 60) return `Há ${diffInMinutes} minutos`;
     if (diffInMinutes < 1440) return `Há ${Math.floor(diffInMinutes / 60)} horas`;
     return lastSyncTime.toLocaleDateString('pt-BR');
   };
-
   const handleQuantityChange = (productId: string, newQuantity: number) => {
     if (newQuantity < 1) return;
     updateQuantity(productId, newQuantity);
   };
-
   const handleRemoveItem = (productId: string, productName: string) => {
     removeItem(productId);
     toast({
       title: "Produto removido",
-      description: `${productName} foi removido do carrinho`,
+      description: `${productName} foi removido do carrinho`
     });
   };
-
   const handleClearCart = () => {
     clearCart();
     toast({
       title: "Carrinho limpo",
-      description: "Todos os produtos foram removidos do carrinho",
+      description: "Todos os produtos foram removidos do carrinho"
     });
   };
-
   const handleCheckout = () => {
     if (items.length === 0) return;
     navigate('/checkout');
   };
-
   const handleSyncPrices = async () => {
     const result = await syncPrices();
-    
     if (result.updated) {
       let message = '';
       const changes = [];
-      
       if (result.updatedItems.length > 0) {
         changes.push(`${result.updatedItems.length} produto(s) com preços atualizados`);
       }
-      
       if (result.removedItems.length > 0) {
         changes.push(`${result.removedItems.length} produto(s) removidos (indisponíveis)`);
       }
-      
       message = changes.join(' e ');
-      
       toast({
         title: "Carrinho atualizado!",
         description: message,
-        variant: result.removedItems.length > 0 ? "destructive" : "default",
+        variant: result.removedItems.length > 0 ? "destructive" : "default"
       });
     } else {
       toast({
         title: "✅ Tudo em dia!",
-        description: "Todos os preços e produtos estão atualizados",
+        description: "Todos os preços e produtos estão atualizados"
       });
     }
   };
-
   const shippingThreshold = 199;
   const freeShipping = totalPrice >= shippingThreshold;
   const shippingCost = freeShipping ? 0 : 29.90;
   const finalTotal = totalPrice + shippingCost;
-
   if (items.length === 0) {
-    return (
-      <>
+    return <>
         <Header />
         <main className="min-h-screen bg-background">
           <div className="container mx-auto px-4 py-8">
@@ -130,12 +127,9 @@ const Carrinho = () => {
           </div>
         </main>
         <Footer />
-      </>
-    );
+      </>;
   }
-
-  return (
-    <>
+  return <>
       <Header />
       <main className="min-h-screen bg-background">
         <div className="container mx-auto px-4 py-8 max-w-full">
@@ -160,38 +154,26 @@ const Carrinho = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
             {/* Cart Items */}
             <div className="lg:col-span-2 space-y-4">
-              {items.map((item) => (
-                <Card key={item.productId} className="overflow-hidden">
+              {items.map(item => <Card key={item.productId} className="overflow-hidden">
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex flex-col space-y-4">
                       {/* Product Image & Info Row */}
                       <div className="flex items-start space-x-4 min-w-0">
                         <div className="flex-shrink-0">
-                          <img
-                            src={item.productImage}
-                            alt={item.productName}
-                            className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 object-cover rounded-lg bg-muted"
-                          />
+                          <img src={item.productImage} alt={item.productName} className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 object-cover rounded-lg bg-muted" />
                         </div>
 
                         {/* Product Info */}
                         <div className="flex-grow space-y-2 min-w-0">
-                          <Link 
-                            to={`/produto/${item.productId}`}
-                            className="block hover:text-primary transition-colors"
-                          >
+                          <Link to={`/produto/${item.productId}`} className="block hover:text-primary transition-colors">
                             <h3 className="font-semibold text-sm sm:text-base md:text-lg line-clamp-2">{item.productName}</h3>
                           </Link>
                           
-                          {item.variants && Object.keys(item.variants).length > 0 && (
-                            <div className="flex flex-wrap gap-1 sm:gap-2">
-                              {Object.entries(item.variants).map(([key, value]) => (
-                                <Badge key={key} variant="secondary" className="text-xs truncate max-w-full">
+                          {item.variants && Object.keys(item.variants).length > 0 && <div className="flex flex-wrap gap-1 sm:gap-2">
+                              {Object.entries(item.variants).map(([key, value]) => <Badge key={key} variant="secondary" className="text-xs truncate max-w-full">
                                   {key}: {value}
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
+                                </Badge>)}
+                            </div>}
 
                           <p className="text-lg sm:text-xl md:text-2xl font-bold text-primary">
                             {formatPrice(item.price)}
@@ -205,34 +187,18 @@ const Carrinho = () => {
                       {/* Quantity Controls */}
                       <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
                         <div className="flex items-center justify-center sm:justify-start space-x-1 bg-muted rounded-lg p-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleQuantityChange(item.productId, item.quantity - 1)}
-                            disabled={item.quantity <= 1}
-                            className="h-10 w-10"
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => handleQuantityChange(item.productId, item.quantity - 1)} disabled={item.quantity <= 1} className="h-10 w-10">
                             <Minus className="w-4 h-4" />
                           </Button>
                           <span className="w-16 text-center font-medium text-lg">
                             {item.quantity}
                           </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleQuantityChange(item.productId, item.quantity + 1)}
-                            className="h-10 w-10"
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => handleQuantityChange(item.productId, item.quantity + 1)} className="h-10 w-10">
                             <Plus className="w-4 h-4" />
                           </Button>
                         </div>
 
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveItem(item.productId, item.productName)}
-                          className="text-destructive hover:text-destructive h-10 px-4 w-full sm:w-auto"
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => handleRemoveItem(item.productId, item.productName)} className="text-destructive hover:text-destructive h-10 px-4 w-full sm:w-auto">
                           <Trash2 className="w-4 h-4 mr-2" />
                           <span className="sm:hidden">Remover</span>
                         </Button>
@@ -247,50 +213,36 @@ const Carrinho = () => {
                       </div>
                     </div>
                   </CardContent>
-                </Card>
-              ))}
+                </Card>)}
             </div>
 
             {/* Cart Actions */}
-            {items.length > 0 && (
-              <div className="lg:col-span-2 mt-6">
+            {items.length > 0 && <div className="lg:col-span-2 mt-6">
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div className="flex flex-col sm:flex-row gap-2">
-                        <Button 
-                          variant="outline" 
-                          onClick={handleSyncPrices}
-                          disabled={isUpdatingPrices}
-                          size="sm"
-                        >
-                          {isUpdatingPrices ? (
-                            <>
+                        <Button variant="outline" onClick={handleSyncPrices} disabled={isUpdatingPrices} size="sm">
+                          {isUpdatingPrices ? <>
                               <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                               Atualizando...
-                            </>
-                          ) : (
-                            <>
+                            </> : <>
                               <RefreshCw className="w-4 h-4 mr-2" />
                               Atualizar Preços
-                            </>
-                          )}
+                            </>}
                         </Button>
                         <Button variant="outline" onClick={handleClearCart} size="sm">
                           <Trash2 className="w-4 h-4 mr-2" />
                           Limpar Carrinho
                         </Button>
                       </div>
-                      {lastSyncTime && (
-                        <div className="text-sm text-muted-foreground">
+                      {lastSyncTime && <div className="text-sm text-muted-foreground">
                           Última atualização: {formatLastSync()}
-                        </div>
-                      )}
+                        </div>}
                     </div>
                   </CardContent>
                 </Card>
-              </div>
-            )}
+              </div>}
 
             {/* Order Summary */}
             <div className="lg:col-span-1">
@@ -311,13 +263,7 @@ const Carrinho = () => {
                       </span>
                     </div>
 
-                    {!freeShipping && (
-                      <div className="p-3 bg-warning/10 rounded-lg border border-warning/20">
-                        <p className="text-sm text-warning-foreground">
-                          Faltam {formatPrice(shippingThreshold - totalPrice)} para frete grátis!
-                        </p>
-                      </div>
-                    )}
+                    {!freeShipping}
 
                     <Separator />
                     
@@ -328,11 +274,7 @@ const Carrinho = () => {
                   </div>
 
                   <div className="space-y-3">
-                    <Button 
-                      onClick={handleCheckout}
-                      className="w-full btn-checkout" 
-                      size="lg"
-                    >
+                    <Button onClick={handleCheckout} className="w-full btn-checkout" size="lg">
                       Finalizar Compra
                     </Button>
                     
@@ -358,8 +300,6 @@ const Carrinho = () => {
         </div>
       </main>
       <Footer />
-    </>
-  );
+    </>;
 };
-
 export default Carrinho;
