@@ -15,8 +15,10 @@ const PublicStoreProviderRoute: React.FC<ProviderProps> = ({ children }) => {
   const { store, isLoading, error } = usePublicStore(slug);
 
   // Update document title and favicon when store data is available
-  usePublicStoreDocumentTitle(store!, undefined);
-  usePublicStoreFavicon(store!);
+  if (store) {
+    usePublicStoreDocumentTitle(store, undefined);
+    usePublicStoreFavicon(store);
+  }
 
   if (isLoading) {
     return (
