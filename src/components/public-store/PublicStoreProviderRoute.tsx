@@ -2,6 +2,8 @@ import React from "react";
 import { useParams } from "react-router-dom";
 import { usePublicStore } from "@/hooks/usePublicStore";
 import { PublicStoreContext } from "@/hooks/usePublicStoreContext";
+import { usePublicStoreDocumentTitle } from "@/hooks/usePublicStoreDocumentTitle";
+import { usePublicStoreFavicon } from "@/hooks/usePublicStoreFavicon";
 
 interface ProviderProps {
   children: React.ReactNode;
@@ -12,6 +14,10 @@ const PublicStoreProviderRoute: React.FC<ProviderProps> = ({ children }) => {
   const { slug } = useParams<{ slug: string }>();
   const { store, isLoading, error } = usePublicStore(slug);
 
+  // Update document title and favicon when store data is available
+  usePublicStoreDocumentTitle(store!, undefined);
+  usePublicStoreFavicon(store!);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -21,6 +27,20 @@ const PublicStoreProviderRoute: React.FC<ProviderProps> = ({ children }) => {
   }
 
   if (error || !store) {
+    // Reset to default favicon and title when store is not found
+    if (typeof document !== 'undefined') {
+      document.title = 'Loja não encontrada';
+      const existingFavicon = document.querySelector('link[rel="icon"]');
+      if (existingFavicon) {
+        existingFavicon.remove();
+      }
+      const link = document.createElement('link');
+      link.rel = 'icon';
+      link.href = '/favicon.ico';
+      link.type = 'image/x-icon';
+      document.head.appendChild(link);
+    }
+    
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
