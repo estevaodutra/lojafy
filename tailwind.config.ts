@@ -102,6 +102,21 @@ export default {
       transitionTimingFunction: {
         'smooth': 'var(--transition-smooth)',
       },
+      height: {
+        'mobile-30': '30vh',
+        'mobile-35': '35vh',
+        'mobile-40': '40vh',
+        'mobile-45': '45vh',
+        'mobile-50': '50vh',
+        'mobile-55': '55vh',
+        'mobile-60': '60vh',
+        'mobile-65': '65vh',
+        'mobile-70': '70vh',
+        'mobile-75': '75vh',
+        'mobile-80': '80vh',
+        'mobile-85': '85vh',
+        'mobile-90': '90vh',
+      },
       keyframes: {
         "accordion-down": {
           from: {

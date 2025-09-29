@@ -44,7 +44,7 @@ const Hero = () => {
     description: 'Descontos imperdíveis em produtos selecionados',
     image_url: heroBanner,
     mobile_image_url: undefined,
-    mobile_height: 50,
+    mobile_height: 70,
     button_text: 'Comprar Agora',
     button_link: '/promocoes',
     position: 1,
@@ -71,11 +71,31 @@ const Hero = () => {
     const isImageOnly = !banner.title && !banner.subtitle && !banner.description && !banner.button_text;
     
     if (isImageOnly) {
-      const mobileHeight = banner.mobile_height || 50;
+      const mobileHeight = banner.mobile_height || 70;
+      
+      // Map height values to Tailwind classes
+      const getHeightClass = (height: number) => {
+        switch(height) {
+          case 30: return 'h-mobile-30';
+          case 35: return 'h-mobile-35';
+          case 40: return 'h-mobile-40';
+          case 45: return 'h-mobile-45';
+          case 50: return 'h-mobile-50';
+          case 55: return 'h-mobile-55';
+          case 60: return 'h-mobile-60';
+          case 65: return 'h-mobile-65';
+          case 70: return 'h-mobile-70';
+          case 75: return 'h-mobile-75';
+          case 80: return 'h-mobile-80';
+          case 85: return 'h-mobile-85';
+          case 90: return 'h-mobile-90';
+          default: return 'h-mobile-70';
+        }
+      };
       
       return (
         <section className="relative overflow-hidden">
-          <div className={`w-full h-[${mobileHeight}vh] md:h-[60vh] lg:h-[70vh]`}>
+          <div className={`w-full ${getHeightClass(mobileHeight)} md:h-[60vh] lg:h-[70vh]`}>
             <picture>
               {banner.mobile_image_url && (
                 <source 
@@ -86,7 +106,7 @@ const Hero = () => {
               <img
                 src={banner.image_url}
                 alt="Banner"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain md:object-cover"
               />
             </picture>
           </div>

@@ -78,7 +78,7 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
         description: '',
         image_url: '',
         mobile_image_url: '',
-        mobile_height: 50,
+        mobile_height: 70,
         button_text: '',
         button_link: '',
         position: getNextAvailablePosition(),
@@ -316,7 +316,8 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
                   type="range"
                   id="mobile_height"
                   min="30"
-                  max="80"
+                  max="90"
+                  step="5"
                   value={formData.mobile_height}
                   onChange={(e) => setFormData(prev => ({ ...prev, mobile_height: parseInt(e.target.value) }))}
                   className="w-full"
