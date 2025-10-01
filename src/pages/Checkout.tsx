@@ -336,16 +336,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
           description: "Por favor, informe um CPF válido.",
           variant: "destructive",
         });
-        return;
-      }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast({
-          title: "Erro de autenticação",
-          description: "Você precisa estar logado para finalizar a compra.",
-          variant: "destructive",
-        });
+        setIsProcessingPayment(false);
         return;
       }
 
@@ -359,13 +350,13 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
         unitPrice: item.price,
       }));
 
-      const paymentRequest = {
-        amount: total,
+      const paymentRequest: PixPaymentRequest = {
+        amount: parseFloat(total.toFixed(2)),
         description: `Pedido - ${cartItems.length} item(s)`,
         payer: {
           email: formData.email,
           firstName: formData.firstName,
-          lastName: formData.lastName,
+          lastName: formData.lastName || '',
           cpf: cleanCPF(formData.cpf),
         },
         orderItems,
@@ -380,21 +371,53 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
         },
       };
 
-      const { data, error } = await supabase.functions.invoke('create-pix-payment', {
-        body: paymentRequest,
-      });
+      console.log('Creating PIX payment via Edge Function...');
+      const response = await createModernPixPayment(paymentRequest);
+      
+      console.log('PIX payment created successfully:', response);
+      
+      // Upload shipping file if provided
+      if (shippingFile && shippingFile.file && response.order_id) {
+        try {
+          console.log('Uploading shipping file for order:', response.order_id);
+          
+          const fileExtension = shippingFile.file.name.split('.').pop();
+          const fileName = `order_${response.order_id}_${Date.now()}.${fileExtension}`;
+          const filePath = `${response.order_id}/${fileName}`;
 
-      if (error) {
-        console.error('PIX payment error:', error);
-        toast({
-          title: "Erro ao criar pagamento PIX",
-          description: error.message || "Tente novamente em alguns instantes.",
-          variant: "destructive",
-        });
-        return;
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('shipping-files')
+            .upload(filePath, shippingFile.file);
+
+          if (uploadError) {
+            console.error('Error uploading shipping file:', uploadError);
+          } else {
+            console.log('Shipping file uploaded successfully:', uploadData);
+            
+            const { error: dbError } = await supabase
+              .from('order_shipping_files')
+              .insert({
+                order_id: response.order_id,
+                file_name: shippingFile.file.name,
+                file_path: filePath,
+                file_size: shippingFile.file.size,
+              });
+
+            if (dbError) {
+              console.error('Error saving shipping file reference:', dbError);
+            }
+          }
+        } catch (uploadError) {
+          console.error('Error in shipping file upload process:', uploadError);
+        }
       }
 
-      setPixPaymentData(data);
+      // Set PIX data to show payment UI
+      setModernPixData({
+        qr_code: response.qr_code,
+        qr_code_base64: response.qr_code_base64,
+        payment_id: response.payment_id,
+      });
       
       toast({
         title: "PIX gerado com sucesso!",
@@ -403,9 +426,34 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
 
     } catch (error) {
       console.error('Error creating PIX payment:', error);
+      
+      let errorTitle = "Erro ao gerar PIX";
+      let errorDescription = "Tente novamente em alguns instantes.";
+      
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        });
+        
+        if (error.message.includes('Webhook N8N não está ativo') || error.message.includes('WEBHOOK_NOT_REGISTERED')) {
+          errorTitle = "Webhook N8N não está ativo";
+          errorDescription = "O sistema de pagamento PIX não está configurado. Entre em contato com o administrador.";
+        } else if (error.message.includes('timeout') || error.message.includes('PIX_SERVICE_TIMEOUT')) {
+          errorTitle = "Timeout do serviço";
+          errorDescription = "O serviço de PIX demorou para responder. Tente novamente.";
+        } else if (error.message.includes('PIX service unavailable') || error.message.includes('503')) {
+          errorTitle = "Serviço indisponível";
+          errorDescription = "O serviço de PIX está temporariamente indisponível. Tente novamente em alguns minutos.";
+        } else {
+          errorDescription = error.message;
+        }
+      }
+      
       toast({
-        title: "Erro inesperado",
-        description: "Ocorreu um erro ao processar seu pagamento. Tente novamente.",
+        title: errorTitle,
+        description: errorDescription,
         variant: "destructive",
       });
     } finally {
@@ -430,7 +478,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
       return;
     }
 
-    await processPixPayment();
+    await createPixPayment();
   };
 
   const checkHighRotationProducts = async (): Promise<boolean> => {
@@ -450,153 +498,15 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
   };
 
   const processPixPayment = async () => {
-    setIsProcessingPayment(true);
-
-    try {
-      const orderItems = cartItems.map(item => ({
-        productId: item.productId,
-        productName: item.productName,
-        quantity: item.quantity,
-        unitPrice: item.price,
-      }));
-
-      const paymentRequest: PixPaymentRequest = {
-        amount: parseFloat(total.toFixed(2)),
-        description: `Pedido - ${cartItems.length} item(s)`,
-        payer: {
-          email: formData.email,
-          firstName: formData.firstName,
-          lastName: formData.lastName || '',
-          cpf: formData.cpf
-        },
-        orderItems,
-        shippingAddress: isLabelMethod() ? null : {
-          street: formData.address,
-          number: formData.number,
-          complement: formData.complement,
-          neighborhood: formData.neighborhood,
-          city: formData.city,
-          state: formData.state,
-          zipCode: formData.zipCode,
-        }
-      };
-
-      console.log('Creating modern PIX payment...', paymentRequest);
-      const response = await createModernPixPayment(paymentRequest);
-      
-      console.log('Modern PIX payment created:', response);
-      
-      // Upload shipping file if provided
-      if (shippingFile && shippingFile.file && response.order_id) {
-        try {
-          console.log('Uploading shipping file for order:', response.order_id);
-          
-          // Generate unique filename
-          const fileExtension = shippingFile.file.name.split('.').pop();
-          const fileName = `order_${response.order_id}_${Date.now()}.${fileExtension}`;
-          const filePath = `${response.order_id}/${fileName}`;
-
-          // Upload file to Supabase Storage
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('shipping-files')
-            .upload(filePath, shippingFile.file);
-
-          if (uploadError) {
-            console.error('Error uploading shipping file:', uploadError);
-            toast({
-              title: "Aviso",
-              description: "Pedido criado, mas houve erro no upload da etiqueta. Você pode fazer o upload depois.",
-              variant: "destructive",
-            });
-          } else {
-            // Insert file record into database
-            const { error: dbError } = await supabase
-              .from('order_shipping_files')
-              .insert({
-                order_id: response.order_id,
-                file_name: shippingFile.file.name,
-                file_path: filePath,
-                file_size: shippingFile.file.size,
-              });
-
-            if (dbError) {
-              console.error('Error saving shipping file record:', dbError);
-            } else {
-              console.log('Shipping file uploaded successfully');
-            }
-          }
-        } catch (fileError) {
-          console.error('Error processing shipping file:', fileError);
-        }
-      }
-      
-      // Open the PIX modal with the payment data
-      setPixModalData({
-        qrCodeBase64: response.qr_code_base64,
-        qrCodeCopyPaste: response.qr_code,
-        paymentId: response.payment_id,
-        amount: parseFloat(total.toFixed(2))
-      });
-      setShowPixModal(true);
-
-      toast({
-        title: "PIX gerado com sucesso!",
-        description: "Escaneie o QR Code ou copie o código PIX para efetuar o pagamento.",
-      });
-
-    } catch (error) {
-      console.error('Error creating modern PIX:', error);
-      
-      // Melhor tratamento de erro para diferentes cenários
-      let errorTitle = "Erro ao gerar PIX";
-      let errorDescription = "Tente novamente em alguns instantes.";
-      let showRetryButton = true;
-      
-      if (error instanceof Error) {
-        // Log detalhes do erro para debugging
-        console.error('Detalhes do erro PIX:', {
-          message: error.message,
-          name: error.name,
-          stack: error.stack
-        });
-        
-        // Tratar erros específicos do webhook
-        if (error.message.includes('Webhook N8N não está ativo') || error.message.includes('WEBHOOK_NOT_REGISTERED')) {
-          errorTitle = "Webhook N8N não está ativo";
-          errorDescription = "O sistema de pagamento PIX não está configurado. Entre em contato com o administrador.";
-          showRetryButton = false;
-        } else if (error.message.includes('timeout') || error.message.includes('PIX_SERVICE_TIMEOUT')) {
-          errorTitle = "Timeout do serviço";
-          errorDescription = "O serviço de PIX demorou para responder. Tente novamente.";
-        } else if (error.message.includes('PIX service unavailable') || error.message.includes('503')) {
-          errorTitle = "Serviço indisponível";
-          errorDescription = "O serviço de PIX está temporariamente indisponível. Tente novamente em alguns minutos.";
-        } else {
-          errorDescription = error.message;
-        }
-      }
-      
-      toast({
-        title: errorTitle,
-        description: errorDescription,
-        variant: "destructive",
-      });
-      
-      // Mostrar botão de retry se apropriado
-      if (showRetryButton) {
-        setTimeout(() => {
-          toast({
-            title: "💡 Dica",
-            description: "Você pode tentar gerar o PIX novamente clicando no botão de pagamento.",
-          });
-        }, 3000);
-      }
-    } finally {
-      setIsProcessingPayment(false);
-    }
+    // This function is no longer used, kept for compatibility
+    await createPixPayment();
   };
 
   const handleSubmit = () => {
+    createModernPix();
+  };
+
+  const handleGeneratePix = () => {
     createModernPix();
   };
 
@@ -949,9 +859,17 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Após confirmar o pedido, você receberá o QR Code para pagamento via PIX.
+                    Clique no botão abaixo para gerar o QR Code PIX para pagamento.
                     O pagamento é processado instantaneamente.
                   </p>
+                  <Button 
+                    onClick={handleGeneratePix}
+                    disabled={isProcessingPayment || !canAdvanceToNextStep()}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {isProcessingPayment ? "Gerando PIX..." : "Gerar PIX"}
+                  </Button>
                 </CardContent>
               </Card>
             )}
@@ -995,24 +913,17 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
                   <Button 
                     variant="outline" 
                     onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
-                    disabled={currentStep === 1}
+                    disabled={currentStep === 1 || isProcessingPayment}
                   >
                     Voltar
                   </Button>
                   
-                  {currentStep < 4 ? (
+                  {currentStep < 3 && (
                     <Button 
                       onClick={() => setCurrentStep(currentStep + 1)}
                       disabled={!canAdvanceToNextStep()}
                     >
                       Continuar
-                    </Button>
-                  ) : (
-                    <Button 
-                      onClick={handleSubmit} 
-                      disabled={isProcessingPayment}
-                    >
-                      {isProcessingPayment ? "Processando..." : "Finalizar Pedido"}
                     </Button>
                   )}
                 </div>
