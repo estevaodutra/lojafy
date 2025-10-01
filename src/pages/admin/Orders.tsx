@@ -6,10 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import OrderDetailsModal from "@/components/OrderDetailsModal";
-import { ShippingLabelUploadModal } from "@/components/admin/ShippingLabelUploadModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, Package, Search, Filter, Upload } from "lucide-react";
+import { Eye, Package, Search, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -32,10 +31,8 @@ const AdminOrders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [uploadLabelOrder, setUploadLabelOrder] = useState<Order | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [labelFilter, setLabelFilter] = useState("all");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -147,10 +144,7 @@ const AdminOrders = () => {
     const matchesSearch = order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       `${order.profiles.first_name} ${order.profiles.last_name}`.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
-    const matchesLabel = labelFilter === "all" || 
-      (labelFilter === "with" && order.has_shipping_file) ||
-      (labelFilter === "without" && !order.has_shipping_file);
-    return matchesSearch && matchesStatus && matchesLabel;
+    return matchesSearch && matchesStatus;
   });
 
   return (
@@ -194,16 +188,6 @@ const AdminOrders = () => {
                 <SelectItem value="shipped">Enviado</SelectItem>
                 <SelectItem value="delivered">Entregue</SelectItem>
                 <SelectItem value="cancelled">Cancelado</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={labelFilter} onValueChange={setLabelFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Status da etiqueta" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as etiquetas</SelectItem>
-                <SelectItem value="with">Com etiqueta</SelectItem>
-                <SelectItem value="without">Sem etiqueta</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -250,29 +234,17 @@ const AdminOrders = () => {
                      </TableCell>
                      <TableCell>{getStatusBadge(order.status)}</TableCell>
                      <TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {order.has_shipping_file ? (
-                            <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
-                              📄 Enviada
-                            </Badge>
-                          ) : (
-                            <>
-                              <Badge variant="outline" className="text-orange-600 border-orange-300">
-                                ⚠️ Pendente
-                              </Badge>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setUploadLabelOrder(order)}
-                                title="Upload de etiqueta"
-                              >
-                                <Upload className="w-4 h-4" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
+                     <TableCell>
+                       {order.has_shipping_file ? (
+                         <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
+                           📄 Enviada
+                         </Badge>
+                       ) : (
+                         <Badge variant="outline">
+                           📄 Pendente
+                         </Badge>
+                       )}
+                     </TableCell>
                      <TableCell>R$ {order.total_amount.toFixed(2)}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
@@ -313,16 +285,6 @@ const AdminOrders = () => {
           orderId={selectedOrder.id}
           isOpen={!!selectedOrder}
           onClose={() => setSelectedOrder(null)}
-        />
-      )}
-
-      {uploadLabelOrder && (
-        <ShippingLabelUploadModal
-          orderId={uploadLabelOrder.id}
-          orderNumber={uploadLabelOrder.order_number}
-          isOpen={!!uploadLabelOrder}
-          onClose={() => setUploadLabelOrder(null)}
-          onSuccess={fetchOrders}
         />
       )}
     </div>
