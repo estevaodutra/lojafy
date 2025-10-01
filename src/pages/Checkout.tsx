@@ -420,25 +420,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
     }
   };
 
-  const createModernPix = async () => {
-    if (!formData.firstName || !formData.email || !formData.cpf) {
-      toast({
-        title: "Dados incompletos",
-        description: "Preencha todos os dados pessoais para continuar.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Check if there are high rotation products in cart
-    const hasHighRotationProducts = await checkHighRotationProducts();
-    if (hasHighRotationProducts) {
-      setShowHighRotationAlert(true);
-      return;
-    }
-
-    await processPixPayment();
-  };
+  // Removed unused createModernPix function
 
   const checkHighRotationProducts = async (): Promise<boolean> => {
     try {
@@ -654,6 +636,13 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
       }
 
       // Step 6: Store order ID and advance to payment
+      console.log('✅ [DEBUG] Setting createdOrderId:', orderData.id);
+      console.log('✅ [DEBUG] Setting createdOrderData:', {
+        id: orderData.id,
+        order_number: orderData.order_number,
+        total_amount: orderData.total_amount,
+      });
+      
       setCreatedOrderId(orderData.id);
       
       toast({
@@ -678,10 +667,15 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
 
   // NEW: Process PIX payment for existing order
   const processPixPayment = async () => {
-    if (!createdOrderId) {
+    console.log('🔍 [DEBUG] processPixPayment called');
+    console.log('🔍 [DEBUG] createdOrderId:', createdOrderId);
+    console.log('🔍 [DEBUG] createdOrderData:', createdOrderData);
+    
+    if (!createdOrderId || !createdOrderData) {
+      console.error('❌ [DEBUG] Missing order data - createdOrderId:', createdOrderId, 'createdOrderData:', createdOrderData);
       toast({
         title: "Erro",
-        description: "Pedido não foi criado. Por favor, tente novamente.",
+        description: "Pedido não foi criado. Por favor, volte e crie o pedido primeiro.",
         variant: "destructive",
       });
       return;
@@ -691,6 +685,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
 
     try {
       console.log('💳 Generating PIX for order:', createdOrderId);
+      console.log('📦 Order details:', createdOrderData);
 
       const orderItems = cartItems.map(item => ({
         productId: item.productId,
@@ -726,15 +721,25 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
         return;
       }
 
-      console.log('✅ PIX generated:', data);
+      console.log('✅ PIX generated successfully:', data);
+      console.log('✅ [DEBUG] PIX data received:', {
+        qr_code_base64: data.qr_code_base64 ? 'present' : 'missing',
+        qr_code: data.qr_code ? 'present' : 'missing',
+        payment_id: data.payment_id,
+      });
       
       // Open the PIX modal with the payment data
-      setPixModalData({
+      const pixData = {
         qrCodeBase64: data.qr_code_base64,
         qrCodeCopyPaste: data.qr_code,
         paymentId: data.payment_id,
         amount: parseFloat(total.toFixed(2))
-      });
+      };
+      
+      console.log('✅ [DEBUG] Setting pixModalData:', pixData);
+      setPixModalData(pixData);
+      
+      console.log('✅ [DEBUG] Opening PIX modal');
       setShowPixModal(true);
 
       toast({
@@ -809,6 +814,21 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
   };
 
   const handleGeneratePixPayment = async () => {
+    console.log('🎯 [DEBUG] handleGeneratePixPayment called');
+    console.log('🔍 [DEBUG] Current state - createdOrderId:', createdOrderId);
+    console.log('🔍 [DEBUG] Current state - createdOrderData:', createdOrderData);
+    
+    if (!createdOrderId || !createdOrderData) {
+      console.error('❌ [DEBUG] Cannot generate PIX - missing order data');
+      toast({
+        title: "Erro",
+        description: "Dados do pedido não encontrados. Por favor, tente criar o pedido novamente.",
+        variant: "destructive",
+      });
+      setCurrentStep(3); // Go back to payment step
+      return;
+    }
+    
     await processPixPayment();
   };
 
@@ -1168,7 +1188,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
               </Card>
             )}
 
-            {currentStep === 4 && !createdOrderId && (
+            {currentStep === 4 && !createdOrderData && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1187,7 +1207,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
               </Card>
             )}
 
-            {currentStep === 4 && createdOrderId && (
+            {currentStep === 4 && createdOrderData && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1238,12 +1258,20 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
 
                     <Button 
                       onClick={handleGeneratePixPayment} 
-                      disabled={isProcessingPayment}
+                      disabled={isProcessingPayment || !createdOrderId || !createdOrderData}
                       className="w-full"
                       size="lg"
                     >
                       {isProcessingPayment ? "Gerando PIX..." : "Gerar Código PIX"}
                     </Button>
+                    
+                    {(!createdOrderId || !createdOrderData) && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-md mt-2">
+                        <p className="text-xs text-amber-700 text-center">
+                          ⚠️ Dados do pedido não disponíveis. Por favor, volte e recrie o pedido.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
