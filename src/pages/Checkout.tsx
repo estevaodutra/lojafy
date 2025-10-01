@@ -18,7 +18,7 @@ import Footer from "@/components/Footer";
 import PixPayment from "@/components/PixPayment";
 import { ModernPixPayment } from '@/components/ModernPixPayment';
 import { PixPaymentModal } from '@/components/PixPaymentModal';
-import { createModernPixPayment, PixPaymentRequest } from '@/lib/mercadoPago';
+
 import { ShoppingCart, CreditCard, Truck, Shield, AlertTriangle } from "lucide-react";
 import { ShippingMethodSelector } from "@/components/ShippingMethodSelector";
 import { HighRotationAlert } from '@/components/HighRotationAlert';
@@ -439,7 +439,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
   };
 
   // NEW: Create order with draft status BEFORE payment
-  const handleCreateOrder = async () => {
+  const handleCreateOrder = async (): Promise<{ id: string; order_number: string; total_amount: number } | null> => {
     // Validate shipping label if it's a label method
     if (isLabelMethod() && selectedShippingMethod?.requires_upload && !shippingFile) {
       toast({
@@ -447,7 +447,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
         description: "Por favor, anexe a etiqueta de envio antes de continuar.",
         variant: "destructive",
       });
-      return;
+      return null;
     }
 
     setIsCreatingOrder(true);
@@ -459,7 +459,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
       await saveUserDataAndAddress();
 
       // Step 2: Upload shipping file if provided
-      let uploadedFilePath = null;
+      let uploadedFilePath: string | null = null;
       if (shippingFile && shippingFile.file) {
         try {
           console.log('📤 Uploading shipping label...');
@@ -479,7 +479,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
               description: "Não foi possível fazer upload da etiqueta. Tente novamente.",
               variant: "destructive",
             });
-            return;
+            return null;
           }
 
           uploadedFilePath = tempFilePath;
@@ -491,7 +491,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
             description: "Erro inesperado. Tente novamente.",
             variant: "destructive",
           });
-          return;
+          return null;
         }
       }
 
@@ -503,7 +503,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
           description: "Você precisa estar logado para finalizar a compra.",
           variant: "destructive",
         });
-        return;
+        return null;
       }
 
       const externalReference = `order_${Date.now()}_${user?.id.substring(0, 8)}`;
@@ -516,7 +516,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
         shipping_amount: shippingCost,
         payment_method: 'pix',
         payment_status: 'pending',
-        status: 'draft', // Draft status until payment is generated
+        status: 'draft' as const, // Draft status until payment is generated
         shipping_method_id: selectedShippingMethod?.id || null,
         shipping_method_name: selectedShippingMethod?.name || null,
         shipping_estimated_days: selectedShippingMethod?.estimated_days || null,
@@ -539,24 +539,26 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
         .select()
         .single();
 
-      if (orderError) {
+      if (orderError || !orderData) {
         console.error('Error creating order:', orderError);
         toast({
           title: "Erro ao criar pedido",
           description: "Não foi possível criar o pedido. Tente novamente.",
           variant: "destructive",
         });
-        return;
+        return null;
       }
 
       console.log('✅ Order created with draft status:', orderData.id);
 
-      // Store order data for display
-      setCreatedOrderData({
+      const created = {
         id: orderData.id,
         order_number: orderData.order_number,
         total_amount: orderData.total_amount,
-      });
+      };
+
+      // Store order data for display
+      setCreatedOrderData(created);
 
       // Step 4: Create order items
       const orderItemsData = cartItems.map(item => ({
@@ -582,7 +584,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
           description: "Não foi possível criar os itens do pedido.",
           variant: "destructive",
         });
-        return;
+        return null;
       }
 
       // Step 5: Link shipping file to order if uploaded
@@ -637,11 +639,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
 
       // Step 6: Store order ID and advance to payment
       console.log('✅ [DEBUG] Setting createdOrderId:', orderData.id);
-      console.log('✅ [DEBUG] Setting createdOrderData:', {
-        id: orderData.id,
-        order_number: orderData.order_number,
-        total_amount: orderData.total_amount,
-      });
+      console.log('✅ [DEBUG] Setting createdOrderData:', created);
       
       setCreatedOrderId(orderData.id);
       
@@ -653,6 +651,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
       // Automatically advance to payment generation
       setCurrentStep(4);
 
+      return created;
     } catch (error) {
       console.error('Error creating order:', error);
       toast({
@@ -660,19 +659,23 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
         description: "Ocorreu um erro inesperado. Tente novamente.",
         variant: "destructive",
       });
+      return null;
     } finally {
       setIsCreatingOrder(false);
     }
   };
 
   // NEW: Process PIX payment for existing order
-  const processPixPayment = async () => {
+  const processPixPayment = async (params?: { orderId?: string; orderData?: { id: string; order_number: string; total_amount: number } }) => {
+    const effectiveOrderId = params?.orderId ?? createdOrderId;
+    const effectiveOrderData = params?.orderData ?? createdOrderData;
+
     console.log('🔍 [DEBUG] processPixPayment called');
-    console.log('🔍 [DEBUG] createdOrderId:', createdOrderId);
-    console.log('🔍 [DEBUG] createdOrderData:', createdOrderData);
+    console.log('🔍 [DEBUG] effectiveOrderId:', effectiveOrderId);
+    console.log('🔍 [DEBUG] effectiveOrderData:', effectiveOrderData);
     
-    if (!createdOrderId || !createdOrderData) {
-      console.error('❌ [DEBUG] Missing order data - createdOrderId:', createdOrderId, 'createdOrderData:', createdOrderData);
+    if (!effectiveOrderId || !effectiveOrderData) {
+      console.error('❌ [DEBUG] Missing order data - effectiveOrderId:', effectiveOrderId, 'effectiveOrderData:', effectiveOrderData);
       toast({
         title: "Erro",
         description: "Pedido não foi criado. Por favor, volte e crie o pedido primeiro.",
@@ -684,8 +687,8 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
     setIsProcessingPayment(true);
 
     try {
-      console.log('💳 Generating PIX for order:', createdOrderId);
-      console.log('📦 Order details:', createdOrderData);
+      console.log('💳 Generating PIX for order:', effectiveOrderId);
+      console.log('📦 Order details:', effectiveOrderData);
 
       const orderItems = cartItems.map(item => ({
         productId: item.productId,
@@ -695,14 +698,14 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
       }));
 
       const paymentRequest = {
-        orderId: createdOrderId, // Send existing order ID
+        orderId: effectiveOrderId, // Send existing order ID
         amount: parseFloat(total.toFixed(2)),
         description: `Pedido - ${cartItems.length} item(s)`,
         payer: {
           email: formData.email,
           firstName: formData.firstName,
           lastName: formData.lastName || '',
-          cpf: formData.cpf
+          cpf: cleanCPF(formData.cpf),
         },
         orderItems,
       };
@@ -775,7 +778,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
           errorTitle = "Serviço indisponível";
           errorDescription = "O serviço de PIX está temporariamente indisponível. Tente novamente em alguns minutos.";
         } else {
-          errorDescription = error.message;
+          errorDescription = (error as Error).message;
         }
       }
       
@@ -1415,7 +1418,17 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
         onClose={() => setShowHighRotationAlert(false)}
         onConfirm={() => {
           setShowHighRotationAlert(false);
-          processPixPayment();
+          (async () => {
+            let orderId = createdOrderId;
+            let orderData = createdOrderData;
+            if (!orderId || !orderData) {
+              const created = await handleCreateOrder();
+              if (!created) return;
+              orderId = created.id;
+              orderData = created;
+            }
+            await processPixPayment({ orderId, orderData });
+          })();
         }}
       />
     </div>
