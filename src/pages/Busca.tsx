@@ -225,6 +225,7 @@ const Busca = () => {
                   </div>
 
                   <Button 
+                    variant="cart"
                     className="w-full" 
                     size="sm"
                     onClick={() => handleAddToCart(product)}
