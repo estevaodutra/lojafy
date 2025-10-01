@@ -402,6 +402,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
       }
 
       setPixPaymentData(data);
+      setCurrentStep(4); // Avança para Step 4 após gerar PIX
       
       toast({
         title: "PIX gerado com sucesso!",
@@ -810,10 +811,8 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
       return;
     }
 
-    // Step 2: Create order first
-    if (!createdOrderId) {
-      await handleCreateOrder();
-    }
+    // Step 2: Generate PIX directly (old flow)
+    await createPixPayment();
   };
 
   const handleGeneratePixPayment = async () => {
@@ -1419,15 +1418,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
         onConfirm={() => {
           setShowHighRotationAlert(false);
           (async () => {
-            let orderId = createdOrderId;
-            let orderData = createdOrderData;
-            if (!orderId || !orderData) {
-              const created = await handleCreateOrder();
-              if (!created) return;
-              orderId = created.id;
-              orderData = created;
-            }
-            await processPixPayment({ orderId, orderData });
+            await createPixPayment();
           })();
         }}
       />
