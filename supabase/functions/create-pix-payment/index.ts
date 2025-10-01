@@ -13,7 +13,6 @@ const supabase = createClient(
 );
 
 interface PixPaymentRequest {
-  orderId?: string; // Optional: if provided, update existing order instead of creating new one
   amount: number;
   description: string;
   payer: {
@@ -28,7 +27,7 @@ interface PixPaymentRequest {
     quantity: number;
     unitPrice: number;
   }>;
-  shippingAddress?: any;
+  shippingAddress: any;
 }
 
 serve(async (req) => {
@@ -40,7 +39,7 @@ serve(async (req) => {
   try {
     console.log('Iniciando criação de pagamento PIX');
     
-    const { orderId, amount, description, payer, orderItems, shippingAddress }: PixPaymentRequest = await req.json();
+    const { amount, description, payer, orderItems, shippingAddress }: PixPaymentRequest = await req.json();
     
     // Since verify_jwt = false, we don't require authentication but try to get user if available
     let user = null;
@@ -332,125 +331,63 @@ serve(async (req) => {
       );
     }
 
-    let orderData;
+    // Generate order number
+    const orderNumber = externalReference.toUpperCase().replace('ORDER_', 'ORD-');
+    console.log('Generated order number:', orderNumber);
 
-    // If orderId is provided, update existing order instead of creating new one
-    if (orderId) {
-      console.log('Atualizando pedido existente:', orderId);
-      
-      // Fetch existing order
-      const { data: existingOrder, error: fetchError } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('id', orderId)
-        .single();
+    // Create order in database with N8N response data
+    const orderInsertData: any = {
+      order_number: orderNumber,
+      total_amount: amount,
+      payment_method: 'pix',
+      payment_status: 'pending',
+      status: 'pending',
+      payment_id: pixData.paymentId || externalReference,
+      pix_qr_code: pixData.qrCodeCopyPaste,
+      pix_qr_code_base64: pixData.qrCodeBase64,
+      shipping_address: shippingAddress,
+      external_reference: externalReference
+    };
 
-      if (fetchError || !existingOrder) {
-        console.error('Pedido não encontrado:', fetchError);
-        return new Response(
-          JSON.stringify({ error: 'Order not found' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+    // Only add user_id if we have an authenticated user
+    if (user) {
+      orderInsertData.user_id = user.id;
+    }
 
-      // Validate that order has shipping file if it's a label method
-      if (existingOrder.has_shipping_file === false && !existingOrder.shipping_address) {
-        console.error('Pedido sem etiqueta de envio obrigatória');
-        return new Response(
-          JSON.stringify({ 
-            error: 'Shipping label required',
-            message: 'Este pedido requer uma etiqueta de envio antes de gerar o pagamento.'
-          }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+    const { data: orderData, error: orderError } = await supabase
+      .from('orders')
+      .insert(orderInsertData)
+      .select()
+      .single();
 
-      // Update order with PIX data
-      const { data: updatedOrder, error: updateError } = await supabase
-        .from('orders')
-        .update({
-          payment_id: pixData.paymentId || externalReference,
-          pix_qr_code: pixData.qrCodeCopyPaste,
-          pix_qr_code_base64: pixData.qrCodeBase64,
-          status: 'awaiting_payment', // Update from draft to awaiting payment
-          external_reference: externalReference,
-        })
-        .eq('id', orderId)
-        .select()
-        .single();
+    if (orderError) {
+      console.error('Error creating order:', orderError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to create order' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-      if (updateError) {
-        console.error('Error updating order:', updateError);
-        return new Response(
-          JSON.stringify({ error: 'Failed to update order with payment data' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      orderData = updatedOrder;
-      console.log('✅ Pedido atualizado com dados do PIX');
-
-    } else {
-      // Legacy flow: create new order (for backward compatibility)
-      console.log('Criando novo pedido (fluxo legado)');
-      
-      const orderNumber = externalReference.toUpperCase().replace('ORDER_', 'ORD-');
-      console.log('Generated order number:', orderNumber);
-
-      const orderInsertData: any = {
-        order_number: orderNumber,
-        total_amount: amount,
-        payment_method: 'pix',
-        payment_status: 'pending',
-        status: 'awaiting_payment',
-        payment_id: pixData.paymentId || externalReference,
-        pix_qr_code: pixData.qrCodeCopyPaste,
-        pix_qr_code_base64: pixData.qrCodeBase64,
-        shipping_address: shippingAddress,
-        external_reference: externalReference
-      };
-
-      if (user) {
-        orderInsertData.user_id = user.id;
-      }
-
-      const { data: newOrder, error: orderError } = await supabase
-        .from('orders')
-        .insert(orderInsertData)
-        .select()
-        .single();
-
-      if (orderError) {
-        console.error('Error creating order:', orderError);
-        return new Response(
-          JSON.stringify({ error: 'Failed to create order' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      orderData = newOrder;
-
-      // Create order items
-      if (orderItems && orderItems.length > 0) {
-        const orderItemsData = orderItems.map(item => ({
-          order_id: orderData.id,
-          product_id: item.productId,
-          quantity: item.quantity,
-          unit_price: item.unitPrice,
-          total_price: item.quantity * item.unitPrice,
-          product_snapshot: {
-            name: item.productName,
-            price: item.unitPrice
-          }
-        }));
-
-        const { error: itemsError } = await supabase
-          .from('order_items')
-          .insert(orderItemsData);
-
-        if (itemsError) {
-          console.error('Error creating order items:', itemsError);
+    // Create order items
+    if (orderItems && orderItems.length > 0) {
+      const orderItemsData = orderItems.map(item => ({
+        order_id: orderData.id,
+        product_id: item.productId,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        total_price: item.quantity * item.unitPrice,
+        product_snapshot: {
+          name: item.productName,
+          price: item.unitPrice
         }
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItemsData);
+
+      if (itemsError) {
+        console.error('Error creating order items:', itemsError);
       }
     }
 

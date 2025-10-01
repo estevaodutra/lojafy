@@ -53,13 +53,6 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
     amount: number;
   } | null>(null);
   const [showHighRotationAlert, setShowHighRotationAlert] = useState(false);
-  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
-  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
-  const [createdOrderData, setCreatedOrderData] = useState<{
-    id: string;
-    order_number: string;
-    total_amount: number;
-  } | null>(null);
 
   // Check if cart is empty and redirect
   useEffect(() => {
@@ -420,7 +413,25 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
     }
   };
 
-  // Removed unused createModernPix function
+  const createModernPix = async () => {
+    if (!formData.firstName || !formData.email || !formData.cpf) {
+      toast({
+        title: "Dados incompletos",
+        description: "Preencha todos os dados pessoais para continuar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if there are high rotation products in cart
+    const hasHighRotationProducts = await checkHighRotationProducts();
+    if (hasHighRotationProducts) {
+      setShowHighRotationAlert(true);
+      return;
+    }
+
+    await processPixPayment();
+  };
 
   const checkHighRotationProducts = async (): Promise<boolean> => {
     try {
@@ -438,9 +449,8 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
     }
   };
 
-  // NEW: Create order with draft status BEFORE payment
-  const handleCreateOrder = async () => {
-    // Validate shipping label if it's a label method
+  const processPixPayment = async () => {
+    // Validate shipping label BEFORE payment if it's a label method
     if (isLabelMethod() && selectedShippingMethod?.requires_upload && !shippingFile) {
       toast({
         title: "Etiqueta obrigatória",
@@ -450,19 +460,14 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
       return;
     }
 
-    setIsCreatingOrder(true);
+    setIsProcessingPayment(true);
 
     try {
-      console.log('📝 Creating order with draft status...');
-
-      // Step 1: Save user data
-      await saveUserDataAndAddress();
-
-      // Step 2: Upload shipping file if provided
+      // Step 1: Upload shipping file FIRST if provided
       let uploadedFilePath = null;
       if (shippingFile && shippingFile.file) {
         try {
-          console.log('📤 Uploading shipping label...');
+          console.log('📤 Uploading shipping label before order creation...');
           
           const fileExtension = shippingFile.file.name.split('.').pop();
           const tempFileName = `temp_${Date.now()}.${fileExtension}`;
@@ -479,6 +484,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
               description: "Não foi possível fazer upload da etiqueta. Tente novamente.",
               variant: "destructive",
             });
+            setIsProcessingPayment(false);
             return;
           }
 
@@ -491,202 +497,12 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
             description: "Erro inesperado. Tente novamente.",
             variant: "destructive",
           });
+          setIsProcessingPayment(false);
           return;
         }
       }
 
-      // Step 3: Create order with draft status
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast({
-          title: "Erro de autenticação",
-          description: "Você precisa estar logado para finalizar a compra.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const externalReference = `order_${Date.now()}_${user?.id.substring(0, 8)}`;
-      const orderNumber = externalReference.toUpperCase().replace('ORDER_', 'ORD-');
-
-      const orderInsertData = {
-        user_id: user!.id,
-        order_number: orderNumber,
-        total_amount: total,
-        shipping_amount: shippingCost,
-        payment_method: 'pix',
-        payment_status: 'pending',
-        status: 'draft', // Draft status until payment is generated
-        shipping_method_id: selectedShippingMethod?.id || null,
-        shipping_method_name: selectedShippingMethod?.name || null,
-        shipping_estimated_days: selectedShippingMethod?.estimated_days || null,
-        shipping_address: isLabelMethod() ? null : {
-          street: formData.address,
-          number: formData.number,
-          complement: formData.complement,
-          neighborhood: formData.neighborhood,
-          city: formData.city,
-          state: formData.state,
-          zipCode: formData.zipCode,
-        },
-        external_reference: externalReference,
-        has_shipping_file: !!uploadedFilePath,
-      };
-
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .insert(orderInsertData)
-        .select()
-        .single();
-
-      if (orderError) {
-        console.error('Error creating order:', orderError);
-        toast({
-          title: "Erro ao criar pedido",
-          description: "Não foi possível criar o pedido. Tente novamente.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      console.log('✅ Order created with draft status:', orderData.id);
-
-      // Store order data for display
-      setCreatedOrderData({
-        id: orderData.id,
-        order_number: orderData.order_number,
-        total_amount: orderData.total_amount,
-      });
-
-      // Step 4: Create order items
-      const orderItemsData = cartItems.map(item => ({
-        order_id: orderData.id,
-        product_id: item.productId,
-        quantity: item.quantity,
-        unit_price: item.price,
-        total_price: item.quantity * item.price,
-        product_snapshot: {
-          name: item.productName,
-          price: item.price,
-        }
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItemsData);
-
-      if (itemsError) {
-        console.error('Error creating order items:', itemsError);
-        toast({
-          title: "Erro ao criar itens do pedido",
-          description: "Não foi possível criar os itens do pedido.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Step 5: Link shipping file to order if uploaded
-      if (uploadedFilePath && orderData.id) {
-        try {
-          const fileExtension = shippingFile.file.name.split('.').pop();
-          const finalFileName = `order_${orderData.id}_${Date.now()}.${fileExtension}`;
-          const finalFilePath = `${orderData.id}/${finalFileName}`;
-
-          // Move file to final location
-          const { error: moveError } = await supabase.storage
-            .from('shipping-files')
-            .move(uploadedFilePath, finalFilePath);
-
-          if (moveError) {
-            console.error('Error moving file:', moveError);
-            // Fallback: copy instead
-            const { data: downloadData } = await supabase.storage
-              .from('shipping-files')
-              .download(uploadedFilePath);
-            
-            if (downloadData) {
-              await supabase.storage
-                .from('shipping-files')
-                .upload(finalFilePath, downloadData);
-              
-              await supabase.storage
-                .from('shipping-files')
-                .remove([uploadedFilePath]);
-            }
-          }
-
-          // Save file metadata
-          const { error: dbError } = await supabase
-            .from('order_shipping_files')
-            .insert({
-              order_id: orderData.id,
-              file_name: shippingFile.name,
-              file_path: finalFilePath,
-              file_size: shippingFile.size
-            });
-
-          if (dbError) {
-            console.error('❌ Error saving file metadata:', dbError);
-          } else {
-            console.log('✅ Shipping label linked to order');
-          }
-        } catch (err) {
-          console.error('❌ Error linking shipping file:', err);
-        }
-      }
-
-      // Step 6: Store order ID and advance to payment
-      console.log('✅ [DEBUG] Setting createdOrderId:', orderData.id);
-      console.log('✅ [DEBUG] Setting createdOrderData:', {
-        id: orderData.id,
-        order_number: orderData.order_number,
-        total_amount: orderData.total_amount,
-      });
-      
-      setCreatedOrderId(orderData.id);
-      
-      toast({
-        title: "Pedido criado!",
-        description: "Agora você pode gerar o pagamento PIX.",
-      });
-
-      // Automatically advance to payment generation
-      setCurrentStep(4);
-
-    } catch (error) {
-      console.error('Error creating order:', error);
-      toast({
-        title: "Erro ao criar pedido",
-        description: "Ocorreu um erro inesperado. Tente novamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCreatingOrder(false);
-    }
-  };
-
-  // NEW: Process PIX payment for existing order
-  const processPixPayment = async () => {
-    console.log('🔍 [DEBUG] processPixPayment called');
-    console.log('🔍 [DEBUG] createdOrderId:', createdOrderId);
-    console.log('🔍 [DEBUG] createdOrderData:', createdOrderData);
-    
-    if (!createdOrderId || !createdOrderData) {
-      console.error('❌ [DEBUG] Missing order data - createdOrderId:', createdOrderId, 'createdOrderData:', createdOrderData);
-      toast({
-        title: "Erro",
-        description: "Pedido não foi criado. Por favor, volte e crie o pedido primeiro.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsProcessingPayment(true);
-
-    try {
-      console.log('💳 Generating PIX for order:', createdOrderId);
-      console.log('📦 Order details:', createdOrderData);
-
+      // Step 2: Create payment and order
       const orderItems = cartItems.map(item => ({
         productId: item.productId,
         productName: item.productName,
@@ -694,8 +510,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
         unitPrice: item.price,
       }));
 
-      const paymentRequest = {
-        orderId: createdOrderId, // Send existing order ID
+      const paymentRequest: PixPaymentRequest = {
         amount: parseFloat(total.toFixed(2)),
         description: `Pedido - ${cartItems.length} item(s)`,
         payer: {
@@ -705,41 +520,85 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
           cpf: formData.cpf
         },
         orderItems,
+        shippingAddress: isLabelMethod() ? null : {
+          street: formData.address,
+          number: formData.number,
+          complement: formData.complement,
+          neighborhood: formData.neighborhood,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
+        }
       };
 
-      const { data, error } = await supabase.functions.invoke('create-pix-payment', {
-        body: paymentRequest,
-      });
+      console.log('💳 Creating modern PIX payment...', paymentRequest);
+      const response = await createModernPixPayment(paymentRequest);
+      
+      console.log('✅ Modern PIX payment created:', response);
+      
+      // Step 3: Move uploaded file to proper location and link to order
+      if (uploadedFilePath && response.order_id) {
+        try {
+          console.log('📦 Linking shipping label to order:', response.order_id);
+          
+          // Move file from temp to order folder
+          const fileExtension = shippingFile.file.name.split('.').pop();
+          const finalFileName = `order_${response.order_id}_${Date.now()}.${fileExtension}`;
+          const finalFilePath = `${response.order_id}/${finalFileName}`;
 
-      if (error) {
-        console.error('PIX generation error:', error);
-        toast({
-          title: "Erro ao gerar PIX",
-          description: error.message || "Tente novamente em alguns instantes.",
-          variant: "destructive",
-        });
-        return;
+          // Copy file to final location
+          const { error: moveError } = await supabase.storage
+            .from('shipping-files')
+            .move(uploadedFilePath, finalFilePath);
+
+          if (moveError) {
+            console.error('Error moving file:', moveError);
+            // Try to copy instead
+            const { data: downloadData } = await supabase.storage
+              .from('shipping-files')
+              .download(uploadedFilePath);
+            
+            if (downloadData) {
+              await supabase.storage
+                .from('shipping-files')
+                .upload(finalFilePath, downloadData);
+              
+              // Delete temp file
+              await supabase.storage
+                .from('shipping-files')
+                .remove([uploadedFilePath]);
+            }
+          }
+
+          console.log('✅ Shipping label moved to final location:', finalFilePath);
+
+          // Save file metadata to database
+          const { error: dbError } = await supabase
+            .from('order_shipping_files')
+            .insert({
+              order_id: response.order_id,
+              file_name: shippingFile.name,
+              file_path: finalFilePath,
+              file_size: shippingFile.size
+            });
+
+          if (dbError) {
+            console.error('❌ Error saving file metadata:', dbError);
+          } else {
+            console.log('✅ File metadata saved successfully');
+          }
+        } catch (uploadErr) {
+          console.error('❌ Unexpected error linking file to order:', uploadErr);
+        }
       }
-
-      console.log('✅ PIX generated successfully:', data);
-      console.log('✅ [DEBUG] PIX data received:', {
-        qr_code_base64: data.qr_code_base64 ? 'present' : 'missing',
-        qr_code: data.qr_code ? 'present' : 'missing',
-        payment_id: data.payment_id,
-      });
       
       // Open the PIX modal with the payment data
-      const pixData = {
-        qrCodeBase64: data.qr_code_base64,
-        qrCodeCopyPaste: data.qr_code,
-        paymentId: data.payment_id,
+      setPixModalData({
+        qrCodeBase64: response.qr_code_base64,
+        qrCodeCopyPaste: response.qr_code,
+        paymentId: response.payment_id,
         amount: parseFloat(total.toFixed(2))
-      };
-      
-      console.log('✅ [DEBUG] Setting pixModalData:', pixData);
-      setPixModalData(pixData);
-      
-      console.log('✅ [DEBUG] Opening PIX modal');
+      });
       setShowPixModal(true);
 
       toast({
@@ -799,46 +658,17 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
     }
   };
 
-  const handleSubmit = async () => {
-    // Step 1: Check for high rotation products
-    const hasHighRotationProducts = await checkHighRotationProducts();
-    if (hasHighRotationProducts) {
-      setShowHighRotationAlert(true);
-      return;
-    }
-
-    // Step 2: Create order first
-    if (!createdOrderId) {
-      await handleCreateOrder();
-    }
-  };
-
-  const handleGeneratePixPayment = async () => {
-    console.log('🎯 [DEBUG] handleGeneratePixPayment called');
-    console.log('🔍 [DEBUG] Current state - createdOrderId:', createdOrderId);
-    console.log('🔍 [DEBUG] Current state - createdOrderData:', createdOrderData);
-    
-    if (!createdOrderId || !createdOrderData) {
-      console.error('❌ [DEBUG] Cannot generate PIX - missing order data');
-      toast({
-        title: "Erro",
-        description: "Dados do pedido não encontrados. Por favor, tente criar o pedido novamente.",
-        variant: "destructive",
-      });
-      setCurrentStep(3); // Go back to payment step
-      return;
-    }
-    
-    await processPixPayment();
+  const handleSubmit = () => {
+    createModernPix();
   };
 
   const handlePixPaymentConfirmed = () => {
     clearCart();
     toast({
       title: "Pagamento confirmado!",
-      description: `Pedido ${createdOrderData?.order_number || ''} processado com sucesso.`,
+      description: "Seu pedido foi processado com sucesso.",
     });
-    navigate("/customer/orders");
+    navigate("/");
   };
 
   const steps = [
@@ -1188,26 +1018,7 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
               </Card>
             )}
 
-            {currentStep === 4 && !createdOrderData && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="w-5 h-5" />
-                    Processando Pedido
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-                    <p className="text-muted-foreground">
-                      Criando seu pedido e validando dados...
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {currentStep === 4 && createdOrderData && (
+            {currentStep === 4 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1216,97 +1027,56 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {/* Order Number Display */}
-                    <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Shield className="w-5 h-5 text-green-600" />
-                        <p className="text-sm font-semibold text-green-800">
-                          Pedido criado com sucesso!
-                        </p>
-                      </div>
-                      <p className="text-lg font-bold text-green-900">
-                        Número do Pedido: {createdOrderData?.order_number || 'Carregando...'}
-                      </p>
-                    </div>
-
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-                      <p className="text-sm text-blue-700">
-                        Clique no botão abaixo para gerar o código PIX e finalizar o pagamento.
-                      </p>
-                    </div>
-                    
-                    <div className="space-y-2 text-sm p-4 bg-muted/50 rounded-lg">
-                      <p><strong>Nome:</strong> {formData.firstName} {formData.lastName}</p>
-                      <p><strong>E-mail:</strong> {formData.email}</p>
-                      <p><strong>Telefone:</strong> {formData.phone}</p>
-                      {!isLabelMethod() ? (
-                        <p><strong>Endereço:</strong> {formData.address}, {formData.number} {formData.complement && `- ${formData.complement}`}, {formData.neighborhood}, {formData.city} - {formData.state}</p>
-                      ) : (
-                        <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-                          <p><strong>Entrega:</strong> Envio com Etiqueta</p>
-                          {shippingFile && (
-                            <p className="text-xs text-blue-600 mt-1">
-                              ✅ Etiqueta anexada: {shippingFile.name}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                      <p><strong>Pagamento:</strong> PIX</p>
-                      <p><strong>Total:</strong> {formatPrice(total)}</p>
-                    </div>
-
-                    <Button 
-                      onClick={handleGeneratePixPayment} 
-                      disabled={isProcessingPayment || !createdOrderId || !createdOrderData}
-                      className="w-full"
-                      size="lg"
-                    >
-                      {isProcessingPayment ? "Gerando PIX..." : "Gerar Código PIX"}
-                    </Button>
-                    
-                    {(!createdOrderId || !createdOrderData) && (
-                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-md mt-2">
-                        <p className="text-xs text-amber-700 text-center">
-                          ⚠️ Dados do pedido não disponíveis. Por favor, volte e recrie o pedido.
-                        </p>
+                  <p className="text-muted-foreground mb-4">
+                    Revise seus dados e finalize a compra. Você receberá um e-mail de confirmação.
+                  </p>
+                  <div className="space-y-2 text-sm">
+                    <p><strong>Nome:</strong> {formData.firstName} {formData.lastName}</p>
+                    <p><strong>E-mail:</strong> {formData.email}</p>
+                    <p><strong>Telefone:</strong> {formData.phone}</p>
+                    {!isLabelMethod() ? (
+                      <p><strong>Endereço:</strong> {formData.address}, {formData.number} {formData.complement && `- ${formData.complement}`}, {formData.neighborhood}, {formData.city} - {formData.state}</p>
+                    ) : (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                        <p><strong>Entrega:</strong> Envio com Etiqueta</p>
+                        {shippingFile && (
+                          <p className="text-xs text-blue-600 mt-1">
+                            Etiqueta anexada: {shippingFile.name}
+                          </p>
+                        )}
                       </div>
                     )}
+                    <p><strong>Pagamento:</strong> PIX</p>
                   </div>
                 </CardContent>
               </Card>
             )}
 
-
                 {/* Navigation Buttons */}
                 <div className="flex justify-between">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
+                    disabled={currentStep === 1}
+                  >
+                    Voltar
+                  </Button>
+                  
                   {currentStep < 4 ? (
-                    <>
-                      <Button 
-                        variant="outline" 
-                        onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
-                        disabled={currentStep === 1}
-                      >
-                        Voltar
-                      </Button>
-                      
-                      {currentStep < 3 ? (
-                        <Button 
-                          onClick={() => setCurrentStep(currentStep + 1)}
-                          disabled={!canAdvanceToNextStep()}
-                        >
-                          Continuar
-                        </Button>
-                      ) : currentStep === 3 ? (
-                        <Button 
-                          onClick={handleSubmit}
-                          disabled={isCreatingOrder || !canAdvanceToNextStep()}
-                        >
-                          {isCreatingOrder ? "Criando pedido..." : "Criar Pedido e Continuar"}
-                        </Button>
-                      ) : null}
-                    </>
-                  ) : null}
+                    <Button 
+                      onClick={() => setCurrentStep(currentStep + 1)}
+                      disabled={!canAdvanceToNextStep()}
+                    >
+                      Continuar
+                    </Button>
+                  ) : (
+                    <Button 
+                      onClick={handleSubmit} 
+                      disabled={isProcessingPayment}
+                    >
+                      {isProcessingPayment ? "Processando..." : "Finalizar Pedido"}
+                    </Button>
+                  )}
                 </div>
               </>
             )}
