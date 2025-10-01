@@ -21,6 +21,13 @@ const Busca = () => {
   const { addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
   const { addItem } = useCart();
 
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(price);
+  };
+
   useEffect(() => {
     const searchProducts = async () => {
       if (!searchQuery.trim()) {
@@ -208,11 +215,11 @@ const Busca = () => {
 
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-lg font-bold text-primary">
-                      R$ {(product.price / 100).toFixed(2).replace('.', ',')}
+                      {formatPrice(Number(product.price))}
                     </span>
                     {product.original_price && product.original_price > product.price && (
                       <span className="text-sm text-muted-foreground line-through">
-                        R$ {(product.original_price / 100).toFixed(2).replace('.', ',')}
+                        {formatPrice(Number(product.original_price))}
                       </span>
                     )}
                   </div>
