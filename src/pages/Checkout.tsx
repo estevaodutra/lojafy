@@ -450,9 +450,59 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
   };
 
   const processPixPayment = async () => {
+    // Validate shipping label BEFORE payment if it's a label method
+    if (isLabelMethod() && selectedShippingMethod?.requires_upload && !shippingFile) {
+      toast({
+        title: "Etiqueta obrigatória",
+        description: "Por favor, anexe a etiqueta de envio antes de continuar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsProcessingPayment(true);
 
     try {
+      // Step 1: Upload shipping file FIRST if provided
+      let uploadedFilePath = null;
+      if (shippingFile && shippingFile.file) {
+        try {
+          console.log('📤 Uploading shipping label before order creation...');
+          
+          const fileExtension = shippingFile.file.name.split('.').pop();
+          const tempFileName = `temp_${Date.now()}.${fileExtension}`;
+          const tempFilePath = `temp/${tempFileName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('shipping-files')
+            .upload(tempFilePath, shippingFile.file);
+
+          if (uploadError) {
+            console.error('Error uploading shipping file:', uploadError);
+            toast({
+              title: "Erro no upload da etiqueta",
+              description: "Não foi possível fazer upload da etiqueta. Tente novamente.",
+              variant: "destructive",
+            });
+            setIsProcessingPayment(false);
+            return;
+          }
+
+          uploadedFilePath = tempFilePath;
+          console.log('✅ Shipping label uploaded successfully:', uploadedFilePath);
+        } catch (uploadErr) {
+          console.error('Unexpected error uploading file:', uploadErr);
+          toast({
+            title: "Erro ao enviar etiqueta",
+            description: "Erro inesperado. Tente novamente.",
+            variant: "destructive",
+          });
+          setIsProcessingPayment(false);
+          return;
+        }
+      }
+
+      // Step 2: Create payment and order
       const orderItems = cartItems.map(item => ({
         productId: item.productId,
         productName: item.productName,
@@ -481,52 +531,64 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
         }
       };
 
-      console.log('Creating modern PIX payment...', paymentRequest);
+      console.log('💳 Creating modern PIX payment...', paymentRequest);
       const response = await createModernPixPayment(paymentRequest);
       
-      console.log('Modern PIX payment created:', response);
+      console.log('✅ Modern PIX payment created:', response);
       
-      // Upload shipping file if provided
-      if (shippingFile && shippingFile.file && response.order_id) {
+      // Step 3: Move uploaded file to proper location and link to order
+      if (uploadedFilePath && response.order_id) {
         try {
-          console.log('Uploading shipping file for order:', response.order_id);
+          console.log('📦 Linking shipping label to order:', response.order_id);
           
-          // Generate unique filename
+          // Move file from temp to order folder
           const fileExtension = shippingFile.file.name.split('.').pop();
-          const fileName = `order_${response.order_id}_${Date.now()}.${fileExtension}`;
-          const filePath = `${response.order_id}/${fileName}`;
+          const finalFileName = `order_${response.order_id}_${Date.now()}.${fileExtension}`;
+          const finalFilePath = `${response.order_id}/${finalFileName}`;
 
-          // Upload file to Supabase Storage
-          const { data: uploadData, error: uploadError } = await supabase.storage
+          // Copy file to final location
+          const { error: moveError } = await supabase.storage
             .from('shipping-files')
-            .upload(filePath, shippingFile.file);
+            .move(uploadedFilePath, finalFilePath);
 
-          if (uploadError) {
-            console.error('Error uploading shipping file:', uploadError);
-            toast({
-              title: "Aviso",
-              description: "Pedido criado, mas houve erro no upload da etiqueta. Você pode fazer o upload depois.",
-              variant: "destructive",
-            });
-          } else {
-            // Insert file record into database
-            const { error: dbError } = await supabase
-              .from('order_shipping_files')
-              .insert({
-                order_id: response.order_id,
-                file_name: shippingFile.file.name,
-                file_path: filePath,
-                file_size: shippingFile.file.size,
-              });
-
-            if (dbError) {
-              console.error('Error saving shipping file record:', dbError);
-            } else {
-              console.log('Shipping file uploaded successfully');
+          if (moveError) {
+            console.error('Error moving file:', moveError);
+            // Try to copy instead
+            const { data: downloadData } = await supabase.storage
+              .from('shipping-files')
+              .download(uploadedFilePath);
+            
+            if (downloadData) {
+              await supabase.storage
+                .from('shipping-files')
+                .upload(finalFilePath, downloadData);
+              
+              // Delete temp file
+              await supabase.storage
+                .from('shipping-files')
+                .remove([uploadedFilePath]);
             }
           }
-        } catch (fileError) {
-          console.error('Error processing shipping file:', fileError);
+
+          console.log('✅ Shipping label moved to final location:', finalFilePath);
+
+          // Save file metadata to database
+          const { error: dbError } = await supabase
+            .from('order_shipping_files')
+            .insert({
+              order_id: response.order_id,
+              file_name: shippingFile.name,
+              file_path: finalFilePath,
+              file_size: shippingFile.size
+            });
+
+          if (dbError) {
+            console.error('❌ Error saving file metadata:', dbError);
+          } else {
+            console.log('✅ File metadata saved successfully');
+          }
+        } catch (uploadErr) {
+          console.error('❌ Unexpected error linking file to order:', uploadErr);
         }
       }
       
