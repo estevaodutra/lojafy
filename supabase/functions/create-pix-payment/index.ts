@@ -372,7 +372,7 @@ serve(async (req) => {
           payment_id: pixData.paymentId || externalReference,
           pix_qr_code: pixData.qrCodeCopyPaste,
           pix_qr_code_base64: pixData.qrCodeBase64,
-          status: 'awaiting_payment', // Update from draft to awaiting payment
+          status: 'pending', // Status válido conforme constraint da tabela orders
           external_reference: externalReference,
         })
         .eq('id', orderId)
@@ -402,7 +402,7 @@ serve(async (req) => {
         total_amount: amount,
         payment_method: 'pix',
         payment_status: 'pending',
-        status: 'awaiting_payment',
+        status: 'pending', // Status válido conforme constraint da tabela orders
         payment_id: pixData.paymentId || externalReference,
         pix_qr_code: pixData.qrCodeCopyPaste,
         pix_qr_code_base64: pixData.qrCodeBase64,
