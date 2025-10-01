@@ -55,6 +55,11 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
   const [showHighRotationAlert, setShowHighRotationAlert] = useState(false);
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const [createdOrderData, setCreatedOrderData] = useState<{
+    id: string;
+    order_number: string;
+    total_amount: number;
+  } | null>(null);
 
   // Check if cart is empty and redirect
   useEffect(() => {
@@ -564,6 +569,13 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
 
       console.log('✅ Order created with draft status:', orderData.id);
 
+      // Store order data for display
+      setCreatedOrderData({
+        id: orderData.id,
+        order_number: orderData.order_number,
+        total_amount: orderData.total_amount,
+      });
+
       // Step 4: Create order items
       const orderItemsData = cartItems.map(item => ({
         order_id: orderData.id,
@@ -804,9 +816,9 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
     clearCart();
     toast({
       title: "Pagamento confirmado!",
-      description: "Seu pedido foi processado com sucesso.",
+      description: `Pedido ${createdOrderData?.order_number || ''} processado com sucesso.`,
     });
-    navigate("/");
+    navigate("/customer/orders");
   };
 
   const steps = [
@@ -1180,14 +1192,29 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Shield className="w-5 h-5" />
-                    Gerar Pagamento PIX
+                    Confirmação do Pedido
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <p className="text-muted-foreground">
-                      Seu pedido foi criado com sucesso! Agora você pode gerar o código PIX para pagamento.
-                    </p>
+                    {/* Order Number Display */}
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Shield className="w-5 h-5 text-green-600" />
+                        <p className="text-sm font-semibold text-green-800">
+                          Pedido criado com sucesso!
+                        </p>
+                      </div>
+                      <p className="text-lg font-bold text-green-900">
+                        Número do Pedido: {createdOrderData?.order_number || 'Carregando...'}
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                      <p className="text-sm text-blue-700">
+                        Clique no botão abaixo para gerar o código PIX e finalizar o pagamento.
+                      </p>
+                    </div>
                     
                     <div className="space-y-2 text-sm p-4 bg-muted/50 rounded-lg">
                       <p><strong>Nome:</strong> {formData.firstName} {formData.lastName}</p>
