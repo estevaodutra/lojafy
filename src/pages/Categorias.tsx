@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -10,11 +10,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { ChevronRight, Grid3X3, List, Star, Filter, Heart } from "lucide-react";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+
+const PRODUCTS_PER_PAGE = 20;
 
 const Categorias = () => {
   const { slug } = useParams();
@@ -22,8 +33,14 @@ const Categorias = () => {
   const [sortBy, setSortBy] = useState("relevance");
   const [priceRange, setPriceRange] = useState([0, 10000]);
   const [selectedBrand, setSelectedBrand] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
   const { addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
   const { toast } = useToast();
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [sortBy, priceRange, selectedBrand, slug]);
 
   // Fetch categories with real product count
   const { data: categories = [], isLoading: categoriesLoading } = useQuery({
@@ -93,6 +110,45 @@ const Categorias = () => {
         return 0;
     }
   });
+
+  // Pagination logic
+  const totalPages = Math.ceil(sortedProducts.length / PRODUCTS_PER_PAGE);
+  const startIndex = (currentPage - 1) * PRODUCTS_PER_PAGE;
+  const endIndex = startIndex + PRODUCTS_PER_PAGE;
+  const paginatedProducts = sortedProducts.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Generate page numbers to display
+  const getPageNumbers = () => {
+    const pages: (number | 'ellipsis')[] = [];
+    
+    if (totalPages <= 7) {
+      // Show all pages if 7 or less
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Always show first page
+      pages.push(1);
+      
+      if (currentPage <= 3) {
+        // Near start
+        pages.push(2, 3, 4, 'ellipsis', totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        // Near end
+        pages.push('ellipsis', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        // Middle
+        pages.push('ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis', totalPages);
+      }
+    }
+    
+    return pages;
+  };
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -245,7 +301,7 @@ const Categorias = () => {
                   {selectedCategory ? selectedCategory.name : 'Todas as Categorias'}
                 </h1>
                 <p className="text-muted-foreground">
-                  {sortedProducts.length} produtos encontrados
+                  Mostrando {sortedProducts.length > 0 ? startIndex + 1 : 0}-{Math.min(endIndex, sortedProducts.length)} de {sortedProducts.length} produtos
                 </p>
               </div>
 
@@ -312,7 +368,7 @@ const Categorias = () => {
                   ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
                   : "space-y-4"
               }>
-                {sortedProducts.map((product) => (
+                {paginatedProducts.map((product) => (
                   <Card key={product.id} className="group cursor-pointer hover:shadow-lg transition-shadow">
                     <CardContent className="p-4">
                       <Link to={`/produto/${product.id}`}>
@@ -387,16 +443,44 @@ const Categorias = () => {
               </div>
             )}
 
-            {/* Pagination would go here */}
-            <div className="flex justify-center mt-12">
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm">Anterior</Button>
-                <Button size="sm">1</Button>
-                <Button variant="outline" size="sm">2</Button>
-                <Button variant="outline" size="sm">3</Button>
-                <Button variant="outline" size="sm">Próximo</Button>
+            {/* Pagination */}
+            {sortedProducts.length > PRODUCTS_PER_PAGE && (
+              <div className="flex justify-center mt-12">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
+                        className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+
+                    {getPageNumbers().map((page, index) => (
+                      <PaginationItem key={index}>
+                        {page === 'ellipsis' ? (
+                          <PaginationEllipsis />
+                        ) : (
+                          <PaginationLink
+                            onClick={() => handlePageChange(page)}
+                            isActive={currentPage === page}
+                            className="cursor-pointer"
+                          >
+                            {page}
+                          </PaginationLink>
+                        )}
+                      </PaginationItem>
+                    ))}
+
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
+                        className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </main>
