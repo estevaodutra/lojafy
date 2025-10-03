@@ -368,7 +368,7 @@ const Produto = ({
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button size="lg" variant="outline" onClick={handleAddToCart} disabled={(product.stock_quantity || 0) <= 0} className="flex-1 h-12">
-                  <ShoppingCart className="h-5 w-5" />
+                  <span className="text-xl">🛒</span>
                   <span className="hidden sm:inline ml-2">Adicionar ao Carrinho</span>
                 </Button>
                 <Button size="lg" variant="outline" onClick={handleAddToWishlist} className={`h-12 w-12 sm:w-auto ${isFavorite(product.id) ? "text-destructive border-destructive" : ""}`}>
