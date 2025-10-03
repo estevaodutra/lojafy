@@ -261,9 +261,9 @@ const PublicStoreCart = () => {
                 </div>
 
                 <div className="space-y-3">
-                  <Button onClick={handleCheckout} className="w-full btn-checkout" size="lg" style={{
+                  <Button onClick={handleCheckout} size="lg" style={{
                   backgroundColor: store.accent_color
-                }}>
+                }} className="w-full btn-checkout bg-[#3fc356]">
                     Finalizar Compra
                   </Button>
                   
