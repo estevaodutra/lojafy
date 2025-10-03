@@ -26,45 +26,37 @@ const PublicStoreContact = () => {
           <div className="space-y-6 bg-card p-6 rounded-lg border">
             <h2 className="text-2xl font-semibold mb-4 text-foreground">Fale Conosco</h2>
             
-            {store.whatsapp && (
-              <div className="flex items-start gap-3">
-                <MessageCircle className="h-5 w-5 mt-1" style={{ color: store.accent_color }} />
-                <div>
-                  <p className="font-medium text-foreground">WhatsApp</p>
-                  <p className="text-muted-foreground">{store.whatsapp}</p>
-                </div>
+            <div className="flex items-start gap-3">
+              <MessageCircle className="h-5 w-5 mt-1" style={{ color: store.accent_color }} />
+              <div>
+                <p className="font-medium text-foreground">WhatsApp</p>
+                <p className="text-muted-foreground">{store.whatsapp || '(00) 00000-0000'}</p>
               </div>
-            )}
+            </div>
             
-            {store.contact_email && (
-              <div className="flex items-start gap-3">
-                <Mail className="h-5 w-5 mt-1" style={{ color: store.accent_color }} />
-                <div>
-                  <p className="font-medium text-foreground">Email</p>
-                  <p className="text-muted-foreground">{store.contact_email}</p>
-                </div>
+            <div className="flex items-start gap-3">
+              <Mail className="h-5 w-5 mt-1" style={{ color: store.accent_color }} />
+              <div>
+                <p className="font-medium text-foreground">Email</p>
+                <p className="text-muted-foreground">{store.contact_email || 'contato@loja.com'}</p>
               </div>
-            )}
+            </div>
             
-            {store.contact_phone && (
-              <div className="flex items-start gap-3">
-                <Phone className="h-5 w-5 mt-1" style={{ color: store.accent_color }} />
-                <div>
-                  <p className="font-medium text-foreground">Telefone</p>
-                  <p className="text-muted-foreground">{store.contact_phone}</p>
-                </div>
+            <div className="flex items-start gap-3">
+              <Phone className="h-5 w-5 mt-1" style={{ color: store.accent_color }} />
+              <div>
+                <p className="font-medium text-foreground">Telefone</p>
+                <p className="text-muted-foreground">{store.contact_phone || '(00) 0000-0000'}</p>
               </div>
-            )}
+            </div>
             
-            {store.contact_address && (
-              <div className="flex items-start gap-3">
-                <MapPin className="h-5 w-5 mt-1" style={{ color: store.accent_color }} />
-                <div>
-                  <p className="font-medium text-foreground">Endereço</p>
-                  <p className="text-muted-foreground">{store.contact_address}</p>
-                </div>
+            <div className="flex items-start gap-3">
+              <MapPin className="h-5 w-5 mt-1" style={{ color: store.accent_color }} />
+              <div>
+                <p className="font-medium text-foreground">Endereço</p>
+                <p className="text-muted-foreground">{store.contact_address || 'Rua Exemplo, 123 - Bairro - Cidade/UF'}</p>
               </div>
-            )}
+            </div>
             
             {store.whatsapp && (
               <Button 
