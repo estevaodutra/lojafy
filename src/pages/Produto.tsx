@@ -367,9 +367,9 @@ const Produto = ({
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
-                <Button size="lg" className="flex-1 btn-cart h-12" onClick={handleAddToCart} disabled={(product.stock_quantity || 0) <= 0}>
-                  <ShoppingCart className="h-5 w-5 mr-2" />
-                  <span className="text-sm sm:text-base">Adicionar ao Carrinho</span>
+                <Button size="lg" variant="outline" onClick={handleAddToCart} disabled={(product.stock_quantity || 0) <= 0} className="flex-1 h-12">
+                  <ShoppingCart className="h-5 w-5" />
+                  <span className="hidden sm:inline ml-2">Adicionar ao Carrinho</span>
                 </Button>
                 <Button size="lg" variant="outline" onClick={handleAddToWishlist} className={`h-12 w-12 sm:w-auto ${isFavorite(product.id) ? "text-destructive border-destructive" : ""}`}>
                   <Heart className={`h-5 w-5 ${isFavorite(product.id) ? 'fill-current' : ''}`} />
