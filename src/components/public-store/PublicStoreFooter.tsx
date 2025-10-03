@@ -85,19 +85,28 @@ const PublicStoreFooter = ({ store }: PublicStoreFooterProps) => {
             </div>
           </div>
 
-          {/* Policies */}
+          {/* Links */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Informações</h3>
-            <div className="space-y-2 text-sm text-muted-foreground">
-              {store.policies?.returns && (
-                <p><strong>Trocas e Devoluções:</strong> {store.policies.returns}</p>
-              )}
-              {store.policies?.shipping && (
-                <p><strong>Entrega:</strong> {store.policies.shipping}</p>
-              )}
-              {store.policies?.warranty && (
-                <p><strong>Garantia:</strong> {store.policies.warranty}</p>
-              )}
+            <h3 className="text-lg font-semibold">Links Úteis</h3>
+            <div className="space-y-2 text-sm">
+              <a href={`/loja/${store.store_slug}/quem-somos`} className="block hover:text-primary transition-colors">
+                Quem Somos
+              </a>
+              <a href={`/loja/${store.store_slug}/faq`} className="block hover:text-primary transition-colors">
+                Perguntas Frequentes
+              </a>
+              <a href={`/loja/${store.store_slug}/politica-troca`} className="block hover:text-primary transition-colors">
+                Política de Troca
+              </a>
+              <a href={`/loja/${store.store_slug}/termos-uso`} className="block hover:text-primary transition-colors">
+                Termos de Uso
+              </a>
+              <a href={`/loja/${store.store_slug}/rastrear-pedido`} className="block hover:text-primary transition-colors">
+                Rastrear Pedido
+              </a>
+              <a href={`/loja/${store.store_slug}/central-ajuda`} className="block hover:text-primary transition-colors">
+                Central de Ajuda
+              </a>
             </div>
           </div>
         </div>

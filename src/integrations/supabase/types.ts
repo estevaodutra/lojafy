@@ -1141,6 +1141,36 @@ export type Database = {
           },
         ]
       }
+      reseller_store_pages: {
+        Row: {
+          active: boolean
+          content: Json
+          created_at: string
+          id: string
+          page_type: string
+          reseller_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          content?: Json
+          created_at?: string
+          id?: string
+          page_type: string
+          reseller_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          content?: Json
+          created_at?: string
+          id?: string
+          page_type?: string
+          reseller_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       reseller_stores: {
         Row: {
           accent_color: string | null

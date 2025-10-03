@@ -9,7 +9,8 @@ import {
   Store,
   LogOut,
   Package,
-  Target
+  Target,
+  FileText
 } from 'lucide-react';
 import {
   Sidebar,
@@ -45,6 +46,11 @@ const resellerMenuItems = [
     title: 'Minha Loja',
     url: '/reseller/loja',
     icon: Store,
+  },
+  {
+    title: 'Páginas',
+    url: '/reseller/paginas',
+    icon: FileText,
   },
   {
     title: 'Vendas',
