@@ -5,7 +5,7 @@ import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { ImageZoomModal } from "@/components/ImageZoomModal";
@@ -405,62 +405,14 @@ const Produto = ({
           </div>
         </div>
 
-        {/* Product Details Tabs */}
+        {/* Product Reviews */}
         <section className="mb-12">
-          <Tabs defaultValue="specifications" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="specifications">Especificações</TabsTrigger>
-              <TabsTrigger value="reviews">Avaliações</TabsTrigger>
-              <TabsTrigger value="shipping">Entrega</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="specifications" className="mt-6">
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold mb-4">Especificações Técnicas</h3>
-                  {product.specifications && Object.keys(product.specifications as Record<string, string>).length > 0 ? <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {Object.entries(product.specifications as Record<string, string>).map(([key, value]) => <div key={key} className="flex justify-between py-2 border-b">
-                          <span className="font-medium">{key}:</span>
-                          <span className="text-muted-foreground">{String(value)}</span>
-                        </div>)}
-                    </div> : <p className="text-muted-foreground">Especificações não disponíveis.</p>}
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="reviews" className="mt-6">
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold mb-4">Avaliações dos Clientes</h3>
-                  <p className="text-muted-foreground">Ainda não há avaliações para este produto.</p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="shipping" className="mt-6">
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold mb-4">Informações de Entrega</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <Truck className="h-5 w-5 text-primary" />
-                      <div>
-                        <p className="font-medium">Entrega Padrão</p>
-                        <p className="text-sm text-muted-foreground">5-7 dias úteis • Grátis acima de R$ 199</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Truck className="h-5 w-5 text-primary" />
-                      <div>
-                        <p className="font-medium">Entrega Expressa</p>
-                        <p className="text-sm text-muted-foreground">1-2 dias úteis • R$ 29,90</p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+          <Card>
+            <CardContent className="p-6">
+              <h3 className="text-lg font-semibold mb-4">Avaliações dos Clientes</h3>
+              <p className="text-muted-foreground">Ainda não há avaliações para este produto.</p>
+            </CardContent>
+          </Card>
         </section>
 
         {/* Related Products */}
