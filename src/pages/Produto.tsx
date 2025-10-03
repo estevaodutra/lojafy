@@ -372,7 +372,7 @@ const Produto = ({
                   <span className="hidden sm:inline ml-2">Adicionar ao Carrinho</span>
                 </Button>
                 <Button size="lg" variant="outline" onClick={handleAddToWishlist} className={`h-12 w-12 sm:w-auto ${isFavorite(product.id) ? "text-destructive border-destructive" : ""}`}>
-                  <Heart className={`h-5 w-5 ${isFavorite(product.id) ? 'fill-current' : ''}`} />
+                  <span className="text-xl">{isFavorite(product.id) ? '❤️' : '🤍'}</span>
                   <span className="hidden sm:inline ml-2">Favoritos</span>
                 </Button>
                 <Button size="lg" variant="outline" className="h-12 w-12 sm:w-auto">
