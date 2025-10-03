@@ -215,21 +215,23 @@ export default function PixPayment({ paymentData, onPaymentConfirmed }: PixPayme
         </div>
 
         {/* PIX Code */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">
+        <div className="space-y-3">
+          <label className="text-sm font-semibold text-foreground">
             Ou copie e cole o código PIX:
           </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={paymentData.qr_code}
-              readOnly
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-xs font-mono bg-gray-50"
-            />
-            <Button onClick={copyPixCode} size="sm" variant="outline">
-              <Copy className="h-4 w-4" />
-            </Button>
+          <div className="bg-accent/20 border-2 border-accent/40 rounded-lg p-4">
+            <p className="text-sm font-mono break-all text-center text-foreground font-medium">
+              {paymentData.qr_code}
+            </p>
           </div>
+          <Button 
+            onClick={copyPixCode} 
+            size="lg" 
+            className="w-full h-12 text-base font-semibold shadow-md"
+          >
+            <Copy className="h-5 w-5 mr-2" />
+            Copiar código PIX
+          </Button>
         </div>
 
         {/* Timer */}

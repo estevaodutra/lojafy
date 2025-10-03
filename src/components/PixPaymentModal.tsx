@@ -140,10 +140,10 @@ export function PixPaymentModal({
           <div className="space-y-3">
             <Button
               onClick={copyPixCode}
-              className="w-full"
-              variant={copied ? "default" : "outline"}
+              className="w-full h-12 text-base font-semibold shadow-md"
+              size="lg"
             >
-              <Copy className="h-4 w-4 mr-2" />
+              <Copy className="h-5 w-5 mr-2" />
               {copied ? "Código copiado!" : "Copiar código PIX"}
             </Button>
 

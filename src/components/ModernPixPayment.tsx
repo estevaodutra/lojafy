@@ -150,8 +150,8 @@ export const ModernPixPayment: React.FC<ModernPixPaymentProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="bg-muted rounded-lg p-4">
-            <p className="text-xs font-mono break-all text-center text-muted-foreground">
+          <div className="bg-accent/20 border border-accent/30 rounded-lg p-4">
+            <p className="text-sm font-mono break-all text-center text-foreground font-medium">
               {qrCode}
             </p>
           </div>
@@ -159,18 +159,19 @@ export const ModernPixPayment: React.FC<ModernPixPaymentProps> = ({
           <div className="space-y-3">
             <Button 
               onClick={copyPixCode}
-              className="w-full h-12 text-base font-medium relative overflow-hidden group"
+              className="w-full h-14 text-lg font-semibold relative overflow-hidden group shadow-lg"
+              size="lg"
               disabled={!qrCode}
             >
               <div className="absolute inset-0 bg-gradient-to-r from-primary to-primary-foreground opacity-0 group-hover:opacity-10 transition-opacity"></div>
               {copied ? (
                 <>
-                  <Check className="mr-2 h-5 w-5" />
+                  <Check className="mr-2 h-6 w-6" />
                   Copiado!
                 </>
               ) : (
                 <>
-                  <Copy className="mr-2 h-5 w-5" />
+                  <Copy className="mr-2 h-6 w-6" />
                   Copiar código PIX
                 </>
               )}
