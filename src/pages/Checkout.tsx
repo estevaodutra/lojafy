@@ -739,7 +739,7 @@ const Checkout = ({
                     O pagamento é processado instantaneamente.
                   </p>
                   <Button onClick={handleGeneratePix} disabled={isProcessingPayment || !canAdvanceToNextStep()} size="lg" className="w-full bg-[#3fc356]">
-                    {isProcessingPayment ? "Gerando PIX..." : "Gerar PIX"}
+                    {isProcessingPayment ? "Gerando PIX..." : "Concluir Pagamento"}
                   </Button>
                 </CardContent>
               </Card>}
