@@ -389,26 +389,17 @@ const Produto = ({
 
             {/* Benefits */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="flex items-center gap-3 p-4 rounded-lg bg-zinc-200">
-                <Truck className="h-6 w-6 text-primary flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-center">Envio em 24hrs</p>
-                  
-                </div>
+              <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg bg-zinc-200">
+                <Truck className="h-6 w-6 text-primary" />
+                <p className="text-sm font-medium">Envio em 24hrs</p>
               </div>
-              <div className="flex items-center gap-3 p-4 rounded-lg bg-zinc-200">
-                <Shield className="h-6 w-6 text-primary flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-center">Garantia</p>
-                  
-                </div>
+              <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg bg-zinc-200">
+                <Shield className="h-6 w-6 text-primary" />
+                <p className="text-sm font-medium">Garantia</p>
               </div>
-              <div className="flex items-center gap-3 p-4 rounded-lg bg-zinc-200">
-                <RotateCcw className="h-6 w-6 text-primary flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium">Troca Fácil</p>
-                  
-                </div>
+              <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg bg-zinc-200">
+                <RotateCcw className="h-6 w-6 text-primary" />
+                <p className="text-sm font-medium">Troca Fácil</p>
               </div>
             </div>
           </div>
