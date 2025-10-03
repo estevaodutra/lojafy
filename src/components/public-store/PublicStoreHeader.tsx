@@ -180,11 +180,11 @@ const PublicStoreHeader = ({ store }: PublicStoreHeaderProps) => {
                   <div className="border-t p-4">
                     <div className="space-y-2 mb-4">
                       <Link 
-                        to={`/loja/${store.store_slug}/produtos`}
+                        to={`/loja/${store.store_slug}`}
                         className="flex items-center py-3 px-4 text-left hover:bg-muted transition-colors rounded-lg"
                         onClick={() => setMobileMenuOpen(false)}
                       >
-                        <span className="text-sm font-medium">Todos os Produtos</span>
+                        <span className="text-sm font-medium">Início</span>
                       </Link>
                       <Link 
                         to={`/loja/${store.store_slug}/categorias`}
@@ -192,6 +192,20 @@ const PublicStoreHeader = ({ store }: PublicStoreHeaderProps) => {
                         onClick={() => setMobileMenuOpen(false)}
                       >
                         <span className="text-sm font-medium">Categorias</span>
+                      </Link>
+                      <Link 
+                        to={`/loja/${store.store_slug}/produtos?filter=lancamentos`}
+                        className="flex items-center py-3 px-4 text-left hover:bg-muted transition-colors rounded-lg"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <span className="text-sm font-medium">Lançamentos</span>
+                      </Link>
+                      <Link 
+                        to={`/loja/${store.store_slug}/contato`}
+                        className="flex items-center py-3 px-4 text-left hover:bg-muted transition-colors rounded-lg"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <span className="text-sm font-medium">Contato</span>
                       </Link>
                     </div>
 
@@ -262,6 +276,22 @@ const PublicStoreHeader = ({ store }: PublicStoreHeaderProps) => {
             </Sheet>
           </div>
         </div>
+
+        {/* Navigation Menu - Desktop */}
+        <nav className="hidden md:flex items-center justify-center space-x-8 mt-4 pb-2 border-t pt-4">
+          <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
+            <Link to={`/loja/${store.store_slug}`}>Início</Link>
+          </Button>
+          <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
+            <Link to={`/loja/${store.store_slug}/categorias`}>Categorias</Link>
+          </Button>
+          <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
+            <Link to={`/loja/${store.store_slug}/produtos?filter=lancamentos`}>Lançamentos</Link>
+          </Button>
+          <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
+            <Link to={`/loja/${store.store_slug}/contato`}>Contato</Link>
+          </Button>
+        </nav>
       </div>
     </header>
   );

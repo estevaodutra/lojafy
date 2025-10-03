@@ -74,6 +74,7 @@ import PublicStoreFavorites from "./pages/PublicStoreFavorites";
 import PublicStoreCart from "./pages/PublicStoreCart";
 import PublicStoreCheckout from "./pages/PublicStoreCheckout";
 import PublicStoreSearch from "./pages/PublicStoreSearch";
+import PublicStoreContact from "./pages/PublicStoreContact";
 import SuperAdminDashboard from "./pages/admin/Dashboard";
 import Usuarios from "./pages/admin/Usuarios";
 import Plataforma from "./pages/admin/Plataforma";
@@ -260,6 +261,14 @@ const App = () => {
                 element={
                   <PublicStoreProviderRoute>
                     <PublicStoreCategoryList />
+                  </PublicStoreProviderRoute>
+                }
+              />
+              <Route
+                path="/loja/:slug/contato"
+                element={
+                  <PublicStoreProviderRoute>
+                    <PublicStoreContact />
                   </PublicStoreProviderRoute>
                 }
               />
