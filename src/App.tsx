@@ -69,7 +69,7 @@ import PublicStore from "./pages/PublicStore";
 import PublicStoreProduct from "./pages/PublicStoreProduct";
 import PublicStoreCategory from "./pages/PublicStoreCategory";
 import PublicStoreProducts from "./pages/PublicStoreProducts";
-import PublicStoreCategories from "./pages/PublicStoreCategories";
+import PublicStoreCategoryList from "./pages/PublicStoreCategoryList";
 import PublicStoreFavorites from "./pages/PublicStoreFavorites";
 import PublicStoreCart from "./pages/PublicStoreCart";
 import PublicStoreCheckout from "./pages/PublicStoreCheckout";
@@ -251,7 +251,15 @@ const App = () => {
                 path="/loja/:slug/categorias"
                 element={
                   <PublicStoreProviderRoute>
-                    <PublicStoreCategories />
+                    <PublicStoreCategoryList />
+                  </PublicStoreProviderRoute>
+                }
+              />
+              <Route
+                path="/loja/:slug/categorias/:categorySlug"
+                element={
+                  <PublicStoreProviderRoute>
+                    <PublicStoreCategoryList />
                   </PublicStoreProviderRoute>
                 }
               />

@@ -110,7 +110,7 @@ export const usePublicStoreCategories = (resellerId?: string) => {
       const { data: resellerProducts, error: productsError } = await supabase
         .from('reseller_products')
         .select(`
-          product:products(category_id, categories(id, name, slug, icon, color))
+          product:products(category_id, categories(id, name, slug, icon, color, image_url))
         `)
         .eq('reseller_id', resellerId)
         .eq('active', true);
@@ -169,6 +169,38 @@ export const usePublicStoreCategories = (resellerId?: string) => {
         const minProducts = resellerId ? 1 : 5;
         return cat.products.length >= minProducts;
       });
+    },
+    enabled: !!resellerId,
+  });
+};
+
+export const usePublicStoreCategoryProducts = (resellerId?: string, categorySlug?: string) => {
+  return useQuery({
+    queryKey: ['public-store-category-products', resellerId, categorySlug],
+    queryFn: async () => {
+      if (!resellerId) throw new Error('Reseller ID required');
+
+      let query = supabase
+        .from('reseller_products')
+        .select(`
+          *,
+          products!inner(
+            *,
+            categories(id, slug, name)
+          )
+        `)
+        .eq('reseller_id', resellerId)
+        .eq('active', true)
+        .eq('products.active', true);
+
+      if (categorySlug) {
+        query = query.eq('products.categories.slug', categorySlug);
+      }
+
+      const { data, error } = await query.order('position', { ascending: true });
+
+      if (error) throw error;
+      return data;
     },
     enabled: !!resellerId,
   });
