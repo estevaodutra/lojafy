@@ -398,7 +398,7 @@ const Produto = ({
                 <p className="text-sm font-medium">Garantia</p>
               </div>
               <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg bg-zinc-200">
-                <RotateCcw className="h-6 w-6 text-primary" />
+                <span className="text-2xl">🔄</span>
                 <p className="text-sm font-medium">Troca Fácil</p>
               </div>
             </div>
