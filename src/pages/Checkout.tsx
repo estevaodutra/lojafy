@@ -20,6 +20,7 @@ import { ModernPixPayment } from '@/components/ModernPixPayment';
 import { PixPaymentModal } from '@/components/PixPaymentModal';
 import { createModernPixPayment, PixPaymentRequest } from '@/lib/mercadoPago';
 import { ShoppingCart, CreditCard, Truck, Shield, AlertTriangle } from "lucide-react";
+import pixIcon from "@/assets/pix-icon.png";
 import { ShippingMethodSelector } from "@/components/ShippingMethodSelector";
 import { HighRotationAlert } from '@/components/HighRotationAlert';
 interface CheckoutProps {
@@ -723,7 +724,7 @@ const Checkout = ({
                   <div className="p-4 border rounded-lg bg-muted/50">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                        <Shield className="w-5 h-5 text-primary-foreground" />
+                        <img src={pixIcon} alt="PIX" className="w-5 h-5" />
                       </div>
                       <div>
                         <h4 className="font-semibold">PIX</h4>
