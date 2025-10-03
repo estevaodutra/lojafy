@@ -1,4 +1,4 @@
-import { Search, Heart, ShoppingCart, Menu, MessageCircle, ArrowLeft } from "lucide-react";
+import { Search, Heart, ShoppingCart, Menu, MessageCircle, ArrowLeft, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
@@ -17,7 +17,11 @@ const PublicStoreHeader = ({ store }: PublicStoreHeaderProps) => {
     mobileMenuOpen,
     setMobileMenuOpen,
     handleSearch,
-    handleWhatsAppContact
+    handleWhatsAppContact,
+    user,
+    profile,
+    handleLogin,
+    handleProfile
   } = usePublicStoreHeader(store);
 
   return (
@@ -95,6 +99,31 @@ const PublicStoreHeader = ({ store }: PublicStoreHeaderProps) => {
               </Button>
             )}
 
+            {/* Login/Profile */}
+            {user ? (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="flex flex-col items-center p-1 sm:p-2 min-w-[44px]"
+                onClick={handleProfile}
+              >
+                <User className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="text-xs hidden sm:block">
+                  {profile?.first_name || 'Perfil'}
+                </span>
+              </Button>
+            ) : (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleLogin}
+                className="gap-2"
+              >
+                <User className="h-4 w-4" />
+                <span>Entrar</span>
+              </Button>
+            )}
+
             {/* Favorites */}
             <Button variant="ghost" size="sm" className="flex flex-col items-center p-1 sm:p-2 min-w-[44px]" asChild>
               <Link to={`/loja/${store.store_slug}/favoritos`}>
@@ -167,22 +196,50 @@ const PublicStoreHeader = ({ store }: PublicStoreHeaderProps) => {
                     </div>
 
                     {/* Quick Actions */}
-                    <div className="flex gap-4 mb-4 pt-4 border-t">
-                       <Link 
-                         to={`/loja/${store.store_slug}/favoritos`}
-                        className="flex-1 flex items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors"
+                    <div className="grid grid-cols-3 gap-2 mb-4 pt-4 border-t">
+                      {/* Login/Profile Mobile */}
+                      {user ? (
+                        <button
+                          onClick={() => {
+                            handleProfile();
+                            setMobileMenuOpen(false);
+                          }}
+                          className="flex flex-col items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors"
+                        >
+                          <User className="h-4 w-4 mb-1" />
+                          <span className="text-xs">{profile?.first_name || 'Perfil'}</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            handleLogin();
+                            setMobileMenuOpen(false);
+                          }}
+                          className="flex flex-col items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors"
+                        >
+                          <User className="h-4 w-4 mb-1" />
+                          <span className="text-xs">Entrar</span>
+                        </button>
+                      )}
+
+                      {/* Favorites Mobile */}
+                      <Link 
+                        to={`/loja/${store.store_slug}/favoritos`}
+                        className="flex flex-col items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors"
                         onClick={() => setMobileMenuOpen(false)}
                       >
-                        <Heart className="h-4 w-4 mr-2" />
-                        <span className="text-sm">Favoritos</span>
+                        <Heart className="h-4 w-4 mb-1" />
+                        <span className="text-xs">Favoritos</span>
                       </Link>
-                       <Link 
-                         to={`/loja/${store.store_slug}/carrinho`}
-                        className="flex-1 flex items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors"
+
+                      {/* Cart Mobile */}
+                      <Link 
+                        to={`/loja/${store.store_slug}/carrinho`}
+                        className="flex flex-col items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors"
                         onClick={() => setMobileMenuOpen(false)}
                       >
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                        <span className="text-sm">Carrinho</span>
+                        <ShoppingCart className="h-4 w-4 mb-1" />
+                        <span className="text-xs">Carrinho</span>
                       </Link>
                     </div>
 

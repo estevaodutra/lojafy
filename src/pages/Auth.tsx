@@ -58,6 +58,14 @@ const Auth = () => {
     if (result.error && result.error.needsEmailConfirmation) {
       setUnconfirmedEmail(loginEmail);
       setShowEmailNotConfirmedDialog(true);
+    } else if (!result.error) {
+      // Check for return URL after successful login
+      const returnUrl = sessionStorage.getItem('returnUrl');
+      if (returnUrl) {
+        sessionStorage.removeItem('returnUrl');
+        window.location.href = returnUrl;
+        return;
+      }
     }
     
     setIsLoading(false);

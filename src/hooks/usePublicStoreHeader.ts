@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PublicStoreData } from './usePublicStore';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const usePublicStoreHeader = (store: PublicStoreData | null) => {
+  const { user, profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
@@ -24,12 +26,36 @@ export const usePublicStoreHeader = (store: PublicStoreData | null) => {
     }
   };
 
+  const handleLogin = () => {
+    // Save current URL to return after login
+    if (store?.store_slug) {
+      const returnUrl = `/loja/${store.store_slug}`;
+      sessionStorage.setItem('returnUrl', returnUrl);
+    }
+    navigate('/auth');
+  };
+
+  const handleProfile = () => {
+    // Navigate to user panel based on role
+    if (profile?.role === 'reseller') {
+      navigate('/reseller');
+    } else if (profile?.role === 'customer') {
+      navigate('/customer');
+    } else {
+      navigate('/auth');
+    }
+  };
+
   return {
     searchTerm,
     setSearchTerm,
     mobileMenuOpen,
     setMobileMenuOpen,
     handleSearch,
-    handleWhatsAppContact
+    handleWhatsAppContact,
+    user,
+    profile,
+    handleLogin,
+    handleProfile
   };
 };
