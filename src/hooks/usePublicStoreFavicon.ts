@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { PublicStoreData } from './usePublicStore';
 
-export const usePublicStoreFavicon = (store: PublicStoreData) => {
+export const usePublicStoreFavicon = (store?: PublicStoreData) => {
   useEffect(() => {
     const updateFavicon = (iconUrl: string) => {
       // Remove existing favicon
@@ -17,6 +17,14 @@ export const usePublicStoreFavicon = (store: PublicStoreData) => {
       link.type = 'image/png';
       document.head.appendChild(link);
     };
+
+    if (!store) {
+      // No store yet, use default favicon
+      updateFavicon('/favicon.ico');
+      return () => {
+        updateFavicon('/favicon.ico');
+      };
+    }
 
     if (store.logo_url) {
       // Test if logo URL is accessible
@@ -38,5 +46,5 @@ export const usePublicStoreFavicon = (store: PublicStoreData) => {
     return () => {
       updateFavicon('/favicon.ico');
     };
-  }, [store.logo_url]);
+  }, [store?.logo_url]);
 };

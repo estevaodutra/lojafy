@@ -14,11 +14,9 @@ const PublicStoreProviderRoute: React.FC<ProviderProps> = ({ children }) => {
   const { slug } = useParams<{ slug: string }>();
   const { store, isLoading, error } = usePublicStore(slug);
 
-  // Update document title and favicon when store data is available
-  if (store) {
-    usePublicStoreDocumentTitle(store, undefined);
-    usePublicStoreFavicon(store);
-  }
+  // Update document title and favicon (hooks must not be conditional)
+  usePublicStoreDocumentTitle(store, undefined);
+  usePublicStoreFavicon(store);
 
   if (isLoading) {
     return (
