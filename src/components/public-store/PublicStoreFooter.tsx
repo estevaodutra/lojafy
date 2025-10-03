@@ -54,24 +54,18 @@ const PublicStoreFooter = ({ store }: PublicStoreFooterProps) => {
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Contato</h3>
             <div className="space-y-3">
-              {store.contact_phone && (
-                <div className="flex items-center space-x-3">
-                  <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <span className="text-sm">{store.contact_phone}</span>
-                </div>
-              )}
-              {store.contact_email && (
-                <div className="flex items-center space-x-3">
-                  <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <span className="text-sm">{store.contact_email}</span>
-                </div>
-              )}
-              {store.contact_address && (
-                <div className="flex items-start space-x-3">
-                  <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">{store.contact_address}</span>
-                </div>
-              )}
+              <div className="flex items-center space-x-3">
+                <MessageCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm">{store.whatsapp || '(00) 00000-0000'}</span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm">{store.contact_email || 'contato@loja.com'}</span>
+              </div>
+              <div className="flex items-start space-x-3">
+                <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <span className="text-sm">{store.contact_address || 'Rua Exemplo, 123 - Bairro - Cidade/UF'}</span>
+              </div>
               {store.whatsapp && (
                 <Button 
                   onClick={handleWhatsAppContact}
