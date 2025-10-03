@@ -26,9 +26,10 @@ import { HighRotationAlert } from '@/components/HighRotationAlert';
 interface CheckoutProps {
   showHeader?: boolean;
   showFooter?: boolean;
+  storeSlug?: string;
 }
 
-const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
+const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { items: cartItems, clearCart } = useCart();
@@ -482,6 +483,11 @@ const Checkout = ({ showHeader = true, showFooter = true }: CheckoutProps) => {
   };
 
   const checkHighRotationProducts = async (): Promise<boolean> => {
+    // Não verificar produtos de alta rotação na loja do revendedor
+    if (storeSlug) {
+      return false;
+    }
+    
     try {
       const productIds = cartItems.map(item => item.productId);
       

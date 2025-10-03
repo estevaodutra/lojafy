@@ -9,7 +9,7 @@ const PublicStoreCheckoutPage = () => {
   return (
     <div className="min-h-screen">
       <PublicStoreHeader store={store} />
-      <Checkout showHeader={false} showFooter={false} />
+      <Checkout showHeader={false} showFooter={false} storeSlug={store.store_slug} />
       <PublicStoreFooter store={store} />
     </div>
   );

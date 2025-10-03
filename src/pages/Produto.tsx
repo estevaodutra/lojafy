@@ -253,7 +253,7 @@ const Produto = ({
             <div>
               <h1 className="text-2xl md:text-3xl font-bold mb-2 line-clamp-2 flex items-start gap-3">
                 <span className="line-clamp-2">{product.name}</span>
-                {product.high_rotation && <span className="text-orange-500 text-2xl flex-shrink-0" title="Produto de Alta Rotatividade - Pode haver atraso no envio devido à alta demanda">
+                {product.high_rotation && !storeSlug && <span className="text-orange-500 text-2xl flex-shrink-0" title="Produto de Alta Rotatividade - Pode haver atraso no envio devido à alta demanda">
                     ⚠️
                   </span>}
               </h1>
@@ -327,7 +327,7 @@ const Produto = ({
                   </div>}
                 
                 {/* High Rotation Warning */}
-                {product.high_rotation && <div className="col-span-2 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg p-3">
+                {product.high_rotation && !storeSlug && <div className="col-span-2 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg p-3">
                     <div className="flex items-start gap-2">
                       <span className="text-orange-500 text-lg">⚠️</span>
                       <div className="flex-1 space-y-1">
