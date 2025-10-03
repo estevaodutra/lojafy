@@ -394,7 +394,7 @@ const Produto = ({
                 <p className="text-sm font-medium">Envio em 24hrs</p>
               </div>
               <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg bg-zinc-200">
-                <Shield className="h-6 w-6 text-primary" />
+                <span className="text-2xl">🛡️</span>
                 <p className="text-sm font-medium">Garantia</p>
               </div>
               <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg bg-zinc-200">
