@@ -1,18 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { ImpersonationButton } from '@/components/admin/ImpersonationButton';
 import { UserRole } from '@/hooks/useUserRole';
+import { Search, X } from 'lucide-react';
 
 const Usuarios = () => {
   const { toast } = useToast();
   const [updatingUsers, setUpdatingUsers] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const { data: users, isLoading, refetch } = useQuery({
     queryKey: ['users'],
@@ -24,6 +27,19 @@ const Usuarios = () => {
       return data;
     }
   });
+
+  const filteredUsers = useMemo(() => {
+    if (!users) return [];
+    if (!searchTerm.trim()) return users;
+    
+    const search = searchTerm.toLowerCase().trim();
+    return users.filter(user => {
+      const fullName = `${user.first_name || ''} ${user.last_name || ''}`.toLowerCase();
+      const email = (user.email || '').toLowerCase();
+      
+      return fullName.includes(search) || email.includes(search);
+    });
+  }, [users, searchTerm]);
 
   const updateUserRole = async (userId: string, newRole: string) => {
     setUpdatingUsers(prev => [...prev, userId]);
@@ -103,6 +119,32 @@ const Usuarios = () => {
           <CardDescription>
             Lista de todos os usuários cadastrados e seus respectivos roles
           </CardDescription>
+          <div className="mt-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome ou email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-10"
+              />
+              {searchTerm && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                  onClick={() => setSearchTerm('')}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            {searchTerm && (
+              <p className="text-sm text-muted-foreground mt-2">
+                Mostrando {filteredUsers.length} de {users?.length || 0} usuários
+              </p>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -118,7 +160,14 @@ const Usuarios = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users?.map((user) => (
+              {filteredUsers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    {searchTerm ? 'Nenhum usuário encontrado com esse critério de busca.' : 'Nenhum usuário cadastrado.'}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">
                     {user.first_name} {user.last_name}
@@ -164,7 +213,8 @@ const Usuarios = () => {
                     />
                   </TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
