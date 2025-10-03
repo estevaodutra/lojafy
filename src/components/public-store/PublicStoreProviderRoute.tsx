@@ -61,9 +61,9 @@ const PublicStoreProviderRoute: React.FC<ProviderProps> = ({ children }) => {
         // Values are already normalized in other components using HSL tokens
         // We keep inline vars here to avoid duplicating wrappers
         // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-        "--primary": `hsl(${store.primary_color || "#000000"})`,
-        "--secondary": `hsl(${store.secondary_color || "#f3f4f6"})`,
-        "--accent": `hsl(${store.accent_color || "#3b82f6"})`,
+        "--primary": store.primary_color || "#000000",
+        "--secondary": store.secondary_color || "#f3f4f6",
+        "--accent": store.accent_color || "#3b82f6",
       } as React.CSSProperties}
     >
       <PublicStoreContext.Provider value={{ store }}>

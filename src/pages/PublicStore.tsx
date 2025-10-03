@@ -61,9 +61,9 @@ const PublicStore = () => {
       <div 
         className="min-h-screen"
         style={{
-          '--primary': `hsl(${store.primary_color || '#000000'})`,
-          '--secondary': `hsl(${store.secondary_color || '#f3f4f6'})`,
-          '--accent': `hsl(${store.accent_color || '#3b82f6'})`,
+          '--primary': store.primary_color || '#000000',
+          '--secondary': store.secondary_color || '#f3f4f6',
+          '--accent': store.accent_color || '#3b82f6',
         } as React.CSSProperties}
       >
         <PublicStoreHeader store={store} />
