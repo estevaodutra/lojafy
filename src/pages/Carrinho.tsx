@@ -287,9 +287,7 @@ const Carrinho = () => {
 
                   <div className="text-center pt-4">
                     <div className="flex items-center justify-center space-x-2 text-sm">
-                      <div className="w-4 h-4 bg-success rounded-full flex items-center justify-center">
-                        <div className="w-2 h-2 bg-white rounded-full" />
-                      </div>
+                      <span className="text-lg">🛡️</span>
                       <span className="text-security">Compra 100% segura</span>
                     </div>
                   </div>
