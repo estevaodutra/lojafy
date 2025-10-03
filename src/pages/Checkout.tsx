@@ -738,7 +738,7 @@ const Checkout = ({
                     Clique no botão abaixo para gerar o QR Code PIX para pagamento.
                     O pagamento é processado instantaneamente.
                   </p>
-                  <Button onClick={handleGeneratePix} disabled={isProcessingPayment || !canAdvanceToNextStep()} className="w-full" size="lg">
+                  <Button onClick={handleGeneratePix} disabled={isProcessingPayment || !canAdvanceToNextStep()} size="lg" className="w-full bg-[#3fc356]">
                     {isProcessingPayment ? "Gerando PIX..." : "Gerar PIX"}
                   </Button>
                 </CardContent>
