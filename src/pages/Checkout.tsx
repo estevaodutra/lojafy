@@ -22,18 +22,29 @@ import { createModernPixPayment, PixPaymentRequest } from '@/lib/mercadoPago';
 import { ShoppingCart, CreditCard, Truck, Shield, AlertTriangle } from "lucide-react";
 import { ShippingMethodSelector } from "@/components/ShippingMethodSelector";
 import { HighRotationAlert } from '@/components/HighRotationAlert';
-
 interface CheckoutProps {
   showHeader?: boolean;
   showFooter?: boolean;
   storeSlug?: string;
 }
-
-const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutProps) => {
+const Checkout = ({
+  showHeader = true,
+  showFooter = true,
+  storeSlug
+}: CheckoutProps) => {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const { items: cartItems, clearCart } = useCart();
-  const { user, session, profile } = useAuth();
+  const {
+    toast
+  } = useToast();
+  const {
+    items: cartItems,
+    clearCart
+  } = useCart();
+  const {
+    user,
+    session,
+    profile
+  } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [couponCode, setCouponCode] = useState("");
   const [selectedShippingMethod, setSelectedShippingMethod] = useState<any>(null);
@@ -61,12 +72,11 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
       toast({
         title: "Carrinho vazio",
         description: "Adicione produtos ao carrinho antes de finalizar a compra.",
-        variant: "destructive",
+        variant: "destructive"
       });
       navigate("/carrinho");
     }
   }, [cartItems, navigate, toast]);
-
   const [formData, setFormData] = useState<CheckoutForm>({
     email: "",
     firstName: "",
@@ -94,19 +104,18 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
           firstName: profile?.first_name || "",
           lastName: profile?.last_name || "",
           phone: profile?.phone || "",
-          cpf: profile?.cpf || "",
+          cpf: profile?.cpf || ""
         }));
 
         // Try to get user's default address
         try {
-          const { data: addresses } = await supabase
-            .from('addresses')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('is_default', { ascending: false })
-            .order('created_at', { ascending: false })
-            .limit(1);
-
+          const {
+            data: addresses
+          } = await supabase.from('addresses').select('*').eq('user_id', user.id).order('is_default', {
+            ascending: false
+          }).order('created_at', {
+            ascending: false
+          }).limit(1);
           if (addresses && addresses.length > 0) {
             const address = addresses[0];
             setFormData(prev => ({
@@ -117,7 +126,7 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
               neighborhood: address.neighborhood || "",
               city: address.city || "",
               state: address.state || "",
-              zipCode: address.zip_code || "",
+              zipCode: address.zip_code || ""
             }));
           }
         } catch (error) {
@@ -125,38 +134,32 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
         }
       }
     };
-
     loadUserData();
   }, [user, session, profile]);
-
   const [isLoadingCep, setIsLoadingCep] = useState(false);
-
   const handleShippingMethodChange = (method: any, calculatedPrice: number) => {
     setSelectedShippingMethod(method);
     setShippingCost(calculatedPrice);
   };
-
   const handleShippingFileUpload = (file: any) => {
     setShippingFile(file);
   };
-
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discount = couponCode === "DESCONTO10" ? subtotal * 0.1 : 0;
   const total = subtotal - discount + shippingCost;
-
   const formatPrice = (price: number) => {
-    return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    return price.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    });
   };
-
   const searchCep = async (cep: string) => {
     const cleanCep = cep.replace(/\D/g, '');
     if (cleanCep.length !== 8) return;
-
     setIsLoadingCep(true);
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
       const data = await response.json();
-      
       if (!data.erro) {
         setFormData(prev => ({
           ...prev,
@@ -165,58 +168,63 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
           city: data.localidade || "",
           state: data.uf || ""
         }));
-        
         toast({
           title: "CEP encontrado!",
-          description: "Endereço preenchido automaticamente.",
+          description: "Endereço preenchido automaticamente."
         });
       } else {
         toast({
           title: "CEP não encontrado",
           description: "Verifique o CEP informado.",
-          variant: "destructive",
+          variant: "destructive"
         });
       }
     } catch (error) {
       toast({
         title: "Erro ao buscar CEP",
         description: "Tente novamente em alguns instantes.",
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setIsLoadingCep(false);
     }
   };
-
   const handleInputChange = (field: keyof CheckoutForm, value: string) => {
     if (field === 'cpf') {
       // Format CPF automatically
       const formattedValue = formatCPF(value);
-      setFormData(prev => ({ ...prev, [field]: formattedValue }));
+      setFormData(prev => ({
+        ...prev,
+        [field]: formattedValue
+      }));
     } else if (field === 'zipCode') {
       // Format CEP and trigger search
       const formattedCep = value.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2');
-      setFormData(prev => ({ ...prev, [field]: formattedCep }));
-      
+      setFormData(prev => ({
+        ...prev,
+        [field]: formattedCep
+      }));
       if (formattedCep.length === 9) {
         searchCep(formattedCep);
       }
     } else {
-      setFormData(prev => ({ ...prev, [field]: value }));
+      setFormData(prev => ({
+        ...prev,
+        [field]: value
+      }));
     }
   };
-
   const applyCoupon = () => {
     if (couponCode === "DESCONTO10") {
       toast({
         title: "Cupom aplicado!",
-        description: "Desconto de 10% aplicado com sucesso.",
+        description: "Desconto de 10% aplicado com sucesso."
       });
     } else {
       toast({
         title: "Cupom inválido",
         description: "O cupom informado não é válido.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
@@ -237,18 +245,15 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
           return selectedShippingMethod && (selectedShippingMethod.requires_upload ? shippingFile : true);
         }
         // Regular method requires full address
-        return selectedShippingMethod && formData.address && formData.number && 
-               formData.neighborhood && formData.city && formData.state && formData.zipCode;
+        return selectedShippingMethod && formData.address && formData.number && formData.neighborhood && formData.city && formData.state && formData.zipCode;
       case 3:
         return formData.paymentMethod;
       default:
         return true;
     }
   };
-
   const saveUserDataAndAddress = async () => {
     if (!user) return;
-
     try {
       // Update user profile with checkout data to complete missing information
       const profileUpdateData: any = {};
@@ -280,11 +285,9 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
 
       // Update profile if any data was changed
       if (profileUpdated) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update(profileUpdateData)
-          .eq('user_id', user.id);
-
+        const {
+          error: profileError
+        } = await supabase.from('profiles').update(profileUpdateData).eq('user_id', user.id);
         if (profileError) {
           console.error('Error updating profile:', profileError);
         } else {
@@ -295,10 +298,9 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
       // Save/update address if all required fields are filled and it's not a label method
       if (!isLabelMethod() && formData.address && formData.number && formData.neighborhood && formData.city && formData.state && formData.zipCode) {
         // First, set all existing addresses as non-default
-        await supabase
-          .from('addresses')
-          .update({ is_default: false })
-          .eq('user_id', user.id);
+        await supabase.from('addresses').update({
+          is_default: false
+        }).eq('user_id', user.id);
 
         // Then insert or update the new address as default
         const addressData = {
@@ -311,13 +313,11 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
           city: formData.city,
           state: formData.state,
           zip_code: formData.zipCode,
-          is_default: true,
+          is_default: true
         };
-
-        const { error: addressError } = await supabase
-          .from('addresses')
-          .insert(addressData);
-
+        const {
+          error: addressError
+        } = await supabase.from('addresses').insert(addressData);
         if (addressError) {
           console.error('Error saving address:', addressError);
         }
@@ -326,7 +326,6 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
       console.error('Error saving user data:', error);
     }
   };
-
   const createPixPayment = async () => {
     setIsProcessingPayment(true);
     try {
@@ -335,7 +334,7 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
         toast({
           title: "CPF inválido",
           description: "Por favor, informe um CPF válido.",
-          variant: "destructive",
+          variant: "destructive"
         });
         setIsProcessingPayment(false);
         return;
@@ -343,14 +342,12 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
 
       // Save user data and address before processing payment
       await saveUserDataAndAddress();
-
       const orderItems = cartItems.map(item => ({
         productId: item.productId,
         productName: item.productName,
         quantity: item.quantity,
-        unitPrice: item.price,
+        unitPrice: item.price
       }));
-
       const paymentRequest: PixPaymentRequest = {
         amount: parseFloat(total.toFixed(2)),
         description: `Pedido - ${cartItems.length} item(s)`,
@@ -358,7 +355,7 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
           email: formData.email,
           firstName: formData.firstName,
           lastName: formData.lastName || '',
-          cpf: cleanCPF(formData.cpf),
+          cpf: cleanCPF(formData.cpf)
         },
         orderItems,
         shippingAddress: isLabelMethod() ? null : {
@@ -368,42 +365,36 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
           neighborhood: formData.neighborhood,
           city: formData.city,
           state: formData.state,
-          zipCode: formData.zipCode,
-        },
+          zipCode: formData.zipCode
+        }
       };
-
       console.log('Creating PIX payment via Edge Function...');
       const response = await createModernPixPayment(paymentRequest);
-      
       console.log('PIX payment created successfully:', response);
-      
+
       // Upload shipping file if provided
       if (shippingFile && shippingFile.file && response.order_id) {
         try {
           console.log('Uploading shipping file for order:', response.order_id);
-          
           const fileExtension = shippingFile.file.name.split('.').pop();
           const fileName = `order_${response.order_id}_${Date.now()}.${fileExtension}`;
           const filePath = `${response.order_id}/${fileName}`;
-
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('shipping-files')
-            .upload(filePath, shippingFile.file);
-
+          const {
+            data: uploadData,
+            error: uploadError
+          } = await supabase.storage.from('shipping-files').upload(filePath, shippingFile.file);
           if (uploadError) {
             console.error('Error uploading shipping file:', uploadError);
           } else {
             console.log('Shipping file uploaded successfully:', uploadData);
-            
-            const { error: dbError } = await supabase
-              .from('order_shipping_files')
-              .insert({
-                order_id: response.order_id,
-                file_name: shippingFile.file.name,
-                file_path: filePath,
-                file_size: shippingFile.file.size,
-              });
-
+            const {
+              error: dbError
+            } = await supabase.from('order_shipping_files').insert({
+              order_id: response.order_id,
+              file_name: shippingFile.file.name,
+              file_path: filePath,
+              file_size: shippingFile.file.size
+            });
             if (dbError) {
               console.error('Error saving shipping file reference:', dbError);
             }
@@ -417,27 +408,22 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
       setModernPixData({
         qr_code: response.qr_code,
         qr_code_base64: response.qr_code_base64,
-        payment_id: response.payment_id,
+        payment_id: response.payment_id
       });
-      
       toast({
         title: "PIX gerado com sucesso!",
-        description: "Escaneie o QR Code ou copie o código para efetuar o pagamento.",
+        description: "Escaneie o QR Code ou copie o código para efetuar o pagamento."
       });
-
     } catch (error) {
       console.error('Error creating PIX payment:', error);
-      
       let errorTitle = "Erro ao gerar PIX";
       let errorDescription = "Tente novamente em alguns instantes.";
-      
       if (error instanceof Error) {
         console.error('Error details:', {
           message: error.message,
           name: error.name,
           stack: error.stack
         });
-        
         if (error.message.includes('Webhook N8N não está ativo') || error.message.includes('WEBHOOK_NOT_REGISTERED')) {
           errorTitle = "Webhook N8N não está ativo";
           errorDescription = "O sistema de pagamento PIX não está configurado. Entre em contato com o administrador.";
@@ -451,23 +437,21 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
           errorDescription = error.message;
         }
       }
-      
       toast({
         title: errorTitle,
         description: errorDescription,
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setIsProcessingPayment(false);
     }
   };
-
   const createModernPix = async () => {
     if (!formData.firstName || !formData.email || !formData.cpf) {
       toast({
         title: "Dados incompletos",
         description: "Preencha todos os dados pessoais para continuar.",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
@@ -478,62 +462,60 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
       setShowHighRotationAlert(true);
       return;
     }
-
     await createPixPayment();
   };
-
   const checkHighRotationProducts = async (): Promise<boolean> => {
     // Não verificar produtos de alta rotação na loja do revendedor
     if (storeSlug) {
       return false;
     }
-    
     try {
       const productIds = cartItems.map(item => item.productId);
-      
-      const { data: products } = await supabase
-        .from('products')
-        .select('id, high_rotation')
-        .in('id', productIds);
-      
+      const {
+        data: products
+      } = await supabase.from('products').select('id, high_rotation').in('id', productIds);
       return products?.some(product => product.high_rotation) || false;
     } catch (error) {
       console.error('Error checking high rotation products:', error);
       return false;
     }
   };
-
   const processPixPayment = async () => {
     // This function is no longer used, kept for compatibility
     await createPixPayment();
   };
-
   const handleSubmit = () => {
     createModernPix();
   };
-
   const handleGeneratePix = () => {
     createModernPix();
   };
-
   const handlePixPaymentConfirmed = () => {
     clearCart();
     toast({
       title: "Pagamento confirmado!",
-      description: "Seu pedido foi processado com sucesso.",
+      description: "Seu pedido foi processado com sucesso."
     });
     navigate("/");
   };
-
-  const steps = [
-    { number: 1, title: "Dados Pessoais", icon: ShoppingCart },
-    { number: 2, title: "Entrega", icon: Truck },
-    { number: 3, title: "Pagamento", icon: CreditCard },
-    { number: 4, title: "PIX", icon: Shield }
-  ];
-
-  return (
-    <div className="min-h-screen bg-background">
+  const steps = [{
+    number: 1,
+    title: "Dados Pessoais",
+    icon: ShoppingCart
+  }, {
+    number: 2,
+    title: "Entrega",
+    icon: Truck
+  }, {
+    number: 3,
+    title: "Pagamento",
+    icon: CreditCard
+  }, {
+    number: 4,
+    title: "PIX",
+    icon: Shield
+  }];
+  return <div className="min-h-screen bg-background">
       {showHeader && <Header />}
       
       <main className="container mx-auto px-4 py-8">
@@ -542,25 +524,15 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
           
           {/* Progress Steps */}
           <div className="flex items-center justify-between mb-8">
-            {steps.map((step, index) => (
-              <div key={step.number} className="flex items-center">
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
-                  currentStep >= step.number ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                }`}>
+            {steps.map((step, index) => <div key={step.number} className="flex items-center">
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full ${currentStep >= step.number ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
                   <step.icon className="w-5 h-5" />
                 </div>
-                <span className={`ml-2 text-sm font-medium ${
-                  currentStep >= step.number ? 'text-primary' : 'text-muted-foreground'
-                }`}>
+                <span className={`ml-2 text-sm font-medium ${currentStep >= step.number ? 'text-primary' : 'text-muted-foreground'}`}>
                   {step.title}
                 </span>
-                {index < steps.length - 1 && (
-                  <div className={`w-20 h-0.5 mx-4 ${
-                    currentStep > step.number ? 'bg-primary' : 'bg-muted'
-                  }`} />
-                )}
-              </div>
-            ))}
+                {index < steps.length - 1 && <div className={`w-20 h-0.5 mx-4 ${currentStep > step.number ? 'bg-primary' : 'bg-muted'}`} />}
+              </div>)}
           </div>
         </div>
 
@@ -569,8 +541,7 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
           <div className="lg:col-span-2 space-y-6">
             
             {/* Profile completion warning for logged-in users */}
-            {user && (!profile?.phone || !profile?.cpf) && (
-              <Card className="border-amber-200 bg-amber-50">
+            {user && (!profile?.phone || !profile?.cpf) && <Card className="border-amber-200 bg-amber-50">
                 <CardContent className="pt-6">
                   <div className="flex items-start gap-3">
                     <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
@@ -580,50 +551,28 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
                         Para uma experiência mais rápida, complete as informações do seu perfil. 
                         Os dados serão salvos automaticamente após a compra.
                       </p>
-                      {!profile?.phone && !profile?.cpf && (
-                        <p className="text-xs text-amber-600 mt-2">
+                      {!profile?.phone && !profile?.cpf && <p className="text-xs text-amber-600 mt-2">
                           Preencha telefone e CPF para que sejam salvos no seu perfil.
-                        </p>
-                      )}
-                      {!profile?.phone && profile?.cpf && (
-                        <p className="text-xs text-amber-600 mt-2">
+                        </p>}
+                      {!profile?.phone && profile?.cpf && <p className="text-xs text-amber-600 mt-2">
                           Preencha seu telefone para que seja salvo no seu perfil.
-                        </p>
-                      )}
-                      {profile?.phone && !profile?.cpf && (
-                        <p className="text-xs text-amber-600 mt-2">
+                        </p>}
+                      {profile?.phone && !profile?.cpf && <p className="text-xs text-amber-600 mt-2">
                           Preencha seu CPF para que seja salvo no seu perfil.
-                        </p>
-                      )}
+                        </p>}
                     </div>
                   </div>
                 </CardContent>
-              </Card>
-            )}
+              </Card>}
             
             {/* Show PIX Payment if available */}
-            {modernPixData ? (
-              <div className="flex justify-center">
-                <ModernPixPayment 
-                  qrCode={modernPixData.qr_code}
-                  qrCodeBase64={modernPixData.qr_code_base64}
-                  amount={total}
-                  paymentId={modernPixData.payment_id}
-                  onPaymentConfirmed={handlePixPaymentConfirmed}
-                />
-              </div>
-            ) : pixPaymentData ? (
-              <div className="flex justify-center">
-                <PixPayment
-                  paymentData={pixPaymentData} 
-                  onPaymentConfirmed={handlePixPaymentConfirmed}
-                />
-              </div>
-            ) : (
-              <>
+            {modernPixData ? <div className="flex justify-center">
+                <ModernPixPayment qrCode={modernPixData.qr_code} qrCodeBase64={modernPixData.qr_code_base64} amount={total} paymentId={modernPixData.payment_id} onPaymentConfirmed={handlePixPaymentConfirmed} />
+              </div> : pixPaymentData ? <div className="flex justify-center">
+                <PixPayment paymentData={pixPaymentData} onPaymentConfirmed={handlePixPaymentConfirmed} />
+              </div> : <>
                 {/* Regular checkout steps */}
-            {currentStep === 1 && (
-              <Card>
+            {currentStep === 1 && <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <ShoppingCart className="w-5 h-5" />
@@ -633,59 +582,30 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
                 <CardContent className="space-y-4">
                   <div>
                     <Label htmlFor="email">E-mail</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => handleInputChange("email", e.target.value)}
-                      placeholder="seu@email.com"
-                    />
+                    <Input id="email" type="email" value={formData.email} onChange={e => handleInputChange("email", e.target.value)} placeholder="seu@email.com" />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="firstName">Nome</Label>
-                      <Input
-                        id="firstName"
-                        value={formData.firstName}
-                        onChange={(e) => handleInputChange("firstName", e.target.value)}
-                        placeholder="Seu nome"
-                      />
+                      <Input id="firstName" value={formData.firstName} onChange={e => handleInputChange("firstName", e.target.value)} placeholder="Seu nome" />
                     </div>
                     <div>
                       <Label htmlFor="lastName">Sobrenome</Label>
-                      <Input
-                        id="lastName"
-                        value={formData.lastName}
-                        onChange={(e) => handleInputChange("lastName", e.target.value)}
-                        placeholder="Seu sobrenome"
-                      />
+                      <Input id="lastName" value={formData.lastName} onChange={e => handleInputChange("lastName", e.target.value)} placeholder="Seu sobrenome" />
                     </div>
                   </div>
                   <div>
                     <Label htmlFor="phone">Telefone</Label>
-                    <Input
-                      id="phone"
-                      value={formData.phone}
-                      onChange={(e) => handleInputChange("phone", e.target.value)}
-                      placeholder="(11) 99999-9999"
-                    />
+                    <Input id="phone" value={formData.phone} onChange={e => handleInputChange("phone", e.target.value)} placeholder="(11) 99999-9999" />
                   </div>
                   <div>
                     <Label htmlFor="cpf">CPF</Label>
-                    <Input
-                      id="cpf"
-                      value={formData.cpf}
-                      onChange={(e) => handleInputChange("cpf", e.target.value)}
-                      placeholder="000.000.000-00"
-                      maxLength={14}
-                    />
+                    <Input id="cpf" value={formData.cpf} onChange={e => handleInputChange("cpf", e.target.value)} placeholder="000.000.000-00" maxLength={14} />
                   </div>
                 </CardContent>
-              </Card>
-            )}
+              </Card>}
 
-            {currentStep === 2 && (
-              <Card>
+            {currentStep === 2 && <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Truck className="w-5 h-5" />
@@ -694,18 +614,11 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Shipping Method Selector */}
-                  <ShippingMethodSelector
-                    orderValue={subtotal}
-                    zipCode={formData.zipCode}
-                    weight={1} // Calculate this based on products if needed
-                    selectedMethodId={selectedShippingMethod?.id}
-                    onMethodChange={handleShippingMethodChange}
-                    onFileUploaded={handleShippingFileUpload}
-                  />
+                  <ShippingMethodSelector orderValue={subtotal} zipCode={formData.zipCode} weight={1} // Calculate this based on products if needed
+                selectedMethodId={selectedShippingMethod?.id} onMethodChange={handleShippingMethodChange} onFileUploaded={handleShippingFileUpload} />
                   
                   {/* Address fields - only show if not using label method */}
-                  {!isLabelMethod() && (
-                    <div className="space-y-4 pt-4 border-t">
+                  {!isLabelMethod() && <div className="space-y-4 pt-4 border-t">
                       <div className="flex items-center gap-2">
                         <Truck className="w-4 h-4" />
                         <Label className="text-base font-semibold">Endereço de Entrega</Label>
@@ -713,74 +626,37 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
                       
                       <div>
                         <Label htmlFor="zipCode">CEP</Label>
-                        <Input
-                          id="zipCode"
-                          value={formData.zipCode}
-                          onChange={(e) => handleInputChange("zipCode", e.target.value)}
-                          placeholder="00000-000"
-                          maxLength={9}
-                          disabled={isLoadingCep}
-                        />
-                        {isLoadingCep && (
-                          <p className="text-sm text-muted-foreground mt-1">
+                        <Input id="zipCode" value={formData.zipCode} onChange={e => handleInputChange("zipCode", e.target.value)} placeholder="00000-000" maxLength={9} disabled={isLoadingCep} />
+                        {isLoadingCep && <p className="text-sm text-muted-foreground mt-1">
                             Buscando endereço...
-                          </p>
-                        )}
+                          </p>}
                       </div>
                       <div>
                         <Label htmlFor="address">Logradouro</Label>
-                        <Input
-                          id="address"
-                          value={formData.address}
-                          onChange={(e) => handleInputChange("address", e.target.value)}
-                          placeholder="Nome da rua"
-                        />
+                        <Input id="address" value={formData.address} onChange={e => handleInputChange("address", e.target.value)} placeholder="Nome da rua" />
                       </div>
                       <div className="grid grid-cols-3 gap-4">
                         <div className="col-span-1">
                           <Label htmlFor="number">Número</Label>
-                          <Input
-                            id="number"
-                            value={formData.number}
-                            onChange={(e) => handleInputChange("number", e.target.value)}
-                            placeholder="123"
-                          />
+                          <Input id="number" value={formData.number} onChange={e => handleInputChange("number", e.target.value)} placeholder="123" />
                         </div>
                         <div className="col-span-2">
                           <Label htmlFor="complement">Complemento</Label>
-                          <Input
-                            id="complement"
-                            value={formData.complement}
-                            onChange={(e) => handleInputChange("complement", e.target.value)}
-                            placeholder="Apto, casa, etc. (opcional)"
-                          />
+                          <Input id="complement" value={formData.complement} onChange={e => handleInputChange("complement", e.target.value)} placeholder="Apto, casa, etc. (opcional)" />
                         </div>
                       </div>
                       <div>
                         <Label htmlFor="neighborhood">Bairro</Label>
-                        <Input
-                          id="neighborhood"
-                          value={formData.neighborhood}
-                          onChange={(e) => handleInputChange("neighborhood", e.target.value)}
-                          placeholder="Nome do bairro"
-                        />
+                        <Input id="neighborhood" value={formData.neighborhood} onChange={e => handleInputChange("neighborhood", e.target.value)} placeholder="Nome do bairro" />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor="city">Cidade</Label>
-                          <Input
-                            id="city"
-                            value={formData.city}
-                            onChange={(e) => handleInputChange("city", e.target.value)}
-                            placeholder="Sua cidade"
-                          />
+                          <Input id="city" value={formData.city} onChange={e => handleInputChange("city", e.target.value)} placeholder="Sua cidade" />
                         </div>
                         <div>
                           <Label htmlFor="state">Estado</Label>
-                          <Select 
-                            value={formData.state} 
-                            onValueChange={(value) => handleInputChange("state", value)}
-                          >
+                          <Select value={formData.state} onValueChange={value => handleInputChange("state", value)}>
                             <SelectTrigger>
                               <SelectValue placeholder="Selecione" />
                             </SelectTrigger>
@@ -816,34 +692,27 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
                           </Select>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    </div>}
                   
                   {/* Label method info message */}
-                  {isLabelMethod() && (
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  {isLabelMethod() && <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                       <div className="flex items-start gap-2">
                         <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
                         <div>
                           <h4 className="font-semibold text-blue-800">Envio com Etiqueta</h4>
                           <p className="text-sm text-blue-700 mt-1">
                             Com esta modalidade de envio, não é necessário informar o endereço de entrega. 
-                            {selectedShippingMethod?.requires_file && !shippingFile && (
-                              <span className="block mt-1 font-medium">
+                            {selectedShippingMethod?.requires_file && !shippingFile && <span className="block mt-1 font-medium">
                                 Por favor, faça o upload da etiqueta de envio para continuar.
-                              </span>
-                            )}
+                              </span>}
                           </p>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    </div>}
                 </CardContent>
-              </Card>
-            )}
+              </Card>}
 
-            {currentStep === 3 && (
-              <Card>
+            {currentStep === 3 && <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <CreditCard className="w-5 h-5" />
@@ -868,20 +737,13 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
                     Clique no botão abaixo para gerar o QR Code PIX para pagamento.
                     O pagamento é processado instantaneamente.
                   </p>
-                  <Button 
-                    onClick={handleGeneratePix}
-                    disabled={isProcessingPayment || !canAdvanceToNextStep()}
-                    className="w-full"
-                    size="lg"
-                  >
+                  <Button onClick={handleGeneratePix} disabled={isProcessingPayment || !canAdvanceToNextStep()} className="w-full" size="lg">
                     {isProcessingPayment ? "Gerando PIX..." : "Gerar PIX"}
                   </Button>
                 </CardContent>
-              </Card>
-            )}
+              </Card>}
 
-            {currentStep === 4 && (
-              <Card>
+            {currentStep === 4 && <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Shield className="w-5 h-5" />
@@ -896,45 +758,28 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
                     <p><strong>Nome:</strong> {formData.firstName} {formData.lastName}</p>
                     <p><strong>E-mail:</strong> {formData.email}</p>
                     <p><strong>Telefone:</strong> {formData.phone}</p>
-                    {!isLabelMethod() ? (
-                      <p><strong>Endereço:</strong> {formData.address}, {formData.number} {formData.complement && `- ${formData.complement}`}, {formData.neighborhood}, {formData.city} - {formData.state}</p>
-                    ) : (
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                    {!isLabelMethod() ? <p><strong>Endereço:</strong> {formData.address}, {formData.number} {formData.complement && `- ${formData.complement}`}, {formData.neighborhood}, {formData.city} - {formData.state}</p> : <div className="p-3 bg-blue-50 border border-blue-200 rounded">
                         <p><strong>Entrega:</strong> Envio com Etiqueta</p>
-                        {shippingFile && (
-                          <p className="text-xs text-blue-600 mt-1">
+                        {shippingFile && <p className="text-xs text-blue-600 mt-1">
                             Etiqueta anexada: {shippingFile.name}
-                          </p>
-                        )}
-                      </div>
-                    )}
+                          </p>}
+                      </div>}
                     <p><strong>Pagamento:</strong> PIX</p>
                   </div>
                 </CardContent>
-              </Card>
-            )}
+              </Card>}
 
                 {/* Navigation Buttons */}
                 <div className="flex justify-between">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
-                    disabled={currentStep === 1 || isProcessingPayment}
-                  >
+                  <Button variant="outline" onClick={() => setCurrentStep(Math.max(1, currentStep - 1))} disabled={currentStep === 1 || isProcessingPayment}>
                     Voltar
                   </Button>
                   
-                  {currentStep < 3 && (
-                    <Button 
-                      onClick={() => setCurrentStep(currentStep + 1)}
-                      disabled={!canAdvanceToNextStep()}
-                    >
+                  {currentStep < 3 && <Button onClick={() => setCurrentStep(currentStep + 1)} disabled={!canAdvanceToNextStep()} className="bg-[#3fc356]">
                       Continuar
-                    </Button>
-                  )}
+                    </Button>}
                 </div>
-              </>
-            )}
+              </>}
           </div>
 
           {/* Order Summary */}
@@ -944,40 +789,26 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
                 <CardTitle>Resumo do Pedido</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {cartItems.map((item) => (
-                  <div key={item.productId} className="flex gap-3">
-                    <img 
-                      src={item.productImage} 
-                      alt={item.productName}
-                      className="w-16 h-16 object-cover rounded"
-                    />
+                {cartItems.map(item => <div key={item.productId} className="flex gap-3">
+                    <img src={item.productImage} alt={item.productName} className="w-16 h-16 object-cover rounded" />
                     <div className="flex-1">
                       <h4 className="font-medium text-sm">{item.productName}</h4>
-                      {item.variants && (
-                        <div className="flex gap-1 mt-1">
-                          {Object.entries(item.variants).map(([key, value]) => (
-                            <Badge key={key} variant="secondary" className="text-xs">
+                      {item.variants && <div className="flex gap-1 mt-1">
+                          {Object.entries(item.variants).map(([key, value]) => <Badge key={key} variant="secondary" className="text-xs">
                               {value}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
+                            </Badge>)}
+                        </div>}
                       <p className="text-sm text-muted-foreground">Qtd: {item.quantity}</p>
                       <p className="font-medium">{formatPrice(item.price)}</p>
                     </div>
-                  </div>
-                ))}
+                  </div>)}
                 
                 <Separator />
                 
                 {/* Coupon */}
                 <div className="space-y-2">
                   <div className="flex gap-2">
-                    <Input
-                      placeholder="Código do cupom"
-                      value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value)}
-                    />
+                    <Input placeholder="Código do cupom" value={couponCode} onChange={e => setCouponCode(e.target.value)} />
                     <Button variant="outline" onClick={applyCoupon}>
                       Aplicar
                     </Button>
@@ -992,19 +823,14 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
                     <span>Subtotal</span>
                     <span>{formatPrice(subtotal)}</span>
                   </div>
-                  {discount > 0 && (
-                    <div className="flex justify-between text-green-600">
+                  {discount > 0 && <div className="flex justify-between text-green-600">
                       <span>Desconto</span>
                       <span>-{formatPrice(discount)}</span>
-                    </div>
-                  )}
+                    </div>}
                   <div className="flex justify-between">
                     <span>Frete</span>
                     <span>
-                      {selectedShippingMethod 
-                        ? (shippingCost === 0 ? "GRÁTIS" : formatPrice(shippingCost))
-                        : "A calcular"
-                      }
+                      {selectedShippingMethod ? shippingCost === 0 ? "GRÁTIS" : formatPrice(shippingCost) : "A calcular"}
                     </span>
                   </div>
                   <Separator />
@@ -1022,29 +848,13 @@ const Checkout = ({ showHeader = true, showFooter = true, storeSlug }: CheckoutP
       {showFooter && <Footer />}
 
       {/* PIX Payment Modal */}
-      {pixModalData && (
-        <PixPaymentModal
-          isOpen={showPixModal}
-          onClose={() => setShowPixModal(false)}
-          qrCodeBase64={pixModalData.qrCodeBase64}
-          qrCodeCopyPaste={pixModalData.qrCodeCopyPaste}
-          paymentId={pixModalData.paymentId}
-          amount={pixModalData.amount}
-          onPaymentConfirmed={handlePixPaymentConfirmed}
-        />
-      )}
+      {pixModalData && <PixPaymentModal isOpen={showPixModal} onClose={() => setShowPixModal(false)} qrCodeBase64={pixModalData.qrCodeBase64} qrCodeCopyPaste={pixModalData.qrCodeCopyPaste} paymentId={pixModalData.paymentId} amount={pixModalData.amount} onPaymentConfirmed={handlePixPaymentConfirmed} />}
 
       {/* High Rotation Alert Modal */}
-      <HighRotationAlert
-        isOpen={showHighRotationAlert}
-        onClose={() => setShowHighRotationAlert(false)}
-        onConfirm={() => {
-          setShowHighRotationAlert(false);
-          processPixPayment();
-        }}
-      />
-    </div>
-  );
+      <HighRotationAlert isOpen={showHighRotationAlert} onClose={() => setShowHighRotationAlert(false)} onConfirm={() => {
+      setShowHighRotationAlert(false);
+      processPixPayment();
+    }} />
+    </div>;
 };
-
 export default Checkout;
