@@ -390,7 +390,7 @@ const Produto = ({
             {/* Benefits */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg bg-zinc-200">
-                <Truck className="h-6 w-6 text-primary" />
+                <span className="text-2xl">🚚💨</span>
                 <p className="text-sm font-medium">Envio em 24hrs</p>
               </div>
               <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg bg-zinc-200">
