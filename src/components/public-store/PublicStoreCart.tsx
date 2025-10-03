@@ -233,7 +233,7 @@ const PublicStoreCart = () => {
 
           {/* Order Summary */}
           <div className="lg:col-span-1">
-            <Card className="sticky top-8">
+            <Card className="sticky top-4">
               <CardContent className="p-6 space-y-6">
                 <h2 className="text-xl font-bold">Resumo do Pedido</h2>
                 
