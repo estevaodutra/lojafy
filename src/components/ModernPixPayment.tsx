@@ -159,11 +159,11 @@ export const ModernPixPayment: React.FC<ModernPixPaymentProps> = ({
           <div className="space-y-3">
             <Button 
               onClick={copyPixCode}
-              className="w-full h-14 text-lg font-semibold relative overflow-hidden group shadow-lg"
+              className="w-full h-14 text-lg font-semibold relative overflow-hidden group shadow-lg text-white hover:opacity-90"
+              style={{ backgroundColor: '#3fc356' }}
               size="lg"
               disabled={!qrCode}
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-primary to-primary-foreground opacity-0 group-hover:opacity-10 transition-opacity"></div>
               {copied ? (
                 <>
                   <Check className="mr-2 h-6 w-6" />

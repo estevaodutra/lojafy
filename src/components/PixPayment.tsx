@@ -227,7 +227,8 @@ export default function PixPayment({ paymentData, onPaymentConfirmed }: PixPayme
           <Button 
             onClick={copyPixCode} 
             size="lg" 
-            className="w-full h-12 text-base font-semibold shadow-md"
+            className="w-full h-12 text-base font-semibold shadow-md text-white hover:opacity-90"
+            style={{ backgroundColor: '#3fc356' }}
           >
             <Copy className="h-5 w-5 mr-2" />
             Copiar código PIX

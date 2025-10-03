@@ -140,7 +140,8 @@ export function PixPaymentModal({
           <div className="space-y-3">
             <Button
               onClick={copyPixCode}
-              className="w-full h-12 text-base font-semibold shadow-md"
+              className="w-full h-12 text-base font-semibold shadow-md text-white hover:opacity-90"
+              style={{ backgroundColor: '#3fc356' }}
               size="lg"
             >
               <Copy className="h-5 w-5 mr-2" />
