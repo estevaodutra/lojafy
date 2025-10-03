@@ -75,6 +75,12 @@ import PublicStoreCart from "./pages/PublicStoreCart";
 import PublicStoreCheckout from "./pages/PublicStoreCheckout";
 import PublicStoreSearch from "./pages/PublicStoreSearch";
 import PublicStoreContact from "./pages/PublicStoreContact";
+import PublicStoreAbout from "./pages/PublicStoreAbout";
+import PublicStoreFAQ from "./pages/PublicStoreFAQ";
+import PublicStorePolicyExchange from "./pages/PublicStorePolicyExchange";
+import PublicStoreTerms from "./pages/PublicStoreTerms";
+import PublicStoreTrackOrder from "./pages/PublicStoreTrackOrder";
+import PublicStoreHelpCenter from "./pages/PublicStoreHelpCenter";
 import SuperAdminDashboard from "./pages/admin/Dashboard";
 import Usuarios from "./pages/admin/Usuarios";
 import Plataforma from "./pages/admin/Plataforma";
@@ -317,6 +323,54 @@ const App = () => {
                 element={
                   <PublicStoreProviderRoute>
                     <PublicStoreSearch />
+                  </PublicStoreProviderRoute>
+                }
+              />
+              <Route
+                path="/loja/:slug/quem-somos"
+                element={
+                  <PublicStoreProviderRoute>
+                    <PublicStoreAbout />
+                  </PublicStoreProviderRoute>
+                }
+              />
+              <Route
+                path="/loja/:slug/faq"
+                element={
+                  <PublicStoreProviderRoute>
+                    <PublicStoreFAQ />
+                  </PublicStoreProviderRoute>
+                }
+              />
+              <Route
+                path="/loja/:slug/politica-troca"
+                element={
+                  <PublicStoreProviderRoute>
+                    <PublicStorePolicyExchange />
+                  </PublicStoreProviderRoute>
+                }
+              />
+              <Route
+                path="/loja/:slug/termos-uso"
+                element={
+                  <PublicStoreProviderRoute>
+                    <PublicStoreTerms />
+                  </PublicStoreProviderRoute>
+                }
+              />
+              <Route
+                path="/loja/:slug/rastrear-pedido"
+                element={
+                  <PublicStoreProviderRoute>
+                    <PublicStoreTrackOrder />
+                  </PublicStoreProviderRoute>
+                }
+              />
+              <Route
+                path="/loja/:slug/ajuda"
+                element={
+                  <PublicStoreProviderRoute>
+                    <PublicStoreHelpCenter />
                   </PublicStoreProviderRoute>
                 }
               />
