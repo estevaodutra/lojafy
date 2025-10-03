@@ -18,9 +18,7 @@ const Usuarios = () => {
     queryKey: ['users'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .rpc('get_users_with_email');
       
       if (error) throw error;
       return data;
@@ -125,7 +123,7 @@ const Usuarios = () => {
                   <TableCell className="font-medium">
                     {user.first_name} {user.last_name}
                   </TableCell>
-                  <TableCell>{user.user_id}</TableCell>
+                  <TableCell>{user.email}</TableCell>
                   <TableCell>
                     <Badge variant={getRoleBadgeVariant(user.role)}>
                       {getRoleLabel(user.role)}

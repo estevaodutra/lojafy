@@ -1672,6 +1672,27 @@ export type Database = {
           total_amount: number
         }[]
       }
+      get_users_with_email: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          avatar_url: string
+          business_address: string
+          business_cnpj: string
+          business_name: string
+          cpf: string
+          created_at: string
+          email: string
+          first_name: string
+          id: string
+          is_active: boolean
+          last_name: string
+          phone: string
+          role: Database["public"]["Enums"]["app_role"]
+          subdomain: string
+          updated_at: string
+          user_id: string
+        }[]
+      }
       has_role: {
         Args: { user_role: Database["public"]["Enums"]["app_role"] }
         Returns: boolean
