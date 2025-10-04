@@ -1,38 +1,27 @@
 import { Phone, Mail, MapPin, MessageCircle, Instagram, Facebook } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PublicStoreData } from "@/hooks/usePublicStore";
-
 interface PublicStoreFooterProps {
   store: PublicStoreData;
 }
-
-const PublicStoreFooter = ({ store }: PublicStoreFooterProps) => {
+const PublicStoreFooter = ({
+  store
+}: PublicStoreFooterProps) => {
   const handleWhatsAppContact = () => {
     if (store.whatsapp) {
       const message = encodeURIComponent(`Olá! Vi sua loja online e gostaria de mais informações.`);
       window.open(`https://wa.me/55${store.whatsapp.replace(/\D/g, '')}?text=${message}`, '_blank');
     }
   };
-
-  return (
-    <footer 
-      className="bg-background border-t py-12"
-      style={{
-        backgroundColor: store.secondary_color || '#f3f4f6'
-      }}
-    >
+  return <footer className="bg-background border-t py-12" style={{
+    backgroundColor: store.secondary_color || '#f3f4f6'
+  }}>
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Store Info */}
           <div className="space-y-4">
             <div className="flex items-center space-x-3">
-              {store.logo_url && (
-                <img 
-                  src={store.logo_url} 
-                  alt={store.store_name}
-                  className="h-12 w-auto"
-                />
-              )}
+              {store.logo_url && <img src={store.logo_url} alt={store.store_name} className="h-12 w-auto" />}
               <h3 className="text-xl font-bold">{store.store_name}</h3>
             </div>
             <p className="text-muted-foreground">
@@ -66,16 +55,12 @@ const PublicStoreFooter = ({ store }: PublicStoreFooterProps) => {
                 <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                 <span className="text-sm">{store.contact_address || 'Rua Exemplo, 123 - Bairro - Cidade/UF'}</span>
               </div>
-              {store.whatsapp && (
-                <Button 
-                  onClick={handleWhatsAppContact}
-                  className="mt-4 text-white"
-                  style={{ backgroundColor: store.accent_color }}
-                >
+              {store.whatsapp && <Button onClick={handleWhatsAppContact} style={{
+              backgroundColor: store.accent_color
+            }} className="mt-4 text-white bg-green-500 hover:bg-green-400">
                   <MessageCircle className="mr-2 h-4 w-4" />
                   Falar no WhatsApp
-                </Button>
-              )}
+                </Button>}
             </div>
           </div>
 
@@ -117,8 +102,6 @@ const PublicStoreFooter = ({ store }: PublicStoreFooterProps) => {
           </div>
         </div>
       </div>
-    </footer>
-  );
+    </footer>;
 };
-
 export default PublicStoreFooter;
