@@ -144,7 +144,7 @@ const PublicStoreHelpCenter = () => {
                       <span className="text-xs text-muted-foreground">{option.time}</span>
                     </div>
                     <p className="text-sm font-medium mb-3">{option.contact}</p>
-                    <Button variant={option.variant} onClick={option.icon === MessageCircle ? handleWhatsAppClick : undefined} asChild={option.icon !== MessageCircle} className="w-full bg-blue-500 hover:bg-blue-400">
+                    <Button variant={option.variant} onClick={option.icon === MessageCircle ? handleWhatsAppClick : undefined} asChild={option.icon !== MessageCircle} className="w-full bg-blue-500 hover:bg-blue-400 text-white">
                       {option.icon === MessageCircle ? <span>{option.action}</span> : option.icon === Mail ? <a href={`mailto:${store.contact_email}`}>{option.action}</a> : <a href={`tel:${store.contact_phone}`}>{option.action}</a>}
                     </Button>
                   </CardContent>
