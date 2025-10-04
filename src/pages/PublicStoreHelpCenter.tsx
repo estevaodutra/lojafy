@@ -135,7 +135,7 @@ const PublicStoreHelpCenter = () => {
               {contactOptions.filter(opt => opt.available).map((option, index) => <Card key={index} className="text-center hover:shadow-lg transition-shadow">
                   <CardContent className="pt-6">
                     <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                      <option.icon className="w-8 h-8 text-primary-foreground" />
+                      <option.icon className="w-8 h-8 text-black" />
                     </div>
                     <h3 className="text-lg font-semibold mb-2">{option.title}</h3>
                     <p className="text-muted-foreground text-sm mb-2">{option.description}</p>
