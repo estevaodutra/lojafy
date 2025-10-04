@@ -83,7 +83,7 @@ const PublicStoreFooter = ({
               <a href={`/loja/${store.store_slug}/rastrear-pedido`} className="block hover:text-primary transition-colors">
                 Rastrear Pedido
               </a>
-              <a href={`/loja/${store.store_slug}/central-ajuda`} className="block hover:text-primary transition-colors">
+              <a href={`/loja/${store.store_slug}/ajuda`} className="block hover:text-primary transition-colors">
                 Central de Ajuda
               </a>
             </div>
