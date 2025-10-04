@@ -66,6 +66,7 @@ import ResellerCatalog from "./pages/reseller/Catalog";
 import ResellerProducts from "./pages/reseller/Products";
 import ResellerStoreEditor from "./pages/reseller/StoreEditor";
 import ResellerPagesEditor from "./pages/reseller/PagesEditor";
+import ResellerBenefits from "./pages/reseller/Benefits";
 import PublicStore from "./pages/PublicStore";
 import PublicStoreProduct from "./pages/PublicStoreProduct";
 import PublicStoreCategory from "./pages/PublicStoreCategory";
@@ -231,6 +232,7 @@ const App = () => {
                 <Route path="produtos" element={<ResellerProducts />} />
                 <Route path="loja" element={<ResellerStoreEditor />} />
                 <Route path="paginas" element={<ResellerPagesEditor />} />
+                <Route path="vantagens" element={<ResellerBenefits />} />
                 <Route path="vendas" element={<ResellerSales />} />
                 <Route path="clientes" element={<ResellerClients />} />
                 <Route path="comissoes" element={<ResellerCommissions />} />

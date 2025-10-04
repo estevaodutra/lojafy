@@ -1178,6 +1178,7 @@ export type Database = {
           banner_image_url: string | null
           banner_subtitle: string | null
           banner_title: string | null
+          benefits_config: Json | null
           contact_address: string | null
           contact_email: string | null
           contact_phone: string | null
@@ -1201,6 +1202,7 @@ export type Database = {
           banner_image_url?: string | null
           banner_subtitle?: string | null
           banner_title?: string | null
+          benefits_config?: Json | null
           contact_address?: string | null
           contact_email?: string | null
           contact_phone?: string | null
@@ -1224,6 +1226,7 @@ export type Database = {
           banner_image_url?: string | null
           banner_subtitle?: string | null
           banner_title?: string | null
+          benefits_config?: Json | null
           contact_address?: string | null
           contact_email?: string | null
           contact_phone?: string | null

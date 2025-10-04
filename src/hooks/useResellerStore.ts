@@ -22,6 +22,7 @@ export interface ResellerStore {
   payment_methods: any;
   policies: any;
   default_margin?: number;
+  benefits_config?: any;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -433,6 +434,40 @@ export const useResellerStore = () => {
     }
   };
 
+  const updateBenefitsConfig = async (benefits: any[]) => {
+    if (!user?.id || !store) {
+      throw new Error('Store not found or user not authenticated');
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { error: updateError } = await supabase
+        .from('reseller_stores')
+        .update({ 
+          benefits_config: benefits,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', store.id);
+
+      if (updateError) throw updateError;
+
+      // Refresh store data
+      await fetchStore();
+
+      toast.success('Vantagens atualizadas com sucesso!');
+      return true;
+    } catch (err: any) {
+      console.error('Error updating benefits config:', err);
+      setError(err.message);
+      toast.error('Erro ao atualizar vantagens: ' + err.message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (user?.id) {
       fetchStore();
@@ -453,6 +488,7 @@ export const useResellerStore = () => {
     updateProductStatus,
     updateProductPrice,
     updateAllProductsMargin,
+    updateBenefitsConfig,
     refetch: () => {
       fetchStore();
       fetchProducts();
