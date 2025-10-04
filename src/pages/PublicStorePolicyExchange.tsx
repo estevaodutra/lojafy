@@ -8,59 +8,46 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw, Clock, Shield, CheckCircle, AlertCircle, Package } from "lucide-react";
 import { Link } from "react-router-dom";
 import { replacePlaceholders } from '@/lib/placeholders';
-
 const PublicStorePolicyExchange = () => {
-  const { store } = usePublicStoreContext();
+  const {
+    store
+  } = usePublicStoreContext();
   usePublicStoreDocumentTitle(store, 'Política de Troca');
-
-  const conditions = [
-    {
-      icon: Clock,
-      title: "Prazo para Troca",
-      description: "30 dias corridos a partir da data de recebimento do produto."
-    },
-    {
-      icon: Package,
-      title: "Embalagem Original",
-      description: "Produto deve estar na embalagem original, sem sinais de uso."
-    },
-    {
-      icon: Shield,
-      title: "Nota Fiscal",
-      description: "Apresentar a nota fiscal ou comprovante de compra."
-    },
-    {
-      icon: CheckCircle,
-      title: "Estado do Produto",
-      description: "Produto deve estar íntegro, sem arranhões ou avarias."
-    }
-  ];
-
-  const steps = [
-    {
-      step: 1,
-      title: "Solicite a Troca",
-      description: `Entre em contato conosco através do WhatsApp {WHATSAPP} ou telefone {PHONE} informando o motivo da troca.`
-    },
-    {
-      step: 2,
-      title: "Autorização",
-      description: "Nossa equipe analisará sua solicitação e fornecerá as instruções para devolução."
-    },
-    {
-      step: 3,
-      title: "Envio do Produto",
-      description: "Embale o produto adequadamente e envie pelos Correios com AR (porte pago por nós)."
-    },
-    {
-      step: 4,
-      title: "Análise e Troca",
-      description: "Após recebermos e analisarmos o produto, providenciaremos a troca ou reembolso em até 7 dias úteis."
-    }
-  ];
-
-  return (
-    <div className="min-h-screen bg-background">
+  const conditions = [{
+    icon: Clock,
+    title: "Prazo para Troca",
+    description: "30 dias corridos a partir da data de recebimento do produto."
+  }, {
+    icon: Package,
+    title: "Embalagem Original",
+    description: "Produto deve estar na embalagem original, sem sinais de uso."
+  }, {
+    icon: Shield,
+    title: "Nota Fiscal",
+    description: "Apresentar a nota fiscal ou comprovante de compra."
+  }, {
+    icon: CheckCircle,
+    title: "Estado do Produto",
+    description: "Produto deve estar íntegro, sem arranhões ou avarias."
+  }];
+  const steps = [{
+    step: 1,
+    title: "Solicite a Troca",
+    description: `Entre em contato conosco através do WhatsApp {WHATSAPP} ou telefone {PHONE} informando o motivo da troca.`
+  }, {
+    step: 2,
+    title: "Autorização",
+    description: "Nossa equipe analisará sua solicitação e fornecerá as instruções para devolução."
+  }, {
+    step: 3,
+    title: "Envio do Produto",
+    description: "Embale o produto adequadamente e envie pelos Correios com AR (porte pago por nós)."
+  }, {
+    step: 4,
+    title: "Análise e Troca",
+    description: "Após recebermos e analisarmos o produto, providenciaremos a troca ou reembolso em até 7 dias úteis."
+  }];
+  return <div className="min-h-screen bg-background">
       <PublicStoreHeader store={store} />
       
       <main className="container mx-auto px-4 py-8">
@@ -103,8 +90,7 @@ const PublicStorePolicyExchange = () => {
           <div className="mb-8">
             <h2 className="text-2xl font-bold mb-6">Condições para Troca</h2>
             <div className="grid md:grid-cols-2 gap-6">
-              {conditions.map((condition, index) => (
-                <Card key={index}>
+              {conditions.map((condition, index) => <Card key={index}>
                   <CardContent className="pt-6">
                     <div className="flex items-start gap-4">
                       <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
@@ -116,8 +102,7 @@ const PublicStorePolicyExchange = () => {
                       </div>
                     </div>
                   </CardContent>
-                </Card>
-              ))}
+                </Card>)}
             </div>
           </div>
 
@@ -125,8 +110,7 @@ const PublicStorePolicyExchange = () => {
           <div className="mb-8">
             <h2 className="text-2xl font-bold mb-6">Como Solicitar uma Troca</h2>
             <div className="space-y-6">
-              {steps.map((step, index) => (
-                <Card key={index}>
+              {steps.map((step, index) => <Card key={index}>
                   <CardContent className="pt-6">
                     <div className="flex items-start gap-4">
                       <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center flex-shrink-0 text-primary-foreground font-bold">
@@ -140,8 +124,7 @@ const PublicStorePolicyExchange = () => {
                       </div>
                     </div>
                   </CardContent>
-                </Card>
-              ))}
+                </Card>)}
             </div>
           </div>
 
@@ -196,14 +179,12 @@ const PublicStorePolicyExchange = () => {
                   Nossa equipe está pronta para ajudar você com sua solicitação de troca.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  {store.whatsapp && (
-                    <Button onClick={() => {
-                      const message = encodeURIComponent(`Olá! Gostaria de solicitar uma troca de produto.`);
-                      window.open(`https://wa.me/55${store.whatsapp.replace(/\D/g, '')}?text=${message}`, '_blank');
-                    }}>
+                  {store.whatsapp && <Button onClick={() => {
+                  const message = encodeURIComponent(`Olá! Gostaria de solicitar uma troca de produto.`);
+                  window.open(`https://wa.me/55${store.whatsapp.replace(/\D/g, '')}?text=${message}`, '_blank');
+                }} className="bg-green-500 hover:bg-green-400">
                       Falar no WhatsApp
-                    </Button>
-                  )}
+                    </Button>}
                   <Button variant="outline" asChild>
                     <Link to={`/loja/${store.store_slug}/rastrear-pedido`}>
                       Rastrear Meu Pedido
@@ -217,8 +198,6 @@ const PublicStorePolicyExchange = () => {
       </main>
       
       <PublicStoreFooter store={store} />
-    </div>
-  );
+    </div>;
 };
-
 export default PublicStorePolicyExchange;
