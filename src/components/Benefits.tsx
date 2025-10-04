@@ -6,30 +6,17 @@ const benefits = [
   {
     id: 1,
     icon: Truck,
-    title: "Frete Grátis",
-    description: "Acima de R$ 199",
-    color: "bg-green-500",
+    title: "Envio em 24hrs",
   },
   {
     id: 2,
-    icon: CreditCard,
-    title: "Parcelamento",
-    description: "Em até 10x sem juros",
-    color: "bg-blue-500",
+    icon: Shield,
+    title: "Garantia",
   },
   {
     id: 3,
-    icon: Shield,
-    title: "Compra Segura",
-    description: "Site protegido",
-    color: "bg-purple-500",
-  },
-  {
-    id: 4,
     icon: RefreshCw,
     title: "Troca Fácil",
-    description: "30 dias para trocar",
-    color: "bg-orange-500",
   },
 ];
 
@@ -50,29 +37,19 @@ const Benefits = () => {
   return (
     <section className="py-16 bg-background">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 justify-center items-center place-items-center">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
           {displayBenefits.map((benefit) => {
             const IconComponent = iconMap[benefit.icon as keyof typeof iconMap] || benefit.icon;
             return (
               <Card 
                 key={benefit.id}
-                className="text-center border-border bg-card hover:shadow-card transition-all duration-300"
+                className="border-none bg-gray-100 hover:bg-gray-200 transition-all duration-300"
               >
-                <CardContent className="p-6 flex flex-col items-center space-y-4">
-                  <div 
-                    className="w-16 h-16 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: benefit.color }}
-                  >
-                    <IconComponent className="h-8 w-8 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground text-lg mb-1">
-                      {benefit.title}
-                    </h3>
-                    <p className="text-muted-foreground">
-                      {benefit.description}
-                    </p>
-                  </div>
+                <CardContent className="p-6 flex items-center gap-4">
+                  <IconComponent className="h-12 w-12 text-black flex-shrink-0" />
+                  <h3 className="font-bold text-black text-lg">
+                    {benefit.title}
+                  </h3>
                 </CardContent>
               </Card>
             );
