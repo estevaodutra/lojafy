@@ -139,6 +139,7 @@ export const OrdersManagementSection = () => {
       case 'processing': return <Package className="h-4 w-4" />;
       case 'shipped': return <Truck className="h-4 w-4" />;
       case 'delivered': return <CheckCircle className="h-4 w-4" />;
+      case 'refunded': return <CheckCircle className="h-4 w-4" />;
       default: return <Clock className="h-4 w-4" />;
     }
   };
@@ -149,6 +150,7 @@ export const OrdersManagementSection = () => {
       case 'shipped': return 'secondary';
       case 'processing': return 'outline';
       case 'pending': return 'outline';
+      case 'refunded': return 'secondary';
       default: return 'outline';
     }
   };
@@ -159,6 +161,7 @@ export const OrdersManagementSection = () => {
       case 'processing': return 'Processando';
       case 'shipped': return 'Enviado';
       case 'delivered': return 'Entregue';
+      case 'refunded': return 'Reembolsado';
       default: return 'Desconhecido';
     }
   };
@@ -205,6 +208,7 @@ export const OrdersManagementSection = () => {
               <SelectItem value="processing">Processando</SelectItem>
               <SelectItem value="shipped">Enviado</SelectItem>
               <SelectItem value="delivered">Entregue</SelectItem>
+              <SelectItem value="refunded">Reembolsado</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -294,6 +298,7 @@ export const OrdersManagementSection = () => {
                               <SelectItem value="processing">Processando</SelectItem>
                               <SelectItem value="shipped">Enviado</SelectItem>
                               <SelectItem value="delivered">Entregue</SelectItem>
+                              <SelectItem value="refunded">Reembolsado</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>

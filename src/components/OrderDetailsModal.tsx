@@ -59,6 +59,15 @@ interface ShippingFile {
   uploaded_at: string;
 }
 
+interface RefundDocument {
+  id: string;
+  file_name: string;
+  file_path: string;
+  file_size: number;
+  uploaded_at: string;
+  uploaded_by?: string;
+}
+
 interface OrderDetailsModalProps {
   orderId: string | null;
   isOpen: boolean;
@@ -70,9 +79,12 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
   const [customer, setCustomer] = useState<CustomerProfile | null>(null);
   const [statusHistory, setStatusHistory] = useState<OrderStatusHistory[]>([]);
   const [shippingFiles, setShippingFiles] = useState<ShippingFile[]>([]);
+  const [refundDocuments, setRefundDocuments] = useState<RefundDocument[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [refundUploadFile, setRefundUploadFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isRefundUploading, setIsRefundUploading] = useState(false);
   const { toast } = useToast();
   const { profile } = useAuth();
 
@@ -83,6 +95,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
       fetchOrderDetails();
       fetchStatusHistory();
       fetchShippingFiles();
+      fetchRefundDocuments();
     }
   }, [orderId, isOpen]);
 
@@ -201,6 +214,23 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
     }
   };
 
+  const fetchRefundDocuments = async () => {
+    if (!orderId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('order_refund_documents')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('uploaded_at', { ascending: false });
+      
+      if (error) throw error;
+      setRefundDocuments(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar documentos de reembolso:', error);
+    }
+  };
+
   const handleFileUpload = async (file: File) => {
     if (!orderId || !isAdmin) return;
 
@@ -255,6 +285,86 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
     }
   };
 
+  const handleRefundFileUpload = async (file: File) => {
+    if (!orderId || !isAdmin) return;
+    
+    setIsRefundUploading(true);
+    try {
+      const fileExtension = file.name.split('.').pop();
+      const fileName = `refund_${Date.now()}.${fileExtension}`;
+      const filePath = `${orderId}/${fileName}`;
+      
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('refund-documents')
+        .upload(filePath, file);
+      
+      if (uploadError) throw uploadError;
+      
+      // Insert record
+      const { error: dbError } = await supabase
+        .from('order_refund_documents')
+        .insert({
+          order_id: orderId,
+          file_name: file.name,
+          file_path: filePath,
+          file_size: file.size,
+          uploaded_by: profile?.user_id
+        });
+      
+      if (dbError) throw dbError;
+      
+      toast({
+        title: "Sucesso",
+        description: "Comprovante enviado com sucesso."
+      });
+      
+      fetchRefundDocuments();
+      setRefundUploadFile(null);
+    } catch (error) {
+      console.error('Error uploading refund document:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar comprovante.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRefundUploading(false);
+    }
+  };
+
+  const downloadRefundDocument = async (filePath: string, fileName: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('refund-documents')
+        .download(filePath);
+      
+      if (error) throw error;
+      
+      const blob = new Blob([data]);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Sucesso",
+        description: "Documento baixado com sucesso."
+      });
+    } catch (error) {
+      console.error('Error downloading refund document:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao baixar documento.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -270,6 +380,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
       case 'shipped': return <Truck className="h-4 w-4" />;
       case 'delivered': return <CheckCircle className="h-4 w-4" />;
       case 'cancelled': return <XCircle className="h-4 w-4" />;
+      case 'refunded': return <CheckCircle className="h-4 w-4" />;
       default: return <Package className="h-4 w-4" />;
     }
   };
@@ -281,6 +392,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
       case 'shipped': return 'Enviado';
       case 'delivered': return 'Entregue';
       case 'cancelled': return 'Cancelado';
+      case 'refunded': return 'Reembolsado';
       default: return 'Desconhecido';
     }
   };
@@ -292,6 +404,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
       case 'processing': return 'outline';
       case 'pending': return 'outline';
       case 'cancelled': return 'destructive';
+      case 'refunded': return 'secondary';
       default: return 'outline';
     }
   };
@@ -592,6 +705,114 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                     ) : (
                       <p className="text-sm text-muted-foreground text-center py-4">
                         Nenhuma etiqueta enviada ainda. Use o botão acima para fazer upload.
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Refund Documents - Only show if order is refunded or if admin */}
+            {(order.status === 'refunded' || isAdmin) && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-amber-600" />
+                      Comprovantes de Reembolso (PDF)
+                    </div>
+                    {isAdmin && (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="file"
+                          accept=".pdf"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file && file.type === 'application/pdf') {
+                              setRefundUploadFile(file);
+                            } else {
+                              toast({
+                                title: "Erro",
+                                description: "Por favor, selecione apenas arquivos PDF.",
+                                variant: "destructive"
+                              });
+                            }
+                          }}
+                          className="hidden"
+                          id="refund-file-upload"
+                        />
+                        <Label
+                          htmlFor="refund-file-upload"
+                          className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 py-2"
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Enviar PDF
+                        </Label>
+                      </div>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {refundUploadFile && isAdmin && (
+                    <div className="mb-4 p-3 border border-amber-200 rounded-lg bg-amber-50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-amber-600" />
+                          <span className="text-sm font-medium text-amber-900">{refundUploadFile.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleRefundFileUpload(refundUploadFile)}
+                            disabled={isRefundUploading}
+                          >
+                            {isRefundUploading ? "Enviando..." : "Confirmar"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setRefundUploadFile(null)}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="space-y-3">
+                    {refundDocuments.length > 0 ? (
+                      refundDocuments.map((doc) => (
+                        <div key={doc.id} className="flex items-center justify-between p-3 border border-amber-200 rounded-lg bg-amber-50">
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center justify-center w-10 h-10 bg-amber-100 rounded-lg">
+                              <FileText className="h-5 w-5 text-amber-600" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-amber-900">{doc.file_name}</p>
+                              <p className="text-sm text-amber-700">
+                                {formatFileSize(doc.file_size)} • Enviado em {formatDate(doc.uploaded_at)}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => downloadRefundDocument(doc.file_path, doc.file_name)}
+                            className="border-amber-300 hover:bg-amber-100"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Baixar PDF
+                          </Button>
+                        </div>
+                      ))
+                    ) : !isAdmin ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Nenhum comprovante disponível.
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Nenhum comprovante enviado. Use o botão acima para fazer upload de PDFs.
                       </p>
                     )}
                   </div>

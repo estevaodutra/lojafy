@@ -79,6 +79,8 @@ const Orders = () => {
         return <CheckCircle className="h-4 w-4" />;
       case 'cancelled':
         return <XCircle className="h-4 w-4" />;
+      case 'refunded':
+        return <CheckCircle className="h-4 w-4" />;
       default:
         return <Package className="h-4 w-4" />;
     }
@@ -95,6 +97,8 @@ const Orders = () => {
         return 'Entregue';
       case 'cancelled':
         return 'Cancelado';
+      case 'refunded':
+        return 'Reembolsado';
       default:
         return 'Desconhecido';
     }
@@ -111,6 +115,8 @@ const Orders = () => {
         return 'outline';
       case 'cancelled':
         return 'destructive';
+      case 'refunded':
+        return 'secondary';
       default:
         return 'outline';
     }

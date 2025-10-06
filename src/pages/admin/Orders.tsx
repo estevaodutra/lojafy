@@ -123,6 +123,7 @@ const AdminOrders = () => {
       shipped: { label: "Enviado", variant: "default" as const },
       delivered: { label: "Entregue", variant: "default" as const },
       cancelled: { label: "Cancelado", variant: "destructive" as const },
+      refunded: { label: "Reembolsado", variant: "secondary" as const },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
@@ -188,6 +189,7 @@ const AdminOrders = () => {
                 <SelectItem value="shipped">Enviado</SelectItem>
                 <SelectItem value="delivered">Entregue</SelectItem>
                 <SelectItem value="cancelled">Cancelado</SelectItem>
+                <SelectItem value="refunded">Reembolsado</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -268,6 +270,7 @@ const AdminOrders = () => {
                             <SelectItem value="shipped">Enviado</SelectItem>
                             <SelectItem value="delivered">Entregue</SelectItem>
                             <SelectItem value="cancelled">Cancelado</SelectItem>
+                            <SelectItem value="refunded">Reembolsado</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
