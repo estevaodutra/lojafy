@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,11 +11,23 @@ import { useToast } from '@/hooks/use-toast';
 import { ImpersonationButton } from '@/components/admin/ImpersonationButton';
 import { UserRole } from '@/hooks/useUserRole';
 import { Search, X } from 'lucide-react';
+import { 
+  Pagination, 
+  PaginationContent, 
+  PaginationEllipsis, 
+  PaginationItem, 
+  PaginationLink, 
+  PaginationNext, 
+  PaginationPrevious 
+} from '@/components/ui/pagination';
+import { cn } from '@/lib/utils';
 
 const Usuarios = () => {
   const { toast } = useToast();
   const [updatingUsers, setUpdatingUsers] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   const { data: users, isLoading, refetch } = useQuery({
     queryKey: ['users'],
@@ -28,18 +40,36 @@ const Usuarios = () => {
     }
   });
 
-  const filteredUsers = useMemo(() => {
-    if (!users) return [];
-    if (!searchTerm.trim()) return users;
+  const { paginatedUsers, totalPages, totalFiltered } = useMemo(() => {
+    if (!users) return { paginatedUsers: [], totalPages: 0, totalFiltered: 0 };
     
-    const search = searchTerm.toLowerCase().trim();
-    return users.filter(user => {
-      const fullName = `${user.first_name || ''} ${user.last_name || ''}`.toLowerCase();
-      const email = (user.email || '').toLowerCase();
-      
-      return fullName.includes(search) || email.includes(search);
-    });
-  }, [users, searchTerm]);
+    // Aplicar filtro
+    let filtered = users;
+    if (searchTerm.trim()) {
+      const search = searchTerm.toLowerCase().trim();
+      filtered = users.filter(user => {
+        const fullName = `${user.first_name || ''} ${user.last_name || ''}`.toLowerCase();
+        const email = (user.email || '').toLowerCase();
+        return fullName.includes(search) || email.includes(search);
+      });
+    }
+    
+    // Calcular paginação
+    const total = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const paginated = filtered.slice(startIndex, endIndex);
+    
+    return {
+      paginatedUsers: paginated,
+      totalPages: total,
+      totalFiltered: filtered.length
+    };
+  }, [users, searchTerm, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const updateUserRole = async (userId: string, newRole: string) => {
     setUpdatingUsers(prev => [...prev, userId]);
@@ -139,9 +169,13 @@ const Usuarios = () => {
                 </Button>
               )}
             </div>
-            {searchTerm && (
+            {paginatedUsers.length > 0 && (
               <p className="text-sm text-muted-foreground mt-2">
-                Mostrando {filteredUsers.length} de {users?.length || 0} usuários
+                {searchTerm 
+                  ? `Mostrando ${paginatedUsers.length} de ${totalFiltered} usuários`
+                  : `Mostrando ${(currentPage - 1) * ITEMS_PER_PAGE + 1}-${Math.min(currentPage * ITEMS_PER_PAGE, users?.length || 0)} de ${users?.length || 0} usuários`
+                }
+                {totalPages > 1 && ` (Página ${currentPage} de ${totalPages})`}
               </p>
             )}
           </div>
@@ -160,14 +194,14 @@ const Usuarios = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.length === 0 ? (
+              {paginatedUsers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     {searchTerm ? 'Nenhum usuário encontrado com esse critério de busca.' : 'Nenhum usuário cadastrado.'}
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredUsers.map((user) => (
+                paginatedUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">
                     {user.first_name} {user.last_name}
@@ -217,6 +251,66 @@ const Usuarios = () => {
               )}
             </TableBody>
           </Table>
+          
+          {totalPages > 1 && (
+            <div className="mt-6">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      className={cn(
+                        "cursor-pointer",
+                        currentPage === 1 && "pointer-events-none opacity-50"
+                      )}
+                    />
+                  </PaginationItem>
+
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    const showPage = 
+                      page === 1 || 
+                      page === totalPages || 
+                      (page >= currentPage - 1 && page <= currentPage + 1);
+                    
+                    const showEllipsisBefore = page === currentPage - 2 && currentPage > 3;
+                    const showEllipsisAfter = page === currentPage + 2 && currentPage < totalPages - 2;
+
+                    if (showEllipsisBefore || showEllipsisAfter) {
+                      return (
+                        <PaginationItem key={page}>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      );
+                    }
+
+                    if (!showPage) return null;
+
+                    return (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => setCurrentPage(page)}
+                          isActive={currentPage === page}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  })}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      className={cn(
+                        "cursor-pointer",
+                        currentPage === totalPages && "pointer-events-none opacity-50"
+                      )}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
