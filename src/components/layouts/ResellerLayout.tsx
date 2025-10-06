@@ -11,7 +11,8 @@ import {
   Package,
   Target,
   FileText,
-  Gift
+  Gift,
+  Image
 } from 'lucide-react';
 import {
   Sidebar,
@@ -57,6 +58,11 @@ const resellerMenuItems = [
     title: 'Páginas',
     url: '/reseller/paginas',
     icon: FileText,
+  },
+  {
+    title: 'Banners',
+    url: '/reseller/banners',
+    icon: Image,
   },
   {
     title: 'Vendas',

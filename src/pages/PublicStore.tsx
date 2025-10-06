@@ -10,10 +10,16 @@ import PublicStoreHero from "@/components/public-store/PublicStoreHero";
 import PublicStoreProductGrid from "@/components/public-store/PublicStoreProductGrid";
 import PublicStoreCategoryCarousels from "@/components/public-store/PublicStoreCategoryCarousels";
 import PublicStoreFooter from "@/components/public-store/PublicStoreFooter";
+import PublicStoreBannerCarousel from "@/components/public-store/PublicStoreBannerCarousel";
+import PublicStoreFeaturedBanners from "@/components/public-store/PublicStoreFeaturedBanners";
+import { useResellerBanners } from "@/hooks/useResellerBanners";
 
 const PublicStore = () => {
   const { slug } = useParams<{ slug: string }>();
   const { store, isLoading, error } = usePublicStore(slug);
+  
+  const { banners: carouselBanners } = useResellerBanners(store?.reseller_id, 'carousel');
+  const { banners: featuredBanners } = useResellerBanners(store?.reseller_id, 'featured');
 
   if (isLoading) {
     return (
@@ -67,8 +73,15 @@ const PublicStore = () => {
         } as React.CSSProperties}
       >
         <PublicStoreHeader store={store} />
-        <PublicStoreHero store={store} />
+        {carouselBanners.length > 0 ? (
+          <PublicStoreBannerCarousel banners={carouselBanners} />
+        ) : (
+          <PublicStoreHero store={store} />
+        )}
         <PublicStoreProductGrid resellerId={store.reseller_id} storeSlug={store.store_slug} />
+        {featuredBanners.length > 0 && (
+          <PublicStoreFeaturedBanners banners={featuredBanners} />
+        )}
         <PublicStoreCategoryCarousels resellerId={store.reseller_id} storeSlug={store.store_slug} />
         <Benefits />
         <Testimonials />

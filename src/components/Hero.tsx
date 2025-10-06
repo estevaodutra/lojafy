@@ -29,6 +29,7 @@ const Hero = () => {
         .from('banners')
         .select('*')
         .eq('active', true)
+        .eq('banner_type', 'carousel')
         .order('position', { ascending: true });
       
       if (error) throw error;
