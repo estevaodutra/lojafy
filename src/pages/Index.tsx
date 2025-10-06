@@ -7,6 +7,7 @@ import Benefits from "@/components/Benefits";
 import Testimonials from "@/components/Testimonials";
 import Newsletter from "@/components/Newsletter";
 import Footer from "@/components/Footer";
+import FeaturedBanners from "@/components/FeaturedBanners";
 import { useAuthRedirect } from "@/hooks/useAuthRedirect";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -47,6 +48,7 @@ const Index = () => {
       <main>
         <Hero />
         <ProductGrid />
+        <FeaturedBanners />
         <CategoryCarousels />
         <CategorySection />
         <Benefits />

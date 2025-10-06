@@ -104,14 +104,17 @@ export type Database = {
       banners: {
         Row: {
           active: boolean
+          banner_type: string | null
           button_link: string | null
           button_text: string | null
           created_at: string
           description: string | null
           id: string
           image_url: string
+          link_url: string | null
           mobile_height: number | null
           mobile_image_url: string | null
+          open_new_tab: boolean | null
           position: number
           subtitle: string | null
           title: string
@@ -119,14 +122,17 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          banner_type?: string | null
           button_link?: string | null
           button_text?: string | null
           created_at?: string
           description?: string | null
           id?: string
           image_url: string
+          link_url?: string | null
           mobile_height?: number | null
           mobile_image_url?: string | null
+          open_new_tab?: boolean | null
           position?: number
           subtitle?: string | null
           title: string
@@ -134,14 +140,17 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          banner_type?: string | null
           button_link?: string | null
           button_text?: string | null
           created_at?: string
           description?: string | null
           id?: string
           image_url?: string
+          link_url?: string | null
           mobile_height?: number | null
           mobile_image_url?: string | null
+          open_new_tab?: boolean | null
           position?: number
           subtitle?: string | null
           title?: string
@@ -1089,6 +1098,56 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      reseller_banners: {
+        Row: {
+          active: boolean
+          banner_type: string
+          created_at: string | null
+          desktop_image_url: string
+          id: string
+          link_url: string | null
+          mobile_image_url: string | null
+          open_new_tab: boolean | null
+          position: number
+          reseller_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean
+          banner_type?: string
+          created_at?: string | null
+          desktop_image_url: string
+          id?: string
+          link_url?: string | null
+          mobile_image_url?: string | null
+          open_new_tab?: boolean | null
+          position?: number
+          reseller_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean
+          banner_type?: string
+          created_at?: string | null
+          desktop_image_url?: string
+          id?: string
+          link_url?: string | null
+          mobile_image_url?: string | null
+          open_new_tab?: boolean | null
+          position?: number
+          reseller_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reseller_banners_reseller_id_fkey"
+            columns: ["reseller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       reseller_products: {
         Row: {

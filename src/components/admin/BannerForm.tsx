@@ -14,12 +14,15 @@ import { MobileBannerUpload } from './MobileBannerUpload';
 
 interface Banner {
   id: string;
-  title: string;
+  title?: string;
   subtitle?: string;
   description?: string;
   image_url: string;
   mobile_image_url?: string;
   mobile_height?: number;
+  link_url?: string;
+  open_new_tab: boolean;
+  banner_type: 'carousel' | 'featured';
   button_text?: string;
   button_link?: string;
   position: number;
@@ -30,25 +33,24 @@ interface BannerFormProps {
   isOpen: boolean;
   onClose: () => void;
   banner?: Banner | null;
+  bannerType: 'carousel' | 'featured';
   existingBanners: Banner[];
 }
 
 
-const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existingBanners }) => {
+const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, bannerType, existingBanners }) => {
   const [formData, setFormData] = useState({
     title: '',
-    subtitle: '',
-    description: '',
     image_url: '',
     mobile_image_url: '',
-    mobile_height: 50,
-    button_text: '',
-    button_link: '',
+    link_url: '',
+    open_new_tab: false,
     position: 1,
     active: true
   });
   
-  const [imageOnly, setImageOnly] = useState(false);
+  const [imageOnly, setImageOnly] = useState(true);
+  const maxBanners = bannerType === 'carousel' ? 5 : 6;
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -56,31 +58,24 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
   // Reset form when banner changes or dialog opens/closes
   useEffect(() => {
     if (banner) {
-      const isImageOnlyBanner = !banner.title && !banner.subtitle && !banner.description && !banner.button_text;
-      setImageOnly(isImageOnlyBanner);
+      setImageOnly(true);
       setFormData({
-        title: banner.title,
-        subtitle: banner.subtitle || '',
-        description: banner.description || '',
+        title: banner.title || '',
         image_url: banner.image_url,
         mobile_image_url: banner.mobile_image_url || '',
-        mobile_height: banner.mobile_height || 50,
-        button_text: banner.button_text || '',
-        button_link: banner.button_link || '',
+        link_url: banner.link_url || '',
+        open_new_tab: banner.open_new_tab,
         position: banner.position,
         active: banner.active
       });
     } else {
-      setImageOnly(false);
+      setImageOnly(true);
       setFormData({
         title: '',
-        subtitle: '',
-        description: '',
         image_url: '',
         mobile_image_url: '',
-        mobile_height: 70,
-        button_text: '',
-        button_link: '',
+        link_url: '',
+        open_new_tab: false,
         position: getNextAvailablePosition(),
         active: true
       });
@@ -88,8 +83,8 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
   }, [banner, existingBanners, isOpen]);
 
   const getNextAvailablePosition = () => {
-    const activeBanners = existingBanners.filter(b => b.active);
-    for (let i = 1; i <= 5; i++) {
+    const activeBanners = existingBanners.filter(b => b.active && b.banner_type === bannerType);
+    for (let i = 1; i <= maxBanners; i++) {
       if (!activeBanners.find(b => b.position === i)) {
         return i;
       }
@@ -98,9 +93,9 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
   };
 
   const getAvailablePositions = () => {
-    const activeBanners = existingBanners.filter(b => b.active && (!banner || b.id !== banner.id));
+    const activeBanners = existingBanners.filter(b => b.active && b.banner_type === bannerType && (!banner || b.id !== banner.id));
     const positions = [];
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= maxBanners; i++) {
       if (!activeBanners.find(b => b.position === i)) {
         positions.push(i);
       }
@@ -109,7 +104,7 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
   };
 
   const createBannerMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
+    mutationFn: async (data: typeof formData & { banner_type: 'carousel' | 'featured' }) => {
       const { error } = await supabase
         .from('banners')
         .insert([data]);
@@ -119,6 +114,7 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-banners'] });
       queryClient.invalidateQueries({ queryKey: ['banners'] });
+      queryClient.invalidateQueries({ queryKey: ['featured-banners'] });
       toast({
         title: "Banner criado",
         description: "O banner foi criado com sucesso.",
@@ -135,7 +131,7 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
   });
 
   const updateBannerMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
+    mutationFn: async (data: typeof formData & { banner_type: 'carousel' | 'featured' }) => {
       if (!banner) throw new Error('Banner não encontrado');
       
       const { error } = await supabase
@@ -148,6 +144,7 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-banners'] });
       queryClient.invalidateQueries({ queryKey: ['banners'] });
+      queryClient.invalidateQueries({ queryKey: ['featured-banners'] });
       toast({
         title: "Banner atualizado",
         description: "O banner foi atualizado com sucesso.",
@@ -165,15 +162,6 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!imageOnly && !formData.title.trim()) {
-      toast({
-        title: "Erro de validação",
-        description: "O título é obrigatório para banners com texto.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     if (!formData.image_url) {
       toast({
@@ -184,14 +172,11 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
       return;
     }
 
-    const dataToSubmit = imageOnly ? {
+    const dataToSubmit = {
       ...formData,
-      title: '',
-      subtitle: '',
-      description: '',
-      button_text: '',
-      button_link: ''
-    } : formData;
+      title: formData.title || '',
+      banner_type: bannerType
+    };
 
     if (banner) {
       updateBannerMutation.mutate(dataToSubmit);
@@ -223,68 +208,6 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
-            <div className="flex items-center space-x-2 p-4 bg-muted/50 rounded-lg">
-              <Switch
-                id="image-only"
-                checked={imageOnly}
-                onCheckedChange={(checked) => {
-                  setImageOnly(checked);
-                  if (checked) {
-                    setFormData(prev => ({
-                      ...prev,
-                      title: '',
-                      subtitle: '',
-                      description: '',
-                      button_text: '',
-                      button_link: ''
-                    }));
-                  }
-                }}
-              />
-              <Label htmlFor="image-only" className="font-medium">
-                Banner somente com imagem
-              </Label>
-              <p className="text-sm text-muted-foreground ml-2">
-                Oculta todos os textos e botões, mostrando apenas a imagem
-              </p>
-            </div>
-
-            {!imageOnly && (
-              <>
-                <div>
-                  <Label htmlFor="title">Título *</Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                    placeholder="Digite o título do banner"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="subtitle">Subtítulo</Label>
-                  <Input
-                    id="subtitle"
-                    value={formData.subtitle}
-                    onChange={(e) => setFormData(prev => ({ ...prev, subtitle: e.target.value }))}
-                    placeholder="Digite o subtítulo (opcional)"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="description">Descrição</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Digite a descrição do banner (opcional)"
-                    rows={3}
-                  />
-                </div>
-              </>
-            )}
-
             <div>
               <Label>Imagem do Banner *</Label>
               <BannerUpload
@@ -294,60 +217,35 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
             </div>
 
             <div className="space-y-4 border-t pt-4">
-              <h3 className="text-lg font-medium">Configurações Mobile</h3>
-              
               <div className="space-y-2">
                 <Label>Imagem para Mobile (Opcional)</Label>
-                <p className="text-sm text-muted-foreground">
-                  Imagem otimizada para dispositivos móveis. Se não fornecida, será usada a imagem principal.
-                </p>
                 <MobileBannerUpload
                   onImageUploaded={handleMobileImageUploaded}
                   currentImage={formData.mobile_image_url}
                 />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="mobile_height">Altura Mobile (vh)</Label>
-                <p className="text-sm text-muted-foreground">
-                  Altura do banner em dispositivos móveis: {formData.mobile_height}vh
-                </p>
-                <input
-                  type="range"
-                  id="mobile_height"
-                  min="30"
-                  max="90"
-                  step="5"
-                  value={formData.mobile_height}
-                  onChange={(e) => setFormData(prev => ({ ...prev, mobile_height: parseInt(e.target.value) }))}
-                  className="w-full"
-                />
-              </div>
             </div>
 
-            {!imageOnly && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="button_text">Texto do Botão</Label>
-                  <Input
-                    id="button_text"
-                    value={formData.button_text}
-                    onChange={(e) => setFormData(prev => ({ ...prev, button_text: e.target.value }))}
-                    placeholder="Ex: Comprar Agora"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="button_link">Link do Botão</Label>
-                  <Input
-                    id="button_link"
-                    value={formData.button_link}
-                    onChange={(e) => setFormData(prev => ({ ...prev, button_link: e.target.value }))}
-                    placeholder="/promocoes"
-                  />
-                </div>
+            <div className="space-y-4 border-t pt-4">
+              <div>
+                <Label htmlFor="link_url">Link (Opcional)</Label>
+                <Input
+                  id="link_url"
+                  value={formData.link_url}
+                  onChange={(e) => setFormData(prev => ({ ...prev, link_url: e.target.value }))}
+                  placeholder="https://exemplo.com ou /produtos"
+                />
               </div>
-            )}
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="open_new_tab"
+                  checked={formData.open_new_tab}
+                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, open_new_tab: checked }))}
+                />
+                <Label htmlFor="open_new_tab">Abrir link em nova aba</Label>
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -355,13 +253,12 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, existi
                 <Select
                   value={formData.position.toString()}
                   onValueChange={(value) => setFormData(prev => ({ ...prev, position: parseInt(value) }))}
-                  disabled={isPositionDisabled}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {[1, 2, 3, 4, 5].map((pos) => {
+                    {Array.from({ length: maxBanners }, (_, i) => i + 1).map((pos) => {
                       const isAvailable = availablePositions.includes(pos) || 
                         (banner && banner.position === pos);
                       
