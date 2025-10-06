@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import ResellerBannerForm from '@/components/reseller/ResellerBannerForm';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
-const BannersPage = () => {
+const ResellerBanners = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'carousel' | 'featured'>('carousel');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -245,4 +245,4 @@ const BannersPage = () => {
   );
 };
 
-export default BannersPage;
+export default ResellerBanners;
