@@ -90,6 +90,12 @@ export const useCourseEnrollment = (userId?: string) => {
     return enrollments?.some(e => e.course_id === courseId) ?? false;
   };
 
+  const canAccessCourse = (courseId: string) => {
+    // User can access if enrolled OR if course has access_level='all'
+    const course = availableCourses?.find(c => c.id === courseId);
+    return isEnrolled(courseId) || course?.access_level === 'all';
+  };
+
   return {
     enrollments,
     availableCourses,
@@ -98,5 +104,6 @@ export const useCourseEnrollment = (userId?: string) => {
     enrollInCourse: enrollMutation.mutate,
     unenrollFromCourse: unenrollMutation.mutate,
     isEnrolled,
+    canAccessCourse,
   };
 };

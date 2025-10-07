@@ -57,7 +57,10 @@ export default function CourseViewer() {
   }, [currentProgress]);
 
   const handleLessonComplete = (isCompleted: boolean) => {
-    if (!user || !enrollment || !selectedLesson) return;
+    if (!user || !enrollment || !selectedLesson) {
+      toast.info('Para salvar progresso, matricule-se no curso.');
+      return;
+    }
     
     markLessonComplete({
       lessonId: selectedLesson,
@@ -117,16 +120,19 @@ export default function CourseViewer() {
     );
   }
 
-  if (!enrollment) {
+  // Check if user has access (enrolled OR course is free for all)
+  const hasAccess = enrollment || course?.access_level === 'all';
+
+  if (!hasAccess) {
     return (
       <Card className="container mx-auto p-12 m-6">
         <div className="text-center space-y-4">
           <h2 className="text-2xl font-bold">Acesso Negado</h2>
           <p className="text-muted-foreground">
-            Você não está matriculado neste curso.
+            Você não tem acesso a este curso.
           </p>
-          <Button onClick={() => navigate('/minha-conta/aulas')}>
-            Voltar para Meus Cursos
+          <Button onClick={() => navigate('/minha-conta/academy')}>
+            Voltar para Lojafy Academy
           </Button>
         </div>
       </Card>
@@ -148,7 +154,7 @@ export default function CourseViewer() {
               <p className="text-sm text-muted-foreground">{currentLesson?.title}</p>
             </div>
           </div>
-          <CourseProgressBar progress={enrollment.progress_percentage} showLabel={false} />
+          {enrollment && <CourseProgressBar progress={enrollment.progress_percentage} showLabel={false} />}
         </div>
       </div>
 

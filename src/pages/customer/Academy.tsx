@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 
 export default function Academy() {
   const { user } = useAuth();
-  const { availableCourses, enrollments, loading, coursesLoading, isEnrolled } = useCourseEnrollment(user?.id);
+  const { availableCourses, enrollments, loading, coursesLoading, isEnrolled, canAccessCourse } = useCourseEnrollment(user?.id);
 
   if (loading || coursesLoading) {
     return (
@@ -64,6 +64,8 @@ export default function Academy() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {availableCourses.map((course) => {
             const enrolled = isEnrolled(course.id);
+            const hasAccess = canAccessCourse(course.id);
+            const isFreeForAll = course.access_level === 'all';
             const enrollment = enrollments?.find(e => e.course_id === course.id);
 
             return (
@@ -71,7 +73,8 @@ export default function Academy() {
                 key={course.id} 
                 className={cn(
                   "flex flex-col overflow-hidden transition-all hover:shadow-lg",
-                  enrolled && "border-green-500 border-2"
+                  enrolled && "border-green-500 border-2",
+                  isFreeForAll && !enrolled && "border-blue-500 border-2"
                 )}
               >
                 {/* Thumbnail com overlay de cadeado */}
@@ -88,7 +91,7 @@ export default function Academy() {
                     </div>
                   )}
                   
-                  {!enrolled && (
+                  {!hasAccess && (
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center">
                       <Lock className="w-12 h-12 text-white drop-shadow-lg" />
                     </div>
@@ -101,6 +104,10 @@ export default function Academy() {
                     {enrolled ? (
                       <Badge className="bg-green-600 hover:bg-green-700 shrink-0">
                         🎓 Matriculado
+                      </Badge>
+                    ) : isFreeForAll ? (
+                      <Badge className="bg-blue-600 hover:bg-blue-700 shrink-0">
+                        🌐 Acesso Livre
                       </Badge>
                     ) : (
                       <Badge variant="outline" className="shrink-0">
@@ -158,7 +165,7 @@ export default function Academy() {
                 </CardHeader>
 
                 <CardContent className="pt-0">
-                  {enrolled ? (
+                  {hasAccess ? (
                     <Button 
                       asChild 
                       className="w-full bg-green-600 hover:bg-green-700"
