@@ -98,25 +98,30 @@ export default function Courses() {
           ))}
         </div>
       ) : (
-        <Card className="p-12">
-          <div className="text-center space-y-4">
-            <div className="flex justify-center">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <BookOpen className="w-8 h-8 text-primary" />
+            <Card className="p-12">
+              <div className="text-center space-y-4">
+                <div className="flex justify-center">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                    <BookOpen className="w-8 h-8 text-primary" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold">Nenhum curso encontrado</h3>
+                  <p className="text-muted-foreground mt-2">
+                    {filter === 'completed' 
+                      ? 'Você ainda não concluiu nenhum curso'
+                      : filter === 'in_progress'
+                      ? 'Você não tem cursos em andamento'
+                      : 'Você ainda não está matriculado em nenhum curso'}
+                  </p>
+                </div>
+                <Button asChild>
+                  <Link to="/minha-conta/catalogo-aulas">
+                    Explorar Catálogo de Cursos
+                  </Link>
+                </Button>
               </div>
-            </div>
-            <div>
-              <h3 className="text-xl font-semibold">Nenhum curso encontrado</h3>
-              <p className="text-muted-foreground mt-2">
-                {filter === 'completed' 
-                  ? 'Você ainda não concluiu nenhum curso'
-                  : filter === 'in_progress'
-                  ? 'Você não tem cursos em andamento'
-                  : 'Você ainda não está matriculado em nenhum curso'}
-              </p>
-            </div>
-          </div>
-        </Card>
+            </Card>
       )}
     </div>
   );

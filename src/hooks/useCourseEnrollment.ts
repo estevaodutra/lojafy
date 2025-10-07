@@ -1,10 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { CourseEnrollment } from '@/types/courses';
+import { CourseEnrollment, Course } from '@/types/courses';
 import { toast } from 'sonner';
+import { useUserRole } from './useUserRole';
 
 export const useCourseEnrollment = (userId?: string) => {
   const queryClient = useQueryClient();
+  const { role } = useUserRole();
 
   const { data: enrollments, isLoading } = useQuery({
     queryKey: ['course-enrollments', userId],
@@ -62,13 +64,37 @@ export const useCourseEnrollment = (userId?: string) => {
     },
   });
 
+  // Query for available courses based on access_level
+  const { data: availableCourses, isLoading: coursesLoading } = useQuery({
+    queryKey: ['available-courses', role],
+    queryFn: async () => {
+      let query = supabase
+        .from('courses')
+        .select('*')
+        .eq('is_published', true)
+        .order('position', { ascending: true });
+      
+      // Filter by access_level based on user role
+      if (role && role !== 'super_admin') {
+        query = query.or(`access_level.eq.all,access_level.eq.${role}`);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as Course[];
+    },
+    enabled: !!role,
+  });
+
   const isEnrolled = (courseId: string) => {
     return enrollments?.some(e => e.course_id === courseId) ?? false;
   };
 
   return {
     enrollments,
+    availableCourses,
     loading: isLoading,
+    coursesLoading,
     enrollInCourse: enrollMutation.mutate,
     unenrollFromCourse: unenrollMutation.mutate,
     isEnrolled,

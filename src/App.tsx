@@ -35,6 +35,7 @@ import CustomerFavorites from "./pages/customer/Favorites";
 import CustomerSettings from "./pages/customer/Settings";
 import CustomerHelp from "./pages/customer/Help";
 import CustomerCourses from "./pages/customer/Courses";
+import CustomerCourseCatalog from "./pages/customer/CourseCatalog";
 import CourseViewer from "./pages/customer/CourseViewer";
 import { RoleBasedRoute } from "./components/auth/RoleBasedRoute";
 import AdminLayout from "./components/admin/AdminLayout";
@@ -153,6 +154,7 @@ const App = () => {
               <Route path="/minha-conta" element={<CustomerLayout />}>
                 <Route index element={<CustomerDashboard />} />
                 <Route path="pedidos" element={<CustomerOrders />} />
+                <Route path="catalogo-aulas" element={<CustomerCourseCatalog />} />
                 <Route path="aulas" element={<CustomerCourses />} />
                 <Route path="aulas/:courseId" element={<CourseViewer />} />
                 <Route path="favoritos" element={<CustomerFavorites />} />

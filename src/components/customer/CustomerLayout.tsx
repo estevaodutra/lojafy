@@ -1,12 +1,13 @@
 import React from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { User, Package, MapPin, Heart, HelpCircle, Settings, Home, LogOut, GraduationCap } from 'lucide-react';
+import { User, Package, MapPin, Heart, HelpCircle, Settings, Home, LogOut, GraduationCap, BookOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const customerMenuItems = [
   { title: 'Resumo', url: '/minha-conta', icon: User },
   { title: 'Meus Pedidos', url: '/minha-conta/pedidos', icon: Package },
+  { title: 'Catálogo de Cursos', url: '/minha-conta/catalogo-aulas', icon: BookOpen },
   { title: 'Minhas Aulas', url: '/minha-conta/aulas', icon: GraduationCap },
   { title: 'Favoritos', url: '/minha-conta/favoritos', icon: Heart },
   { title: 'Meu Perfil', url: '/minha-conta/configuracoes', icon: Settings },
