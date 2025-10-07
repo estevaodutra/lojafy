@@ -34,9 +34,9 @@ import CustomerAddresses from "./pages/customer/Addresses";
 import CustomerFavorites from "./pages/customer/Favorites";
 import CustomerSettings from "./pages/customer/Settings";
 import CustomerHelp from "./pages/customer/Help";
-import CustomerCourses from "./pages/customer/Courses";
-import CustomerCourseCatalog from "./pages/customer/CourseCatalog";
+import Academy from "./pages/customer/Academy";
 import CourseViewer from "./pages/customer/CourseViewer";
+import CourseCheckout from "./pages/CourseCheckout";
 import { RoleBasedRoute } from "./components/auth/RoleBasedRoute";
 import AdminLayout from "./components/admin/AdminLayout";
 import { SupplierLayout } from "./components/layouts/SupplierLayout";
@@ -149,13 +149,13 @@ const App = () => {
               <Route path="/central-ajuda" element={<CentralAjuda />} />
               <Route path="/carrinho" element={<Carrinho />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/checkout/curso/:courseId" element={<CourseCheckout />} />
               
               {/* Customer Panel Routes */}
               <Route path="/minha-conta" element={<CustomerLayout />}>
                 <Route index element={<CustomerDashboard />} />
                 <Route path="pedidos" element={<CustomerOrders />} />
-                <Route path="catalogo-aulas" element={<CustomerCourseCatalog />} />
-                <Route path="aulas" element={<CustomerCourses />} />
+                <Route path="academy" element={<Academy />} />
                 <Route path="aulas/:courseId" element={<CourseViewer />} />
                 <Route path="favoritos" element={<CustomerFavorites />} />
                 <Route path="enderecos" element={<CustomerAddresses />} />

@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCourseContent } from '@/hooks/useCourseContent';
 import { useCourseProgress } from '@/hooks/useCourseProgress';
 import { useCourseEnrollment } from '@/hooks/useCourseEnrollment';
+import { isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/videoUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -189,10 +190,10 @@ export default function CourseViewer() {
               <Card>
                 <CardContent className="p-0">
                   <div className="aspect-video bg-black">
-                    {currentLesson.video_url.includes('youtube.com') || currentLesson.video_url.includes('youtu.be') ? (
+                    {isYouTubeUrl(currentLesson.video_url) ? (
                       <iframe
                         className="w-full h-full"
-                        src={currentLesson.video_url.replace('watch?v=', 'embed/')}
+                        src={getYouTubeEmbedUrl(currentLesson.video_url)}
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
                       />

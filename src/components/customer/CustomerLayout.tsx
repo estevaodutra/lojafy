@@ -7,11 +7,10 @@ import { useAuth } from '@/contexts/AuthContext';
 const customerMenuItems = [
   { title: 'Resumo', url: '/minha-conta', icon: User },
   { title: 'Meus Pedidos', url: '/minha-conta/pedidos', icon: Package },
-  { title: 'Catálogo de Cursos', url: '/minha-conta/catalogo-aulas', icon: BookOpen },
-  { title: 'Minhas Aulas', url: '/minha-conta/aulas', icon: GraduationCap },
   { title: 'Favoritos', url: '/minha-conta/favoritos', icon: Heart },
   { title: 'Meu Perfil', url: '/minha-conta/configuracoes', icon: Settings },
   { title: 'Ajuda', url: '/minha-conta/ajuda', icon: HelpCircle },
+  { title: 'Lojafy Academy', url: '/minha-conta/academy', icon: GraduationCap },
 ];
 
 const CustomerSidebar = () => {
