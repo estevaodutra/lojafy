@@ -77,7 +77,8 @@ export default function CourseEnrollments() {
           profiles:user_id (
             first_name,
             last_name,
-            user_id
+            user_id,
+            role
           )
         `)
         .eq('course_id', courseId!)
@@ -94,7 +95,7 @@ export default function CourseEnrollments() {
       const { data, error } = await supabase
         .from('profiles')
         .select('user_id, first_name, last_name, role')
-        .in('role', ['customer', 'reseller'])
+        .in('role', ['customer', 'reseller', 'supplier'])
         .order('first_name');
       if (error) throw error;
       return data;
@@ -198,15 +199,16 @@ export default function CourseEnrollments() {
             </div>
           ) : (
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Data de Matrícula</TableHead>
-                  <TableHead>Progresso</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Data de Matrícula</TableHead>
+                <TableHead>Progresso</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
               <TableBody>
                 {enrollments.map((enrollment) => {
                   const profile = enrollment.profiles as any;
@@ -217,6 +219,13 @@ export default function CourseEnrollments() {
                   return (
                     <TableRow key={enrollment.id}>
                       <TableCell className="font-medium">{fullName}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {profile.role === 'customer' && 'Cliente'}
+                          {profile.role === 'reseller' && 'Revendedor'}
+                          {profile.role === 'supplier' && 'Fornecedor'}
+                        </Badge>
+                      </TableCell>
                       <TableCell>
                         {new Date(enrollment.enrolled_at!).toLocaleDateString('pt-BR')}
                       </TableCell>
@@ -271,13 +280,22 @@ export default function CourseEnrollments() {
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um usuário" />
                 </SelectTrigger>
-                <SelectContent>
-                  {availableUsers?.map((user) => (
-                    <SelectItem key={user.user_id} value={user.user_id}>
-                      {`${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Sem nome'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+              <SelectContent>
+                {availableUsers?.map((user) => (
+                  <SelectItem key={user.user_id} value={user.user_id}>
+                    <div className="flex items-center gap-2">
+                      <span>
+                        {`${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Sem nome'}
+                      </span>
+                      <Badge variant="outline" className="text-xs">
+                        {user.role === 'customer' && 'Cliente'}
+                        {user.role === 'reseller' && 'Revendedor'}
+                        {user.role === 'supplier' && 'Fornecedor'}
+                      </Badge>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
               </Select>
             </div>
           </div>
