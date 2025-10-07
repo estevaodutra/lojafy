@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getAccessLevelBadge, type CourseAccessLevel } from '@/lib/courseAccess';
 
 export default function CourseEnrollments() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -90,16 +91,22 @@ export default function CourseEnrollments() {
   });
 
   const { data: users } = useQuery({
-    queryKey: ['users-for-enrollment'],
+    queryKey: ['users-for-enrollment', course?.access_level],
     queryFn: async () => {
+      const accessLevel = (course as any)?.access_level || 'all';
+      const roles = accessLevel === 'all' 
+        ? ['customer', 'reseller', 'supplier']
+        : [accessLevel];
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('user_id, first_name, last_name, role')
-        .in('role', ['customer', 'reseller', 'supplier'])
+        .in('role', roles)
         .order('first_name');
       if (error) throw error;
       return data;
     },
+    enabled: !!course,
   });
 
   const enrollMutation = useMutation({
@@ -174,7 +181,15 @@ export default function CourseEnrollments() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold">{course?.title}</h1>
-            <p className="text-muted-foreground">Gerenciar matrículas</p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-muted-foreground">Gerenciar matrículas</p>
+              {course && (course as any).access_level && (
+                <Badge variant="secondary" className="text-sm">
+                  {getAccessLevelBadge((course as any).access_level as CourseAccessLevel).icon}{' '}
+                  Liberado para: {getAccessLevelBadge((course as any).access_level as CourseAccessLevel).label}
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
         <Button onClick={() => setAddDialogOpen(true)}>

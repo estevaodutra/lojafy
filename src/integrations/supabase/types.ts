@@ -331,6 +331,7 @@ export type Database = {
       }
       courses: {
         Row: {
+          access_level: Database["public"]["Enums"]["course_access_level"]
           created_at: string | null
           description: string | null
           duration_hours: number | null
@@ -345,6 +346,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          access_level?: Database["public"]["Enums"]["course_access_level"]
           created_at?: string | null
           description?: string | null
           duration_hours?: number | null
@@ -359,6 +361,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          access_level?: Database["public"]["Enums"]["course_access_level"]
           created_at?: string | null
           description?: string | null
           duration_hours?: number | null
@@ -2068,6 +2071,7 @@ export type Database = {
     }
     Enums: {
       app_role: "customer" | "admin" | "super_admin" | "supplier" | "reseller"
+      course_access_level: "all" | "customer" | "supplier" | "reseller"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2196,6 +2200,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["customer", "admin", "super_admin", "supplier", "reseller"],
+      course_access_level: ["all", "customer", "supplier", "reseller"],
     },
   },
 } as const

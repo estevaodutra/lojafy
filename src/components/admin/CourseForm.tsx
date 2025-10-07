@@ -25,6 +25,7 @@ const courseSchema = z.object({
   price: z.coerce.number().min(0, 'O preço deve ser maior ou igual a zero'),
   is_published: z.boolean(),
   position: z.coerce.number().min(1).optional(),
+  access_level: z.enum(['all', 'customer', 'supplier', 'reseller']).default('all'),
 });
 
 type CourseFormData = z.infer<typeof courseSchema>;
@@ -58,6 +59,7 @@ export function CourseForm({ open, onOpenChange, course, onSuccess }: CourseForm
       price: course?.price ? Number(course.price) : 0,
       is_published: course?.is_published || false,
       position: course?.position || 1,
+      access_level: (course as any)?.access_level || 'all',
     },
   });
 
@@ -75,6 +77,7 @@ export function CourseForm({ open, onOpenChange, course, onSuccess }: CourseForm
         price: data.price,
         is_published: data.is_published,
         position: data.position || 1,
+        access_level: data.access_level,
       };
 
       if (course?.id) {
@@ -248,6 +251,28 @@ export function CourseForm({ open, onOpenChange, course, onSuccess }: CourseForm
               checked={isPublished}
               onCheckedChange={(checked) => setValue('is_published', checked)}
             />
+          </div>
+
+          {/* Nível de Acesso */}
+          <div className="space-y-2">
+            <Label htmlFor="access_level">Nível de Acesso</Label>
+            <Select
+              onValueChange={(value) => setValue('access_level', value as any)}
+              defaultValue={(course as any)?.access_level || 'all'}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione quem pode acessar" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">🌐 Todos os usuários</SelectItem>
+                <SelectItem value="customer">👤 Apenas Clientes</SelectItem>
+                <SelectItem value="supplier">📦 Apenas Fornecedores</SelectItem>
+                <SelectItem value="reseller">🏪 Apenas Revendedores</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground">
+              Define quem pode se matricular neste curso
+            </p>
           </div>
 
           {/* Ações */}
