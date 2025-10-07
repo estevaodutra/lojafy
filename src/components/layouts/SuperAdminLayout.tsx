@@ -52,7 +52,7 @@ const superAdminMenuItems = [
     icon: ShoppingCart,
   },
   {
-    title: 'Aulas',
+    title: 'Lojafy Academy',
     url: '/super-admin/aulas',
     icon: BookOpen,
   },
