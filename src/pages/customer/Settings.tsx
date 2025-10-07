@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatCep, validateCep, fetchAddressByCep } from '@/lib/cep';
+import { formatCPF, validateCPF } from '@/lib/cpf';
 import { User, Mail, Phone, Shield, LogOut, MapPin, Plus, Edit, Trash2, Loader2 } from 'lucide-react';
 
 interface Profile {
@@ -97,14 +98,27 @@ const Settings = () => {
     e.preventDefault();
     if (!effectiveUserId) return;
 
+    // Validar CPF se fornecido
+    if (profile.cpf && !validateCPF(profile.cpf)) {
+      toast({ 
+        title: 'CPF inválido', 
+        description: 'Por favor, insira um CPF válido',
+        variant: 'destructive' 
+      });
+      return;
+    }
+
     setUpdating(true);
     try {
       const { error } = await supabase
         .from('profiles')
-        .upsert({
-          user_id: effectiveUserId,
-          ...profile
-        });
+        .update({
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          phone: profile.phone,
+          cpf: profile.cpf
+        })
+        .eq('user_id', effectiveUserId);
 
       if (error) throw error;
       toast({ title: 'Perfil atualizado com sucesso!' });
@@ -326,8 +340,9 @@ const Settings = () => {
               <Input
                 id="cpf"
                 value={profile.cpf}
-                onChange={(e) => setProfile({...profile, cpf: e.target.value})}
+                onChange={(e) => setProfile({...profile, cpf: formatCPF(e.target.value)})}
                 placeholder="000.000.000-00"
+                maxLength={14}
               />
             </div>
             <Button type="submit" disabled={updating}>
