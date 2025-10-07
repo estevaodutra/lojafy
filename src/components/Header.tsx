@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import { useState } from "react";
 import { useStoreConfig } from '@/hooks/useStoreConfig';
+import { NotificationBell } from "@/components/NotificationBell";
 
 const Header = () => {
   const { favoritesCount } = useFavorites();
@@ -176,6 +177,9 @@ const Header = () => {
               </Link>
             </Button>
 
+            {/* Notifications */}
+            {user && <NotificationBell />}
+
             {/* Cart */}
             <Button variant="ghost" size="sm" className="flex flex-col items-center p-1 sm:p-2 relative min-w-[44px]" asChild>
               <Link to="/carrinho">
@@ -275,7 +279,7 @@ const Header = () => {
 
                   {/* Quick Actions - Favorites & Cart */}
                   <div className="border-t p-4">
-                    <div className="flex gap-4 mb-4">
+                    <div className="flex gap-3 mb-4">
                       <Link 
                         to="/favoritos" 
                         className="flex-1 flex items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors relative"
@@ -289,6 +293,11 @@ const Header = () => {
                           </span>
                         )}
                       </Link>
+                      {user && (
+                        <div className="flex items-center justify-center py-3 border rounded-lg">
+                          <NotificationBell />
+                        </div>
+                      )}
                       <Link 
                         to="/carrinho" 
                         className="flex-1 flex items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors relative"
