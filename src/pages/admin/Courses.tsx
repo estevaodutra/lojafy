@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,10 +15,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useNavigate } from 'react-router-dom';
+import { CourseForm } from '@/components/admin/CourseForm';
 
 export default function Courses() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('courses');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<Course | undefined>(undefined);
 
   const { data: courses, isLoading } = useQuery({
     queryKey: ['admin-courses'],
@@ -52,6 +56,20 @@ export default function Courses() {
   const publishedCourses = courses?.filter(c => c.is_published).length || 0;
   const totalEnrollments = courses?.reduce((acc, c: any) => acc + (c.enrollments?.[0]?.count || 0), 0) || 0;
 
+  const handleCreateCourse = () => {
+    setEditingCourse(undefined);
+    setIsDialogOpen(true);
+  };
+
+  const handleEditCourse = (course: Course) => {
+    setEditingCourse(course);
+    setIsDialogOpen(true);
+  };
+
+  const handleSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin-courses'] });
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -65,7 +83,7 @@ export default function Courses() {
             Crie e gerencie cursos, módulos e aulas
           </p>
         </div>
-        <Button size="lg">
+        <Button size="lg" onClick={handleCreateCourse}>
           <Plus className="w-4 h-4 mr-2" />
           Novo Curso
         </Button>
@@ -152,7 +170,7 @@ export default function Courses() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEditCourse(course)}>
                           <Edit className="w-4 h-4 mr-2" />
                           Editar
                         </DropdownMenuItem>
@@ -205,7 +223,7 @@ export default function Courses() {
                     Crie seu primeiro curso para começar
                   </p>
                 </div>
-                <Button>
+                <Button onClick={handleCreateCourse}>
                   <Plus className="w-4 h-4 mr-2" />
                   Criar Primeiro Curso
                 </Button>
@@ -229,6 +247,13 @@ export default function Courses() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <CourseForm
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        course={editingCourse}
+        onSuccess={handleSuccess}
+      />
     </div>
   );
 }
