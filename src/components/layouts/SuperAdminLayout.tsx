@@ -14,7 +14,8 @@ import {
   Megaphone,
   LogOut,
   Truck,
-  BookOpen
+  BookOpen,
+  Bell
 } from 'lucide-react';
 import {
   Sidebar,
@@ -40,6 +41,11 @@ const superAdminMenuItems = [
     title: 'Usuários',
     url: '/super-admin/usuarios',
     icon: Users,
+  },
+  {
+    title: 'Notificações',
+    url: '/super-admin/notificacoes',
+    icon: Bell,
   },
   {
     title: 'Produtos',
