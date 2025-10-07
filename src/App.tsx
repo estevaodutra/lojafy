@@ -90,6 +90,8 @@ import SuperAdminDashboard from "./pages/admin/Dashboard";
 import Usuarios from "./pages/admin/Usuarios";
 import Plataforma from "./pages/admin/Plataforma";
 import AdminCourses from "./pages/admin/Courses";
+import CourseContent from "./pages/admin/CourseContent";
+import CourseEnrollments from "./pages/admin/CourseEnrollments";
 import PublicStoreProviderRoute from "./components/public-store/PublicStoreProviderRoute";
 
 const queryClient = new QueryClient({
@@ -205,6 +207,8 @@ const App = () => {
                 <Route path="newsletter-config" element={<NewsletterConfig />} />
                 <Route path="frete" element={<Frete />} />
                 <Route path="aulas" element={<AdminCourses />} />
+                <Route path="aulas/:courseId/conteudo" element={<CourseContent />} />
+                <Route path="aulas/:courseId/matriculas" element={<CourseEnrollments />} />
                 <Route path="integracoes" element={<IntegracaoPage />} />
               </Route>
 
