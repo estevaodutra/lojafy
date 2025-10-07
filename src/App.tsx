@@ -34,6 +34,7 @@ import CustomerAddresses from "./pages/customer/Addresses";
 import CustomerFavorites from "./pages/customer/Favorites";
 import CustomerSettings from "./pages/customer/Settings";
 import CustomerHelp from "./pages/customer/Help";
+import CustomerNotifications from "./pages/customer/Notifications";
 import Academy from "./pages/customer/Academy";
 import CourseViewer from "./pages/customer/CourseViewer";
 import CourseCheckout from "./pages/CourseCheckout";
@@ -93,6 +94,7 @@ import Plataforma from "./pages/admin/Plataforma";
 import AdminCourses from "./pages/admin/Courses";
 import CourseContent from "./pages/admin/CourseContent";
 import CourseEnrollments from "./pages/admin/CourseEnrollments";
+import NotificationsManagement from "./pages/admin/NotificationsManagement";
 import PublicStoreProviderRoute from "./components/public-store/PublicStoreProviderRoute";
 
 const queryClient = new QueryClient({
@@ -155,6 +157,7 @@ const App = () => {
               <Route path="/minha-conta" element={<CustomerLayout />}>
                 <Route index element={<CustomerDashboard />} />
                 <Route path="pedidos" element={<CustomerOrders />} />
+                <Route path="notificacoes" element={<CustomerNotifications />} />
                 <Route path="academy" element={<Academy />} />
                 <Route path="aulas/:courseId" element={<CourseViewer />} />
                 <Route path="favoritos" element={<CustomerFavorites />} />
@@ -197,6 +200,7 @@ const App = () => {
               >
                 <Route index element={<SuperAdminDashboard />} />
                 <Route path="usuarios" element={<Usuarios />} />
+                <Route path="notificacoes" element={<NotificationsManagement />} />
                 <Route path="plataforma" element={<Plataforma />} />
                 <Route path="produtos" element={<AdminProducts />} />
                 <Route path="categorias" element={<AdminCategorias />} />

@@ -110,6 +110,36 @@ export const useNotifications = () => {
     }
   };
 
+  const deleteNotification = async (notificationId: string) => {
+    const { error } = await supabase
+      .from('notifications')
+      .delete()
+      .eq('id', notificationId);
+
+    if (error) {
+      console.error('Error deleting notification:', error);
+      toast.error('Erro ao excluir notificação');
+    } else {
+      toast.success('Notificação excluída');
+    }
+  };
+
+  const deleteAllNotifications = async () => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('notifications')
+      .delete()
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Error deleting all notifications:', error);
+      toast.error('Erro ao limpar notificações');
+    } else {
+      toast.success('Todas as notificações foram removidas');
+    }
+  };
+
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return {
@@ -118,6 +148,8 @@ export const useNotifications = () => {
     loading,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
+    deleteAllNotifications,
     refetch: fetchNotifications
   };
 };

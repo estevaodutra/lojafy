@@ -768,6 +768,51 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_campaigns: {
+        Row: {
+          action_label: string | null
+          action_url: string | null
+          created_at: string | null
+          created_by: string
+          id: string
+          message: string
+          metadata: Json | null
+          sent_count: number | null
+          target_audience: string
+          target_user_ids: string[] | null
+          title: string
+          type: string
+        }
+        Insert: {
+          action_label?: string | null
+          action_url?: string | null
+          created_at?: string | null
+          created_by: string
+          id?: string
+          message: string
+          metadata?: Json | null
+          sent_count?: number | null
+          target_audience: string
+          target_user_ids?: string[] | null
+          title: string
+          type: string
+        }
+        Update: {
+          action_label?: string | null
+          action_url?: string | null
+          created_at?: string | null
+          created_by?: string
+          id?: string
+          message?: string
+          metadata?: Json | null
+          sent_count?: number | null
+          target_audience?: string
+          target_user_ids?: string[] | null
+          title?: string
+          type?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           action_label: string | null
@@ -2067,6 +2112,20 @@ export type Database = {
       is_admin_user: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      send_notification_campaign: {
+        Args: {
+          p_action_label: string
+          p_action_url: string
+          p_campaign_id: string
+          p_message: string
+          p_metadata: Json
+          p_target_audience: string
+          p_target_user_ids: string[]
+          p_title: string
+          p_type: string
+        }
+        Returns: number
       }
     }
     Enums: {
