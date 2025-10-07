@@ -139,7 +139,7 @@ export default function CourseViewer() {
       <div className="border-b bg-background p-4">
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/minha-conta/aulas')}>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/minha-conta/academy')}>
               <ChevronLeft className="w-4 h-4 mr-2" />
               Voltar
             </Button>
