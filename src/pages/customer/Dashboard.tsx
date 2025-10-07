@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { GraduationCap } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -133,15 +134,13 @@ const Dashboard = () => {
 
         <Card>
           <CardContent className="flex flex-col items-center justify-center p-6">
-            <div className="h-8 w-8 bg-hero-gradient rounded-full flex items-center justify-center mb-2">
-              <span className="text-white font-bold text-sm">E</span>
-            </div>
-            <h3 className="font-semibold">Continuar Comprando</h3>
+            <GraduationCap className="h-8 w-8 text-primary mb-2" />
+            <h3 className="font-semibold">Minhas Aulas</h3>
             <p className="text-sm text-muted-foreground text-center">
-              Explore novos produtos
+              Continue aprendendo
             </p>
             <Button variant="outline" size="sm" className="mt-3" asChild>
-              <Link to="/">Ver Loja</Link>
+              <Link to="/minha-conta/aulas">Acessar Cursos</Link>
             </Button>
           </CardContent>
         </Card>

@@ -13,7 +13,8 @@ import {
   Palette,
   Megaphone,
   LogOut,
-  Truck
+  Truck,
+  BookOpen
 } from 'lucide-react';
 import {
   Sidebar,
@@ -49,6 +50,11 @@ const superAdminMenuItems = [
     title: 'Pedidos',
     url: '/super-admin/pedidos',
     icon: ShoppingCart,
+  },
+  {
+    title: 'Aulas',
+    url: '/super-admin/aulas',
+    icon: BookOpen,
   },
   {
     title: 'Frete',
