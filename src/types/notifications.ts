@@ -43,3 +43,37 @@ export interface NotificationStats {
   total_unread: number;
   sent_today: number;
 }
+
+export type AutomaticTriggerType =
+  | 'price_decrease'
+  | 'price_increase'
+  | 'back_in_stock'
+  | 'low_stock'
+  | 'order_confirmed'
+  | 'order_shipped'
+  | 'order_delivered'
+  | 'new_lesson'
+  | 'course_completed';
+
+export interface NotificationTemplate {
+  id: string;
+  trigger_type: AutomaticTriggerType;
+  active: boolean;
+  title_template: string;
+  message_template: string;
+  target_audience: string;
+  action_url_template?: string;
+  action_label?: string;
+  conditions?: Record<string, any>;
+  total_sent: number;
+  total_read: number;
+  last_sent_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TemplateVariable {
+  key: string;
+  description: string;
+  example: string;
+}

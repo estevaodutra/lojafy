@@ -813,6 +813,57 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_templates: {
+        Row: {
+          action_label: string | null
+          action_url_template: string | null
+          active: boolean
+          conditions: Json | null
+          created_at: string | null
+          id: string
+          last_sent_at: string | null
+          message_template: string
+          target_audience: string
+          title_template: string
+          total_read: number | null
+          total_sent: number | null
+          trigger_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          action_label?: string | null
+          action_url_template?: string | null
+          active?: boolean
+          conditions?: Json | null
+          created_at?: string | null
+          id?: string
+          last_sent_at?: string | null
+          message_template: string
+          target_audience?: string
+          title_template: string
+          total_read?: number | null
+          total_sent?: number | null
+          trigger_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          action_label?: string | null
+          action_url_template?: string | null
+          active?: boolean
+          conditions?: Json | null
+          created_at?: string | null
+          id?: string
+          last_sent_at?: string | null
+          message_template?: string
+          target_audience?: string
+          title_template?: string
+          total_read?: number | null
+          total_sent?: number | null
+          trigger_type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           action_label: string | null
@@ -2112,6 +2163,14 @@ export type Database = {
       is_admin_user: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      send_automatic_notification: {
+        Args: {
+          p_target_user_ids?: string[]
+          p_trigger_type: string
+          p_variables: Json
+        }
+        Returns: number
       }
       send_notification_campaign: {
         Args: {

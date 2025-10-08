@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Bell, Send, History, TrendingUp } from 'lucide-react';
 import { useAdminNotifications } from '@/hooks/useAdminNotifications';
+import { useNotificationTemplates } from '@/hooks/useNotificationTemplates';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -16,7 +17,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import type { NotificationFormData, NotificationCampaign, NotificationStats } from '@/types/notifications';
+import type { NotificationFormData, NotificationCampaign, NotificationStats, NotificationTemplate } from '@/types/notifications';
+import { NotificationTemplateCard } from '@/components/admin/NotificationTemplateCard';
+import { NotificationTemplateEditor } from '@/components/admin/NotificationTemplateEditor';
 
 const notificationSchema = z.object({
   target_audience: z.enum(['all', 'customers', 'resellers', 'suppliers', 'specific']),
@@ -29,6 +32,8 @@ const notificationSchema = z.object({
 
 export default function NotificationsManagement() {
   const { sendNotification, fetchNotificationHistory, getNotificationStats, loading } = useAdminNotifications();
+  const { templates, loading: templatesLoading, updateTemplate, toggleTemplate } = useNotificationTemplates();
+  const [editingTemplate, setEditingTemplate] = useState<NotificationTemplate | null>(null);
   const [history, setHistory] = useState<NotificationCampaign[]>([]);
   const [stats, setStats] = useState<NotificationStats>({
     total_sent: 0,
@@ -128,6 +133,7 @@ export default function NotificationsManagement() {
       <Tabs defaultValue="send" className="space-y-6">
         <TabsList>
           <TabsTrigger value="send">Enviar Notificação</TabsTrigger>
+          <TabsTrigger value="templates">Templates Automáticos</TabsTrigger>
           <TabsTrigger value="history">Histórico</TabsTrigger>
         </TabsList>
 
@@ -273,6 +279,38 @@ export default function NotificationsManagement() {
           </Card>
         </TabsContent>
 
+        {/* Templates Tab */}
+        <TabsContent value="templates" className="space-y-6">
+          {templatesLoading ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Carregando templates...</p>
+            </div>
+          ) : (
+            <>
+              <Card className="bg-muted/50">
+                <CardContent className="pt-6">
+                  <h3 className="font-semibold mb-2">📋 Sobre Templates Automáticos</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Templates automáticos são disparados por eventos do sistema (mudança de preço, estoque, pedidos, etc.).
+                    Você pode personalizar o título, mensagem e condições de cada template.
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {templates.map((template) => (
+                  <NotificationTemplateCard
+                    key={template.id}
+                    template={template}
+                    onToggle={toggleTemplate}
+                    onEdit={setEditingTemplate}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </TabsContent>
+
         {/* History Tab */}
         <TabsContent value="history" className="space-y-6">
           <Card>
@@ -325,6 +363,13 @@ export default function NotificationsManagement() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <NotificationTemplateEditor
+        template={editingTemplate}
+        open={!!editingTemplate}
+        onClose={() => setEditingTemplate(null)}
+        onSave={updateTemplate}
+      />
     </div>
   );
 }
