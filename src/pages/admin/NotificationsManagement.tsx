@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Bell, Send, History, TrendingUp, AlertCircle } from 'lucide-react';
+import { Bell, Send, History, TrendingUp, AlertCircle, BookOpen } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAdminNotifications } from '@/hooks/useAdminNotifications';
 import { useNotificationTemplates } from '@/hooks/useNotificationTemplates';
+import { useAllLessons } from '@/hooks/useAllLessons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -39,6 +41,7 @@ export default function NotificationsManagement() {
   const [editingTemplate, setEditingTemplate] = useState<NotificationTemplate | null>(null);
   const [confirmTemplate, setConfirmTemplate] = useState<NotificationTemplate | null>(null);
   const [selectedDispatchTemplate, setSelectedDispatchTemplate] = useState<string | null>(null);
+  const [selectedLesson, setSelectedLesson] = useState<string | null>(null);
   const [history, setHistory] = useState<NotificationCampaign[]>([]);
   const [stats, setStats] = useState<NotificationStats>({
     total_sent: 0,
@@ -48,6 +51,7 @@ export default function NotificationsManagement() {
   });
 
   const selectedTemplateData = templates.find(t => t.id === selectedDispatchTemplate);
+  const { data: allLessons, isLoading: lessonsLoading } = useAllLessons();
 
   const form = useForm<NotificationFormData>({
     resolver: zodResolver(notificationSchema),
@@ -97,13 +101,35 @@ export default function NotificationsManagement() {
   const handleDispatch = async () => {
     if (!selectedTemplateData) return;
     
+    // Validate lesson selection for new_lesson notifications
+    if (selectedTemplateData.trigger_type === 'new_lesson' && !selectedLesson) {
+      toast.error('Selecione uma aula para enviar a notificação');
+      return;
+    }
+    
     const confirmed = window.confirm(
       `Confirma o envio da notificação "${selectedTemplateData.title_template}" para ${getAudienceLabel(selectedTemplateData.target_audience)}?`
     );
     
     if (confirmed) {
-      await triggerManualNotification(selectedTemplateData);
+      // Prepare lesson data if new_lesson type
+      let lessonData = null;
+      if (selectedTemplateData.trigger_type === 'new_lesson' && selectedLesson) {
+        const lesson = allLessons?.find(l => l.lesson_id === selectedLesson);
+        if (lesson) {
+          lessonData = {
+            LESSON_ID: lesson.lesson_id,
+            LESSON_TITLE: lesson.lesson_title,
+            COURSE_ID: lesson.course_id,
+            COURSE_NAME: lesson.course_title,
+            MODULE_ID: lesson.module_id,
+          };
+        }
+      }
+      
+      await triggerManualNotification(selectedTemplateData, lessonData);
       setSelectedDispatchTemplate(null);
+      setSelectedLesson(null);
       loadData();
     }
   };
@@ -363,6 +389,40 @@ export default function NotificationsManagement() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Lesson Selection - Only for new_lesson */}
+              {selectedTemplateData?.trigger_type === 'new_lesson' && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4" />
+                    Selecione a Aula *
+                  </Label>
+                  <Select 
+                    value={selectedLesson || undefined} 
+                    onValueChange={setSelectedLesson}
+                    disabled={lessonsLoading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={lessonsLoading ? "Carregando aulas..." : "Escolha a aula..."} />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      {allLessons?.map((lesson) => (
+                        <SelectItem key={lesson.lesson_id} value={lesson.lesson_id}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{lesson.lesson_title}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {lesson.course_title} → {lesson.module_title}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Ao clicar na notificação, o usuário será redirecionado para esta aula
+                  </p>
+                </div>
+              )}
 
               {/* Step 2: Preview da Notificação */}
               {selectedTemplateData && (

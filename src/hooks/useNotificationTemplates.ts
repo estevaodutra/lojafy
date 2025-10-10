@@ -101,15 +101,19 @@ export const useNotificationTemplates = () => {
     return examples[triggerType] || {};
   };
 
-  const triggerManualNotification = async (template: NotificationTemplate) => {
+  const triggerManualNotification = async (
+    template: NotificationTemplate, 
+    customVariables?: any
+  ) => {
     try {
       setLoading(true);
       
-      const exampleVariables = getExampleVariablesForTrigger(template.trigger_type);
+      // Use custom variables if provided, otherwise use examples
+      const variables = customVariables || getExampleVariablesForTrigger(template.trigger_type);
       
       const { data, error } = await supabase.rpc('send_automatic_notification', {
         p_trigger_type: template.trigger_type,
-        p_variables: exampleVariables,
+        p_variables: variables,
         p_target_user_ids: null,
       });
       
