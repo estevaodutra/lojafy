@@ -81,7 +81,7 @@ export const NotificationTemplateCard = ({ template, onToggle, onEdit, onManualT
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-3 border-t">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-3 border-t">
           <div className="flex items-center space-x-2">
             <Switch
               id={`active-${template.id}`}
@@ -93,19 +93,24 @@ export const NotificationTemplateCard = ({ template, onToggle, onEdit, onManualT
             </Label>
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
               onClick={() => onManualTrigger(template)}
               disabled={!template.last_sent_at}
               title={!template.last_sent_at ? 'Este template ainda não foi enviado' : 'Reenviar última notificação'}
+              className="flex-1 sm:flex-none"
             >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Reenviar
+              <RefreshCw className="h-4 w-4" />
             </Button>
             
-            <Button variant="outline" size="sm" onClick={() => onEdit(template)}>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => onEdit(template)}
+              className="flex-1 sm:flex-none"
+            >
               <Edit className="h-4 w-4 mr-2" />
               Editar
             </Button>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Bell, Send, History, TrendingUp } from 'lucide-react';
+import { Bell, Send, History, TrendingUp, AlertCircle } from 'lucide-react';
 import { useAdminNotifications } from '@/hooks/useAdminNotifications';
 import { useNotificationTemplates } from '@/hooks/useNotificationTemplates';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,8 @@ import type { NotificationFormData, NotificationCampaign, NotificationStats, Not
 import { NotificationTemplateCard } from '@/components/admin/NotificationTemplateCard';
 import { NotificationTemplateEditor } from '@/components/admin/NotificationTemplateEditor';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Label } from '@/components/ui/label';
 
 const notificationSchema = z.object({
   target_audience: z.enum(['all', 'customers', 'resellers', 'suppliers', 'specific']),
@@ -36,6 +38,7 @@ export default function NotificationsManagement() {
   const { templates, loading: templatesLoading, updateTemplate, toggleTemplate, triggerManualNotification } = useNotificationTemplates();
   const [editingTemplate, setEditingTemplate] = useState<NotificationTemplate | null>(null);
   const [confirmTemplate, setConfirmTemplate] = useState<NotificationTemplate | null>(null);
+  const [selectedDispatchTemplate, setSelectedDispatchTemplate] = useState<string | null>(null);
   const [history, setHistory] = useState<NotificationCampaign[]>([]);
   const [stats, setStats] = useState<NotificationStats>({
     total_sent: 0,
@@ -43,6 +46,8 @@ export default function NotificationsManagement() {
     total_unread: 0,
     sent_today: 0,
   });
+
+  const selectedTemplateData = templates.find(t => t.id === selectedDispatchTemplate);
 
   const form = useForm<NotificationFormData>({
     resolver: zodResolver(notificationSchema),
@@ -87,6 +92,44 @@ export default function NotificationsManagement() {
       setConfirmTemplate(null);
       loadData();
     }
+  };
+
+  const handleDispatch = async () => {
+    if (!selectedTemplateData) return;
+    
+    const confirmed = window.confirm(
+      `Confirma o envio da notificação "${selectedTemplateData.title_template}" para ${getAudienceLabel(selectedTemplateData.target_audience)}?`
+    );
+    
+    if (confirmed) {
+      await triggerManualNotification(selectedTemplateData);
+      setSelectedDispatchTemplate(null);
+      loadData();
+    }
+  };
+
+  const getAudienceLabel = (audience: string) => {
+    const labels: Record<string, string> = {
+      'all': 'Todos os usuários',
+      'customers': 'Apenas clientes',
+      'resellers': 'Apenas revendedores',
+      'favorites_only': 'Usuários com produto favoritado',
+      'enrolled_only': 'Alunos matriculados',
+      'customer_only': 'Cliente específico',
+    };
+    return labels[audience] || audience;
+  };
+
+  const TRIGGER_LABELS: Record<string, string> = {
+    price_decrease: 'Produto mais barato',
+    price_increase: 'Produto mais caro',
+    back_in_stock: 'Voltou ao estoque',
+    low_stock: 'Estoque baixo',
+    order_confirmed: 'Pedido confirmado',
+    order_shipped: 'Pedido enviado',
+    order_delivered: 'Pedido entregue',
+    new_lesson: 'Nova aula',
+    course_completed: 'Curso concluído',
   };
 
   return (
@@ -147,6 +190,7 @@ export default function NotificationsManagement() {
       <Tabs defaultValue="send" className="space-y-6">
         <TabsList>
           <TabsTrigger value="send">Enviar Notificação</TabsTrigger>
+          <TabsTrigger value="dispatcher">Disparador de Notificações</TabsTrigger>
           <TabsTrigger value="templates">Templates Automáticos</TabsTrigger>
           <TabsTrigger value="history">Histórico</TabsTrigger>
         </TabsList>
@@ -291,6 +335,96 @@ export default function NotificationsManagement() {
               </Form>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Tab: Disparador de Notificações */}
+        <TabsContent value="dispatcher" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>🚀 Disparador de Notificações</CardTitle>
+              <CardDescription>
+                Selecione um template automático e dispare manualmente para os usuários
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Step 1: Selecionar Template */}
+              <div className="space-y-2">
+                <Label>Selecione o Template</Label>
+                <Select onValueChange={(value) => setSelectedDispatchTemplate(value)} value={selectedDispatchTemplate || ""}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Escolha um template..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {TRIGGER_LABELS[template.trigger_type]} - {template.title_template}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Step 2: Preview da Notificação */}
+              {selectedTemplateData && (
+                <Alert>
+                  <Bell className="h-4 w-4" />
+                  <AlertTitle>{selectedTemplateData.title_template}</AlertTitle>
+                  <AlertDescription>{selectedTemplateData.message_template}</AlertDescription>
+                </Alert>
+              )}
+
+              {/* Step 3: Informações de Destinatários */}
+              {selectedTemplateData && (
+                <div className="grid gap-4 p-4 border rounded-lg bg-muted/50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Destinatários:</span>
+                    <Badge>{getAudienceLabel(selectedTemplateData.target_audience)}</Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Última vez enviado:</span>
+                    <span className="text-sm text-muted-foreground">
+                      {selectedTemplateData.last_sent_at 
+                        ? formatDistanceToNow(new Date(selectedTemplateData.last_sent_at), { addSuffix: true, locale: ptBR })
+                        : 'Nunca'
+                      }
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Total enviado:</span>
+                    <span className="text-sm font-bold">{selectedTemplateData.total_sent}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 4: Botão de Disparo */}
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectedDispatchTemplate(null)}
+                  disabled={!selectedDispatchTemplate}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleDispatch}
+                  disabled={!selectedDispatchTemplate || loading}
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  {loading ? 'Enviando...' : 'Disparar Notificação'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Alerta de Aviso */}
+          <Alert variant="default" className="bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900">
+            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+            <AlertTitle className="text-amber-900 dark:text-amber-400">Atenção</AlertTitle>
+            <AlertDescription className="text-amber-800 dark:text-amber-300">
+              O disparo manual usará <strong>variáveis de exemplo</strong> definidas no sistema. 
+              Esta notificação será enviada para todos os usuários conforme o público-alvo configurado no template.
+            </AlertDescription>
+          </Alert>
         </TabsContent>
 
         {/* Templates Tab */}
