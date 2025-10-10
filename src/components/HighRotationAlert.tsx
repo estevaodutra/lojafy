@@ -13,16 +13,20 @@ import {
 interface HighRotationAlertProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm?: () => void;
+  allowContinue?: boolean;
 }
 
 export const HighRotationAlert: React.FC<HighRotationAlertProps> = ({
   isOpen,
   onClose,
   onConfirm,
+  allowContinue = false,
 }) => {
   const handleConfirm = () => {
-    onConfirm();
+    if (onConfirm) {
+      onConfirm();
+    }
     onClose();
   };
 
@@ -31,23 +35,31 @@ export const HighRotationAlert: React.FC<HighRotationAlertProps> = ({
       <AlertDialogContent className="max-w-lg">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2 text-orange-600">
-            ⚠️ Atenção: Produto de Alta Rotatividade
+            ⚠️ Produto de Alta Rotatividade Detectado
           </AlertDialogTitle>
           <AlertDialogDescription className="space-y-4 text-left">
-            <p className="text-sm">
-              Este produto está marcado como de <strong>Alta Rotatividade</strong>.
-              Devido à alta demanda, não há garantia imediata de envio.
+            <p className="text-sm font-semibold text-destructive">
+              Pagamento via PIX não disponível para este carrinho.
             </p>
             
             <p className="text-sm">
-              Ao prosseguir com a compra, você declara estar ciente de que:
+              Seu carrinho contém produtos de <strong>Alta Rotatividade</strong>.
+              Por política da loja, não é possível gerar PIX para estes produtos.
             </p>
             
-            <ul className="list-disc list-inside space-y-1 text-sm ml-4">
-              <li>Podem ocorrer atrasos no processamento do pedido</li>
-              <li>Existe a possibilidade de cancelamento por indisponibilidade de estoque</li>
-              <li>Em caso de cancelamento, o valor será reembolsado integralmente em até 7 dias úteis</li>
-            </ul>
+            <p className="text-sm">
+              <strong>Motivo:</strong> Devido à alta demanda e rotatividade de estoque,
+              precisamos garantir disponibilidade imediata antes de processar o pagamento.
+            </p>
+            
+            {!allowContinue && (
+              <div className="bg-muted p-3 rounded-md">
+                <p className="text-sm text-muted-foreground">
+                  💡 <strong>Sugestão:</strong> Entre em contato conosco para verificar
+                  métodos de pagamento alternativos ou disponibilidade do produto.
+                </p>
+              </div>
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="flex gap-2">
@@ -55,14 +67,17 @@ export const HighRotationAlert: React.FC<HighRotationAlertProps> = ({
             onClick={onClose}
             className="flex-1"
           >
-            ❌ Cancelar
+            ❌ Voltar ao Carrinho
           </AlertDialogCancel>
-          <AlertDialogAction 
-            onClick={handleConfirm}
-            className="flex-1 bg-primary hover:bg-primary/90"
-          >
-            ✔️ Entendi e desejo continuar
-          </AlertDialogAction>
+          
+          {allowContinue && onConfirm && (
+            <AlertDialogAction 
+              onClick={handleConfirm}
+              className="flex-1 bg-primary hover:bg-primary/90"
+            >
+              ✔️ Entendi e desejo continuar
+            </AlertDialogAction>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

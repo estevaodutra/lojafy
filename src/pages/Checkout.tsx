@@ -852,10 +852,11 @@ const Checkout = ({
       {pixModalData && <PixPaymentModal isOpen={showPixModal} onClose={() => setShowPixModal(false)} qrCodeBase64={pixModalData.qrCodeBase64} qrCodeCopyPaste={pixModalData.qrCodeCopyPaste} paymentId={pixModalData.paymentId} amount={pixModalData.amount} onPaymentConfirmed={handlePixPaymentConfirmed} />}
 
       {/* High Rotation Alert Modal */}
-      <HighRotationAlert isOpen={showHighRotationAlert} onClose={() => setShowHighRotationAlert(false)} onConfirm={() => {
-      setShowHighRotationAlert(false);
-      processPixPayment();
-    }} />
+      <HighRotationAlert 
+        isOpen={showHighRotationAlert} 
+        onClose={() => setShowHighRotationAlert(false)} 
+        allowContinue={false}
+      />
     </div>;
 };
 export default Checkout;
