@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCourseContent } from '@/hooks/useCourseContent';
 import { useCourseProgress } from '@/hooks/useCourseProgress';
@@ -20,6 +20,8 @@ import { toast } from 'sonner';
 
 export default function CourseViewer() {
   const { courseId } = useParams<{ courseId: string }>();
+  const [searchParams] = useSearchParams();
+  const lessonIdFromUrl = searchParams.get('lesson');
   const navigate = useNavigate();
   const { user } = useAuth();
   const { course, modules, loading: contentLoading } = useCourseContent(courseId);
@@ -37,15 +39,34 @@ export default function CourseViewer() {
   const currentLesson = currentModule?.lessons?.find(l => l.id === selectedLesson);
   const currentProgress = progress?.find(p => p.lesson_id === selectedLesson);
 
-  // Select first lesson on load
+  // Select first lesson on load OR lesson from URL (notification redirect)
   useEffect(() => {
-    if (modules && modules.length > 0 && !selectedLesson) {
-      const firstLesson = modules[0]?.lessons?.[0];
-      if (firstLesson) {
-        setSelectedLesson(firstLesson.id);
+    if (modules && modules.length > 0) {
+      // Priority 1: Lesson from URL (notification redirect)
+      if (lessonIdFromUrl && !selectedLesson) {
+        const lessonExists = modules.some(m => 
+          m.lessons?.some(l => l.id === lessonIdFromUrl)
+        );
+        
+        if (lessonExists) {
+          setSelectedLesson(lessonIdFromUrl);
+          // Remove query param after setting lesson
+          navigate(`/minha-conta/aulas/${courseId}`, { replace: true });
+          return;
+        } else {
+          toast.error('Aula não encontrada. Mostrando primeira aula disponível.');
+        }
+      }
+      
+      // Priority 2: First lesson (default behavior)
+      if (!selectedLesson) {
+        const firstLesson = modules[0]?.lessons?.[0];
+        if (firstLesson) {
+          setSelectedLesson(firstLesson.id);
+        }
       }
     }
-  }, [modules, selectedLesson]);
+  }, [modules, selectedLesson, lessonIdFromUrl, courseId, navigate]);
 
   // Load notes for current lesson
   useEffect(() => {
