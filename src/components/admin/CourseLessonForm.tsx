@@ -13,6 +13,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -178,10 +179,17 @@ export function CourseLessonForm({
                   <FormLabel>URL do Vídeo</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="https://www.youtube.com/watch?v=..."
+                      placeholder="YouTube, Google Drive ou arquivo direto..."
                       {...field}
                     />
                   </FormControl>
+                  <FormDescription className="text-xs space-y-1">
+                    <div className="font-semibold">Formatos aceitos:</div>
+                    <div>• YouTube: https://www.youtube.com/watch?v=VIDEO_ID</div>
+                    <div>• Google Drive (URL): https://drive.google.com/file/d/FILE_ID/view</div>
+                    <div>• Google Drive (iframe): Cole o iframe completo do Google Drive</div>
+                    <div>• Vídeo direto: URL de arquivo MP4</div>
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

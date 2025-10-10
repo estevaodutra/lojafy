@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCourseContent } from '@/hooks/useCourseContent';
 import { useCourseProgress } from '@/hooks/useCourseProgress';
 import { useCourseEnrollment } from '@/hooks/useCourseEnrollment';
-import { isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/videoUtils';
+import { isYouTubeUrl, getYouTubeEmbedUrl, isGoogleDriveUrl, getGoogleDriveEmbedUrl } from '@/lib/videoUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -201,6 +201,13 @@ export default function CourseViewer() {
                         className="w-full h-full"
                         src={getYouTubeEmbedUrl(currentLesson.video_url)}
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    ) : isGoogleDriveUrl(currentLesson.video_url) ? (
+                      <iframe
+                        className="w-full h-full"
+                        src={getGoogleDriveEmbedUrl(currentLesson.video_url)}
+                        allow="autoplay"
                         allowFullScreen
                       />
                     ) : (

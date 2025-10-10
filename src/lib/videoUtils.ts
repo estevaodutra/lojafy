@@ -19,3 +19,44 @@ export function getYouTubeEmbedUrl(url: string): string {
 export function isYouTubeUrl(url: string): boolean {
   return url.includes('youtube.com') || url.includes('youtu.be');
 }
+
+/**
+ * Extracts iframe src attribute from HTML string
+ */
+export function extractIframeSrc(htmlString: string): string | null {
+  const srcMatch = htmlString.match(/src=["']([^"']+)["']/);
+  return srcMatch ? srcMatch[1] : null;
+}
+
+/**
+ * Checks if a URL is a Google Drive video
+ */
+export function isGoogleDriveUrl(url: string): boolean {
+  return url.includes('drive.google.com') || url.includes('<iframe');
+}
+
+/**
+ * Extracts Google Drive file ID and returns proper embed URL
+ * Supports:
+ * - Full iframes: <iframe src="https://drive.google.com/file/d/FILE_ID/preview"...
+ * - Direct URLs: https://drive.google.com/file/d/FILE_ID/view
+ * - Embed URLs: https://drive.google.com/file/d/FILE_ID/preview
+ */
+export function getGoogleDriveEmbedUrl(url: string): string {
+  // If it's an iframe string, extract the src
+  if (url.includes('<iframe')) {
+    const src = extractIframeSrc(url);
+    if (src) {
+      url = src;
+    }
+  }
+  
+  // Extract file ID from various Google Drive URL formats
+  const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  
+  if (fileIdMatch && fileIdMatch[1]) {
+    return `https://drive.google.com/file/d/${fileIdMatch[1]}/preview`;
+  }
+  
+  return url; // Return original URL if unable to extract
+}
