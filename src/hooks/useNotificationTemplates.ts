@@ -101,20 +101,58 @@ export const useNotificationTemplates = () => {
     return examples[triggerType] || {};
   };
 
+  const replaceVariables = (text: string, variables: any): string => {
+    let result = text;
+    Object.entries(variables).forEach(([key, value]) => {
+      result = result.replace(new RegExp(`{${key}}`, 'g'), String(value));
+    });
+    return result;
+  };
+
   const triggerManualNotification = async (
     template: NotificationTemplate, 
-    customVariables?: any
+    customVariables?: any,
+    targetAudience?: string
   ) => {
     try {
       setLoading(true);
       
       // Use custom variables if provided, otherwise use examples
       const variables = customVariables || getExampleVariablesForTrigger(template.trigger_type);
+      const audienceToUse = targetAudience || template.target_audience;
       
-      const { data, error } = await supabase.rpc('send_automatic_notification', {
-        p_trigger_type: template.trigger_type,
-        p_variables: variables,
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error('Usuário não autenticado');
+      
+      // Create temporary campaign
+      const { data: campaign, error: campaignError } = await supabase
+        .from('notification_campaigns')
+        .insert({
+          created_by: user.id,
+          title: replaceVariables(template.title_template, variables),
+          message: replaceVariables(template.message_template, variables),
+          type: template.trigger_type,
+          target_audience: audienceToUse,
+        })
+        .select()
+        .single();
+
+      if (campaignError) throw campaignError;
+      
+      // Send using campaign RPC which accepts target_audience
+      const { data, error } = await supabase.rpc('send_notification_campaign', {
+        p_campaign_id: campaign.id,
+        p_title: replaceVariables(template.title_template, variables),
+        p_message: replaceVariables(template.message_template, variables),
+        p_type: template.trigger_type,
+        p_target_audience: audienceToUse,
         p_target_user_ids: null,
+        p_action_url: template.action_url_template 
+          ? replaceVariables(template.action_url_template, variables) 
+          : null,
+        p_action_label: template.action_label || null,
+        p_metadata: variables,
       });
       
       if (error) throw error;

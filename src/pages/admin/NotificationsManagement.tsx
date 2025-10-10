@@ -42,6 +42,7 @@ export default function NotificationsManagement() {
   const [confirmTemplate, setConfirmTemplate] = useState<NotificationTemplate | null>(null);
   const [selectedDispatchTemplate, setSelectedDispatchTemplate] = useState<string | null>(null);
   const [selectedLesson, setSelectedLesson] = useState<string | null>(null);
+  const [customAudience, setCustomAudience] = useState<string | null>(null);
   const [history, setHistory] = useState<NotificationCampaign[]>([]);
   const [stats, setStats] = useState<NotificationStats>({
     total_sent: 0,
@@ -107,8 +108,10 @@ export default function NotificationsManagement() {
       return;
     }
     
+    const targetAudience = customAudience || selectedTemplateData.target_audience;
+    
     const confirmed = window.confirm(
-      `Confirma o envio da notificação "${selectedTemplateData.title_template}" para ${getAudienceLabel(selectedTemplateData.target_audience)}?`
+      `Confirma o envio da notificação "${selectedTemplateData.title_template}" para ${getAudienceLabel(targetAudience)}?`
     );
     
     if (confirmed) {
@@ -127,21 +130,23 @@ export default function NotificationsManagement() {
         }
       }
       
-      await triggerManualNotification(selectedTemplateData, lessonData);
+      await triggerManualNotification(selectedTemplateData, lessonData, targetAudience);
       setSelectedDispatchTemplate(null);
       setSelectedLesson(null);
+      setCustomAudience(null);
       loadData();
     }
   };
 
   const getAudienceLabel = (audience: string) => {
     const labels: Record<string, string> = {
-      'all': 'Todos os usuários',
-      'customers': 'Apenas clientes',
-      'resellers': 'Apenas revendedores',
-      'favorites_only': 'Usuários com produto favoritado',
-      'enrolled_only': 'Alunos matriculados',
-      'customer_only': 'Cliente específico',
+      'all': '👥 Todos os usuários',
+      'customers': '👤 Apenas clientes',
+      'resellers': '🏪 Apenas revendedores',
+      'suppliers': '📦 Apenas fornecedores',
+      'favorites_only': '⭐ Usuários com produto favoritado',
+      'enrolled_only': '🎓 Alunos matriculados',
+      'customer_only': '👤 Cliente específico',
     };
     return labels[audience] || audience;
   };
@@ -389,6 +394,46 @@ export default function NotificationsManagement() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Step 1b: Selecionar Público-Alvo (Override) */}
+              {selectedTemplateData && (
+                <div className="space-y-2">
+                  <Label className="flex items-center justify-between">
+                    <span>Público-Alvo</span>
+                    {customAudience && (
+                      <Badge variant="secondary" className="text-xs">
+                        Sobrescrevendo padrão
+                      </Badge>
+                    )}
+                  </Label>
+                  <Select 
+                    value={customAudience || selectedTemplateData.target_audience} 
+                    onValueChange={(value) => {
+                      if (value === selectedTemplateData.target_audience) {
+                        setCustomAudience(null);
+                      } else {
+                        setCustomAudience(value);
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">👥 Todos os usuários</SelectItem>
+                      <SelectItem value="customers">👤 Apenas clientes</SelectItem>
+                      <SelectItem value="resellers">🏪 Apenas revendedores</SelectItem>
+                      <SelectItem value="suppliers">📦 Apenas fornecedores</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {customAudience 
+                      ? '✏️ Você alterou o público-alvo padrão deste template'
+                      : `📋 Usando público-alvo padrão: ${getAudienceLabel(selectedTemplateData.target_audience)}`
+                    }
+                  </p>
+                </div>
+              )}
 
               {/* Lesson Selection - Only for new_lesson */}
               {selectedTemplateData?.trigger_type === 'new_lesson' && (
