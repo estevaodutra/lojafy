@@ -20,6 +20,7 @@ import { ptBR } from 'date-fns/locale';
 import type { NotificationFormData, NotificationCampaign, NotificationStats, NotificationTemplate } from '@/types/notifications';
 import { NotificationTemplateCard } from '@/components/admin/NotificationTemplateCard';
 import { NotificationTemplateEditor } from '@/components/admin/NotificationTemplateEditor';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const notificationSchema = z.object({
   target_audience: z.enum(['all', 'customers', 'resellers', 'suppliers', 'specific']),
@@ -32,8 +33,9 @@ const notificationSchema = z.object({
 
 export default function NotificationsManagement() {
   const { sendNotification, fetchNotificationHistory, getNotificationStats, loading } = useAdminNotifications();
-  const { templates, loading: templatesLoading, updateTemplate, toggleTemplate } = useNotificationTemplates();
+  const { templates, loading: templatesLoading, updateTemplate, toggleTemplate, triggerManualNotification } = useNotificationTemplates();
   const [editingTemplate, setEditingTemplate] = useState<NotificationTemplate | null>(null);
+  const [confirmTemplate, setConfirmTemplate] = useState<NotificationTemplate | null>(null);
   const [history, setHistory] = useState<NotificationCampaign[]>([]);
   const [stats, setStats] = useState<NotificationStats>({
     total_sent: 0,
@@ -71,6 +73,18 @@ export default function NotificationsManagement() {
     const result = await sendNotification(data);
     if (result.success) {
       form.reset();
+      loadData();
+    }
+  };
+
+  const handleManualTrigger = (template: NotificationTemplate) => {
+    setConfirmTemplate(template);
+  };
+
+  const confirmTrigger = async () => {
+    if (confirmTemplate) {
+      await triggerManualNotification(confirmTemplate);
+      setConfirmTemplate(null);
       loadData();
     }
   };
@@ -304,6 +318,7 @@ export default function NotificationsManagement() {
                     template={template}
                     onToggle={toggleTemplate}
                     onEdit={setEditingTemplate}
+                    onManualTrigger={handleManualTrigger}
                   />
                 ))}
               </div>
@@ -370,6 +385,38 @@ export default function NotificationsManagement() {
         onClose={() => setEditingTemplate(null)}
         onSave={updateTemplate}
       />
+
+      <AlertDialog open={!!confirmTemplate} onOpenChange={() => setConfirmTemplate(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>🔄 Reenviar Notificação?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Você está prestes a disparar manualmente a notificação{' '}
+                <strong>"{confirmTemplate?.title_template}"</strong>.
+              </p>
+              <div className="pt-2 space-y-1 text-sm">
+                <p>
+                  <strong>Última vez enviada:</strong>{' '}
+                  {confirmTemplate?.last_sent_at
+                    ? formatDistanceToNow(new Date(confirmTemplate.last_sent_at), {
+                        addSuffix: true,
+                        locale: ptBR,
+                      })
+                    : 'Nunca'}
+                </p>
+                <p>
+                  <strong>Destinatários:</strong> <Badge variant="outline">{confirmTemplate?.target_audience}</Badge>
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmTrigger}>Confirmar Envio</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

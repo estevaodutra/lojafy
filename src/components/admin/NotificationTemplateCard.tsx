@@ -3,13 +3,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Edit, TrendingDown, TrendingUp, Package, AlertCircle, CheckCircle, Truck, Gift, GraduationCap, BookOpen } from 'lucide-react';
+import { Edit, TrendingDown, TrendingUp, Package, AlertCircle, CheckCircle, Truck, Gift, GraduationCap, BookOpen, RefreshCw } from 'lucide-react';
 import type { NotificationTemplate } from '@/types/notifications';
 
 interface NotificationTemplateCardProps {
   template: NotificationTemplate;
   onToggle: (id: string, active: boolean) => void;
   onEdit: (template: NotificationTemplate) => void;
+  onManualTrigger: (template: NotificationTemplate) => void;
 }
 
 const TRIGGER_ICONS = {
@@ -36,7 +37,7 @@ const TRIGGER_LABELS = {
   course_completed: 'Curso concluído',
 };
 
-export const NotificationTemplateCard = ({ template, onToggle, onEdit }: NotificationTemplateCardProps) => {
+export const NotificationTemplateCard = ({ template, onToggle, onEdit, onManualTrigger }: NotificationTemplateCardProps) => {
   const Icon = TRIGGER_ICONS[template.trigger_type];
   const label = TRIGGER_LABELS[template.trigger_type];
   const readRate = template.total_sent > 0 ? ((template.total_read / template.total_sent) * 100).toFixed(1) : '0';
@@ -92,10 +93,23 @@ export const NotificationTemplateCard = ({ template, onToggle, onEdit }: Notific
             </Label>
           </div>
           
-          <Button variant="outline" size="sm" onClick={() => onEdit(template)}>
-            <Edit className="h-4 w-4 mr-2" />
-            Editar
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onManualTrigger(template)}
+              disabled={!template.last_sent_at}
+              title={!template.last_sent_at ? 'Este template ainda não foi enviado' : 'Reenviar última notificação'}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Reenviar
+            </Button>
+            
+            <Button variant="outline" size="sm" onClick={() => onEdit(template)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Editar
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
