@@ -72,6 +72,7 @@ export type Database = {
           id: string
           keywords: string[] | null
           priority: number | null
+          subcategory: string | null
           target_audience: string
           title: string
           updated_at: string | null
@@ -85,6 +86,7 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           priority?: number | null
+          subcategory?: string | null
           target_audience?: string
           title: string
           updated_at?: string | null
@@ -98,6 +100,7 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           priority?: number | null
+          subcategory?: string | null
           target_audience?: string
           title?: string
           updated_at?: string | null

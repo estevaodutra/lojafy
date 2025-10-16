@@ -6,6 +6,7 @@ export interface KnowledgeBaseItem {
   id: string;
   category: 'faq' | 'policy' | 'product_info' | 'general' | 'academy_lesson';
   target_audience: 'all' | 'customer' | 'reseller';
+  subcategory?: string;
   title: string;
   content: string;
   keywords: string[];

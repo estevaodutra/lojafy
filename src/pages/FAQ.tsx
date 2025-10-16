@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,124 +8,44 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, HelpCircle, ShoppingCart, Truck, CreditCard, RefreshCw, Phone } from "lucide-react";
+import { Search, HelpCircle, ShoppingCart, Truck, CreditCard, RefreshCw, Phone, Package } from "lucide-react";
 import { Link } from "react-router-dom";
 import { FAQItem } from "@/types";
 
 const FAQ = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  const faqData: FAQItem[] = [
-    // Pedidos
-    {
-      id: "1",
-      question: "Como faço um pedido?",
-      answer: "Para fazer um pedido, navegue pelos produtos, adicione os itens desejados ao carrinho e clique em 'Finalizar Compra'. Preencha seus dados de entrega e pagamento para concluir o pedido.",
-      category: "pedidos"
-    },
-    {
-      id: "2",
-      question: "Posso alterar ou cancelar meu pedido?",
-      answer: "Você pode alterar ou cancelar seu pedido até 2 horas após a confirmação. Após esse prazo, entre em contato conosco pelo WhatsApp (11) 99999-9999.",
-      category: "pedidos"
-    },
-    {
-      id: "3",
-      question: "Como acompanho meu pedido?",
-      answer: "Após a confirmação do pedido, você receberá um código de rastreamento por e-mail. Você também pode acompanhar o status na seção 'Rastrear Pedido' do nosso site.",
-      category: "pedidos"
-    },
-    
-    // Entrega
-    {
-      id: "4",
-      question: "Qual o prazo de entrega?",
-      answer: "O prazo de entrega varia conforme sua localização: Região Sudeste: 3-5 dias úteis, Região Sul: 5-7 dias úteis, Demais regiões: 7-12 dias úteis. O prazo começa a contar após a aprovação do pagamento.",
-      category: "entrega"
-    },
-    {
-      id: "5",
-      question: "Vocês entregam em todo o Brasil?",
-      answer: "Sim, entregamos em todo território nacional através dos Correios. Algumas localidades remotas podem ter prazo estendido.",
-      category: "entrega"
-    },
-    {
-      id: "6",
-      question: "Como é calculado o frete?",
-      answer: "O frete é calculado automaticamente com base no CEP de destino, peso e dimensões do produto. Oferecemos frete grátis para compras acima de R$ 299,00 (Sul e Sudeste) ou R$ 399,00 (demais regiões).",
-      category: "entrega"
-    },
-    
-    // Pagamento
-    {
-      id: "7",
-      question: "Quais formas de pagamento vocês aceitam?",
-      answer: "Aceitamos cartões de crédito (Visa, Mastercard, Elo), cartões de débito, PIX e boleto bancário. Para cartão de crédito, parcelamos em até 12x sem juros em compras acima de R$ 500,00.",
-      category: "pagamento"
-    },
-    {
-      id: "8",
-      question: "É seguro comprar no site?",
-      answer: "Sim, nosso site possui certificado SSL e seguimos os mais altos padrões de segurança. Seus dados estão protegidos e não compartilhamos informações com terceiros.",
-      category: "pagamento"
-    },
-    {
-      id: "9",
-      question: "Quando o pagamento é processado?",
-      answer: "Cartão de crédito/débito e PIX: aprovação imediata. Boleto: até 3 dias úteis após o pagamento. Só enviamos os produtos após a confirmação do pagamento.",
-      category: "pagamento"
-    },
-    
-    // Troca e Devolução
-    {
-      id: "10",
-      question: "Posso trocar um produto?",
-      answer: "Sim, você tem 30 dias para trocar produtos em perfeito estado, na embalagem original. Por arrependimento, o prazo é de 7 dias. O frete da devolução é gratuito em caso de defeito ou erro nosso.",
-      category: "troca"
-    },
-    {
-      id: "11",
-      question: "Como solicito uma troca?",
-      answer: "Entre em contato conosco através do WhatsApp, e-mail ou formulário de contato informando o número do pedido e motivo da troca. Nossa equipe enviará as instruções para devolução.",
-      category: "troca"
-    },
-    {
-      id: "12",
-      question: "Quanto tempo demora o reembolso?",
-      answer: "Após recebermos e analisarmos o produto devolvido, o reembolso é processado em até 7 dias úteis. O valor é estornado na mesma forma de pagamento utilizada na compra.",
-      category: "troca"
-    },
-    
-    // Produtos
-    {
-      id: "13",
-      question: "Os produtos têm garantia?",
-      answer: "Todos os produtos possuem garantia do fabricante. Eletrônicos: 12 meses, Acessórios: 3-6 meses conforme especificação. Também oferecemos garantia estendida opcional para alguns produtos.",
-      category: "produtos"
-    },
-    {
-      id: "14",
-      question: "Os produtos são originais?",
-      answer: "Sim, todos os nossos produtos são 100% originais e procedentes. Trabalhamos apenas com fornecedores autorizados e oferecemos nota fiscal em todas as vendas.",
-      category: "produtos"
-    },
-    {
-      id: "15",
-      question: "Posso retirar o produto na loja?",
-      answer: "Atualmente trabalhamos apenas com vendas online e entrega via Correios. Não possuímos loja física para retirada.",
-      category: "produtos"
+  const { data: faqData = [], isLoading } = useQuery({
+    queryKey: ['public-faqs'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ai_knowledge_base')
+        .select('*')
+        .eq('category', 'faq')
+        .eq('target_audience', 'customer')
+        .eq('active', true)
+        .order('priority', { ascending: false });
+      
+      if (error) throw error;
+      
+      // Mapear para o formato FAQItem
+      return (data || []).map(faq => ({
+        id: faq.id,
+        question: faq.title,
+        answer: faq.content,
+        category: faq.subcategory?.toLowerCase().replace(/\s+/g, '-') || 'outros'
+      })) as FAQItem[];
     }
-  ];
+  });
 
   const categories = [
     { id: "pedidos", name: "Pedidos", icon: ShoppingCart, count: faqData.filter(faq => faq.category === "pedidos").length },
     { id: "entrega", name: "Entrega", icon: Truck, count: faqData.filter(faq => faq.category === "entrega").length },
     { id: "pagamento", name: "Pagamento", icon: CreditCard, count: faqData.filter(faq => faq.category === "pagamento").length },
-    { id: "troca", name: "Troca e Devolução", icon: RefreshCw, count: faqData.filter(faq => faq.category === "troca").length },
-    { id: "produtos", name: "Produtos", icon: HelpCircle, count: faqData.filter(faq => faq.category === "produtos").length }
+    { id: "troca-e-devolucao", name: "Troca e Devolução", icon: RefreshCw, count: faqData.filter(faq => faq.category === "troca-e-devolucao").length },
+    { id: "produtos", name: "Produtos", icon: Package, count: faqData.filter(faq => faq.category === "produtos").length }
   ];
-
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const filteredFAQs = faqData.filter(faq => {
     const matchesSearch = faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -131,6 +53,20 @@ const FAQ = () => {
     const matchesCategory = !selectedCategory || faq.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center h-96">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
