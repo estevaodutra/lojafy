@@ -40,12 +40,22 @@ serve(async (req) => {
       throw insertError;
     }
 
-    // 2. Buscar contexto da base de conhecimento e configuração
-    const [knowledgeResult, configResult, userOrdersResult] = await Promise.all([
+    // 2. Buscar perfil do usuário para detectar role
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('user_id', userId)
+      .single();
+
+    const userRole = userProfile?.role || 'customer';
+
+    // 3. Buscar contexto da base de conhecimento filtrado por target_audience e configuração
+    const [knowledgeResult, configResult, userOrdersResult, academyLessonsResult] = await Promise.all([
       supabase
         .from('ai_knowledge_base')
         .select('*')
         .eq('active', true)
+        .or(`target_audience.eq.all,target_audience.eq.${userRole}`)
         .order('priority', { ascending: false }),
       supabase
         .from('ai_support_config')
@@ -56,14 +66,39 @@ serve(async (req) => {
         .select('order_number, status, total_amount, created_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
-        .limit(5) : Promise.resolve({ data: null })
+        .limit(5) : Promise.resolve({ data: null }),
+      supabase
+        .from('course_lessons')
+        .select(`
+          id,
+          title,
+          lesson_description,
+          video_url,
+          course_modules!inner(
+            title,
+            courses!inner(
+              title,
+              access_level
+            )
+          )
+        `)
+        .eq('is_published', true)
+        .eq('course_modules.is_published', true)
+        .eq('course_modules.courses.is_published', true)
     ]);
 
     const knowledge = knowledgeResult.data || [];
     const config = configResult.data;
     const userOrders = userOrdersResult.data;
+    const allAcademyLessons = academyLessonsResult.data || [];
 
-    // 3. Construir contexto para a IA
+    // Filtrar lições da Academy por access_level do usuário
+    const relevantLessons = allAcademyLessons.filter((lesson: any) => {
+      const accessLevel = lesson.course_modules.courses.access_level;
+      return accessLevel === 'all' || accessLevel === userRole;
+    });
+
+    // 4. Construir contexto para a IA
     const knowledgeContext = knowledge.map(k => 
       `[${k.category.toUpperCase()}] ${k.title}: ${k.content}`
     ).join('\n\n');
@@ -73,22 +108,31 @@ serve(async (req) => {
         `Pedido ${o.order_number}: ${o.status}, R$ ${o.total_amount}, ${new Date(o.created_at).toLocaleDateString('pt-BR')}`
       ).join('\n') : '';
 
+    const academyContext = relevantLessons.length > 0 ?
+      relevantLessons.map((l: any) => 
+        `[ACADEMY] ${l.course_modules.courses.title} > ${l.title}: ${l.lesson_description || 'Sem descrição'}`
+      ).join('\n\n') : '';
+
     const systemPrompt = `Você é um assistente de suporte de e-commerce brasileiro.
 
 Tom de voz: ${config?.ai_tone || 'profissional e amigável'}
+Público-alvo: ${userRole === 'reseller' ? 'Revendedor' : userRole === 'supplier' ? 'Fornecedor' : 'Cliente Final'}
 
 Contexto da Plataforma:
 ${config?.platform_context || 'E-commerce brasileiro'}
 
-Base de Conhecimento:
+Base de Conhecimento (filtrada para ${userRole}):
 ${knowledgeContext}
+
+${academyContext ? `Conteúdo da Lojafy Academy:\n${academyContext}\n\n` : ''}
 
 ${ordersContext ? `Pedidos Recentes do Cliente:\n${ordersContext}\n` : ''}
 
 INSTRUÇÕES IMPORTANTES:
 - Seja ${config?.ai_tone || 'educado, prestativo e objetivo'}
 - Use português brasileiro formal mas acessível
-- Responda com base APENAS nas informações da base de conhecimento
+- Responda com base APENAS nas informações da base de conhecimento e Academy
+- Se houver uma aula da Academy que resolve o problema, sugira ao usuário acessá-la
 - Se não souber responder com certeza, seja honesto e sugira contato com atendimento humano
 - NUNCA invente informações sobre prazos, preços ou políticas
 - Se o cliente demonstrar insatisfação grave, urgência ou reclamação, inicie sua resposta com "ESCALATE:" para transferir para humano

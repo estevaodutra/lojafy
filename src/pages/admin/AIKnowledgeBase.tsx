@@ -21,6 +21,7 @@ export default function AIKnowledgeBase() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     category: 'faq' as 'faq' | 'policy' | 'product_info' | 'general',
+    target_audience: 'all' as 'all' | 'customer' | 'reseller',
     title: '',
     content: '',
     keywords: '',
@@ -73,6 +74,7 @@ export default function AIKnowledgeBase() {
 
     setFormData({
       category: 'faq',
+      target_audience: 'all',
       title: '',
       content: '',
       keywords: '',
@@ -85,6 +87,7 @@ export default function AIKnowledgeBase() {
     setEditingId(item.id);
     setFormData({
       category: item.category,
+      target_audience: item.target_audience || 'all',
       title: item.title,
       content: item.content,
       keywords: item.keywords.join(', '),
@@ -260,6 +263,7 @@ export default function AIKnowledgeBase() {
                         setEditingId(null);
                         setFormData({
                           category: 'faq',
+                          target_audience: 'all',
                           title: '',
                           content: '',
                           keywords: '',

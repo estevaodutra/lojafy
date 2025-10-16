@@ -15,7 +15,8 @@ import {
   LogOut,
   Truck,
   BookOpen,
-  Bell
+  Bell,
+  Headphones
 } from 'lucide-react';
 import {
   Sidebar,
@@ -76,6 +77,14 @@ const superAdminMenuItems = [
     title: 'Integrações',
     url: '/super-admin/integracoes',
     icon: Settings,
+  },
+];
+
+const supportMenuItems = [
+  {
+    title: 'Suporte IA',
+    url: '/super-admin/suporte',
+    icon: Headphones,
   },
 ];
 
@@ -146,6 +155,27 @@ const SuperAdminSidebar = () => {
           <SidebarGroupContent>
             <SidebarMenu>
               {designMenuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton 
+                    asChild
+                    className={currentPath === item.url ? 'bg-sidebar-accent' : ''}
+                  >
+                    <button onClick={() => navigate(item.url)}>
+                      <item.icon className="mr-2 h-4 w-4" />
+                      <span>{item.title}</span>
+                    </button>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Suporte</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {supportMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton 
                     asChild

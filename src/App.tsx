@@ -98,6 +98,7 @@ import NotificationsManagement from "./pages/admin/NotificationsManagement";
 import PublicStoreProviderRoute from "./components/public-store/PublicStoreProviderRoute";
 import AIKnowledgeBase from "./pages/admin/AIKnowledgeBase";
 import ChatWidget from "@/components/support/ChatWidget";
+import SupportManagement from "./pages/admin/SupportManagement";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -220,6 +221,7 @@ const App = () => {
                 <Route path="aulas/:courseId/matriculas" element={<CourseEnrollments />} />
                 <Route path="integracoes" element={<IntegracaoPage />} />
                 <Route path="base-conhecimento" element={<AIKnowledgeBase />} />
+                <Route path="suporte" element={<SupportManagement />} />
               </Route>
 
               {/* Supplier Panel Routes */}

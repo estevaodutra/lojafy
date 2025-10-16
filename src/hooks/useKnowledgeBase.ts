@@ -4,7 +4,8 @@ import { toast } from 'sonner';
 
 export interface KnowledgeBaseItem {
   id: string;
-  category: 'faq' | 'policy' | 'product_info' | 'general';
+  category: 'faq' | 'policy' | 'product_info' | 'general' | 'academy_lesson';
+  target_audience: 'all' | 'customer' | 'reseller';
   title: string;
   content: string;
   keywords: string[];
@@ -46,7 +47,7 @@ export const useKnowledgeBase = () => {
       if (knowledgeResult.error) throw knowledgeResult.error;
       if (configResult.error) throw configResult.error;
 
-      setKnowledge(knowledgeResult.data || []);
+      setKnowledge((knowledgeResult.data || []) as KnowledgeBaseItem[]);
       setConfig(configResult.data);
     } catch (error) {
       console.error('Erro ao carregar base de conhecimento:', error);

@@ -72,6 +72,7 @@ export type Database = {
           id: string
           keywords: string[] | null
           priority: number | null
+          target_audience: string
           title: string
           updated_at: string | null
         }
@@ -84,6 +85,7 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           priority?: number | null
+          target_audience?: string
           title: string
           updated_at?: string | null
         }
@@ -96,6 +98,7 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           priority?: number | null
+          target_audience?: string
           title?: string
           updated_at?: string | null
         }
@@ -369,6 +372,7 @@ export type Database = {
           duration_minutes: number | null
           id: string
           is_published: boolean | null
+          lesson_description: string | null
           module_id: string
           position: number | null
           title: string
@@ -383,6 +387,7 @@ export type Database = {
           duration_minutes?: number | null
           id?: string
           is_published?: boolean | null
+          lesson_description?: string | null
           module_id: string
           position?: number | null
           title: string
@@ -397,6 +402,7 @@ export type Database = {
           duration_minutes?: number | null
           id?: string
           is_published?: boolean | null
+          lesson_description?: string | null
           module_id?: string
           position?: number | null
           title?: string
@@ -2381,7 +2387,12 @@ export type Database = {
     Enums: {
       app_role: "customer" | "admin" | "super_admin" | "supplier" | "reseller"
       course_access_level: "all" | "customer" | "supplier" | "reseller"
-      knowledge_category: "faq" | "policy" | "product_info" | "general"
+      knowledge_category:
+        | "faq"
+        | "policy"
+        | "product_info"
+        | "general"
+        | "academy_lesson"
       message_sender_type: "customer" | "ai" | "admin" | "system"
       ticket_priority: "low" | "normal" | "high" | "urgent"
       ticket_status:
@@ -2519,7 +2530,13 @@ export const Constants = {
     Enums: {
       app_role: ["customer", "admin", "super_admin", "supplier", "reseller"],
       course_access_level: ["all", "customer", "supplier", "reseller"],
-      knowledge_category: ["faq", "policy", "product_info", "general"],
+      knowledge_category: [
+        "faq",
+        "policy",
+        "product_info",
+        "general",
+        "academy_lesson",
+      ],
       message_sender_type: ["customer", "ai", "admin", "system"],
       ticket_priority: ["low", "normal", "high", "urgent"],
       ticket_status: [

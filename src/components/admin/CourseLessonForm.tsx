@@ -30,6 +30,7 @@ import { CourseLesson } from '@/types/courses';
 const lessonSchema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
   description: z.string().optional(),
+  lesson_description: z.string().optional(),
   content: z.string().optional(),
   video_url: z.string().url('URL inválida').optional().or(z.literal('')),
   duration_minutes: z.coerce.number().min(0).optional(),
@@ -59,6 +60,7 @@ export function CourseLessonForm({
     defaultValues: {
       title: '',
       description: '',
+      lesson_description: '',
       content: '',
       video_url: '',
       duration_minutes: 0,
@@ -72,6 +74,7 @@ export function CourseLessonForm({
       form.reset({
         title: lesson.title,
         description: lesson.description || '',
+        lesson_description: (lesson as any).lesson_description || '',
         content: lesson.content || '',
         video_url: lesson.video_url || '',
         duration_minutes: lesson.duration_minutes || 0,
@@ -82,6 +85,7 @@ export function CourseLessonForm({
       form.reset({
         title: '',
         description: '',
+        lesson_description: '',
         content: '',
         video_url: '',
         duration_minutes: 0,
@@ -96,6 +100,7 @@ export function CourseLessonForm({
       const lessonData = {
         title: data.title,
         description: data.description || null,
+        lesson_description: data.lesson_description || null,
         content: data.content || null,
         video_url: data.video_url || null,
         duration_minutes: data.duration_minutes || null,
@@ -166,6 +171,27 @@ export function CourseLessonForm({
                       {...field}
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="lesson_description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descrição para IA</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Descreva brevemente o que é ensinado nesta aula para ajudar a IA a recomendar corretamente..."
+                      rows={3}
+                      {...field}
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    Esta descrição ajuda a IA de suporte a recomendar esta aula aos usuários quando relevante
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}
