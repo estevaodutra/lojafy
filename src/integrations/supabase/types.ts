@@ -62,6 +62,83 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_knowledge_base: {
+        Row: {
+          active: boolean | null
+          category: Database["public"]["Enums"]["knowledge_category"]
+          content: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          keywords: string[] | null
+          priority: number | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          category: Database["public"]["Enums"]["knowledge_category"]
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          keywords?: string[] | null
+          priority?: number | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          category?: Database["public"]["Enums"]["knowledge_category"]
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          keywords?: string[] | null
+          priority?: number | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_knowledge_base_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      ai_support_config: {
+        Row: {
+          ai_tone: string
+          created_at: string | null
+          escalation_keywords: string[] | null
+          id: string
+          max_response_length: number | null
+          platform_context: string
+          updated_at: string | null
+        }
+        Insert: {
+          ai_tone?: string
+          created_at?: string | null
+          escalation_keywords?: string[] | null
+          id?: string
+          max_response_length?: number | null
+          platform_context?: string
+          updated_at?: string | null
+        }
+        Update: {
+          ai_tone?: string
+          created_at?: string | null
+          escalation_keywords?: string[] | null
+          id?: string
+          max_response_length?: number | null
+          platform_context?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       api_keys: {
         Row: {
           active: boolean
@@ -196,6 +273,54 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      chat_messages: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          is_internal: boolean | null
+          metadata: Json | null
+          sender_id: string | null
+          sender_type: Database["public"]["Enums"]["message_sender_type"]
+          ticket_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          is_internal?: boolean | null
+          metadata?: Json | null
+          sender_id?: string | null
+          sender_type: Database["public"]["Enums"]["message_sender_type"]
+          ticket_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          is_internal?: boolean | null
+          metadata?: Json | null
+          sender_id?: string | null
+          sender_type?: Database["public"]["Enums"]["message_sender_type"]
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "chat_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       course_enrollments: {
         Row: {
@@ -2028,6 +2153,72 @@ export type Database = {
           },
         ]
       }
+      support_tickets: {
+        Row: {
+          ai_handled: boolean | null
+          assigned_to: string | null
+          created_at: string | null
+          customer_email: string
+          customer_name: string | null
+          id: string
+          last_message_at: string | null
+          metadata: Json | null
+          priority: Database["public"]["Enums"]["ticket_priority"] | null
+          resolved_at: string | null
+          status: Database["public"]["Enums"]["ticket_status"] | null
+          subject: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          ai_handled?: boolean | null
+          assigned_to?: string | null
+          created_at?: string | null
+          customer_email: string
+          customer_name?: string | null
+          id?: string
+          last_message_at?: string | null
+          metadata?: Json | null
+          priority?: Database["public"]["Enums"]["ticket_priority"] | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["ticket_status"] | null
+          subject: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          ai_handled?: boolean | null
+          assigned_to?: string | null
+          created_at?: string | null
+          customer_email?: string
+          customer_name?: string | null
+          id?: string
+          last_message_at?: string | null
+          metadata?: Json | null
+          priority?: Database["public"]["Enums"]["ticket_priority"] | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["ticket_status"] | null
+          subject?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "support_tickets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       testimonials: {
         Row: {
           active: boolean
@@ -2190,6 +2381,15 @@ export type Database = {
     Enums: {
       app_role: "customer" | "admin" | "super_admin" | "supplier" | "reseller"
       course_access_level: "all" | "customer" | "supplier" | "reseller"
+      knowledge_category: "faq" | "policy" | "product_info" | "general"
+      message_sender_type: "customer" | "ai" | "admin" | "system"
+      ticket_priority: "low" | "normal" | "high" | "urgent"
+      ticket_status:
+        | "open"
+        | "waiting_customer"
+        | "waiting_admin"
+        | "resolved"
+        | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2319,6 +2519,16 @@ export const Constants = {
     Enums: {
       app_role: ["customer", "admin", "super_admin", "supplier", "reseller"],
       course_access_level: ["all", "customer", "supplier", "reseller"],
+      knowledge_category: ["faq", "policy", "product_info", "general"],
+      message_sender_type: ["customer", "ai", "admin", "system"],
+      ticket_priority: ["low", "normal", "high", "urgent"],
+      ticket_status: [
+        "open",
+        "waiting_customer",
+        "waiting_admin",
+        "resolved",
+        "closed",
+      ],
     },
   },
 } as const
