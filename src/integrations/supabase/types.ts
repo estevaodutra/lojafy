@@ -851,6 +851,98 @@ export type Database = {
           },
         ]
       }
+      mandatory_notification_views: {
+        Row: {
+          action_clicked: boolean
+          button_clicked: boolean
+          id: string
+          notification_id: string
+          user_id: string
+          video_completed: boolean
+          video_watched_seconds: number | null
+          viewed_at: string
+        }
+        Insert: {
+          action_clicked?: boolean
+          button_clicked?: boolean
+          id?: string
+          notification_id: string
+          user_id: string
+          video_completed?: boolean
+          video_watched_seconds?: number | null
+          viewed_at?: string
+        }
+        Update: {
+          action_clicked?: boolean
+          button_clicked?: boolean
+          id?: string
+          notification_id?: string
+          user_id?: string
+          video_completed?: boolean
+          video_watched_seconds?: number | null
+          viewed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mandatory_notification_views_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "mandatory_notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mandatory_notifications: {
+        Row: {
+          action_label: string | null
+          action_url: string | null
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          message: string
+          priority: number
+          target_audience: string
+          title: string
+          updated_at: string
+          video_provider: string | null
+          video_url: string | null
+        }
+        Insert: {
+          action_label?: string | null
+          action_url?: string | null
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          message: string
+          priority?: number
+          target_audience?: string
+          title: string
+          updated_at?: string
+          video_provider?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          action_label?: string | null
+          action_url?: string | null
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          message?: string
+          priority?: number
+          target_audience?: string
+          title?: string
+          updated_at?: string
+          video_provider?: string | null
+          video_url?: string | null
+        }
+        Relationships: []
+      }
       newsletter_config: {
         Row: {
           active: boolean
@@ -2298,6 +2390,18 @@ export type Database = {
       get_customer_display_name: {
         Args: { customer_user_id: string }
         Returns: string
+      }
+      get_mandatory_notification_metrics: {
+        Args: { notification_uuid: string }
+        Returns: {
+          action_clicked_count: number
+          button_clicked_count: number
+          ctr_action_click: number
+          ctr_button_click: number
+          ctr_video_completion: number
+          total_views: number
+          video_completed_count: number
+        }[]
       }
       get_safe_demo_user_data: {
         Args: Record<PropertyKey, never>

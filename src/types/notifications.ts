@@ -77,3 +77,55 @@ export interface TemplateVariable {
   description: string;
   example: string;
 }
+
+export type VideoProvider = 'youtube' | 'vimeo' | 'direct';
+
+export interface MandatoryNotification {
+  id: string;
+  title: string;
+  message: string;
+  video_url?: string;
+  video_provider?: VideoProvider;
+  target_audience: 'all' | 'customer' | 'reseller' | 'supplier';
+  action_url?: string;
+  action_label: string;
+  is_active: boolean;
+  priority: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  expires_at?: string;
+}
+
+export interface MandatoryNotificationView {
+  id: string;
+  notification_id: string;
+  user_id: string;
+  viewed_at: string;
+  video_watched_seconds: number;
+  video_completed: boolean;
+  button_clicked: boolean;
+  action_clicked: boolean;
+}
+
+export interface MandatoryNotificationMetrics {
+  total_views: number;
+  video_completed_count: number;
+  button_clicked_count: number;
+  action_clicked_count: number;
+  ctr_video_completion: number;
+  ctr_button_click: number;
+  ctr_action_click: number;
+}
+
+export interface MandatoryNotificationFormData {
+  title: string;
+  message: string;
+  video_url?: string;
+  video_provider?: VideoProvider;
+  target_audience: 'all' | 'customer' | 'reseller' | 'supplier';
+  action_url?: string;
+  action_label: string;
+  priority: number;
+  expires_at?: string;
+}

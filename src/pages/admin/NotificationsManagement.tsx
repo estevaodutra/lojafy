@@ -25,6 +25,7 @@ import { NotificationTemplateEditor } from '@/components/admin/NotificationTempl
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
+import { MandatoryNotificationsTab } from '@/components/admin/MandatoryNotificationsTab';
 
 const notificationSchema = z.object({
   target_audience: z.enum(['all', 'customers', 'resellers', 'suppliers', 'specific']),
@@ -223,6 +224,7 @@ export default function NotificationsManagement() {
           <TabsTrigger value="send">Enviar Notificação</TabsTrigger>
           <TabsTrigger value="dispatcher">Disparador de Notificações</TabsTrigger>
           <TabsTrigger value="templates">Templates Automáticos</TabsTrigger>
+          <TabsTrigger value="mandatory">Notificações Obrigatórias</TabsTrigger>
           <TabsTrigger value="history">Histórico</TabsTrigger>
         </TabsList>
 
@@ -530,6 +532,11 @@ export default function NotificationsManagement() {
               Esta notificação será enviada para todos os usuários conforme o público-alvo configurado no template.
             </AlertDescription>
           </Alert>
+        </TabsContent>
+
+        {/* Mandatory Notifications Tab */}
+        <TabsContent value="mandatory" className="space-y-6">
+          <MandatoryNotificationsTab />
         </TabsContent>
 
         {/* Templates Tab */}

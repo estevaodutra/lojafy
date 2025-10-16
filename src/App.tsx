@@ -99,6 +99,8 @@ import PublicStoreProviderRoute from "./components/public-store/PublicStoreProvi
 import AIKnowledgeBase from "./pages/admin/AIKnowledgeBase";
 import ChatWidget from "@/components/support/ChatWidget";
 import SupportManagement from "./pages/admin/SupportManagement";
+import { MandatoryNotificationModal } from "@/components/MandatoryNotificationModal";
+import { useMandatoryNotifications } from "@/hooks/useMandatoryNotifications";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -123,6 +125,21 @@ const AppContent = () => {
   return null;
 };
 
+const AppWithNotifications = () => {
+  const { pendingNotification, loading } = useMandatoryNotifications();
+
+  return (
+    <>
+      <AppContent />
+      <ImpersonationBanner />
+      <ChatWidget />
+      {!loading && pendingNotification && (
+        <MandatoryNotificationModal notification={pendingNotification} />
+      )}
+    </>
+  );
+};
+
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
@@ -133,9 +150,7 @@ const App = () => {
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <AppContent />
-            <ImpersonationBanner />
-            <ChatWidget />
+            <AppWithNotifications />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/categorias" element={<Categorias />} />
