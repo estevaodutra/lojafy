@@ -96,6 +96,8 @@ import CourseContent from "./pages/admin/CourseContent";
 import CourseEnrollments from "./pages/admin/CourseEnrollments";
 import NotificationsManagement from "./pages/admin/NotificationsManagement";
 import PublicStoreProviderRoute from "./components/public-store/PublicStoreProviderRoute";
+import AIKnowledgeBase from "./pages/admin/AIKnowledgeBase";
+import ChatWidget from "@/components/support/ChatWidget";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -132,6 +134,7 @@ const App = () => {
           <BrowserRouter>
             <AppContent />
             <ImpersonationBanner />
+            <ChatWidget />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/categorias" element={<Categorias />} />
@@ -216,6 +219,7 @@ const App = () => {
                 <Route path="aulas/:courseId/conteudo" element={<CourseContent />} />
                 <Route path="aulas/:courseId/matriculas" element={<CourseEnrollments />} />
                 <Route path="integracoes" element={<IntegracaoPage />} />
+                <Route path="base-conhecimento" element={<AIKnowledgeBase />} />
               </Route>
 
               {/* Supplier Panel Routes */}
