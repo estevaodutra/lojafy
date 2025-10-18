@@ -98,6 +98,7 @@ import NotificationsManagement from "./pages/admin/NotificationsManagement";
 import PublicStoreProviderRoute from "./components/public-store/PublicStoreProviderRoute";
 import AIKnowledgeBase from "./pages/admin/AIKnowledgeBase";
 import ChatWidget from "@/components/support/ChatWidget";
+import AdminReports from "./pages/admin/Reports";
 import SupportManagement from "./pages/admin/SupportManagement";
 import { MandatoryNotificationModal } from "@/components/MandatoryNotificationModal";
 import { useMandatoryNotifications } from "@/hooks/useMandatoryNotifications";
@@ -224,6 +225,7 @@ const App = () => {
                 <Route path="produtos" element={<AdminProducts />} />
                 <Route path="categorias" element={<AdminCategorias />} />
                 <Route path="pedidos" element={<AdminOrders />} />
+                <Route path="relatorios" element={<AdminReports />} />
                 <Route path="clientes" element={<AdminCustomers />} />
                 <Route path="homepage" element={<HomepageManagement />} />
                 <Route path="configuracao-visual" element={<ConfiguracaoVisual />} />

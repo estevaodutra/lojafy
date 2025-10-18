@@ -16,7 +16,8 @@ import {
   Truck,
   BookOpen,
   Bell,
-  Headphones
+  Headphones,
+  FileText
 } from 'lucide-react';
 import {
   Sidebar,
@@ -57,6 +58,11 @@ const superAdminMenuItems = [
     title: 'Pedidos',
     url: '/super-admin/pedidos',
     icon: ShoppingCart,
+  },
+  {
+    title: 'Relatórios',
+    url: '/super-admin/relatorios',
+    icon: FileText,
   },
   {
     title: 'Lojafy Academy',
