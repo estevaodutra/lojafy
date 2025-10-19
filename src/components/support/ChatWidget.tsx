@@ -19,6 +19,7 @@ export default function ChatWidget() {
       <div className="fixed bottom-6 right-6 z-50">
         <Button
           size="lg"
+          variant="whatsapp"
           className="relative h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all"
           onClick={() => setIsOpen(!isOpen)}
         >

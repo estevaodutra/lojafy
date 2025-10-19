@@ -74,6 +74,8 @@ All colors MUST be HSL.
     --order-highlight-bg-color: 221 83% 95%;
     --security-text-color: 142 76% 36%;
     --continue-shopping-text-color: 215 25% 27%;
+    --whatsapp-color: 142 70% 49%;
+    --whatsapp-foreground: 0 0% 100%;
   }
 
   .dark {
@@ -123,6 +125,8 @@ All colors MUST be HSL.
     --order-highlight-bg-color: 221 83% 15%;
     --security-text-color: 142 76% 36%;
     --continue-shopping-text-color: 210 40% 98%;
+    --whatsapp-color: 142 70% 49%;
+    --whatsapp-foreground: 0 0% 100%;
   }
 }
 

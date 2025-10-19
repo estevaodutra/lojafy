@@ -16,6 +16,7 @@ const buttonVariants = cva(
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         cart: "bg-[hsl(var(--cart-button-color))] text-[hsl(var(--cart-button-text-color))] hover:bg-[hsl(var(--cart-button-color))]/90",
+        whatsapp: "bg-[hsl(var(--whatsapp-color))] text-[hsl(var(--whatsapp-foreground))] hover:bg-[hsl(var(--whatsapp-color))]/90",
       },
       size: {
         default: "h-10 px-4 py-2",
