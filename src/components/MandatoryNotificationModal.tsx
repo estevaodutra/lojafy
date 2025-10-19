@@ -7,6 +7,21 @@ import { useNavigate } from 'react-router-dom';
 import { getGoogleDriveEmbedUrl } from '@/lib/videoUtils';
 import type { MandatoryNotification } from '@/types/notifications';
 
+const getVideoDimensions = (aspectRatio: string) => {
+  switch (aspectRatio) {
+    case '9:16':
+      return { width: '100%', height: '711px', maxWidth: '400px' }; // Vertical
+    case '16:9':
+      return { width: '100%', height: '400px', maxWidth: '100%' }; // Horizontal
+    case '1:1':
+      return { width: '100%', height: '400px', maxWidth: '400px' }; // Quadrado
+    case '4:3':
+      return { width: '100%', height: '450px', maxWidth: '600px' }; // Clássico
+    default:
+      return { width: '100%', height: '400px', maxWidth: '100%' };
+  }
+};
+
 interface Props {
   notification: MandatoryNotification;
 }
@@ -103,75 +118,87 @@ export const MandatoryNotificationModal = ({ notification }: Props) => {
   const renderVideo = () => {
     if (!notification.video_url) return null;
 
+    const dimensions = getVideoDimensions(notification.video_aspect_ratio || '9:16');
+
     if (notification.video_provider === 'youtube') {
       const videoId = notification.video_url.includes('v=') 
         ? notification.video_url.split('v=')[1]?.split('&')[0]
         : notification.video_url.split('/').pop();
       return (
-        <iframe
-          width="100%"
-          height="400"
-          src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&rel=0`}
-          frameBorder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          className="rounded-lg"
-        />
+        <div className="flex justify-center">
+          <div style={{ width: dimensions.maxWidth, maxWidth: '100%' }}>
+            <iframe
+              style={{ width: dimensions.width, height: dimensions.height }}
+              src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&rel=0`}
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="rounded-lg"
+            />
+          </div>
+        </div>
       );
     }
 
     if (notification.video_provider === 'vimeo') {
       const videoId = notification.video_url.split('/').pop();
       return (
-        <iframe
-          width="100%"
-          height="400"
-          src={`https://player.vimeo.com/video/${videoId}?api=1`}
-          frameBorder="0"
-          allow="autoplay; fullscreen; picture-in-picture"
-          allowFullScreen
-          className="rounded-lg"
-        />
+        <div className="flex justify-center">
+          <div style={{ width: dimensions.maxWidth, maxWidth: '100%' }}>
+            <iframe
+              style={{ width: dimensions.width, height: dimensions.height }}
+              src={`https://player.vimeo.com/video/${videoId}?api=1`}
+              frameBorder="0"
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowFullScreen
+              className="rounded-lg"
+            />
+          </div>
+        </div>
       );
     }
 
     if (notification.video_provider === 'google_drive') {
       const embedUrl = getGoogleDriveEmbedUrl(notification.video_url);
       return (
-        <div>
-          <iframe
-            width="100%"
-            height="400"
-            src={embedUrl}
-            frameBorder="0"
-            allow="autoplay; fullscreen; picture-in-picture"
-            allowFullScreen
-            className="rounded-lg"
-          />
-          {minTimeReached && !videoCompleted && (
-            <Button 
-              onClick={handleVideoEnd} 
-              variant="outline" 
-              className="mt-3 w-full"
-            >
-              ✓ Concluí o vídeo
-            </Button>
-          )}
+        <div className="flex justify-center">
+          <div style={{ width: dimensions.maxWidth, maxWidth: '100%' }}>
+            <iframe
+              style={{ width: dimensions.width, height: dimensions.height }}
+              src={embedUrl}
+              frameBorder="0"
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowFullScreen
+              className="rounded-lg"
+            />
+            {minTimeReached && !videoCompleted && (
+              <Button 
+                onClick={handleVideoEnd} 
+                variant="outline" 
+                className="mt-3 w-full"
+              >
+                ✓ Concluí o vídeo
+              </Button>
+            )}
+          </div>
         </div>
       );
     }
 
     return (
-      <video
-        width="100%"
-        height="400"
-        controls
-        className="rounded-lg"
-        onEnded={handleVideoEnd}
-      >
-        <source src={notification.video_url} type="video/mp4" />
-        Seu navegador não suporta vídeo HTML5.
-      </video>
+      <div className="flex justify-center">
+        <div style={{ width: dimensions.maxWidth, maxWidth: '100%' }}>
+          <video
+            style={{ width: dimensions.width, height: dimensions.height }}
+            controls
+            className="rounded-lg"
+            onEnded={handleVideoEnd}
+          >
+            <source src={notification.video_url} type="video/mp4" />
+            Seu navegador não suporta vídeo HTML5.
+          </video>
+        </div>
+      </div>
     );
   };
 

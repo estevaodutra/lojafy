@@ -960,6 +960,7 @@ export type Database = {
           target_audience: string
           title: string
           updated_at: string
+          video_aspect_ratio: string | null
           video_provider: string | null
           video_url: string | null
         }
@@ -976,6 +977,7 @@ export type Database = {
           target_audience?: string
           title: string
           updated_at?: string
+          video_aspect_ratio?: string | null
           video_provider?: string | null
           video_url?: string | null
         }
@@ -992,6 +994,7 @@ export type Database = {
           target_audience?: string
           title?: string
           updated_at?: string
+          video_aspect_ratio?: string | null
           video_provider?: string | null
           video_url?: string | null
         }

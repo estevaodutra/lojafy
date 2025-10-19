@@ -80,12 +80,15 @@ export interface TemplateVariable {
 
 export type VideoProvider = 'youtube' | 'vimeo' | 'google_drive' | 'direct';
 
+export type VideoAspectRatio = '9:16' | '16:9' | '1:1' | '4:3';
+
 export interface MandatoryNotification {
   id: string;
   title: string;
   message: string;
   video_url?: string;
   video_provider?: VideoProvider;
+  video_aspect_ratio: VideoAspectRatio;
   target_audience: 'all' | 'customer' | 'reseller' | 'supplier';
   action_url?: string;
   action_label: string;
@@ -123,6 +126,7 @@ export interface MandatoryNotificationFormData {
   message: string;
   video_url?: string;
   video_provider?: VideoProvider;
+  video_aspect_ratio: VideoAspectRatio;
   target_audience: 'all' | 'customer' | 'reseller' | 'supplier';
   action_url?: string;
   action_label: string;

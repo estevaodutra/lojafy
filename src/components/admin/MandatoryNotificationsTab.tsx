@@ -22,6 +22,7 @@ const schema = z.object({
   message: z.string().min(1, 'Mensagem obrigatória').max(500),
   video_url: z.string().url('URL inválida').optional().or(z.literal('')),
   video_provider: z.enum(['youtube', 'vimeo', 'google_drive', 'direct']).optional(),
+  video_aspect_ratio: z.enum(['9:16', '16:9', '1:1', '4:3']).default('9:16'),
   target_audience: z.enum(['all', 'customer', 'reseller', 'supplier']),
   action_url: z.string().optional(),
   action_label: z.string().default('Entendido'),
@@ -41,6 +42,7 @@ export const MandatoryNotificationsTab = () => {
       message: '',
       video_url: '',
       video_provider: undefined as any,
+      video_aspect_ratio: '9:16' as '9:16' | '16:9' | '1:1' | '4:3',
       target_audience: 'all' as 'all' | 'customer' | 'reseller' | 'supplier',
       action_url: '',
       action_label: 'Entendido',
@@ -77,6 +79,7 @@ export const MandatoryNotificationsTab = () => {
     if (data.video_url && data.video_url.trim() !== '') {
       submitData.video_url = data.video_url;
       submitData.video_provider = data.video_provider;
+      submitData.video_aspect_ratio = data.video_aspect_ratio;
     }
 
     // Only add action_url if provided
@@ -105,6 +108,7 @@ export const MandatoryNotificationsTab = () => {
       message: notification.message,
       video_url: notification.video_url || '',
       video_provider: notification.video_provider,
+      video_aspect_ratio: notification.video_aspect_ratio || '9:16',
       target_audience: notification.target_audience,
       action_url: notification.action_url || '',
       action_label: notification.action_label,
@@ -199,7 +203,7 @@ export const MandatoryNotificationsTab = () => {
                 )}
               />
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
                 <FormField
                   control={form.control}
                   name="video_url"
@@ -234,6 +238,31 @@ export const MandatoryNotificationsTab = () => {
                           <SelectItem value="direct">Link Direto</SelectItem>
                         </SelectContent>
                       </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="video_aspect_ratio"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Formato do Vídeo</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="9:16">9:16 - Vertical (Stories/Reels) ⭐</SelectItem>
+                          <SelectItem value="16:9">16:9 - Horizontal (YouTube)</SelectItem>
+                          <SelectItem value="1:1">1:1 - Quadrado (Feed)</SelectItem>
+                          <SelectItem value="4:3">4:3 - Clássico</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>Formato ideal para o seu vídeo</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
