@@ -18,6 +18,7 @@ export const MandatoryNotificationModal = ({ notification }: Props) => {
   const [videoCompleted, setVideoCompleted] = useState(false);
   const [canClose, setCanClose] = useState(!notification.video_url);
   const [minTimeReached, setMinTimeReached] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const progressIntervalRef = useRef<number | null>(null);
   const totalSecondsRef = useRef(0);
 
@@ -81,6 +82,7 @@ export const MandatoryNotificationModal = ({ notification }: Props) => {
 
   const handleButtonClick = async () => {
     await markButtonClicked(notification.id);
+    setIsOpen(false);
   };
 
   const handleActionClick = async () => {
@@ -93,6 +95,8 @@ export const MandatoryNotificationModal = ({ notification }: Props) => {
       } else {
         navigate(notification.action_url);
       }
+      
+      setIsOpen(false);
     }
   };
 
@@ -172,7 +176,11 @@ export const MandatoryNotificationModal = ({ notification }: Props) => {
   };
 
   return (
-    <Dialog open={true} onOpenChange={() => {}}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (canClose && !open) {
+        setIsOpen(false);
+      }
+    }}>
       <DialogContent 
         className="max-w-3xl max-h-[90vh] overflow-y-auto"
         onPointerDownOutside={(e) => !canClose && e.preventDefault()}
