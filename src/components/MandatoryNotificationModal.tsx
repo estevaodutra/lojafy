@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { AlertCircle, ExternalLink } from 'lucide-react';
 import { useMandatoryNotifications } from '@/hooks/useMandatoryNotifications';
 import { useNavigate } from 'react-router-dom';
+import { getGoogleDriveEmbedUrl } from '@/lib/videoUtils';
 import type { MandatoryNotification } from '@/types/notifications';
 
 interface Props {
@@ -16,6 +17,7 @@ export const MandatoryNotificationModal = ({ notification }: Props) => {
   
   const [videoCompleted, setVideoCompleted] = useState(false);
   const [canClose, setCanClose] = useState(!notification.video_url);
+  const [minTimeReached, setMinTimeReached] = useState(false);
   const progressIntervalRef = useRef<number | null>(null);
   const totalSecondsRef = useRef(0);
 
@@ -57,6 +59,11 @@ export const MandatoryNotificationModal = ({ notification }: Props) => {
     progressIntervalRef.current = window.setInterval(() => {
       totalSecondsRef.current += 5;
       updateVideoProgress(notification.id, totalSecondsRef.current);
+      
+      // Para Google Drive, liberar após 30 segundos
+      if (notification.video_provider === 'google_drive' && totalSecondsRef.current >= 30) {
+        setMinTimeReached(true);
+      }
     }, 5000);
 
     return () => {
@@ -121,6 +128,32 @@ export const MandatoryNotificationModal = ({ notification }: Props) => {
           allowFullScreen
           className="rounded-lg"
         />
+      );
+    }
+
+    if (notification.video_provider === 'google_drive') {
+      const embedUrl = getGoogleDriveEmbedUrl(notification.video_url);
+      return (
+        <div>
+          <iframe
+            width="100%"
+            height="400"
+            src={embedUrl}
+            frameBorder="0"
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowFullScreen
+            className="rounded-lg"
+          />
+          {minTimeReached && !videoCompleted && (
+            <Button 
+              onClick={handleVideoEnd} 
+              variant="outline" 
+              className="mt-3 w-full"
+            >
+              ✓ Concluí o vídeo
+            </Button>
+          )}
+        </div>
       );
     }
 

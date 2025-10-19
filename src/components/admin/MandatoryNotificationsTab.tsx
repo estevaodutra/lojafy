@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Video, Trash2, Edit, BarChart3, Eye, MousePointerClick, PlayCircle, X } from 'lucide-react';
 import { useAdminMandatoryNotifications } from '@/hooks/useMandatoryNotifications';
+import { isGoogleDriveUrl, isYouTubeUrl } from '@/lib/videoUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -20,7 +21,7 @@ const schema = z.object({
   title: z.string().min(1, 'Título obrigatório').max(100),
   message: z.string().min(1, 'Mensagem obrigatória').max(500),
   video_url: z.string().url('URL inválida').optional().or(z.literal('')),
-  video_provider: z.enum(['youtube', 'vimeo', 'direct']).optional(),
+  video_provider: z.enum(['youtube', 'vimeo', 'google_drive', 'direct']).optional(),
   target_audience: z.enum(['all', 'customer', 'reseller', 'supplier']),
   action_url: z.string().optional(),
   action_label: z.string().default('Entendido'),
@@ -47,6 +48,21 @@ export const MandatoryNotificationsTab = () => {
       expires_at: '',
     },
   });
+
+  // Auto-detect video provider
+  const videoUrlValue = form.watch('video_url');
+
+  useEffect(() => {
+    if (videoUrlValue && !editingId) {
+      if (isGoogleDriveUrl(videoUrlValue)) {
+        form.setValue('video_provider', 'google_drive');
+      } else if (isYouTubeUrl(videoUrlValue)) {
+        form.setValue('video_provider', 'youtube');
+      } else if (videoUrlValue.includes('vimeo.com')) {
+        form.setValue('video_provider', 'vimeo');
+      }
+    }
+  }, [videoUrlValue, editingId]);
 
   const onSubmit = async (data: any) => {
     const submitData = {
@@ -177,7 +193,7 @@ export const MandatoryNotificationsTab = () => {
                       <FormControl>
                         <Input placeholder="https://youtube.com/watch?v=..." {...field} />
                       </FormControl>
-                      <FormDescription>YouTube, Vimeo ou link direto</FormDescription>
+                      <FormDescription>YouTube, Vimeo, Google Drive ou link direto</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -198,6 +214,7 @@ export const MandatoryNotificationsTab = () => {
                         <SelectContent>
                           <SelectItem value="youtube">YouTube</SelectItem>
                           <SelectItem value="vimeo">Vimeo</SelectItem>
+                          <SelectItem value="google_drive">Google Drive</SelectItem>
                           <SelectItem value="direct">Link Direto</SelectItem>
                         </SelectContent>
                       </Select>
@@ -292,7 +309,7 @@ export const MandatoryNotificationsTab = () => {
                     {notification.video_url ? (
                       <Badge variant="secondary">
                         <PlayCircle className="h-3 w-3 mr-1" />
-                        {notification.video_provider}
+                        {notification.video_provider === 'google_drive' ? 'Google Drive' : notification.video_provider}
                       </Badge>
                     ) : (
                       <Badge variant="outline">Sem vídeo</Badge>

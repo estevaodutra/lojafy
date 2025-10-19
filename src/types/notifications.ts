@@ -78,7 +78,7 @@ export interface TemplateVariable {
   example: string;
 }
 
-export type VideoProvider = 'youtube' | 'vimeo' | 'direct';
+export type VideoProvider = 'youtube' | 'vimeo' | 'google_drive' | 'direct';
 
 export interface MandatoryNotification {
   id: string;
