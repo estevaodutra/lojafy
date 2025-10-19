@@ -8,17 +8,39 @@ import { getGoogleDriveEmbedUrl } from '@/lib/videoUtils';
 import type { MandatoryNotification } from '@/types/notifications';
 
 const getVideoDimensions = (aspectRatio: string) => {
+  const isMobile = window.innerWidth < 640;
+  
   switch (aspectRatio) {
     case '9:16':
-      return { width: '100%', height: '711px', maxWidth: '400px' }; // Vertical
+      return { 
+        width: '100%', 
+        height: isMobile ? '400px' : '711px',
+        maxWidth: isMobile ? '280px' : '400px'
+      };
     case '16:9':
-      return { width: '100%', height: '400px', maxWidth: '100%' }; // Horizontal
+      return { 
+        width: '100%', 
+        height: isMobile ? '200px' : '400px',
+        maxWidth: '100%'
+      };
     case '1:1':
-      return { width: '100%', height: '400px', maxWidth: '400px' }; // Quadrado
+      return { 
+        width: '100%', 
+        height: isMobile ? '280px' : '400px',
+        maxWidth: isMobile ? '280px' : '400px'
+      };
     case '4:3':
-      return { width: '100%', height: '450px', maxWidth: '600px' }; // Clássico
+      return { 
+        width: '100%', 
+        height: isMobile ? '300px' : '450px',
+        maxWidth: isMobile ? '350px' : '600px'
+      };
     default:
-      return { width: '100%', height: '400px', maxWidth: '100%' };
+      return { 
+        width: '100%', 
+        height: isMobile ? '200px' : '400px',
+        maxWidth: '100%'
+      };
   }
 };
 
@@ -125,15 +147,17 @@ export const MandatoryNotificationModal = ({ notification }: Props) => {
         ? notification.video_url.split('v=')[1]?.split('&')[0]
         : notification.video_url.split('/').pop();
       return (
-        <div className="flex justify-center">
-          <div style={{ width: dimensions.maxWidth, maxWidth: '100%' }}>
+        <div className="flex justify-center overflow-hidden">
+          <div 
+            style={{ width: dimensions.maxWidth, maxWidth: '100%' }}
+            className="overflow-hidden rounded-lg"
+          >
             <iframe
-              style={{ width: dimensions.width, height: dimensions.height }}
+              style={{ width: '100%', height: dimensions.height, display: 'block' }}
               src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&rel=0`}
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
-              className="rounded-lg"
             />
           </div>
         </div>
@@ -143,15 +167,17 @@ export const MandatoryNotificationModal = ({ notification }: Props) => {
     if (notification.video_provider === 'vimeo') {
       const videoId = notification.video_url.split('/').pop();
       return (
-        <div className="flex justify-center">
-          <div style={{ width: dimensions.maxWidth, maxWidth: '100%' }}>
+        <div className="flex justify-center overflow-hidden">
+          <div 
+            style={{ width: dimensions.maxWidth, maxWidth: '100%' }}
+            className="overflow-hidden rounded-lg"
+          >
             <iframe
-              style={{ width: dimensions.width, height: dimensions.height }}
+              style={{ width: '100%', height: dimensions.height, display: 'block' }}
               src={`https://player.vimeo.com/video/${videoId}?api=1`}
               frameBorder="0"
               allow="autoplay; fullscreen; picture-in-picture"
               allowFullScreen
-              className="rounded-lg"
             />
           </div>
         </div>
@@ -161,15 +187,17 @@ export const MandatoryNotificationModal = ({ notification }: Props) => {
     if (notification.video_provider === 'google_drive') {
       const embedUrl = getGoogleDriveEmbedUrl(notification.video_url);
       return (
-        <div className="flex justify-center">
-          <div style={{ width: dimensions.maxWidth, maxWidth: '100%' }}>
+        <div className="flex justify-center overflow-hidden">
+          <div 
+            style={{ width: dimensions.maxWidth, maxWidth: '100%' }}
+            className="overflow-hidden rounded-lg"
+          >
             <iframe
-              style={{ width: dimensions.width, height: dimensions.height }}
+              style={{ width: '100%', height: dimensions.height, display: 'block' }}
               src={embedUrl}
               frameBorder="0"
               allow="autoplay; fullscreen; picture-in-picture"
               allowFullScreen
-              className="rounded-lg"
             />
             {minTimeReached && !videoCompleted && (
               <Button 
@@ -186,12 +214,14 @@ export const MandatoryNotificationModal = ({ notification }: Props) => {
     }
 
     return (
-      <div className="flex justify-center">
-        <div style={{ width: dimensions.maxWidth, maxWidth: '100%' }}>
+      <div className="flex justify-center overflow-hidden">
+        <div 
+          style={{ width: dimensions.maxWidth, maxWidth: '100%' }}
+          className="overflow-hidden rounded-lg"
+        >
           <video
-            style={{ width: dimensions.width, height: dimensions.height }}
+            style={{ width: '100%', height: dimensions.height, display: 'block' }}
             controls
-            className="rounded-lg"
             onEnded={handleVideoEnd}
           >
             <source src={notification.video_url} type="video/mp4" />
@@ -209,16 +239,16 @@ export const MandatoryNotificationModal = ({ notification }: Props) => {
       }
     }}>
       <DialogContent 
-        className="max-w-3xl max-h-[90vh] overflow-y-auto"
+        className="max-w-[95vw] sm:max-w-2xl max-h-[95vh] overflow-y-auto p-4 sm:p-6"
         onPointerDownOutside={(e) => !canClose && e.preventDefault()}
         onEscapeKeyDown={(e) => !canClose && e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl">
-            <AlertCircle className="h-6 w-6 text-primary" />
+          <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
+            <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             {notification.title}
           </DialogTitle>
-          <DialogDescription className="text-base mt-2">
+          <DialogDescription className="text-sm sm:text-base mt-2">
             {notification.message}
           </DialogDescription>
         </DialogHeader>
@@ -228,7 +258,7 @@ export const MandatoryNotificationModal = ({ notification }: Props) => {
             {renderVideo()}
             
             {!videoCompleted && (
-              <div className="mt-3 p-3 bg-muted rounded-lg text-sm text-muted-foreground flex items-start gap-2">
+              <div className="mt-3 p-2 sm:p-3 bg-muted rounded-lg text-xs sm:text-sm text-muted-foreground flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                 <span>
                   Por favor, assista ao vídeo completo para continuar.
@@ -238,7 +268,7 @@ export const MandatoryNotificationModal = ({ notification }: Props) => {
           </div>
         )}
 
-        <div className="flex gap-3 mt-4">
+        <div className="flex flex-col sm:flex-row gap-3 mt-4 sm:mt-6">
           {notification.action_url && canClose && (
             <Button
               onClick={handleActionClick}
