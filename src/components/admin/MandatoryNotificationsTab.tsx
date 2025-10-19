@@ -191,7 +191,7 @@ export const MandatoryNotificationsTab = () => {
                     <FormItem>
                       <FormLabel>URL do Vídeo (Opcional)</FormLabel>
                       <FormControl>
-                        <Input placeholder="https://youtube.com/watch?v=..." {...field} />
+                        <Input placeholder="YouTube, Google Drive, Vimeo ou link direto" {...field} />
                       </FormControl>
                       <FormDescription>YouTube, Vimeo, Google Drive ou link direto</FormDescription>
                       <FormMessage />
