@@ -65,13 +65,29 @@ export const MandatoryNotificationsTab = () => {
   }, [videoUrlValue, editingId]);
 
   const onSubmit = async (data: any) => {
-    const submitData = {
-      ...data,
-      video_url: data.video_url || undefined,
-      video_provider: data.video_url ? data.video_provider : undefined,
-      action_url: data.action_url || undefined,
-      expires_at: data.expires_at || undefined,
+    const submitData: any = {
+      title: data.title,
+      message: data.message,
+      target_audience: data.target_audience,
+      action_label: data.action_label,
+      priority: data.priority,
     };
+
+    // Only add video fields if video_url is provided
+    if (data.video_url && data.video_url.trim() !== '') {
+      submitData.video_url = data.video_url;
+      submitData.video_provider = data.video_provider;
+    }
+
+    // Only add action_url if provided
+    if (data.action_url && data.action_url.trim() !== '') {
+      submitData.action_url = data.action_url;
+    }
+
+    // Only add expires_at if provided
+    if (data.expires_at && data.expires_at.trim() !== '') {
+      submitData.expires_at = data.expires_at;
+    }
 
     if (editingId) {
       await updateNotification(editingId, submitData);
