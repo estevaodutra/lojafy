@@ -105,6 +105,8 @@ export interface MandatoryNotificationView {
   notification_id: string;
   user_id: string;
   viewed_at: string;
+  days_viewed: number;
+  last_viewed_date: string;
   video_watched_seconds: number;
   video_completed: boolean;
   button_clicked: boolean;

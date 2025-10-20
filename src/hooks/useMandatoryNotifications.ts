@@ -37,14 +37,23 @@ export const useMandatoryNotifications = () => {
 
       const { data: viewedNotifications, error: viewError } = await supabase
         .from('mandatory_notification_views')
-        .select('notification_id')
+        .select('notification_id, days_viewed, last_viewed_date')
         .eq('user_id', user!.id)
         .in('notification_id', activeNotifications.map(n => n.id));
 
       if (viewError) throw viewError;
 
-      const viewedIds = new Set(viewedNotifications?.map(v => v.notification_id) || []);
-      const pending = activeNotifications.find(n => !viewedIds.has(n.id));
+      const today = new Date().toISOString().split('T')[0];
+      
+      const pending = activeNotifications.find(notification => {
+        const view = viewedNotifications?.find(v => v.notification_id === notification.id);
+        
+        if (!view) return true;
+        if (view.days_viewed >= 7) return false;
+        if (view.last_viewed_date === today) return false;
+        
+        return true;
+      });
       
       setPendingNotification((pending || null) as MandatoryNotification | null);
     } catch (error) {
@@ -56,15 +65,35 @@ export const useMandatoryNotifications = () => {
 
   const markAsViewed = async (notificationId: string) => {
     try {
-      const { error } = await supabase
+      const today = new Date().toISOString().split('T')[0];
+      
+      const { data: existing } = await supabase
         .from('mandatory_notification_views')
-        .insert({
-          notification_id: notificationId,
-          user_id: user!.id,
-        });
+        .select('id, days_viewed, last_viewed_date')
+        .eq('notification_id', notificationId)
+        .eq('user_id', user!.id)
+        .single();
 
-      if (error && error.code !== '23505') {
-        throw error;
+      if (existing) {
+        if (existing.last_viewed_date !== today) {
+          await supabase
+            .from('mandatory_notification_views')
+            .update({
+              days_viewed: existing.days_viewed + 1,
+              last_viewed_date: today,
+              viewed_at: new Date().toISOString()
+            })
+            .eq('id', existing.id);
+        }
+      } else {
+        await supabase
+          .from('mandatory_notification_views')
+          .insert({
+            notification_id: notificationId,
+            user_id: user!.id,
+            days_viewed: 1,
+            last_viewed_date: today
+          });
       }
     } catch (error) {
       console.error('Error marking notification as viewed:', error);

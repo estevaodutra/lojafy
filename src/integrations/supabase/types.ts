@@ -909,7 +909,9 @@ export type Database = {
         Row: {
           action_clicked: boolean
           button_clicked: boolean
+          days_viewed: number | null
           id: string
+          last_viewed_date: string | null
           notification_id: string
           user_id: string
           video_completed: boolean
@@ -919,7 +921,9 @@ export type Database = {
         Insert: {
           action_clicked?: boolean
           button_clicked?: boolean
+          days_viewed?: number | null
           id?: string
+          last_viewed_date?: string | null
           notification_id: string
           user_id: string
           video_completed?: boolean
@@ -929,7 +933,9 @@ export type Database = {
         Update: {
           action_clicked?: boolean
           button_clicked?: boolean
+          days_viewed?: number | null
           id?: string
+          last_viewed_date?: string | null
           notification_id?: string
           user_id?: string
           video_completed?: boolean
