@@ -21,33 +21,58 @@ export const useAdminChatMessages = (ticketId: string | null) => {
   const { user } = useAuth();
 
   useEffect(() => {
-    console.log('🔍 [useAdminChatMessages] ticketId:', ticketId);
-    
     if (!ticketId) {
       console.log('⚠️ [useAdminChatMessages] No ticketId provided');
       setMessages([]);
-      setLoading(false);
       return;
     }
+
+    console.log('🎯 [useAdminChatMessages] Starting fetch for ticket:', ticketId);
 
     const fetchMessages = async () => {
       try {
         setLoading(true);
-        console.log('📡 [useAdminChatMessages] Fetching messages for ticket:', ticketId);
         
-        const { data, error } = await supabase
+        // Log current user
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        console.log('👤 [useAdminChatMessages] Current user:', currentUser?.id);
+        console.log('👤 [useAdminChatMessages] User email:', currentUser?.email);
+        
+        // Check user role
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', currentUser?.id)
+          .single();
+        
+        console.log('🔐 [useAdminChatMessages] User role:', profile?.role);
+        
+        console.log('🔍 [useAdminChatMessages] Executing query for ticket_id:', ticketId);
+        
+        const { data, error, count } = await supabase
           .from('chat_messages')
-          .select('*')
+          .select('*', { count: 'exact' })
           .eq('ticket_id', ticketId)
           .order('created_at', { ascending: true });
 
-        console.log('📨 [useAdminChatMessages] Fetched messages:', data);
-        console.log('❌ [useAdminChatMessages] Error:', error);
+        console.log('📊 [useAdminChatMessages] Query result:');
+        console.log('  - Count:', count);
+        console.log('  - Data length:', data?.length);
+        console.log('  - Error:', error);
+        console.log('  - Messages:', data);
 
-        if (error) throw error;
+        if (error) {
+          console.error('❌ [useAdminChatMessages] Supabase error:', error);
+          throw error;
+        }
+
         setMessages(data || []);
+        console.log('✅ [useAdminChatMessages] Messages loaded successfully:', data?.length || 0);
         
-        console.log(`✅ [useAdminChatMessages] Loaded ${data?.length || 0} messages`);
+        if (data && data.length > 0) {
+          console.log('📝 [useAdminChatMessages] First message:', data[0]);
+          console.log('📝 [useAdminChatMessages] Last message:', data[data.length - 1]);
+        }
       } catch (error) {
         console.error('💥 [useAdminChatMessages] Error fetching messages:', error);
         toast.error('Erro ao carregar mensagens');

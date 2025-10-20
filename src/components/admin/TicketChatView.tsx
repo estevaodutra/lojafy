@@ -6,9 +6,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAdminChatMessages } from '@/hooks/useAdminChatMessages';
 import { useSupportTickets } from '@/hooks/useSupportTickets';
 import { useState, useEffect, useRef } from 'react';
-import { Send, CheckCircle2, XCircle, StickyNote, MessageSquare } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { Send, CheckCircle2, XCircle, StickyNote, MessageSquare, RefreshCw } from 'lucide-react';
+import { ChatMessage } from '@/components/admin/ChatMessage';
 
 interface TicketChatViewProps {
   ticketId: string;
@@ -40,24 +39,9 @@ export const TicketChatView = ({ ticketId }: TicketChatViewProps) => {
     setIsInternal(false);
   };
 
-  const getMessageStyle = (senderType: string, isInternal: boolean) => {
-    if (isInternal) {
-      return 'bg-yellow-100 border-l-4 border-yellow-500';
-    }
-    if (senderType === 'customer') {
-      return 'bg-primary/10 ml-auto';
-    }
-    if (senderType === 'ai') {
-      return 'bg-blue-100';
-    }
-    return 'bg-green-100';
-  };
-
-  const getMessageIcon = (senderType: string, isInternal: boolean) => {
-    if (isInternal) return '📝';
-    if (senderType === 'customer') return '👤';
-    if (senderType === 'ai') return '🤖';
-    return '👨‍💼';
+  const handleForceReload = () => {
+    console.log('🔄 [Force Reload] Recarregando mensagens para ticket:', ticketId);
+    window.location.reload();
   };
 
   if (loading) {
@@ -88,10 +72,18 @@ export const TicketChatView = ({ ticketId }: TicketChatViewProps) => {
       <div className="p-4 border-b space-y-2">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold">{ticket.subject}</h3>
-            <p className="text-sm text-muted-foreground">{ticket.customer_email}</p>
+            <h3 className="font-semibold">👤 {ticket.customer_email}</h3>
+            <p className="text-sm text-muted-foreground">{ticket.subject}</p>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleForceReload}
+              title="Recarregar mensagens"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
             <Badge variant={ticket.status === 'waiting_admin' ? 'destructive' : 'default'}>
               {ticket.status}
             </Badge>
@@ -100,8 +92,8 @@ export const TicketChatView = ({ ticketId }: TicketChatViewProps) => {
         </div>
       </div>
 
-      {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
+      {/* Messages - WhatsApp Style */}
+      <ScrollArea className="flex-1 p-4 bg-gray-50">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center p-6">
@@ -115,30 +107,9 @@ export const TicketChatView = ({ ticketId }: TicketChatViewProps) => {
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-1">
             {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`p-3 rounded-lg max-w-[80%] ${getMessageStyle(message.sender_type, message.is_internal)}`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm">
-                  {getMessageIcon(message.sender_type, message.is_internal)}
-                </span>
-                <span className="text-xs font-medium">
-                  {message.is_internal ? 'Nota Interna' : 
-                   message.sender_type === 'customer' ? 'Cliente' :
-                   message.sender_type === 'ai' ? 'IA' : 'Admin'}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {formatDistanceToNow(new Date(message.created_at), {
-                    addSuffix: true,
-                    locale: ptBR,
-                  })}
-                </span>
-              </div>
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-            </div>
+              <ChatMessage key={message.id} message={message} />
             ))}
             <div ref={scrollRef} />
           </div>

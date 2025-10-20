@@ -115,10 +115,17 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
             {filteredTickets.map(ticket => (
               <Card
                 key={ticket.id}
-                className={`p-3 cursor-pointer transition-colors hover:bg-accent ${
-                  selectedTicketId === ticket.id ? 'bg-accent border-l-4 border-l-primary' : ''
+                onClick={() => {
+                  console.log('🎯 [TicketList] Ticket clicked:', ticket.id);
+                  console.log('📧 [TicketList] Customer email:', ticket.customer_email);
+                  console.log('📋 [TicketList] Subject:', ticket.subject);
+                  onSelectTicket(ticket);
+                }}
+                className={`p-3 cursor-pointer transition-colors ${
+                  selectedTicketId === ticket.id 
+                    ? 'bg-blue-100 border-l-4 border-blue-500' 
+                    : 'hover:bg-accent'
                 }`}
-                onClick={() => onSelectTicket(ticket)}
               >
                 <div className="space-y-2">
                   <div className="flex items-start justify-between gap-2">
