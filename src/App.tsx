@@ -100,6 +100,7 @@ import AIKnowledgeBase from "./pages/admin/AIKnowledgeBase";
 import ChatWidget from "@/components/support/ChatWidget";
 import AdminReports from "./pages/admin/Reports";
 import SupportManagement from "./pages/admin/SupportManagement";
+import ChatSupport from "./pages/admin/ChatSupport";
 import { MandatoryNotificationModal } from "@/components/MandatoryNotificationModal";
 import { useMandatoryNotifications } from "@/hooks/useMandatoryNotifications";
 
@@ -239,6 +240,7 @@ const App = () => {
                 <Route path="integracoes" element={<IntegracaoPage />} />
                 <Route path="base-conhecimento" element={<AIKnowledgeBase />} />
                 <Route path="suporte" element={<SupportManagement />} />
+                <Route path="chat-suporte" element={<ChatSupport />} />
               </Route>
 
               {/* Supplier Panel Routes */}

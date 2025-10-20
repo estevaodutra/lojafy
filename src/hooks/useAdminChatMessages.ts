@@ -21,7 +21,10 @@ export const useAdminChatMessages = (ticketId: string | null) => {
   const { user } = useAuth();
 
   useEffect(() => {
+    console.log('🔍 [useAdminChatMessages] ticketId:', ticketId);
+    
     if (!ticketId) {
+      console.log('⚠️ [useAdminChatMessages] No ticketId provided');
       setMessages([]);
       setLoading(false);
       return;
@@ -30,16 +33,23 @@ export const useAdminChatMessages = (ticketId: string | null) => {
     const fetchMessages = async () => {
       try {
         setLoading(true);
+        console.log('📡 [useAdminChatMessages] Fetching messages for ticket:', ticketId);
+        
         const { data, error } = await supabase
           .from('chat_messages')
           .select('*')
           .eq('ticket_id', ticketId)
           .order('created_at', { ascending: true });
 
+        console.log('📨 [useAdminChatMessages] Fetched messages:', data);
+        console.log('❌ [useAdminChatMessages] Error:', error);
+
         if (error) throw error;
         setMessages(data || []);
+        
+        console.log(`✅ [useAdminChatMessages] Loaded ${data?.length || 0} messages`);
       } catch (error) {
-        console.error('Error fetching messages:', error);
+        console.error('💥 [useAdminChatMessages] Error fetching messages:', error);
         toast.error('Erro ao carregar mensagens');
       } finally {
         setLoading(false);

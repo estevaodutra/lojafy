@@ -6,6 +6,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useState } from 'react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { RefreshCw, MessageSquare } from 'lucide-react';
 
 interface TicketListProps {
   onSelectTicket: (ticket: SupportTicket) => void;
@@ -13,8 +15,15 @@ interface TicketListProps {
 }
 
 export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps) => {
-  const { tickets, loading } = useSupportTickets();
+  const { tickets, loading, refetch } = useSupportTickets();
   const [filter, setFilter] = useState<'all' | 'open' | 'waiting' | 'resolved'>('all');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setTimeout(() => setRefreshing(false), 500);
+  };
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { label: string; variant: any }> = {
@@ -56,15 +65,21 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
     resolved: tickets.filter(t => t.status === 'resolved' || t.status === 'closed').length,
   };
 
-  if (loading) {
-    return <Card className="p-4">Carregando tickets...</Card>;
-  }
-
   return (
-    <Card className="p-4">
-      <div className="space-y-4">
+    <Card className="h-full flex flex-col">
+      <div className="p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Tickets de Suporte</h3>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
         <div>
-          <h3 className="font-semibold mb-2">Tickets de Suporte</h3>
           <Tabs value={filter} onValueChange={(v) => setFilter(v as any)}>
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="all">Todos ({counts.all})</TabsTrigger>
@@ -75,52 +90,66 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
           </Tabs>
         </div>
 
-        <ScrollArea className="h-[600px]">
-          <div className="space-y-2">
-            {filteredTickets.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Nenhum ticket encontrado
-              </p>
-            ) : (
-              filteredTickets.map(ticket => (
-                <Card
-                  key={ticket.id}
-                  className={`p-3 cursor-pointer transition-colors hover:bg-accent ${
-                    selectedTicketId === ticket.id ? 'bg-accent border-primary' : ''
-                  }`}
-                  onClick={() => onSelectTicket(ticket)}
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{ticket.subject}</p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {ticket.customer_email}
-                        </p>
-                      </div>
-                      {ticket.ai_handled && (
-                        <Badge variant="outline" className="text-xs">🤖 IA</Badge>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {getStatusBadge(ticket.status)}
-                      {getPriorityBadge(ticket.priority)}
-                    </div>
-
-                    <p className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(ticket.last_message_at), {
-                        addSuffix: true,
-                        locale: ptBR,
-                      })}
-                    </p>
-                  </div>
-                </Card>
-              ))
-            )}
-          </div>
-        </ScrollArea>
       </div>
+
+      <ScrollArea className="flex-1 px-4">
+        {loading ? (
+          <div className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Carregando tickets...</p>
+            </div>
+          </div>
+        ) : filteredTickets.length === 0 ? (
+          <div className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-50" />
+              <p className="text-muted-foreground font-medium">Nenhum ticket encontrado</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {filter !== 'all' ? 'Tente outro filtro' : 'Nenhum ticket criado ainda'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2 pb-4">
+            {filteredTickets.map(ticket => (
+              <Card
+                key={ticket.id}
+                className={`p-3 cursor-pointer transition-colors hover:bg-accent ${
+                  selectedTicketId === ticket.id ? 'bg-accent border-l-4 border-l-primary' : ''
+                }`}
+                onClick={() => onSelectTicket(ticket)}
+              >
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{ticket.subject}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {ticket.customer_email}
+                      </p>
+                    </div>
+                    {ticket.ai_handled && (
+                      <Badge variant="outline" className="text-xs">🤖 IA</Badge>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {getStatusBadge(ticket.status)}
+                    {getPriorityBadge(ticket.priority)}
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    {formatDistanceToNow(new Date(ticket.last_message_at), {
+                      addSuffix: true,
+                      locale: ptBR,
+                    })}
+                  </p>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </ScrollArea>
     </Card>
   );
 };

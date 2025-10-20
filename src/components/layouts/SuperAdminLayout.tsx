@@ -17,7 +17,8 @@ import {
   BookOpen,
   Bell,
   Headphones,
-  FileText
+  FileText,
+  MessageSquare
 } from 'lucide-react';
 import {
   Sidebar,
@@ -88,7 +89,17 @@ const superAdminMenuItems = [
 
 const supportMenuItems = [
   {
-    title: 'Suporte IA',
+    title: 'Chat de Suporte',
+    url: '/super-admin/chat-suporte',
+    icon: MessageSquare,
+  },
+  {
+    title: 'Base de Conhecimento',
+    url: '/super-admin/base-conhecimento',
+    icon: BookOpen,
+  },
+  {
+    title: 'Config. Suporte IA',
     url: '/super-admin/suporte',
     icon: Headphones,
   },

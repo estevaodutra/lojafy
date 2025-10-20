@@ -6,7 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAdminChatMessages } from '@/hooks/useAdminChatMessages';
 import { useSupportTickets } from '@/hooks/useSupportTickets';
 import { useState, useEffect, useRef } from 'react';
-import { Send, CheckCircle2, XCircle, StickyNote } from 'lucide-react';
+import { Send, CheckCircle2, XCircle, StickyNote, MessageSquare } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -20,6 +20,10 @@ export const TicketChatView = ({ ticketId }: TicketChatViewProps) => {
   const [messageContent, setMessageContent] = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  console.log('🎨 [TicketChatView] Rendering with ticketId:', ticketId);
+  console.log('📋 [TicketChatView] Messages:', messages);
+  console.log('⏳ [TicketChatView] Loading:', loading);
 
   const ticket = tickets.find(t => t.id === ticketId);
 
@@ -57,11 +61,25 @@ export const TicketChatView = ({ ticketId }: TicketChatViewProps) => {
   };
 
   if (loading) {
-    return <Card className="p-4">Carregando conversa...</Card>;
+    return (
+      <Card className="h-full flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando mensagens...</p>
+        </div>
+      </Card>
+    );
   }
 
   if (!ticket) {
-    return <Card className="p-4">Ticket não encontrado</Card>;
+    return (
+      <Card className="h-full flex items-center justify-center p-8">
+        <div className="text-center">
+          <p className="text-muted-foreground text-lg">Ticket não encontrado</p>
+          <p className="text-sm text-muted-foreground mt-2">ID: {ticketId}</p>
+        </div>
+      </Card>
+    );
   }
 
   return (
@@ -84,8 +102,21 @@ export const TicketChatView = ({ ticketId }: TicketChatViewProps) => {
 
       {/* Messages */}
       <ScrollArea className="flex-1 p-4">
-        <div className="space-y-3">
-          {messages.map((message) => (
+        {messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center p-6">
+              <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-50" />
+              <p className="text-muted-foreground text-lg font-medium mb-2">
+                Nenhuma mensagem ainda
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Seja o primeiro a responder este ticket
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {messages.map((message) => (
             <div
               key={message.id}
               className={`p-3 rounded-lg max-w-[80%] ${getMessageStyle(message.sender_type, message.is_internal)}`}
@@ -108,9 +139,10 @@ export const TicketChatView = ({ ticketId }: TicketChatViewProps) => {
               </div>
               <p className="text-sm whitespace-pre-wrap">{message.content}</p>
             </div>
-          ))}
-          <div ref={scrollRef} />
-        </div>
+            ))}
+            <div ref={scrollRef} />
+          </div>
+        )}
       </ScrollArea>
 
       {/* Input */}
