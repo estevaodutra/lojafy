@@ -46,6 +46,26 @@ export const useSupportTickets = () => {
 
   useEffect(() => {
     fetchTickets();
+
+    // Realtime subscription for ticket updates
+    const channel = supabase
+      .channel('support-tickets-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'support_tickets'
+        },
+        () => {
+          fetchTickets();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   const createTicket = async (subject: string) => {

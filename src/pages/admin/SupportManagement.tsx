@@ -9,14 +9,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
-import { Headphones, Plus, Edit, Trash2, Save, Settings, Users, Store } from 'lucide-react';
+import { Headphones, Plus, Edit, Trash2, Save, Settings, Users, Store, MessageSquare } from 'lucide-react';
 import { useKnowledgeBase } from '@/hooks/useKnowledgeBase';
 import { Separator } from '@/components/ui/separator';
+import { SupportMetrics } from '@/components/admin/SupportMetrics';
+import { TicketList } from '@/components/admin/TicketList';
+import { TicketChatView } from '@/components/admin/TicketChatView';
+import { SupportTicket } from '@/hooks/useSupportTickets';
 
 export default function SupportManagement() {
   const { knowledge, config, loading, createKnowledge, updateKnowledge, deleteKnowledge, updateConfig, refetch } = useKnowledgeBase();
   
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [formData, setFormData] = useState({
     category: 'faq' as 'faq' | 'policy' | 'product_info' | 'general',
     target_audience: 'all' as 'all' | 'customer' | 'reseller',
@@ -381,7 +386,7 @@ export default function SupportManagement() {
       </div>
 
       <Tabs defaultValue="customers" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 max-w-2xl">
+        <TabsList className="grid w-full grid-cols-4 max-w-3xl">
           <TabsTrigger value="customers">
             <Users className="h-4 w-4 mr-2" />
             Clientes
@@ -389,6 +394,10 @@ export default function SupportManagement() {
           <TabsTrigger value="resellers">
             <Store className="h-4 w-4 mr-2" />
             Revendedores
+          </TabsTrigger>
+          <TabsTrigger value="chat">
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Chat
           </TabsTrigger>
           <TabsTrigger value="config">
             <Settings className="h-4 w-4 mr-2" />
@@ -406,6 +415,31 @@ export default function SupportManagement() {
         <TabsContent value="resellers" className="space-y-6">
           <KnowledgeForm />
           <KnowledgeTable audience="reseller" />
+        </TabsContent>
+
+        {/* Tab: Chat */}
+        <TabsContent value="chat" className="space-y-6">
+          <SupportMetrics />
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            <div className="lg:col-span-2">
+              <TicketList 
+                onSelectTicket={setSelectedTicket}
+                selectedTicketId={selectedTicket?.id}
+              />
+            </div>
+            <div className="lg:col-span-3">
+              {selectedTicket ? (
+                <TicketChatView ticketId={selectedTicket.id} />
+              ) : (
+                <Card className="p-12 text-center">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground">
+                    Selecione um ticket para visualizar a conversa
+                  </p>
+                </Card>
+              )}
+            </div>
+          </div>
         </TabsContent>
 
         {/* Tab: Configurações */}
