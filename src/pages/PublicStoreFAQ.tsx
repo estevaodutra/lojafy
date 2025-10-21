@@ -95,8 +95,8 @@ const PublicStoreFAQ = () => {
 
           {/* Categories */}
           <div className="mb-8">
-            <div className="flex flex-wrap gap-3 justify-center">
-              {categories.map(category => <Button key={category.id} variant={selectedCategory === category.id ? "default" : "outline"} onClick={() => setSelectedCategory(category.id)} className="gap-2 m-1 text-foreground">
+            <div className="flex flex-wrap justify-center">
+              {categories.map(category => <Button key={category.id} variant={selectedCategory === category.id ? "default" : "outline"} onClick={() => setSelectedCategory(category.id)} className="gap-2 m-2 text-foreground">
                   <category.icon className="h-4 w-4" />
                   {category.label}
                   <Badge variant="secondary" className="ml-1">
