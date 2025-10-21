@@ -18,6 +18,13 @@ export interface SupportTicket {
   last_message_at: string;
   ai_handled: boolean;
   metadata: any;
+  tags?: string[];
+  unread_count?: number;
+  last_message?: {
+    content: string;
+    sender_type: string;
+    created_at: string;
+  };
 }
 
 export const useSupportTickets = () => {
@@ -31,27 +38,45 @@ export const useSupportTickets = () => {
     try {
       console.log('🔄 [useSupportTickets] Fetching tickets...');
       
-      const { data, error, count } = await supabase
+      const { data: ticketsData, error, count } = await supabase
         .from('support_tickets')
         .select('*', { count: 'exact' })
         .order('last_message_at', { ascending: false });
 
       console.log('📊 [useSupportTickets] Result:');
       console.log('  - Count:', count);
-      console.log('  - Data length:', data?.length);
+      console.log('  - Data length:', ticketsData?.length);
       console.log('  - Error:', error);
-      
-      if (data && data.length > 0) {
-        console.log('  - First ticket:', data[0].id, data[0].customer_email);
-        console.log('  - Last ticket:', data[data.length - 1].id, data[data.length - 1].customer_email);
-      }
 
       if (error) {
         console.error('❌ [useSupportTickets] Error:', error);
         throw error;
       }
       
-      setTickets(data || []);
+      // Buscar última mensagem para cada ticket
+      const ticketsWithMessages = await Promise.all(
+        (ticketsData || []).map(async (ticket) => {
+          const { data: lastMsg } = await supabase
+            .from('chat_messages')
+            .select('content, sender_type, created_at')
+            .eq('ticket_id', ticket.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          return {
+            ...ticket,
+            last_message: lastMsg || undefined,
+          };
+        })
+      );
+      
+      if (ticketsWithMessages && ticketsWithMessages.length > 0) {
+        console.log('  - First ticket:', ticketsWithMessages[0].id, ticketsWithMessages[0].customer_email);
+        console.log('  - Last ticket:', ticketsWithMessages[ticketsWithMessages.length - 1].id, ticketsWithMessages[ticketsWithMessages.length - 1].customer_email);
+      }
+      
+      setTickets(ticketsWithMessages || []);
       console.log('✅ [useSupportTickets] Tickets loaded successfully');
     } catch (error) {
       console.error('💥 [useSupportTickets] Error fetching tickets:', error);

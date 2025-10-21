@@ -5,9 +5,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAdminChatMessages } from '@/hooks/useAdminChatMessages';
 import { useSupportTickets } from '@/hooks/useSupportTickets';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Send, CheckCircle2, XCircle, StickyNote, MessageSquare, RefreshCw } from 'lucide-react';
 import { ChatMessage } from '@/components/admin/ChatMessage';
+import { ChatAvatar } from '@/components/admin/ChatAvatar';
+import { MessageDateSeparator } from '@/components/admin/MessageDateSeparator';
+import { isSameDay, parseISO } from 'date-fns';
 
 interface TicketChatViewProps {
   ticketId: string;
@@ -66,16 +69,59 @@ export const TicketChatView = ({ ticketId }: TicketChatViewProps) => {
     );
   }
 
+  // Group messages by date
+  const groupedMessages = useMemo(() => {
+    const groups: { date: Date; messages: typeof messages }[] = [];
+    let currentDate: Date | null = null;
+    let currentGroup: typeof messages = [];
+
+    messages.forEach((message) => {
+      const messageDate = parseISO(message.created_at);
+      
+      if (!currentDate || !isSameDay(currentDate, messageDate)) {
+        if (currentGroup.length > 0) {
+          groups.push({ date: currentDate!, messages: currentGroup });
+        }
+        currentDate = messageDate;
+        currentGroup = [message];
+      } else {
+        currentGroup.push(message);
+      }
+    });
+
+    if (currentGroup.length > 0 && currentDate) {
+      groups.push({ date: currentDate, messages: currentGroup });
+    }
+
+    return groups;
+  }, [messages]);
+
   return (
     <Card className="flex flex-col h-[calc(100vh-300px)]">
-      {/* Header */}
-      <div className="p-4 border-b space-y-2">
+      {/* Header - Estilo profissional */}
+      <div className="p-4 border-b">
         <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-semibold">👤 {ticket.customer_email}</h3>
-            <p className="text-sm text-muted-foreground">{ticket.subject}</p>
+          <div className="flex items-center gap-3">
+            <ChatAvatar
+              name={ticket.customer_name}
+              email={ticket.customer_email}
+              size="lg"
+              showOnline={false}
+            />
+            <div>
+              <h3 className="font-semibold text-lg">
+                {ticket.customer_name || ticket.customer_email}
+              </h3>
+              <p className="text-sm text-muted-foreground">{ticket.customer_email}</p>
+              <div className="flex gap-2 mt-1">
+                <Badge variant="outline" className="text-xs">#{ticket.id.slice(0, 8)}</Badge>
+                {ticket.tags && ticket.tags.length > 0 && ticket.tags.map((tag, i) => (
+                  <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
+                ))}
+              </div>
+            </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             <Button
               variant="ghost"
               size="sm"
@@ -87,29 +133,47 @@ export const TicketChatView = ({ ticketId }: TicketChatViewProps) => {
             <Badge variant={ticket.status === 'waiting_admin' ? 'destructive' : 'default'}>
               {ticket.status}
             </Badge>
-            <Badge>{ticket.priority}</Badge>
+            <Badge variant="outline">{ticket.priority}</Badge>
+            <Button
+              onClick={() => updateTicketStatus('resolved')}
+              disabled={ticket.status === 'resolved'}
+              className="bg-blue-500 hover:bg-blue-600 text-white"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              Finalizar
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Messages - WhatsApp Style */}
-      <ScrollArea className="flex-1 p-4 bg-gray-50">
+      {/* Messages - WhatsApp Style com separadores */}
+      <ScrollArea className="flex-1 p-4 bg-muted/30">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center p-6">
               <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-50" />
               <p className="text-muted-foreground text-lg font-medium mb-2">
-                Nenhuma mensagem ainda
+                Nenhuma mensagem neste ticket
               </p>
               <p className="text-sm text-muted-foreground">
-                Seja o primeiro a responder este ticket
+                Inicie a conversa enviando uma mensagem
               </p>
             </div>
           </div>
         ) : (
           <div className="space-y-1">
-            {messages.map((message) => (
-              <ChatMessage key={message.id} message={message} />
+            {groupedMessages.map((group, groupIndex) => (
+              <div key={groupIndex}>
+                <MessageDateSeparator date={group.date} />
+                {group.messages.map((message) => (
+                  <ChatMessage 
+                    key={message.id} 
+                    message={message}
+                    customerName={ticket.customer_name}
+                    customerEmail={ticket.customer_email}
+                  />
+                ))}
+              </div>
             ))}
             <div ref={scrollRef} />
           </div>
@@ -155,15 +219,6 @@ export const TicketChatView = ({ ticketId }: TicketChatViewProps) => {
         </div>
 
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => updateTicketStatus('resolved')}
-            disabled={ticket.status === 'resolved'}
-          >
-            <CheckCircle2 className="h-4 w-4 mr-1" />
-            Resolver
-          </Button>
           <Button
             variant="outline"
             size="sm"

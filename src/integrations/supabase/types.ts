@@ -282,31 +282,37 @@ export type Database = {
       }
       chat_messages: {
         Row: {
+          attachments: Json | null
           content: string
           created_at: string | null
           id: string
           is_internal: boolean | null
           metadata: Json | null
+          read_at: string | null
           sender_id: string | null
           sender_type: Database["public"]["Enums"]["message_sender_type"]
           ticket_id: string
         }
         Insert: {
+          attachments?: Json | null
           content: string
           created_at?: string | null
           id?: string
           is_internal?: boolean | null
           metadata?: Json | null
+          read_at?: string | null
           sender_id?: string | null
           sender_type: Database["public"]["Enums"]["message_sender_type"]
           ticket_id: string
         }
         Update: {
+          attachments?: Json | null
           content?: string
           created_at?: string | null
           id?: string
           is_internal?: boolean | null
           metadata?: Json | null
+          read_at?: string | null
           sender_id?: string | null
           sender_type?: Database["public"]["Enums"]["message_sender_type"]
           ticket_id?: string
@@ -2361,6 +2367,8 @@ export type Database = {
           resolved_at: string | null
           status: Database["public"]["Enums"]["ticket_status"] | null
           subject: string
+          tags: string[] | null
+          unread_count: number | null
           updated_at: string | null
           user_id: string | null
         }
@@ -2377,6 +2385,8 @@ export type Database = {
           resolved_at?: string | null
           status?: Database["public"]["Enums"]["ticket_status"] | null
           subject: string
+          tags?: string[] | null
+          unread_count?: number | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -2393,6 +2403,8 @@ export type Database = {
           resolved_at?: string | null
           status?: Database["public"]["Enums"]["ticket_status"] | null
           subject?: string
+          tags?: string[] | null
+          unread_count?: number | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -2483,6 +2495,14 @@ export type Database = {
       get_customer_display_name: {
         Args: { customer_user_id: string }
         Returns: string
+      }
+      get_last_message_preview: {
+        Args: { p_ticket_id: string }
+        Returns: {
+          content: string
+          created_at: string
+          sender_type: string
+        }[]
       }
       get_mandatory_notification_metrics: {
         Args: { notification_uuid: string }

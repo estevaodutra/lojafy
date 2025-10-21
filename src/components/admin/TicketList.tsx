@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RefreshCw, MessageSquare, Search } from 'lucide-react';
+import { ChatAvatar } from './ChatAvatar';
 
 interface TicketListProps {
   onSelectTicket: (ticket: SupportTicket) => void;
@@ -27,35 +28,28 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
     setTimeout(() => setRefreshing(false), 500);
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, { label: string; variant: any }> = {
-      open: { label: 'Aberto', variant: 'default' },
-      waiting_customer: { label: 'Aguardando Cliente', variant: 'secondary' },
-      waiting_admin: { label: 'Aguardando Admin', variant: 'destructive' },
-      resolved: { label: 'Resolvido', variant: 'outline' },
-      closed: { label: 'Fechado', variant: 'outline' },
-    };
+  const getCompactTime = (date: string) => {
+    const now = new Date();
+    const past = new Date(date);
+    const diffInMinutes = Math.floor((now.getTime() - past.getTime()) / 60000);
     
-    const config = variants[status] || { label: status, variant: 'default' };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    if (diffInMinutes < 60) return `${diffInMinutes}min`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h`;
+    return `${Math.floor(diffInMinutes / 1440)}d`;
   };
 
-  const getPriorityBadge = (priority: string) => {
-    const variants: Record<string, { label: string; className: string }> = {
-      urgent: { label: '🔴 Urgente', className: 'bg-red-100 text-red-800' },
-      high: { label: '🟠 Alta', className: 'bg-orange-100 text-orange-800' },
-      normal: { label: '🟡 Normal', className: 'bg-blue-100 text-blue-800' },
-      low: { label: '⚪ Baixa', className: 'bg-gray-100 text-gray-800' },
-    };
+  const getMessagePreview = (ticket: SupportTicket) => {
+    if (!ticket.last_message) return 'Sem mensagens';
     
-    const config = variants[priority] || variants.normal;
-    return <Badge className={config.className}>{config.label}</Badge>;
+    const prefix = ticket.last_message.sender_type === 'ai' ? '🤖 ' :
+                   ticket.last_message.sender_type === 'admin' ? '👨‍💼 ' : '';
+    
+    return prefix + ticket.last_message.content.substring(0, 50) + (ticket.last_message.content.length > 50 ? '...' : '');
   };
 
   const filteredTickets = useMemo(() => {
     let filtered = tickets;
 
-    // Filter by status
     if (filter === 'open') {
       filtered = filtered.filter(t => t.status === 'open');
     } else if (filter === 'waiting') {
@@ -64,11 +58,11 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
       filtered = filtered.filter(t => t.status === 'resolved' || t.status === 'closed');
     }
 
-    // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(t =>
         t.customer_email.toLowerCase().includes(query) ||
+        (t.customer_name && t.customer_name.toLowerCase().includes(query)) ||
         t.subject.toLowerCase().includes(query)
       );
     }
@@ -85,9 +79,12 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
 
   return (
     <Card className="h-full flex flex-col">
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-3 border-b">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold">Tickets de Suporte</h3>
+          <div>
+            <h3 className="font-semibold text-lg">Conversas</h3>
+            <p className="text-xs text-muted-foreground">{counts.all} tickets</p>
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -101,32 +98,34 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por email ou assunto..."
+            placeholder="Buscar conversas..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
           />
         </div>
 
-        <div>
-          <Tabs value={filter} onValueChange={(v) => setFilter(v as any)}>
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="all">Todos ({counts.all})</TabsTrigger>
-              <TabsTrigger value="open">Abertos ({counts.open})</TabsTrigger>
-              <TabsTrigger value="waiting">Aguardando ({counts.waiting})</TabsTrigger>
-              <TabsTrigger value="resolved">Resolvidos ({counts.resolved})</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-
+        <Tabs value={filter} onValueChange={(v) => setFilter(v as any)}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="waiting" className="text-xs">
+              Aguardando <span className="ml-1 font-bold">{counts.waiting}</span>
+            </TabsTrigger>
+            <TabsTrigger value="open" className="text-xs">
+              Em aberto <span className="ml-1 font-bold">{counts.open}</span>
+            </TabsTrigger>
+            <TabsTrigger value="resolved" className="text-xs">
+              Finalizadas
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
-      <ScrollArea className="flex-1 px-4">
+      <ScrollArea className="flex-1">
         {loading ? (
           <div className="flex items-center justify-center p-8">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Carregando tickets...</p>
+              <p className="text-muted-foreground">Carregando...</p>
             </div>
           </div>
         ) : filteredTickets.length === 0 ? (
@@ -134,54 +133,71 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
             <div className="text-center">
               <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-50" />
               <p className="text-muted-foreground font-medium">Nenhum ticket encontrado</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {filter !== 'all' ? 'Tente outro filtro' : 'Nenhum ticket criado ainda'}
-              </p>
             </div>
           </div>
         ) : (
-          <div className="space-y-2 pb-4">
+          <div className="divide-y">
             {filteredTickets.map(ticket => (
-              <Card
+              <div
                 key={ticket.id}
                 onClick={() => {
                   console.log('🎯 [TicketList] Ticket clicked:', ticket.id);
-                  console.log('📧 [TicketList] Customer email:', ticket.customer_email);
-                  console.log('📋 [TicketList] Subject:', ticket.subject);
                   onSelectTicket(ticket);
                 }}
-                className={`p-3 cursor-pointer transition-colors ${
+                className={`p-3 cursor-pointer transition-all hover:bg-muted/50 ${
                   selectedTicketId === ticket.id 
-                    ? 'bg-blue-100 border-l-4 border-blue-500' 
-                    : 'hover:bg-accent'
+                    ? 'bg-blue-50 border-l-4 border-blue-500' 
+                    : ''
                 }`}
               >
-                <div className="space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{ticket.subject}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {ticket.customer_email}
-                      </p>
-                    </div>
-                    {ticket.ai_handled && (
-                      <Badge variant="outline" className="text-xs">🤖 IA</Badge>
-                    )}
-                  </div>
+                <div className="flex gap-3">
+                  <ChatAvatar
+                    name={ticket.customer_name || undefined}
+                    email={ticket.customer_email}
+                    size="md"
+                  />
                   
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {getStatusBadge(ticket.status)}
-                    {getPriorityBadge(ticket.priority)}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">
+                          {ticket.customer_name || ticket.customer_email}
+                        </p>
+                      </div>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">
+                        {getCompactTime(ticket.last_message_at)}
+                      </span>
+                    </div>
+                    
+                    <p className="text-xs text-muted-foreground truncate mb-2">
+                      {getMessagePreview(ticket)}
+                    </p>
+                    
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {ticket.status === 'waiting_admin' && (
+                        <Badge variant="destructive" className="text-xs px-2 py-0">
+                          Aguardando
+                        </Badge>
+                      )}
+                      {ticket.tags && ticket.tags.length > 0 && ticket.tags.slice(0, 2).map((tag, i) => (
+                        <Badge key={i} variant="secondary" className="text-xs px-2 py-0">
+                          {tag}
+                        </Badge>
+                      ))}
+                      {ticket.ai_handled && (
+                        <Badge variant="outline" className="text-xs px-2 py-0">
+                          🤖 IA
+                        </Badge>
+                      )}
+                      {ticket.unread_count && ticket.unread_count > 0 && (
+                        <Badge className="text-xs px-2 py-0 bg-blue-500">
+                          {ticket.unread_count}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-
-                  <p className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(ticket.last_message_at), {
-                      addSuffix: true,
-                      locale: ptBR,
-                    })}
-                  </p>
                 </div>
-              </Card>
+              </div>
             ))}
           </div>
         )}

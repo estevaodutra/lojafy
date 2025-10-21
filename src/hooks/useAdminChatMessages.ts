@@ -12,6 +12,8 @@ export interface ChatMessage {
   is_internal: boolean;
   metadata: any;
   created_at: string;
+  read_at?: string;
+  attachments?: any[];
 }
 
 export const useAdminChatMessages = (ticketId: string | null) => {
@@ -70,7 +72,10 @@ export const useAdminChatMessages = (ticketId: string | null) => {
         console.log('📝 [useAdminChatMessages] Last message:', data[data.length - 1].sender_type, data[data.length - 1].content.substring(0, 50));
       }
 
-      setMessages(data || []);
+      setMessages((data || []).map(msg => ({
+        ...msg,
+        attachments: msg.attachments ? (Array.isArray(msg.attachments) ? msg.attachments : []) : []
+      })) as ChatMessage[]);
       console.log('✅ [useAdminChatMessages] Messages loaded successfully:', data?.length || 0);
     } catch (error) {
       console.error('💥 [useAdminChatMessages] Error fetching messages:', error);
