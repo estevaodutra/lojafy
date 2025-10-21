@@ -20,67 +20,67 @@ export const useAdminChatMessages = (ticketId: string | null) => {
   const [sending, setSending] = useState(false);
   const { user } = useAuth();
 
-  useEffect(() => {
+  const fetchMessages = async () => {
     if (!ticketId) {
       console.log('⚠️ [useAdminChatMessages] No ticketId provided');
       setMessages([]);
+      setLoading(false);
       return;
     }
 
-    console.log('🎯 [useAdminChatMessages] Starting fetch for ticket:', ticketId);
+    try {
+      setLoading(true);
+      console.log('🎯 [useAdminChatMessages] Fetching messages for ticket:', ticketId);
+      
+      // Log current user
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      console.log('👤 [useAdminChatMessages] Current user:', currentUser?.id, currentUser?.email);
+      
+      // Check user role (fix: use user_id instead of id)
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('user_id', currentUser?.id)
+        .single();
+      
+      console.log('🔐 [useAdminChatMessages] User role:', profile?.role);
+      if (profileError) console.warn('⚠️ [useAdminChatMessages] Profile error:', profileError);
+      
+      const { data, error, count } = await supabase
+        .from('chat_messages')
+        .select('*', { count: 'exact' })
+        .eq('ticket_id', ticketId)
+        .order('created_at', { ascending: true });
 
-    const fetchMessages = async () => {
-      try {
-        setLoading(true);
-        
-        // Log current user
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        console.log('👤 [useAdminChatMessages] Current user:', currentUser?.id);
-        console.log('👤 [useAdminChatMessages] User email:', currentUser?.email);
-        
-        // Check user role
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', currentUser?.id)
-          .single();
-        
-        console.log('🔐 [useAdminChatMessages] User role:', profile?.role);
-        
-        console.log('🔍 [useAdminChatMessages] Executing query for ticket_id:', ticketId);
-        
-        const { data, error, count } = await supabase
-          .from('chat_messages')
-          .select('*', { count: 'exact' })
-          .eq('ticket_id', ticketId)
-          .order('created_at', { ascending: true });
+      console.log('📊 [useAdminChatMessages] Query result:');
+      console.log('  - Count:', count);
+      console.log('  - Data length:', data?.length);
+      console.log('  - Error:', error);
 
-        console.log('📊 [useAdminChatMessages] Query result:');
-        console.log('  - Count:', count);
-        console.log('  - Data length:', data?.length);
-        console.log('  - Error:', error);
-        console.log('  - Messages:', data);
-
-        if (error) {
-          console.error('❌ [useAdminChatMessages] Supabase error:', error);
-          throw error;
+      if (error) {
+        console.error('❌ [useAdminChatMessages] Query error:', error);
+        if (error.message.includes('RLS') || error.message.includes('policy')) {
+          toast.error('Erro de permissão: você não tem acesso a estas mensagens');
         }
-
-        setMessages(data || []);
-        console.log('✅ [useAdminChatMessages] Messages loaded successfully:', data?.length || 0);
-        
-        if (data && data.length > 0) {
-          console.log('📝 [useAdminChatMessages] First message:', data[0]);
-          console.log('📝 [useAdminChatMessages] Last message:', data[data.length - 1]);
-        }
-      } catch (error) {
-        console.error('💥 [useAdminChatMessages] Error fetching messages:', error);
-        toast.error('Erro ao carregar mensagens');
-      } finally {
-        setLoading(false);
+        throw error;
       }
-    };
 
+      if (data && data.length > 0) {
+        console.log('📝 [useAdminChatMessages] First message:', data[0].sender_type, data[0].content.substring(0, 50));
+        console.log('📝 [useAdminChatMessages] Last message:', data[data.length - 1].sender_type, data[data.length - 1].content.substring(0, 50));
+      }
+
+      setMessages(data || []);
+      console.log('✅ [useAdminChatMessages] Messages loaded successfully:', data?.length || 0);
+    } catch (error) {
+      console.error('💥 [useAdminChatMessages] Error fetching messages:', error);
+      toast.error('Erro ao carregar mensagens');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchMessages();
 
     const channel = supabase
@@ -167,5 +167,6 @@ export const useAdminChatMessages = (ticketId: string | null) => {
     sending,
     sendMessage,
     updateTicketStatus,
+    refetchMessages: fetchMessages,
   };
 };

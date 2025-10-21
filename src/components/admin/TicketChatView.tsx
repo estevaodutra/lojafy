@@ -14,7 +14,7 @@ interface TicketChatViewProps {
 }
 
 export const TicketChatView = ({ ticketId }: TicketChatViewProps) => {
-  const { messages, loading, sending, sendMessage, updateTicketStatus } = useAdminChatMessages(ticketId);
+  const { messages, loading, sending, sendMessage, updateTicketStatus, refetchMessages } = useAdminChatMessages(ticketId);
   const { tickets } = useSupportTickets();
   const [messageContent, setMessageContent] = useState('');
   const [isInternal, setIsInternal] = useState(false);
@@ -39,9 +39,9 @@ export const TicketChatView = ({ ticketId }: TicketChatViewProps) => {
     setIsInternal(false);
   };
 
-  const handleForceReload = () => {
+  const handleForceReload = async () => {
     console.log('🔄 [Force Reload] Recarregando mensagens para ticket:', ticketId);
-    window.location.reload();
+    await refetchMessages();
   };
 
   if (loading) {

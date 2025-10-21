@@ -29,15 +29,32 @@ export const useSupportTickets = () => {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
+      console.log('🔄 [useSupportTickets] Fetching tickets...');
+      
+      const { data, error, count } = await supabase
         .from('support_tickets')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('last_message_at', { ascending: false });
 
-      if (error) throw error;
+      console.log('📊 [useSupportTickets] Result:');
+      console.log('  - Count:', count);
+      console.log('  - Data length:', data?.length);
+      console.log('  - Error:', error);
+      
+      if (data && data.length > 0) {
+        console.log('  - First ticket:', data[0].id, data[0].customer_email);
+        console.log('  - Last ticket:', data[data.length - 1].id, data[data.length - 1].customer_email);
+      }
+
+      if (error) {
+        console.error('❌ [useSupportTickets] Error:', error);
+        throw error;
+      }
+      
       setTickets(data || []);
+      console.log('✅ [useSupportTickets] Tickets loaded successfully');
     } catch (error) {
-      console.error('Erro ao carregar tickets:', error);
+      console.error('💥 [useSupportTickets] Error fetching tickets:', error);
       toast.error('Erro ao carregar tickets de suporte');
     } finally {
       setLoading(false);
@@ -117,11 +134,16 @@ export const useSupportTickets = () => {
     }
   };
 
+  const findTicketByEmail = (email: string) => {
+    return tickets.find(t => t.customer_email.toLowerCase() === email.toLowerCase());
+  };
+
   return {
     tickets,
     loading,
     createTicket,
     updateTicketStatus,
-    refetch: fetchTickets
+    refetch: fetchTickets,
+    findTicketByEmail
   };
 };

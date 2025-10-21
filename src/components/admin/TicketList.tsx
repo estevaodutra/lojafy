@@ -4,10 +4,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useSupportTickets, SupportTicket } from '@/hooks/useSupportTickets';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, MessageSquare } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { RefreshCw, MessageSquare, Search } from 'lucide-react';
 
 interface TicketListProps {
   onSelectTicket: (ticket: SupportTicket) => void;
@@ -18,6 +19,7 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
   const { tickets, loading, refetch } = useSupportTickets();
   const [filter, setFilter] = useState<'all' | 'open' | 'waiting' | 'resolved'>('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -50,13 +52,29 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
     return <Badge className={config.className}>{config.label}</Badge>;
   };
 
-  const filteredTickets = tickets.filter(ticket => {
-    if (filter === 'all') return true;
-    if (filter === 'open') return ticket.status === 'open';
-    if (filter === 'waiting') return ticket.status === 'waiting_admin';
-    if (filter === 'resolved') return ticket.status === 'resolved' || ticket.status === 'closed';
-    return true;
-  });
+  const filteredTickets = useMemo(() => {
+    let filtered = tickets;
+
+    // Filter by status
+    if (filter === 'open') {
+      filtered = filtered.filter(t => t.status === 'open');
+    } else if (filter === 'waiting') {
+      filtered = filtered.filter(t => t.status === 'waiting_admin');
+    } else if (filter === 'resolved') {
+      filtered = filtered.filter(t => t.status === 'resolved' || t.status === 'closed');
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(t =>
+        t.customer_email.toLowerCase().includes(query) ||
+        t.subject.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [tickets, filter, searchQuery]);
 
   const counts = {
     all: tickets.length,
@@ -79,6 +97,17 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
         </div>
+
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por email ou assunto..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
         <div>
           <Tabs value={filter} onValueChange={(v) => setFilter(v as any)}>
             <TabsList className="grid w-full grid-cols-4">

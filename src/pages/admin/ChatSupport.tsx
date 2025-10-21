@@ -1,13 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { SupportMetrics } from '@/components/admin/SupportMetrics';
 import { TicketList } from '@/components/admin/TicketList';
 import { TicketChatView } from '@/components/admin/TicketChatView';
 import { MessageSquare } from 'lucide-react';
-import { SupportTicket } from '@/hooks/useSupportTickets';
+import { SupportTicket, useSupportTickets } from '@/hooks/useSupportTickets';
+import { useSearchParams } from 'react-router-dom';
 
 const ChatSupport = () => {
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
+  const [searchParams] = useSearchParams();
+  const { tickets, loading } = useSupportTickets();
+
+  // Auto-select ticket from URL params or first ticket
+  useEffect(() => {
+    if (loading || tickets.length === 0) return;
+
+    const emailParam = searchParams.get('email');
+    const ticketIdParam = searchParams.get('ticketId');
+
+    console.log('🔍 [ChatSupport] URL params:', { emailParam, ticketIdParam });
+
+    if (emailParam) {
+      const ticket = tickets.find(t => t.customer_email.toLowerCase() === emailParam.toLowerCase());
+      if (ticket) {
+        console.log('✅ [ChatSupport] Auto-selecting ticket by email:', ticket.id, ticket.customer_email);
+        setSelectedTicket(ticket);
+        return;
+      }
+    }
+
+    if (ticketIdParam) {
+      const ticket = tickets.find(t => t.id === ticketIdParam);
+      if (ticket) {
+        console.log('✅ [ChatSupport] Auto-selecting ticket by ID:', ticket.id);
+        setSelectedTicket(ticket);
+        return;
+      }
+    }
+
+    // Auto-select first ticket if none selected
+    if (!selectedTicket && tickets.length > 0) {
+      console.log('🎯 [ChatSupport] Auto-selecting first ticket:', tickets[0].id);
+      setSelectedTicket(tickets[0]);
+    }
+  }, [tickets, loading, searchParams, selectedTicket]);
 
   return (
     <div className="space-y-6">
