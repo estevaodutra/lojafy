@@ -91,8 +91,7 @@ const PublicStoreHeader = ({ store }: PublicStoreHeaderProps) => {
             {store.whatsapp && (
               <Button 
                 onClick={handleWhatsAppContact}
-                className="text-white"
-                style={{ backgroundColor: store.accent_color }}
+                variant="whatsapp"
               >
                 <MessageCircle className="h-4 w-4 mr-2" />
                 WhatsApp
@@ -263,8 +262,8 @@ const PublicStoreHeader = ({ store }: PublicStoreHeaderProps) => {
                           handleWhatsAppContact();
                           setMobileMenuOpen(false);
                         }}
-                        className="w-full text-white"
-                        style={{ backgroundColor: store.accent_color }}
+                        className="w-full"
+                        variant="whatsapp"
                       >
                         <MessageCircle className="mr-2 h-4 w-4" />
                         Falar no WhatsApp
