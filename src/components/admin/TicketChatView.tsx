@@ -29,6 +29,33 @@ export const TicketChatView = ({ ticketId }: TicketChatViewProps) => {
 
   const ticket = tickets.find(t => t.id === ticketId);
 
+  // Group messages by date - MUST be before conditional returns
+  const groupedMessages = useMemo(() => {
+    const groups: { date: Date; messages: typeof messages }[] = [];
+    let currentDate: Date | null = null;
+    let currentGroup: typeof messages = [];
+
+    messages.forEach((message) => {
+      const messageDate = parseISO(message.created_at);
+      
+      if (!currentDate || !isSameDay(currentDate, messageDate)) {
+        if (currentGroup.length > 0) {
+          groups.push({ date: currentDate!, messages: currentGroup });
+        }
+        currentDate = messageDate;
+        currentGroup = [message];
+      } else {
+        currentGroup.push(message);
+      }
+    });
+
+    if (currentGroup.length > 0 && currentDate) {
+      groups.push({ date: currentDate, messages: currentGroup });
+    }
+
+    return groups;
+  }, [messages]);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -68,33 +95,6 @@ export const TicketChatView = ({ ticketId }: TicketChatViewProps) => {
       </Card>
     );
   }
-
-  // Group messages by date
-  const groupedMessages = useMemo(() => {
-    const groups: { date: Date; messages: typeof messages }[] = [];
-    let currentDate: Date | null = null;
-    let currentGroup: typeof messages = [];
-
-    messages.forEach((message) => {
-      const messageDate = parseISO(message.created_at);
-      
-      if (!currentDate || !isSameDay(currentDate, messageDate)) {
-        if (currentGroup.length > 0) {
-          groups.push({ date: currentDate!, messages: currentGroup });
-        }
-        currentDate = messageDate;
-        currentGroup = [message];
-      } else {
-        currentGroup.push(message);
-      }
-    });
-
-    if (currentGroup.length > 0 && currentDate) {
-      groups.push({ date: currentDate, messages: currentGroup });
-    }
-
-    return groups;
-  }, [messages]);
 
   return (
     <Card className="flex flex-col h-[calc(100vh-300px)]">
