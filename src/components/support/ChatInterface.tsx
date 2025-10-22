@@ -5,8 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSupportTickets } from '@/hooks/useSupportTickets';
 import { useChatMessages } from '@/hooks/useChatMessages';
+import { SUPPORT_CATEGORIES } from '@/constants/supportCategories';
 
 interface ChatInterfaceProps {
   isOpen: boolean;
@@ -16,26 +18,26 @@ interface ChatInterfaceProps {
 export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   const [message, setMessage] = useState('');
   const [currentTicketId, setCurrentTicketId] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('outros');
+  const [showCategorySelector, setShowCategorySelector] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { tickets, createTicket } = useSupportTickets();
   const { messages, sending, sendMessage } = useChatMessages(currentTicketId);
 
-  // Usar ticket aberto existente ou criar novo
+  // Buscar ticket existente ou mostrar seletor de categoria
   useEffect(() => {
     if (isOpen && !currentTicketId) {
       const openTicket = tickets.find(t => t.status !== 'closed' && t.status !== 'resolved');
       
       if (openTicket) {
         setCurrentTicketId(openTicket.id);
+        setShowCategorySelector(false);
       } else {
-        // Criar novo ticket
-        createTicket('Atendimento via Chat').then((ticket) => {
-          if (ticket) setCurrentTicketId(ticket.id);
-        });
+        setShowCategorySelector(true);
       }
     }
-  }, [isOpen, tickets, currentTicketId, createTicket]);
+  }, [isOpen, tickets, currentTicketId]);
 
   // Auto scroll para última mensagem
   useEffect(() => {
@@ -43,6 +45,15 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  const handleCreateTicket = async () => {
+    const category = SUPPORT_CATEGORIES.find(c => c.id === selectedCategory);
+    const newTicket = await createTicket(category?.label || 'Atendimento via Chat');
+    if (newTicket) {
+      setCurrentTicketId(newTicket.id);
+      setShowCategorySelector(false);
+    }
+  };
 
   const handleSend = async () => {
     if (!message.trim() || sending) return;
@@ -84,25 +95,69 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
         </Button>
       </div>
 
-      {/* Status do Ticket */}
-      {currentTicket && (
-        <div className="px-4 py-2 border-b bg-muted/50 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Status:</span>
+      {/* Seletor de categoria (primeira interação) */}
+      {showCategorySelector ? (
+        <div className="p-6 space-y-4">
+          <div className="text-center space-y-2">
+            <h4 className="font-semibold text-lg">Como podemos ajudar?</h4>
+            <p className="text-sm text-muted-foreground">
+              Selecione o assunto para iniciar o atendimento
+            </p>
           </div>
-          <Badge variant={
-            currentTicket.status === 'waiting_admin' ? 'default' : 
-            currentTicket.status === 'resolved' ? 'secondary' : 'outline'
-          }>
-            {currentTicket.status === 'open' && 'Aberto'}
-            {currentTicket.status === 'waiting_customer' && 'Aguardando sua resposta'}
-            {currentTicket.status === 'waiting_admin' && 'Aguardando atendente'}
-            {currentTicket.status === 'resolved' && 'Resolvido'}
-            {currentTicket.status === 'closed' && 'Fechado'}
-          </Badge>
+          
+          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione o assunto" />
+            </SelectTrigger>
+            <SelectContent>
+              {SUPPORT_CATEGORIES.map((category) => {
+                const Icon = category.icon;
+                return (
+                  <SelectItem key={category.id} value={category.id}>
+                    <div className="flex items-center gap-2">
+                      <Icon className="h-4 w-4" style={{ color: category.color }} />
+                      <div className="text-left">
+                        <div className="font-medium">{category.label}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {category.description}
+                        </div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+
+          <Button 
+            onClick={handleCreateTicket} 
+            className="w-full"
+            disabled={!selectedCategory}
+          >
+            Iniciar Atendimento
+          </Button>
         </div>
-      )}
+      ) : (
+        <>
+          {/* Status do Ticket */}
+          {currentTicket && (
+            <div className="px-4 py-2 border-b bg-muted/50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Status:</span>
+              </div>
+              <Badge variant={
+                currentTicket.status === 'waiting_admin' ? 'default' : 
+                currentTicket.status === 'resolved' ? 'secondary' : 'outline'
+              }>
+                {currentTicket.status === 'open' && 'Aberto'}
+                {currentTicket.status === 'waiting_customer' && 'Aguardando sua resposta'}
+                {currentTicket.status === 'waiting_admin' && 'Aguardando atendente'}
+                {currentTicket.status === 'resolved' && 'Resolvido'}
+                {currentTicket.status === 'closed' && 'Fechado'}
+              </Badge>
+            </div>
+          )}
 
       {/* Mensagens */}
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
@@ -192,6 +247,8 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
           Pressione Enter para enviar
         </p>
       </div>
+      </>
+      )}
     </Card>
   );
 }

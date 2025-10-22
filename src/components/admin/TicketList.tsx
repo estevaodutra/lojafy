@@ -8,8 +8,10 @@ import { useState, useMemo } from 'react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RefreshCw, MessageSquare, Search } from 'lucide-react';
 import { ChatAvatar } from './ChatAvatar';
+import { SUPPORT_CATEGORIES, getCategoryById } from '@/constants/supportCategories';
 
 interface TicketListProps {
   onSelectTicket: (ticket: SupportTicket) => void;
@@ -19,6 +21,7 @@ interface TicketListProps {
 export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps) => {
   const { tickets, loading, refetch } = useSupportTickets();
   const [filter, setFilter] = useState<'all' | 'open' | 'waiting' | 'resolved'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -58,6 +61,14 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
       filtered = filtered.filter(t => t.status === 'resolved' || t.status === 'closed');
     }
 
+    // Filtro por categoria
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter(t => {
+        const category = t.tags?.[0] || 'outros';
+        return category === categoryFilter;
+      });
+    }
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(t =>
@@ -68,7 +79,7 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
     }
 
     return filtered;
-  }, [tickets, filter, searchQuery]);
+  }, [tickets, filter, categoryFilter, searchQuery]);
 
   const counts = {
     all: tickets.length,
@@ -76,6 +87,15 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
     waiting: tickets.filter(t => t.status === 'waiting_admin').length,
     resolved: tickets.filter(t => t.status === 'resolved' || t.status === 'closed').length,
   };
+
+  // Contar tickets por categoria
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: tickets.length };
+    SUPPORT_CATEGORIES.forEach(cat => {
+      counts[cat.id] = tickets.filter(t => (t.tags?.[0] || 'outros') === cat.id).length;
+    });
+    return counts;
+  }, [tickets]);
 
   return (
     <Card className="h-full flex flex-col">
@@ -118,6 +138,35 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
             </TabsTrigger>
           </TabsList>
         </Tabs>
+
+        {/* Filtro por categoria */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Filtrar por Assunto</label>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todas as categorias" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">
+                Todas as categorias ({categoryCounts.all})
+              </SelectItem>
+              {SUPPORT_CATEGORIES.map((category) => {
+                const Icon = category.icon;
+                return (
+                  <SelectItem key={category.id} value={category.id}>
+                    <div className="flex items-center gap-2">
+                      <Icon className="h-4 w-4" style={{ color: category.color }} />
+                      <span>{category.label}</span>
+                      <span className="text-muted-foreground">
+                        ({categoryCounts[category.id] || 0})
+                      </span>
+                    </div>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <ScrollArea className="flex-1">
@@ -179,11 +228,21 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
                           Aguardando
                         </Badge>
                       )}
-                      {ticket.tags && ticket.tags.length > 0 && ticket.tags.slice(0, 2).map((tag, i) => (
-                        <Badge key={i} variant="secondary" className="text-xs px-2 py-0">
-                          {tag}
-                        </Badge>
-                      ))}
+                      {/* Categoria */}
+                      {ticket.tags && ticket.tags.length > 0 && (() => {
+                        const categoryId = ticket.tags[0];
+                        const category = getCategoryById(categoryId);
+                        if (category) {
+                          const Icon = category.icon;
+                          return (
+                            <Badge key="category" variant="outline" className="text-xs px-2 py-0 flex items-center gap-1">
+                              <Icon className="h-3 w-3" style={{ color: category.color }} />
+                              {category.label}
+                            </Badge>
+                          );
+                        }
+                        return null;
+                      })()}
                       {ticket.ai_handled && (
                         <Badge variant="outline" className="text-xs px-2 py-0">
                           🤖 IA

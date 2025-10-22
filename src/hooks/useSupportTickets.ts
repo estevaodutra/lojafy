@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { getCategoryByKeywords } from '@/constants/supportCategories';
 
 export interface SupportTicket {
   id: string;
@@ -117,6 +118,9 @@ export const useSupportTickets = () => {
     }
 
     try {
+      // Detectar categoria automaticamente baseado no subject
+      const category = getCategoryByKeywords(subject);
+
       const { data, error } = await supabase
         .from('support_tickets')
         .insert({
@@ -125,7 +129,8 @@ export const useSupportTickets = () => {
           customer_email: user.email!,
           subject,
           status: 'open',
-          priority: 'normal'
+          priority: 'normal',
+          tags: [category.id]
         })
         .select()
         .single();

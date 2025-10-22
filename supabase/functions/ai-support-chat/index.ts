@@ -1,6 +1,32 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 
+// Categorias de suporte
+const SUPPORT_CATEGORIES = {
+  pedidos: { keywords: ['pedido', 'compra', 'order', 'status', 'cancelar'] },
+  entrega: { keywords: ['entrega', 'rastreio', 'frete', 'prazo', 'transportadora', 'correios'] },
+  pagamento: { keywords: ['pagamento', 'pagar', 'pix', 'cartão', 'estorno', 'boleto'] },
+  produtos: { keywords: ['produto', 'item', 'estoque', 'disponível', 'especificação'] },
+  trocas: { keywords: ['troca', 'devolução', 'devolver', 'garantia', 'defeito'] },
+  conta: { keywords: ['conta', 'login', 'senha', 'cadastro', 'dados pessoais', 'perfil'] },
+  academia: { keywords: ['academia', 'curso', 'aula', 'vídeo', 'conteúdo educativo'] },
+  comissoes: { keywords: ['comissão', 'repasse', 'vendas', 'ganhos', 'revendedor'] },
+  tecnico: { keywords: ['erro', 'bug', 'problema técnico', 'não funciona', 'travando'] },
+  outros: { keywords: [] }
+};
+
+function detectCategory(text: string): string {
+  const lowerText = text.toLowerCase();
+  
+  for (const [category, config] of Object.entries(SUPPORT_CATEGORIES)) {
+    if (config.keywords.some(keyword => lowerText.includes(keyword))) {
+      return category;
+    }
+  }
+  
+  return 'outros';
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -206,14 +232,28 @@ Palavras-chave para escalação: ${config?.escalation_keywords?.join(', ') || 'n
       throw aiInsertError;
     }
 
-    // 7. Atualizar ticket
+    // 7. Detectar categoria automaticamente
+    const detectedCategory = detectCategory(message);
+
+    // 8. Buscar tags atuais do ticket
+    const { data: currentTicket } = await supabase
+      .from('support_tickets')
+      .select('tags')
+      .eq('id', ticketId)
+      .single();
+
+    const currentTags = currentTicket?.tags || [];
+    const updatedTags = currentTags.length === 0 ? [detectedCategory] : currentTags;
+
+    // 9. Atualizar ticket
     const { error: updateError } = await supabase
       .from('support_tickets')
       .update({
         updated_at: new Date().toISOString(),
         last_message_at: new Date().toISOString(),
         status: needsEscalation ? 'waiting_admin' : 'waiting_customer',
-        ai_handled: !needsEscalation
+        ai_handled: !needsEscalation,
+        tags: updatedTags
       })
       .eq('id', ticketId);
 
