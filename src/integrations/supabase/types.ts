@@ -115,6 +115,68 @@ export type Database = {
           },
         ]
       }
+      ai_pending_questions: {
+        Row: {
+          answer: string | null
+          answered_at: string | null
+          answered_by: string | null
+          asked_count: number | null
+          created_at: string | null
+          first_asked_at: string | null
+          id: string
+          keywords: string[] | null
+          last_asked_at: string | null
+          question: string
+          similar_questions: Json | null
+          status: string
+          ticket_id: string | null
+          updated_at: string | null
+          user_role: string | null
+        }
+        Insert: {
+          answer?: string | null
+          answered_at?: string | null
+          answered_by?: string | null
+          asked_count?: number | null
+          created_at?: string | null
+          first_asked_at?: string | null
+          id?: string
+          keywords?: string[] | null
+          last_asked_at?: string | null
+          question: string
+          similar_questions?: Json | null
+          status?: string
+          ticket_id?: string | null
+          updated_at?: string | null
+          user_role?: string | null
+        }
+        Update: {
+          answer?: string | null
+          answered_at?: string | null
+          answered_by?: string | null
+          asked_count?: number | null
+          created_at?: string | null
+          first_asked_at?: string | null
+          id?: string
+          keywords?: string[] | null
+          last_asked_at?: string | null
+          question?: string
+          similar_questions?: Json | null
+          status?: string
+          ticket_id?: string | null
+          updated_at?: string | null
+          user_role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_pending_questions_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_support_config: {
         Row: {
           ai_tone: string
@@ -2472,18 +2534,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      generate_api_key: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_gtin_ean13: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_order_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      generate_api_key: { Args: never; Returns: string }
+      generate_gtin_ean13: { Args: never; Returns: string }
+      generate_order_number: { Args: never; Returns: string }
       generate_sku: {
         Args: { brand_name?: string; category_name?: string }
         Returns: string
@@ -2517,7 +2570,7 @@ export type Database = {
         }[]
       }
       get_safe_demo_user_data: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           created_at: string
           first_name: string
@@ -2526,7 +2579,7 @@ export type Database = {
         }[]
       }
       get_safe_demo_user_data_for_ranking: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           created_at: string
           first_name: string
@@ -2535,7 +2588,7 @@ export type Database = {
         }[]
       }
       get_safe_order_data_for_public_ranking: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           created_at: string
           id: string
@@ -2544,7 +2597,7 @@ export type Database = {
         }[]
       }
       get_safe_order_data_for_ranking: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           created_at: string
           id: string
@@ -2553,7 +2606,7 @@ export type Database = {
         }[]
       }
       get_users_with_email: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           avatar_url: string
           business_address: string
@@ -2577,10 +2630,7 @@ export type Database = {
         Args: { user_role: Database["public"]["Enums"]["app_role"] }
         Returns: boolean
       }
-      is_admin_user: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      is_admin_user: { Args: never; Returns: boolean }
       send_automatic_notification: {
         Args: {
           p_target_user_ids?: string[]
