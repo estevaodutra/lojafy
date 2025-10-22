@@ -27,6 +27,25 @@ function detectCategory(text: string): string {
   return 'outros';
 }
 
+// Helper function to extract keywords from text
+function extractKeywords(text: string): string[] {
+  const stopWords = ['o', 'a', 'de', 'da', 'do', 'em', 'para', 'com', 'por', 'um', 'uma', 'os', 'as', 'dos', 'das', 'e', 'é'];
+  const words = text.toLowerCase()
+    .replace(/[^\w\sáàãâäéèêëíìîïóòõôöúùûüç]/g, '')
+    .split(/\s+/)
+    .filter(word => word.length > 3 && !stopWords.includes(word));
+  return [...new Set(words)].slice(0, 5);
+}
+
+// Helper function to calculate text similarity
+function calculateSimilarity(text1: string, text2: string): number {
+  const words1 = new Set(extractKeywords(text1));
+  const words2 = new Set(extractKeywords(text2));
+  const intersection = new Set([...words1].filter(x => words2.has(x)));
+  const union = new Set([...words1, ...words2]);
+  return union.size > 0 ? intersection.size / union.size : 0;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -64,6 +83,69 @@ serve(async (req) => {
     if (insertError) {
       console.error('Erro ao salvar mensagem:', insertError);
       throw insertError;
+    }
+
+    // 🆕 STEP 1: Check if there's already an answered question matching this message
+    console.log('Searching for answered questions...');
+    const { data: answeredQuestions, error: aqError } = await supabase
+      .from('ai_pending_questions')
+      .select('*')
+      .eq('status', 'answered')
+      .not('answer', 'is', null);
+
+    if (!aqError && answeredQuestions && answeredQuestions.length > 0) {
+      // Find best match
+      let bestMatch = null;
+      let bestSimilarity = 0;
+
+      for (const aq of answeredQuestions) {
+        const similarity = calculateSimilarity(message, aq.question);
+        if (similarity > bestSimilarity) {
+          bestSimilarity = similarity;
+          bestMatch = aq;
+        }
+      }
+
+      // If we found a good match (>70% similarity), return the saved answer
+      if (bestMatch && bestSimilarity > 0.7) {
+        console.log(`Found matching answer with ${(bestSimilarity * 100).toFixed(1)}% similarity`);
+        
+        // Save AI response
+        await supabase.from('chat_messages').insert({
+          ticket_id: ticketId,
+          sender_type: 'ai',
+          content: bestMatch.answer
+        });
+
+        // Update question stats
+        await supabase
+          .from('ai_pending_questions')
+          .update({
+            asked_count: bestMatch.asked_count + 1,
+            last_asked_at: new Date().toISOString()
+          })
+          .eq('id', bestMatch.id);
+
+        // Update ticket
+        await supabase
+          .from('support_tickets')
+          .update({
+            last_message: bestMatch.answer,
+            last_message_at: new Date().toISOString(),
+            status: 'waiting_customer',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', ticketId);
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: 'Resposta enviada (base de respostas válidas)',
+            usedSavedAnswer: true
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // 2. Buscar perfil do usuário para detectar role
@@ -244,6 +326,38 @@ Palavras-chave para escalação: ${config?.escalation_keywords?.join(', ') || 'n
 
     const currentTags = currentTicket?.tags || [];
     const updatedTags = currentTags.length === 0 ? [detectedCategory] : currentTags;
+
+    // 🆕 STEP 2: Register as pending question if not found in knowledge base
+    console.log('Checking if question should be registered as pending...');
+    const keywords = extractKeywords(message);
+    
+    // Check if similar pending question already exists
+    const { data: existingPending } = await supabase
+      .from('ai_pending_questions')
+      .select('*')
+      .contains('keywords', keywords)
+      .limit(1)
+      .single();
+
+    if (!existingPending && keywords.length > 0) {
+      console.log('Registering new pending question');
+      await supabase.from('ai_pending_questions').insert({
+        question: message,
+        status: 'pending',
+        ticket_id: ticketId,
+        user_role: userRole,
+        keywords: keywords
+      });
+    } else if (existingPending) {
+      // Increment asked count if similar question exists
+      await supabase
+        .from('ai_pending_questions')
+        .update({
+          asked_count: existingPending.asked_count + 1,
+          last_asked_at: new Date().toISOString()
+        })
+        .eq('id', existingPending.id);
+    }
 
     // 9. Atualizar ticket
     const { error: updateError } = await supabase

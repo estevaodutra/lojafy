@@ -9,16 +9,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
-import { Headphones, Plus, Edit, Trash2, Save, Settings, Users, Store, MessageSquare } from 'lucide-react';
+import { Headphones, Plus, Edit, Trash2, Save, Settings, Users, Store, MessageSquare, GraduationCap, BookOpen, MessageSquareText } from 'lucide-react';
 import { useKnowledgeBase } from '@/hooks/useKnowledgeBase';
+import { usePendingQuestions } from '@/hooks/usePendingQuestions';
 import { Separator } from '@/components/ui/separator';
 import { SupportMetrics } from '@/components/admin/SupportMetrics';
 import { TicketList } from '@/components/admin/TicketList';
 import { TicketChatView } from '@/components/admin/TicketChatView';
+import PendingQuestionsTab from '@/components/admin/PendingQuestionsTab';
 import { SupportTicket } from '@/hooks/useSupportTickets';
 
 export default function SupportManagement() {
   const { knowledge, config, loading, createKnowledge, updateKnowledge, deleteKnowledge, updateConfig, refetch } = useKnowledgeBase();
+  const { questions } = usePendingQuestions();
   
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
@@ -38,6 +41,8 @@ export default function SupportManagement() {
     max_response_length: 500,
     escalation_keywords: ''
   });
+
+  const pendingCount = questions.filter(q => q.status === 'pending').length;
 
   // Carregar configuração
   useState(() => {
@@ -386,7 +391,7 @@ export default function SupportManagement() {
       </div>
 
       <Tabs defaultValue="customers" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 max-w-3xl">
+        <TabsList className="grid w-full grid-cols-5 max-w-4xl">
           <TabsTrigger value="customers">
             <Users className="h-4 w-4 mr-2" />
             Clientes
@@ -395,13 +400,22 @@ export default function SupportManagement() {
             <Store className="h-4 w-4 mr-2" />
             Revendedores
           </TabsTrigger>
+          <TabsTrigger value="pending" className="relative">
+            <MessageSquareText className="h-4 w-4 mr-2" />
+            Perguntas
+            {pendingCount > 0 && (
+              <Badge variant="destructive" className="ml-2 h-5 px-1.5 text-xs">
+                {pendingCount}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="chat">
             <MessageSquare className="h-4 w-4 mr-2" />
             Chat
           </TabsTrigger>
           <TabsTrigger value="config">
             <Settings className="h-4 w-4 mr-2" />
-            Configurações
+            Config
           </TabsTrigger>
         </TabsList>
 
@@ -415,6 +429,11 @@ export default function SupportManagement() {
         <TabsContent value="resellers" className="space-y-6">
           <KnowledgeForm />
           <KnowledgeTable audience="reseller" />
+        </TabsContent>
+
+        {/* Tab: Perguntas Pendentes */}
+        <TabsContent value="pending" className="space-y-6">
+          <PendingQuestionsTab />
         </TabsContent>
 
         {/* Tab: Chat */}
@@ -492,34 +511,34 @@ export default function SupportManagement() {
                   id="escalation_keywords"
                   value={configData.escalation_keywords}
                   onChange={(e) => setConfigData({ ...configData, escalation_keywords: e.target.value })}
-                  placeholder="urgente, reclamação, não funciona"
+                  placeholder="não sei, preciso falar com humano, urgente, reclamação"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  A IA transferirá para humano ao detectar essas palavras
+                  Quando detectadas, o ticket será escalado para atendimento humano
                 </p>
               </div>
 
-              <Button onClick={handleSaveConfig}>
+              <Separator />
+
+              <div className="bg-blue-50 border border-blue-200 p-4 rounded-md">
+                <div className="flex items-start gap-3">
+                  <GraduationCap className="h-5 w-5 text-blue-600 mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-blue-900 mb-1">
+                      Integração com Lojafy Academy
+                    </h4>
+                    <p className="text-sm text-blue-800">
+                      A IA automaticamente sugere aulas e cursos da Academy quando identifica que podem 
+                      resolver a dúvida do usuário. As lições são filtradas por nível de acesso (customer/reseller).
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Button onClick={handleSaveConfig} className="w-full">
                 <Save className="h-4 w-4 mr-2" />
                 Salvar Configurações
               </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Integração com Lojafy Academy</CardTitle>
-              <CardDescription>
-                A IA usa automaticamente as descrições das aulas publicadas para sugerir conteúdo educacional relevante
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-muted p-4 rounded-lg">
-                <p className="text-sm">
-                  💡 <strong>Dica:</strong> Adicione descrições detalhadas nas aulas da Lojafy Academy 
-                  para que a IA possa recomendar o conteúdo correto aos usuários.
-                </p>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
