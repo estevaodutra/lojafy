@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { ResellerBanner } from '@/hooks/useResellerBanners';
 
 interface PublicStoreFeaturedBannersProps {
@@ -9,7 +8,7 @@ const PublicStoreFeaturedBanners = ({ banners }: PublicStoreFeaturedBannersProps
   if (banners.length === 0) return null;
 
   const BannerImage = ({ banner }: { banner: ResellerBanner }) => (
-    <div className="group relative overflow-hidden rounded-lg aspect-[2/1] bg-muted transition-transform hover:scale-105">
+    <div className="relative overflow-hidden rounded-lg aspect-[2/1] bg-muted">
       <picture>
         {banner.mobile_image_url && (
           <source 
@@ -24,7 +23,6 @@ const PublicStoreFeaturedBanners = ({ banners }: PublicStoreFeaturedBannersProps
           loading="lazy"
         />
       </picture>
-      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
     </div>
   );
 
@@ -34,21 +32,7 @@ const PublicStoreFeaturedBanners = ({ banners }: PublicStoreFeaturedBannersProps
         <h2 className="text-2xl md:text-3xl font-bold mb-8 text-center">Destaques</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {banners.map((banner) => (
-            <div key={banner.id}>
-              {banner.link_url ? (
-                banner.open_new_tab ? (
-                  <a href={banner.link_url} target="_blank" rel="noopener noreferrer">
-                    <BannerImage banner={banner} />
-                  </a>
-                ) : (
-                  <Link to={banner.link_url}>
-                    <BannerImage banner={banner} />
-                  </Link>
-                )
-              ) : (
-                <BannerImage banner={banner} />
-              )}
-            </div>
+            <BannerImage key={banner.id} banner={banner} />
           ))}
         </div>
       </div>

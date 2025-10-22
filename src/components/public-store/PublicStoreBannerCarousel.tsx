@@ -1,6 +1,5 @@
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import Autoplay from 'embla-carousel-autoplay';
-import { Link } from 'react-router-dom';
 import { ResellerBanner } from '@/hooks/useResellerBanners';
 
 interface PublicStoreBannerCarouselProps {
@@ -32,19 +31,7 @@ const PublicStoreBannerCarousel = ({ banners }: PublicStoreBannerCarouselProps) 
     const banner = banners[0];
     return (
       <section className="relative overflow-hidden">
-        {banner.link_url ? (
-          banner.open_new_tab ? (
-            <a href={banner.link_url} target="_blank" rel="noopener noreferrer">
-              <BannerImage banner={banner} />
-            </a>
-          ) : (
-            <Link to={banner.link_url}>
-              <BannerImage banner={banner} />
-            </Link>
-          )
-        ) : (
-          <BannerImage banner={banner} />
-        )}
+        <BannerImage banner={banner} />
       </section>
     );
   }
@@ -63,19 +50,7 @@ const PublicStoreBannerCarousel = ({ banners }: PublicStoreBannerCarouselProps) 
         <CarouselContent>
           {banners.map((banner) => (
             <CarouselItem key={banner.id}>
-              {banner.link_url ? (
-                banner.open_new_tab ? (
-                  <a href={banner.link_url} target="_blank" rel="noopener noreferrer">
-                    <BannerImage banner={banner} />
-                  </a>
-                ) : (
-                  <Link to={banner.link_url}>
-                    <BannerImage banner={banner} />
-                  </Link>
-                )
-              ) : (
-                <BannerImage banner={banner} />
-              )}
+              <BannerImage banner={banner} />
             </CarouselItem>
           ))}
         </CarouselContent>

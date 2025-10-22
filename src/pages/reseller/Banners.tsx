@@ -72,24 +72,9 @@ const ResellerBanners = () => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="outline" className="text-xs">
-                          Posição {banner.position}
-                        </Badge>
-                        <Badge variant={banner.active ? "default" : "secondary"}>
-                          {banner.active ? "Ativo" : "Inativo"}
-                        </Badge>
-                      </div>
-                      
-                      {banner.link_url && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="text-muted-foreground">Link:</span>
-                          <span className="font-medium truncate">{banner.link_url}</span>
-                          {banner.open_new_tab && (
-                            <Badge variant="outline" className="text-xs">Nova aba</Badge>
-                          )}
-                        </div>
-                      )}
+                      <Badge variant={banner.active ? "default" : "secondary"}>
+                        {banner.active ? "Ativo" : "Inativo"}
+                      </Badge>
                     </div>
                     
                     <div className="flex items-center gap-2 flex-shrink-0">
