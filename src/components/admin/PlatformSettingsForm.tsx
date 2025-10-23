@@ -103,7 +103,7 @@ export const PlatformSettingsForm: React.FC<PlatformSettingsFormProps> = ({ onCl
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="platform_fee_value">Taxa da Plataforma</Label>
+                <Label htmlFor="platform_fee_value">Margem de Lucro Padrão</Label>
                 <div className="flex gap-2">
                   <Input
                     id="platform_fee_value"
@@ -125,6 +125,9 @@ export const PlatformSettingsForm: React.FC<PlatformSettingsFormProps> = ({ onCl
                     </SelectContent>
                   </Select>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Esta margem será aplicada sobre o custo de todos os produtos para calcular o preço de venda automaticamente
+                </p>
               </div>
 
               <div className="space-y-2">

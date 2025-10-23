@@ -16,6 +16,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { ImageUploadArea } from './ImageUploadArea';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useUserRole } from '@/hooks/useUserRole';
+import { useEffect } from 'react';
 import { VariantsManager, ProductVariant } from './VariantsManager';
 import { DimensionsInput } from './DimensionsInput';
 import { CategoryCreationModal } from './CategoryCreationModal';
@@ -24,8 +27,8 @@ import { SubcategoryCreationModal } from './SubcategoryCreationModal';
 const productSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório').max(255, 'Nome muito longo'),
   description: z.string().optional(),
-  cost_price: z.coerce.number().min(0, 'Preço de custo não pode ser negativo').optional(),
-  price: z.coerce.number().min(0.01, 'Preço de venda deve ser maior que zero'),
+  cost_price: z.coerce.number().min(0.01, 'Preço de custo deve ser maior que zero'),
+  price: z.coerce.number().min(0.01, 'Preço de venda deve ser maior que zero').optional(),
   original_price: z.coerce.number().min(0, 'Preço promocional não pode ser negativo').optional(),
   category_id: z.string().uuid('Selecione uma categoria válida'),
   subcategory_id: z.string().optional(),
@@ -56,6 +59,8 @@ interface ProductFormProps {
 
 const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isSuperAdmin } = useUserRole();
+  const { settings } = usePlatformSettings();
   const [specifications, setSpecifications] = useState<{ key: string; value: string }[]>(
     product?.specifications ? Object.entries(product.specifications).map(([key, value]) => ({ key, value: value as string })) : []
   );
@@ -137,6 +142,73 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
   });
 
   const selectedCategoryId = form.watch('category_id');
+  const watchedCostPrice = form.watch('cost_price');
+
+  // Auto-calculate price based on cost_price (only for super_admin)
+  useEffect(() => {
+    if (isSuperAdmin() && watchedCostPrice && settings) {
+      const calculatedPrice = calculatePrice(
+        watchedCostPrice,
+        settings.platform_fee_value,
+        settings.platform_fee_type,
+        settings.gateway_fee_percentage
+      );
+      form.setValue('price', calculatedPrice);
+    }
+  }, [watchedCostPrice, settings, isSuperAdmin, form]);
+
+  // Calculate price based on cost and fees
+  const calculatePrice = (
+    costPrice: number,
+    platformFee: number,
+    platformFeeType: 'percentage' | 'fixed',
+    gatewayFee: number
+  ): number => {
+    let price = costPrice;
+    
+    // Apply platform fee (profit margin)
+    if (platformFeeType === 'percentage') {
+      price += (costPrice * platformFee / 100);
+    } else {
+      price += platformFee;
+    }
+    
+    // Apply gateway fee (transaction fee)
+    price += (costPrice * gatewayFee / 100);
+    
+    // Round to 2 decimal places
+    return Math.round(price * 100) / 100;
+  };
+
+  // Get pricing breakdown for display
+  const getPriceBreakdown = () => {
+    if (!watchedCostPrice || !settings) return null;
+
+    const costPrice = watchedCostPrice;
+    const platformFeeAmount = settings.platform_fee_type === 'percentage'
+      ? (costPrice * settings.platform_fee_value / 100)
+      : settings.platform_fee_value;
+    const gatewayFeeAmount = (costPrice * settings.gateway_fee_percentage / 100);
+    const totalPrice = calculatePrice(
+      costPrice,
+      settings.platform_fee_value,
+      settings.platform_fee_type,
+      settings.gateway_fee_percentage
+    );
+
+    return {
+      costPrice,
+      platformFeeAmount,
+      platformFeeLabel: settings.platform_fee_type === 'percentage' 
+        ? `${settings.platform_fee_value}%` 
+        : `R$ ${settings.platform_fee_value.toFixed(2)}`,
+      gatewayFeeAmount,
+      gatewayFeeLabel: `${settings.gateway_fee_percentage}%`,
+      totalPrice,
+    };
+  };
+
+  const priceBreakdown = getPriceBreakdown();
 
   // Fetch categories
   const { data: categories = [], isLoading: categoriesLoading } = useQuery({
@@ -583,10 +655,22 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         {/* Preços */}
         <Card>
           <CardHeader>
-            <CardTitle>Preços</CardTitle>
-            <CardDescription>
-              Configuração de valores e cálculo de margem de lucro
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Preços</CardTitle>
+                <CardDescription>
+                  {isSuperAdmin() && watchedCostPrice 
+                    ? 'Precificação automática baseada no custo' 
+                    : 'Configuração de valores e margem de lucro'}
+                </CardDescription>
+              </div>
+              {isSuperAdmin() && watchedCostPrice && (
+                <Badge variant="secondary" className="gap-1">
+                  <RefreshCw className="h-3 w-3" />
+                  Automático
+                </Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -595,7 +679,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
                 name="cost_price"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Preço de Custo</FormLabel>
+                    <FormLabel>Preço de Custo *</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
@@ -605,7 +689,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
                       />
                     </FormControl>
                     <FormDescription>
-                      Quanto custou o produto
+                      Base para cálculo automático
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -623,11 +707,15 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
                         type="number" 
                         step="0.01" 
                         placeholder="0,00" 
+                        readOnly={isSuperAdmin() && !!watchedCostPrice}
+                        className={isSuperAdmin() && watchedCostPrice ? 'bg-muted cursor-not-allowed' : ''}
                         {...field}
                       />
                     </FormControl>
                     <FormDescription>
-                      Preço principal do produto
+                      {isSuperAdmin() && watchedCostPrice 
+                        ? 'Calculado automaticamente' 
+                        : 'Preço principal do produto'}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -649,7 +737,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
                       />
                     </FormControl>
                     <FormDescription>
-                      Se preenchido, preço de venda fica taxado
+                      Para mostrar desconto (opcional)
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -657,8 +745,37 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
               />
             </div>
 
-            {/* Profit Calculation */}
-            {(() => {
+            {/* Automatic Price Breakdown */}
+            {isSuperAdmin() && priceBreakdown && (
+              <div className="bg-primary/5 p-4 rounded-lg border border-primary/10">
+                <div className="flex items-center gap-2 mb-3">
+                  <RefreshCw className="h-4 w-4 text-primary" />
+                  <h4 className="text-sm font-semibold">Breakdown de Precificação</h4>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Preço de Custo:</span>
+                    <span className="font-medium">R$ {priceBreakdown.costPrice.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-primary">
+                    <span>+ Margem de Lucro ({priceBreakdown.platformFeeLabel}):</span>
+                    <span className="font-medium">R$ {priceBreakdown.platformFeeAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-primary">
+                    <span>+ Taxa de Transação ({priceBreakdown.gatewayFeeLabel}):</span>
+                    <span className="font-medium">R$ {priceBreakdown.gatewayFeeAmount.toFixed(2)}</span>
+                  </div>
+                  <Separator className="my-2" />
+                  <div className="flex justify-between items-center text-base">
+                    <span className="font-semibold">Preço de Venda Final:</span>
+                    <span className="font-bold text-primary">R$ {priceBreakdown.totalPrice.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Manual Profit Calculation (for non-super-admin or when no cost_price) */}
+            {(!isSuperAdmin() || !watchedCostPrice) && (() => {
               const costPrice = form.watch('cost_price');
               const salePrice = form.watch('price');
               
