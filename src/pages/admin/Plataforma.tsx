@@ -1,21 +1,39 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Shield, Settings, BarChart3, Users, Edit, Loader2 } from 'lucide-react';
+import { Shield, Settings, BarChart3, Users, Loader2, DollarSign, CreditCard, Wallet } from 'lucide-react';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
-import { PlatformSettingsForm } from '@/components/admin/PlatformSettingsForm';
+import { EditableFeeCard } from '@/components/admin/EditableFeeCard';
+import { AdditionalCostsManager } from '@/components/admin/AdditionalCostsManager';
 
 const Plataforma = () => {
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const { settings, isLoading } = usePlatformSettings();
+  const { 
+    settings, 
+    isLoading, 
+    updateSettings,
+    addAdditionalCost,
+    updateAdditionalCost,
+    deleteAdditionalCost,
+  } = usePlatformSettings();
 
-  const formatFeeDisplay = (value: number, type: 'percentage' | 'fixed') => {
-    if (type === 'percentage') {
-      return `${value}%`;
+  const handleUpdateFee = async (
+    field: 'platform_fee' | 'gateway_fee' | 'reseller_withdrawal_fee',
+    value: number,
+    type: 'percentage' | 'fixed'
+  ) => {
+    const updateData: any = {};
+    
+    if (field === 'platform_fee') {
+      updateData.platform_fee_value = value;
+      updateData.platform_fee_type = type;
+    } else if (field === 'gateway_fee') {
+      updateData.gateway_fee_percentage = value;
+    } else if (field === 'reseller_withdrawal_fee') {
+      updateData.reseller_withdrawal_fee_value = value;
+      updateData.reseller_withdrawal_fee_type = type;
     }
-    return `R$ ${value.toFixed(2)}`;
+    
+    updateSettings(updateData);
   };
 
   return (
@@ -36,73 +54,63 @@ const Plataforma = () => {
         </TabsList>
 
         <TabsContent value="configuracoes" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Configurações Gerais
-              </CardTitle>
-              <CardDescription>
-                Configurações básicas da plataforma
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-medium">Taxas da Plataforma</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Configure as taxas cobradas pela plataforma
-                    </p>
-                  </div>
-                  <Button 
-                    onClick={() => setIsSettingsModalOpen(true)}
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-2"
-                  >
-                    <Edit className="h-4 w-4" />
-                    Editar Taxas
-                  </Button>
-                </div>
-                
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                    <span className="ml-2 text-muted-foreground">Carregando configurações...</span>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="p-4 border rounded-lg">
-                      <h4 className="font-medium">Taxa de Transação</h4>
-                      <p className="text-2xl font-bold">
-                        {settings?.gateway_fee_percentage ? `${settings.gateway_fee_percentage}%` : '3.5%'}
-                      </p>
-                      <p className="text-sm text-muted-foreground">Gateway de pagamento</p>
-                    </div>
-                    <div className="p-4 border rounded-lg">
-                      <h4 className="font-medium">Taxa da Plataforma</h4>
-                      <p className="text-2xl font-bold">
-                        {settings ? formatFeeDisplay(settings.platform_fee_value, settings.platform_fee_type) : '5.0%'}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {settings?.platform_fee_type === 'percentage' ? 'Percentual' : 'Valor fixo'}
-                      </p>
-                    </div>
-                    <div className="p-4 border rounded-lg">
-                      <h4 className="font-medium">Taxa de Saque</h4>
-                      <p className="text-2xl font-bold">
-                        {settings ? formatFeeDisplay(settings.reseller_withdrawal_fee_value, settings.reseller_withdrawal_fee_type) : 'R$ 5.00'}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {settings?.reseller_withdrawal_fee_type === 'percentage' ? 'Percentual' : 'Valor fixo'}
-                      </p>
-                    </div>
-                  </div>
-                )}
+          <div>
+            <h2 className="text-xl font-semibold mb-4">Taxas da Plataforma</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Configure as taxas individuais que serão aplicadas no cálculo de preços dos produtos
+            </p>
+            
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-3 text-muted-foreground">Carregando configurações...</span>
               </div>
-            </CardContent>
-          </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <EditableFeeCard
+                  title="Margem de Lucro"
+                  description="Margem padrão aplicada sobre o custo"
+                  value={settings?.platform_fee_value || 5}
+                  type={settings?.platform_fee_type || 'percentage'}
+                  icon={DollarSign}
+                  onUpdate={async (value, type) => {
+                    await handleUpdateFee('platform_fee', value, type);
+                  }}
+                />
+                
+                <EditableFeeCard
+                  title="Taxa de Gateway"
+                  description="Taxa do gateway de pagamento"
+                  value={settings?.gateway_fee_percentage || 3.5}
+                  type="percentage"
+                  icon={CreditCard}
+                  onUpdate={async (value) => {
+                    await handleUpdateFee('gateway_fee', value, 'percentage');
+                  }}
+                />
+                
+                <EditableFeeCard
+                  title="Taxa de Saque"
+                  description="Taxa cobrada no saque do revendedor"
+                  value={settings?.reseller_withdrawal_fee_value || 5}
+                  type={settings?.reseller_withdrawal_fee_type || 'fixed'}
+                  icon={Wallet}
+                  onUpdate={async (value, type) => {
+                    await handleUpdateFee('reseller_withdrawal_fee', value, type);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          {!isLoading && settings && (
+            <AdditionalCostsManager
+              costs={settings.additional_costs || []}
+              onAdd={(cost) => addAdditionalCost(cost)}
+              onUpdate={(costId, updates) => updateAdditionalCost({ costId, updates })}
+              onDelete={(costId) => deleteAdditionalCost(costId)}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="seguranca" className="space-y-4">
@@ -203,16 +211,6 @@ const Plataforma = () => {
           </Card>
         </TabsContent>
       </Tabs>
-
-      {/* Platform Settings Modal */}
-      <Dialog open={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Configurações da Plataforma</DialogTitle>
-          </DialogHeader>
-          <PlatformSettingsForm onClose={() => setIsSettingsModalOpen(false)} />
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

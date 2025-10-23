@@ -1512,6 +1512,7 @@ export type Database = {
       }
       platform_settings: {
         Row: {
+          additional_costs: Json | null
           auto_withdrawal_enabled: boolean | null
           auto_withdrawal_frequency: string | null
           created_at: string | null
@@ -1526,6 +1527,7 @@ export type Database = {
           withdrawal_processing_days: number | null
         }
         Insert: {
+          additional_costs?: Json | null
           auto_withdrawal_enabled?: boolean | null
           auto_withdrawal_frequency?: string | null
           created_at?: string | null
@@ -1540,6 +1542,7 @@ export type Database = {
           withdrawal_processing_days?: number | null
         }
         Update: {
+          additional_costs?: Json | null
           auto_withdrawal_enabled?: boolean | null
           auto_withdrawal_frequency?: string | null
           created_at?: string | null

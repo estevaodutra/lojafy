@@ -188,7 +188,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
   }, [watchedCostPrice, watchedUseAutoPricing, settings, isSuperAdmin, form]);
 
   // Calculate price based on cost and fees
-  // Formula: (cost + profit_margin) / (1 - gateway_fee/100)
+  // Formula: (cost + profit_margin + additional_costs) / (1 - gateway_fee/100)
   // This ensures the gateway fee is calculated on the final price
   const calculatePrice = (
     costPrice: number,
@@ -203,6 +203,19 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       priceBeforeFee += (costPrice * platformFee / 100);
     } else {
       priceBeforeFee += platformFee;
+    }
+    
+    // Apply additional costs (if active)
+    if (settings?.additional_costs && Array.isArray(settings.additional_costs)) {
+      settings.additional_costs.forEach((cost: any) => {
+        if (cost.active) {
+          if (cost.type === 'percentage') {
+            priceBeforeFee += (costPrice * cost.value / 100);
+          } else {
+            priceBeforeFee += cost.value;
+          }
+        }
+      });
     }
     
     // Apply gateway fee on final price (correct formula)
@@ -225,6 +238,22 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       ? (costPrice * settings.platform_fee_value / 100)
       : settings.platform_fee_value;
     
+    // Calculate additional costs total
+    const additionalCosts: Array<{ name: string; amount: number }> = [];
+    let additionalCostsTotal = 0;
+    
+    if (settings.additional_costs && Array.isArray(settings.additional_costs)) {
+      settings.additional_costs.forEach((cost: any) => {
+        if (cost.active) {
+          const costAmount = cost.type === 'percentage'
+            ? (costPrice * cost.value / 100)
+            : cost.value;
+          additionalCosts.push({ name: cost.name, amount: costAmount });
+          additionalCostsTotal += costAmount;
+        }
+      });
+    }
+    
     // Calculate total price first
     const totalPrice = calculatePrice(
       costPrice,
@@ -234,7 +263,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
     );
     
     // Gateway fee is now calculated on the final price (correct method)
-    const gatewayFeeAmount = totalPrice - (costPrice + platformFeeAmount);
+    const gatewayFeeAmount = totalPrice - (costPrice + platformFeeAmount + additionalCostsTotal);
 
     return {
       costPrice,
@@ -242,6 +271,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       platformFeeLabel: settings.platform_fee_type === 'percentage' 
         ? `${settings.platform_fee_value}%` 
         : `R$ ${settings.platform_fee_value.toFixed(2)}`,
+      additionalCosts,
+      additionalCostsTotal,
       gatewayFeeAmount,
       gatewayFeeLabel: `${settings.gateway_fee_percentage}%`,
       totalPrice,
@@ -848,6 +879,12 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
                     <span>+ Margem de Lucro ({priceBreakdown.platformFeeLabel}):</span>
                     <span className="font-medium">R$ {priceBreakdown.platformFeeAmount.toFixed(2)}</span>
                   </div>
+                  {priceBreakdown.additionalCosts && priceBreakdown.additionalCosts.map((cost: any, idx: number) => (
+                    <div key={idx} className="flex justify-between items-center text-blue-600">
+                      <span>+ {cost.name}:</span>
+                      <span className="font-medium">R$ {cost.amount.toFixed(2)}</span>
+                    </div>
+                  ))}
                   <div className="flex justify-between items-center text-primary">
                     <span>+ Taxa de Transação ({priceBreakdown.gatewayFeeLabel}):</span>
                     <span className="font-medium">R$ {priceBreakdown.gatewayFeeAmount.toFixed(2)}</span>

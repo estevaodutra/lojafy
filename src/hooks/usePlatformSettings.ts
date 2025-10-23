@@ -2,6 +2,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+export interface AdditionalCost {
+  id: string;
+  name: string;
+  value: number;
+  type: 'fixed' | 'percentage';
+  active: boolean;
+  created_at: string;
+}
+
 interface PlatformSettings {
   id: string;
   platform_fee_value: number;
@@ -13,6 +22,7 @@ interface PlatformSettings {
   guarantee_period_days: number;
   auto_withdrawal_enabled: boolean;
   auto_withdrawal_frequency: string;
+  additional_costs?: AdditionalCost[];
   created_at: string;
   updated_at: string;
 }
@@ -43,7 +53,13 @@ export const usePlatformSettings = () => {
         throw error;
       }
       
-      return data as PlatformSettings;
+      // Parse additional_costs from JSON
+      const parsedData = {
+        ...data,
+        additional_costs: (data.additional_costs as unknown as AdditionalCost[]) || [],
+      };
+      
+      return parsedData as PlatformSettings;
     },
   });
 
@@ -151,11 +167,109 @@ export const usePlatformSettings = () => {
     };
   };
 
+  const addAdditionalCost = useMutation({
+    mutationFn: async (cost: Omit<AdditionalCost, 'id' | 'created_at'>) => {
+      const newCost: AdditionalCost = {
+        ...cost,
+        id: crypto.randomUUID(),
+        created_at: new Date().toISOString(),
+      };
+
+      const currentCosts = settings?.additional_costs || [];
+      const updatedCosts = [...currentCosts, newCost];
+
+      const { data, error } = await supabase
+        .from('platform_settings')
+        .update({ additional_costs: updatedCosts as any })
+        .eq('id', settings?.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platform-settings'] });
+      toast({ title: "Custo adicionado com sucesso!" });
+    },
+    onError: (error) => {
+      console.error('Error adding cost:', error);
+      toast({
+        title: "Erro ao adicionar custo",
+        description: "Não foi possível adicionar o custo. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const updateAdditionalCost = useMutation({
+    mutationFn: async ({ costId, updates }: { costId: string, updates: Partial<AdditionalCost> }) => {
+      const currentCosts = settings?.additional_costs || [];
+      const updatedCosts = currentCosts.map((cost: AdditionalCost) =>
+        cost.id === costId ? { ...cost, ...updates } : cost
+      );
+
+      const { data, error } = await supabase
+        .from('platform_settings')
+        .update({ additional_costs: updatedCosts as any })
+        .eq('id', settings?.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platform-settings'] });
+      toast({ title: "Custo atualizado com sucesso!" });
+    },
+    onError: (error) => {
+      console.error('Error updating cost:', error);
+      toast({
+        title: "Erro ao atualizar custo",
+        description: "Não foi possível atualizar o custo. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const deleteAdditionalCost = useMutation({
+    mutationFn: async (costId: string) => {
+      const currentCosts = settings?.additional_costs || [];
+      const updatedCosts = currentCosts.filter((cost: AdditionalCost) => cost.id !== costId);
+
+      const { data, error } = await supabase
+        .from('platform_settings')
+        .update({ additional_costs: updatedCosts as any })
+        .eq('id', settings?.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platform-settings'] });
+      toast({ title: "Custo removido com sucesso!" });
+    },
+    onError: (error) => {
+      console.error('Error deleting cost:', error);
+      toast({
+        title: "Erro ao remover custo",
+        description: "Não foi possível remover o custo. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  });
+
   return {
     settings,
     isLoading,
     updateSettings: updateSettings.mutate,
     isUpdating: updateSettings.isPending,
     calculatePriceImpact,
+    addAdditionalCost: addAdditionalCost.mutate,
+    updateAdditionalCost: updateAdditionalCost.mutate,
+    deleteAdditionalCost: deleteAdditionalCost.mutate,
   };
 };
