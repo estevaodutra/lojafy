@@ -27,7 +27,7 @@ import { SubcategoryCreationModal } from './SubcategoryCreationModal';
 const productSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório').max(255, 'Nome muito longo'),
   description: z.string().optional(),
-  cost_price: z.coerce.number().min(0.01, 'Preço de custo deve ser maior que zero'),
+  cost_price: z.coerce.number({ invalid_type_error: 'Preço de custo deve ser um número' }).positive('Preço de custo deve ser maior que zero').min(0.01, 'Preço de custo deve ser maior que zero'),
   price: z.coerce.number().min(0.01, 'Preço de venda deve ser maior que zero').optional(),
   original_price: z.coerce.number().min(0, 'Preço promocional não pode ser negativo').optional(),
   category_id: z.string().uuid('Selecione uma categoria válida'),
@@ -119,8 +119,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
     defaultValues: {
       name: product?.name || '',
       description: product?.description || '',
-      cost_price: product?.cost_price || undefined,
-      price: product?.price || 0,
+      cost_price: product?.cost_price && product.cost_price > 0 ? product.cost_price : undefined,
+      price: product?.price && product.price > 0 ? product.price : 0,
       original_price: product?.original_price || undefined,
       category_id: product?.category_id || '',
       subcategory_id: product?.subcategory_id || 'none',
@@ -146,14 +146,18 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
 
   // Auto-calculate price based on cost_price (only for super_admin)
   useEffect(() => {
-    if (isSuperAdmin() && watchedCostPrice && settings) {
-      const calculatedPrice = calculatePrice(
-        watchedCostPrice,
-        settings.platform_fee_value,
-        settings.platform_fee_type,
-        settings.gateway_fee_percentage
-      );
-      form.setValue('price', calculatedPrice);
+    if (isSuperAdmin() && settings) {
+      const costPrice = Number(watchedCostPrice);
+      // Só calcular se for número válido e maior que zero
+      if (!isNaN(costPrice) && costPrice > 0) {
+        const calculatedPrice = calculatePrice(
+          costPrice,
+          settings.platform_fee_value,
+          settings.platform_fee_type,
+          settings.gateway_fee_percentage
+        );
+        form.setValue('price', calculatedPrice);
+      }
     }
   }, [watchedCostPrice, settings, isSuperAdmin, form]);
 
@@ -182,9 +186,12 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
 
   // Get pricing breakdown for display
   const getPriceBreakdown = () => {
-    if (!watchedCostPrice || !settings) return null;
+    // Validação robusta: deve ser número válido e maior que zero
+    if (!settings || !watchedCostPrice || isNaN(Number(watchedCostPrice)) || Number(watchedCostPrice) <= 0) {
+      return null;
+    }
 
-    const costPrice = watchedCostPrice;
+    const costPrice = Number(watchedCostPrice);
     const platformFeeAmount = settings.platform_fee_type === 'percentage'
       ? (costPrice * settings.platform_fee_value / 100)
       : settings.platform_fee_value;
