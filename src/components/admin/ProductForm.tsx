@@ -146,7 +146,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       cost_price: product?.cost_price && product.cost_price > 0 ? product.cost_price : undefined,
       price: product?.price && product.price > 0 ? product.price : 0,
       original_price: product?.original_price || undefined,
-      use_auto_pricing: product ? false : true, // Desativado para produtos existentes, ativado para novos
+      use_auto_pricing: product?.use_auto_pricing ?? true,
       category_id: product?.category_id || '',
       subcategory_id: product?.subcategory_id || 'none',
       brand: product?.brand || '',
