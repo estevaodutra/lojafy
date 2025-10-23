@@ -66,9 +66,32 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
     product?.specifications ? Object.entries(product.specifications).map(([key, value]) => ({ key, value: value as string })) : []
   );
   const [images, setImages] = useState<any[]>(() => {
-    // Initialize with existing product images if editing
+    // Collect all image URLs from different sources
+    const imageUrls: string[] = [];
+    
+    // Source 1: New format - images array
     if (product?.images && Array.isArray(product.images)) {
-      const initialImages = product.images.map((url: string, index: number) => ({
+      imageUrls.push(...product.images.filter(Boolean));
+    }
+    
+    // Source 2: Legacy format - single image_url
+    if (product?.image_url && typeof product.image_url === 'string') {
+      // Avoid duplicates
+      if (!imageUrls.includes(product.image_url)) {
+        imageUrls.unshift(product.image_url); // Add as first image
+      }
+    }
+    
+    // Source 3: Legacy format - main_image_url
+    if (product?.main_image_url && typeof product.main_image_url === 'string') {
+      if (!imageUrls.includes(product.main_image_url)) {
+        imageUrls.unshift(product.main_image_url);
+      }
+    }
+    
+    // Map URLs to ImageFile format
+    if (imageUrls.length > 0) {
+      const initialImages = imageUrls.map((url: string, index: number) => ({
         id: `existing-${index}`,
         file: null,
         preview: url,
@@ -82,7 +105,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       if (mainCount === 0 && initialImages.length > 0) {
         initialImages[0].isMain = true;
       } else if (mainCount > 1) {
-        // If multiple images are marked as main, keep only the first one found
         let foundMain = false;
         initialImages.forEach(img => {
           if (img.isMain && foundMain) {
@@ -95,6 +117,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       
       return initialImages;
     }
+    
     return [];
   });
   const [variants, setVariants] = useState<ProductVariant[]>([]);
@@ -310,6 +333,28 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       let savedProduct;
       
       if (product?.id) {
+        // VALIDATION: Prevent accidental image loss
+        const hasOriginalImages = product.images && Array.isArray(product.images) && product.images.length > 0;
+        const hasCurrentImages = imageUrls.length > 0;
+        
+        if (hasOriginalImages && !hasCurrentImages) {
+          const confirmClear = window.confirm(
+            '⚠️ ATENÇÃO: Este produto tinha imagens que não estão mais visíveis.\n\n' +
+            'Salvar agora irá REMOVER todas as imagens do produto.\n\n' +
+            'Deseja continuar?'
+          );
+          
+          if (!confirmClear) {
+            setIsSubmitting(false);
+            toast({
+              title: "Operação cancelada",
+              description: "As alterações não foram salvas para proteger as imagens do produto.",
+              variant: "default",
+            });
+            return;
+          }
+        }
+        
         // Update existing product
         const { data: updated, error } = await supabase
           .from('products')
