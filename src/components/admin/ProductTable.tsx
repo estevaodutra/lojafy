@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Edit, Copy, Trash2, Eye, Search, Filter, ExternalLink, Check, X } from 'lucide-react';
+import { MoreHorizontal, Edit, Copy, Trash2, Eye, Search, Filter, ExternalLink, Check, X, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -35,6 +35,7 @@ const ProductTable: React.FC<ProductTableProps> = ({
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [rotationFilter, setRotationFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [isSelectAllChecked, setIsSelectAllChecked] = useState(false);
@@ -54,7 +55,11 @@ const ProductTable: React.FC<ProductTableProps> = ({
                          (statusFilter === 'active' && product.active) ||
                          (statusFilter === 'inactive' && !product.active);
     
-    return matchesSearch && matchesCategory && matchesStatus;
+    const matchesRotation = rotationFilter === 'all' || 
+                           (rotationFilter === 'high' && product.high_rotation) ||
+                           (rotationFilter === 'normal' && !product.high_rotation);
+    
+    return matchesSearch && matchesCategory && matchesStatus && matchesRotation;
   });
 
   // Pagination
@@ -395,6 +400,16 @@ const ProductTable: React.FC<ProductTableProps> = ({
                 <SelectItem value="inactive">Inativo</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={rotationFilter} onValueChange={setRotationFilter}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Rotatividade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="high">Alta Rotatividade</SelectItem>
+                <SelectItem value="normal">Normal</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -536,9 +551,17 @@ const ProductTable: React.FC<ProductTableProps> = ({
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-medium truncate max-w-[200px]" title={product.name}>
-                              {product.name}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium truncate max-w-[200px]" title={product.name}>
+                                {product.name}
+                              </p>
+                              {product.high_rotation && (
+                                <Badge variant="secondary" className="shrink-0">
+                                  <TrendingUp className="h-3 w-3 mr-1" />
+                                  Alta
+                                </Badge>
+                              )}
+                            </div>
                             <p className="text-sm text-muted-foreground">
                               {product.brand || 'Marca não informada'}
                             </p>

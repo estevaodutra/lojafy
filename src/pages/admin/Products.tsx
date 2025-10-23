@@ -134,7 +134,7 @@ const Products = () => {
       </div>
 
       {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Produtos</CardTitle>
@@ -183,6 +183,21 @@ const Products = () => {
             <div className="text-2xl font-bold">{categories.length}</div>
             <p className="text-xs text-muted-foreground">
               Disponíveis
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Alta Rotatividade</CardTitle>
+            <TrendingUp className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">
+              {products.filter(p => p.high_rotation).length}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Produtos em destaque
             </p>
           </CardContent>
         </Card>
