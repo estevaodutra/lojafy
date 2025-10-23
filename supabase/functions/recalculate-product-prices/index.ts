@@ -38,6 +38,20 @@ serve(async (req) => {
       gateway_fee_percentage
     })
 
+    // Fetch platform settings including additional_costs
+    const { data: platformSettings, error: settingsError } = await supabaseClient
+      .from('platform_settings')
+      .select('additional_costs')
+      .single()
+
+    if (settingsError) {
+      console.error('Error fetching platform settings:', settingsError)
+      throw settingsError
+    }
+
+    const additionalCosts = platformSettings?.additional_costs || []
+    console.log('Additional costs to apply:', additionalCosts)
+
     // Fetch all active products with cost_price
     const { data: products, error: fetchError } = await supabaseClient
       .from('products')
@@ -77,8 +91,22 @@ serve(async (req) => {
         newPrice += platform_fee_value
       }
 
-      // Apply gateway fee
-      newPrice += (product.cost_price * gateway_fee_percentage / 100)
+      // Apply additional costs
+      if (Array.isArray(additionalCosts)) {
+        additionalCosts.forEach((cost: any) => {
+          if (cost.active) {
+            if (cost.type === 'percentage') {
+              newPrice += (product.cost_price * cost.value / 100)
+            } else {
+              newPrice += cost.value
+            }
+          }
+        })
+      }
+
+      // Apply gateway fee on final price
+      const priceBeforeFee = newPrice
+      newPrice = priceBeforeFee / (1 - gateway_fee_percentage / 100)
 
       // Round to 2 decimal places
       newPrice = Math.round(newPrice * 100) / 100

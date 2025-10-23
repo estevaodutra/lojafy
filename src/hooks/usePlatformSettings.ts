@@ -262,6 +262,42 @@ export const usePlatformSettings = () => {
     }
   });
 
+  const recalculateAllPrices = useMutation({
+    mutationFn: async () => {
+      if (!settings) {
+        throw new Error('Configurações não carregadas');
+      }
+
+      console.log('Triggering price recalculation for all products...');
+      
+      const { data, error } = await supabase.functions.invoke('recalculate-product-prices', {
+        body: { 
+          platform_fee_value: settings.platform_fee_value,
+          platform_fee_type: settings.platform_fee_type,
+          gateway_fee_percentage: settings.gateway_fee_percentage,
+        }
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      console.log('Recalculation response:', data);
+      toast({
+        title: "✅ Recálculo Iniciado",
+        description: `${data.products_to_update} produtos serão atualizados. Estimativa: ${data.estimated_completion}`,
+      });
+    },
+    onError: (error) => {
+      console.error('Error recalculating prices:', error);
+      toast({
+        title: "❌ Erro ao Recalcular",
+        description: "Não foi possível iniciar o recálculo de preços.",
+        variant: "destructive",
+      });
+    },
+  });
+
   return {
     settings,
     isLoading,
@@ -271,5 +307,7 @@ export const usePlatformSettings = () => {
     addAdditionalCost: addAdditionalCost.mutate,
     updateAdditionalCost: updateAdditionalCost.mutate,
     deleteAdditionalCost: deleteAdditionalCost.mutate,
+    recalculateAllPrices: recalculateAllPrices.mutate,
+    isRecalculating: recalculateAllPrices.isPending,
   };
 };

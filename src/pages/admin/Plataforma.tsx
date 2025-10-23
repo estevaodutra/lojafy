@@ -5,6 +5,8 @@ import { Shield, Settings, BarChart3, Users, Loader2, DollarSign, CreditCard, Wa
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { EditableFeeCard } from '@/components/admin/EditableFeeCard';
 import { AdditionalCostsManager } from '@/components/admin/AdditionalCostsManager';
+import { RecalculatePricesButton } from '@/components/admin/RecalculatePricesButton';
+import { Calculator } from 'lucide-react';
 
 const Plataforma = () => {
   const { 
@@ -14,6 +16,8 @@ const Plataforma = () => {
     addAdditionalCost,
     updateAdditionalCost,
     deleteAdditionalCost,
+    recalculateAllPrices,
+    isRecalculating,
   } = usePlatformSettings();
 
   const handleUpdateFee = async (
@@ -104,12 +108,57 @@ const Plataforma = () => {
           </div>
 
           {!isLoading && settings && (
-            <AdditionalCostsManager
-              costs={settings.additional_costs || []}
-              onAdd={(cost) => addAdditionalCost(cost)}
-              onUpdate={(costId, updates) => updateAdditionalCost({ costId, updates })}
-              onDelete={(costId) => deleteAdditionalCost(costId)}
-            />
+            <>
+              <AdditionalCostsManager
+                costs={settings.additional_costs || []}
+                onAdd={(cost) => addAdditionalCost(cost)}
+                onUpdate={(costId, updates) => updateAdditionalCost({ costId, updates })}
+                onDelete={(costId) => deleteAdditionalCost(costId)}
+              />
+
+              <Card className="border-amber-200 bg-amber-50/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-amber-900">
+                    <Calculator className="h-5 w-5" />
+                    Recálculo Global de Preços
+                  </CardTitle>
+                  <CardDescription className="text-amber-800">
+                    Atualize os preços de todos os produtos com base nas configurações atuais de taxas e custos.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Esta ação aplicará automaticamente as seguintes configurações aos produtos:
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Margem:</span>
+                        <span>{settings.platform_fee_value}{settings.platform_fee_type === 'percentage' ? '%' : ' (fixo)'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Gateway:</span>
+                        <span>{settings.gateway_fee_percentage}%</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Custos Adicionais:</span>
+                        <span>{settings.additional_costs?.filter(c => c.active).length || 0} ativos</span>
+                      </div>
+                    </div>
+                    
+                    <RecalculatePricesButton
+                      onRecalculate={recalculateAllPrices}
+                      isRecalculating={isRecalculating}
+                      productCount={238}
+                      platformFeeValue={settings.platform_fee_value}
+                      platformFeeType={settings.platform_fee_type}
+                      gatewayFeePercentage={settings.gateway_fee_percentage}
+                      additionalCostsCount={settings.additional_costs?.filter(c => c.active).length || 0}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </>
           )}
         </TabsContent>
 
