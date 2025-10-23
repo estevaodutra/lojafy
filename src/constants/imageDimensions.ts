@@ -34,6 +34,13 @@ export const IMAGE_DIMENSIONS = {
     aspectRatio: 1,
     description: "Ícone de benefício",
     recommendedFormat: "PNG com fundo transparente"
+  },
+  COURSE_BANNER: {
+    width: 1600,
+    height: 900,
+    aspectRatio: 16 / 9,
+    description: "Banner do curso (ideal para mobile e desktop)",
+    recommendedFormat: "JPG ou PNG"
   }
 } as const;
 

@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from '@/hooks/use-toast';
 import { Course } from '@/types/courses';
 import { Loader2 } from 'lucide-react';
+import { CourseBannerUpload } from './CourseBannerUpload';
 
 const courseSchema = z.object({
   title: z.string().min(3, 'O título deve ter no mínimo 3 caracteres'),
@@ -163,17 +164,16 @@ export function CourseForm({ open, onOpenChange, course, onSuccess }: CourseForm
             />
           </div>
 
-          {/* URL da Thumbnail */}
+          {/* Banner do Curso */}
           <div className="space-y-2">
-            <Label htmlFor="thumbnail_url">URL da Imagem (Thumbnail)</Label>
-            <Input
-              id="thumbnail_url"
-              {...register('thumbnail_url')}
-              placeholder="https://exemplo.com/imagem.jpg"
+            <Label>Banner do Curso</Label>
+            <CourseBannerUpload
+              onImageUploaded={(url) => setValue('thumbnail_url', url)}
+              currentImage={watch('thumbnail_url')}
             />
-            {errors.thumbnail_url && (
-              <p className="text-sm text-destructive">{errors.thumbnail_url.message}</p>
-            )}
+            <p className="text-sm text-muted-foreground">
+              Dimensões recomendadas: 1600x900px (16:9) - Ideal para mobile e desktop
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
