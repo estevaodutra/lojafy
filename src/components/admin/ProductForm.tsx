@@ -338,6 +338,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         cost_price: data.cost_price || null,
         price: data.price,
         original_price: data.original_price || null,
+        use_auto_pricing: data.use_auto_pricing,
         category_id: data.category_id,
         subcategory_id: data.subcategory_id === 'none' ? null : data.subcategory_id,
         brand: data.brand || null,

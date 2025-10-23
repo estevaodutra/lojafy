@@ -1683,6 +1683,7 @@ export type Database = {
           subcategory_id: string | null
           supplier_id: string | null
           updated_at: string
+          use_auto_pricing: boolean | null
           weight: number | null
           width: number | null
         }
@@ -1716,6 +1717,7 @@ export type Database = {
           subcategory_id?: string | null
           supplier_id?: string | null
           updated_at?: string
+          use_auto_pricing?: boolean | null
           weight?: number | null
           width?: number | null
         }
@@ -1749,6 +1751,7 @@ export type Database = {
           subcategory_id?: string | null
           supplier_id?: string | null
           updated_at?: string
+          use_auto_pricing?: boolean | null
           weight?: number | null
           width?: number | null
         }
