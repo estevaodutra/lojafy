@@ -30,6 +30,7 @@ const productSchema = z.object({
   cost_price: z.coerce.number({ invalid_type_error: 'Preço de custo deve ser um número' }).positive('Preço de custo deve ser maior que zero').min(0.01, 'Preço de custo deve ser maior que zero'),
   price: z.coerce.number().min(0.01, 'Preço de venda deve ser maior que zero').optional(),
   original_price: z.coerce.number().min(0, 'Preço promocional não pode ser negativo').optional(),
+  use_auto_pricing: z.boolean().default(false),
   category_id: z.string().uuid('Selecione uma categoria válida'),
   subcategory_id: z.string().optional(),
   brand: z.string().optional(),
@@ -122,6 +123,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       cost_price: product?.cost_price && product.cost_price > 0 ? product.cost_price : undefined,
       price: product?.price && product.price > 0 ? product.price : 0,
       original_price: product?.original_price || undefined,
+      use_auto_pricing: product ? false : true, // Desativado para produtos existentes, ativado para novos
       category_id: product?.category_id || '',
       subcategory_id: product?.subcategory_id || 'none',
       brand: product?.brand || '',
@@ -143,10 +145,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
 
   const selectedCategoryId = form.watch('category_id');
   const watchedCostPrice = form.watch('cost_price');
+  const watchedUseAutoPricing = form.watch('use_auto_pricing');
 
-  // Auto-calculate price based on cost_price (only for super_admin)
+  // Auto-calculate price based on cost_price (only for super_admin with auto pricing enabled)
   useEffect(() => {
-    if (isSuperAdmin() && settings) {
+    if (isSuperAdmin() && settings && watchedUseAutoPricing) {
       const costPrice = Number(watchedCostPrice);
       // Só calcular se for número válido e maior que zero
       if (!isNaN(costPrice) && costPrice > 0) {
@@ -159,29 +162,32 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         form.setValue('price', calculatedPrice);
       }
     }
-  }, [watchedCostPrice, settings, isSuperAdmin, form]);
+  }, [watchedCostPrice, watchedUseAutoPricing, settings, isSuperAdmin, form]);
 
   // Calculate price based on cost and fees
+  // Formula: (cost + profit_margin) / (1 - gateway_fee/100)
+  // This ensures the gateway fee is calculated on the final price
   const calculatePrice = (
     costPrice: number,
     platformFee: number,
     platformFeeType: 'percentage' | 'fixed',
     gatewayFee: number
   ): number => {
-    let price = costPrice;
+    let priceBeforeFee = costPrice;
     
     // Apply platform fee (profit margin)
     if (platformFeeType === 'percentage') {
-      price += (costPrice * platformFee / 100);
+      priceBeforeFee += (costPrice * platformFee / 100);
     } else {
-      price += platformFee;
+      priceBeforeFee += platformFee;
     }
     
-    // Apply gateway fee (transaction fee)
-    price += (costPrice * gatewayFee / 100);
+    // Apply gateway fee on final price (correct formula)
+    // Gateway fee should be calculated on the final amount, not the cost
+    const finalPrice = priceBeforeFee / (1 - gatewayFee / 100);
     
     // Round to 2 decimal places
-    return Math.round(price * 100) / 100;
+    return Math.round(finalPrice * 100) / 100;
   };
 
   // Get pricing breakdown for display
@@ -195,13 +201,17 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
     const platformFeeAmount = settings.platform_fee_type === 'percentage'
       ? (costPrice * settings.platform_fee_value / 100)
       : settings.platform_fee_value;
-    const gatewayFeeAmount = (costPrice * settings.gateway_fee_percentage / 100);
+    
+    // Calculate total price first
     const totalPrice = calculatePrice(
       costPrice,
       settings.platform_fee_value,
       settings.platform_fee_type,
       settings.gateway_fee_percentage
     );
+    
+    // Gateway fee is now calculated on the final price (correct method)
+    const gatewayFeeAmount = totalPrice - (costPrice + platformFeeAmount);
 
     return {
       costPrice,
@@ -666,12 +676,12 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
               <div>
                 <CardTitle>Preços</CardTitle>
                 <CardDescription>
-                  {isSuperAdmin() && watchedCostPrice 
+                  {isSuperAdmin() && watchedUseAutoPricing 
                     ? 'Precificação automática baseada no custo' 
                     : 'Configuração de valores e margem de lucro'}
                 </CardDescription>
               </div>
-              {isSuperAdmin() && watchedCostPrice && (
+              {isSuperAdmin() && watchedUseAutoPricing && (
                 <Badge variant="secondary" className="gap-1">
                   <RefreshCw className="h-3 w-3" />
                   Automático
@@ -680,6 +690,31 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            {isSuperAdmin() && (
+              <FormField
+                control={form.control}
+                name="use_auto_pricing"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border border-border p-4 bg-muted/30">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">
+                        Precificação Automática
+                      </FormLabel>
+                      <FormDescription>
+                        Calcular preço automaticamente com base no custo, margem e taxas da plataforma
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
@@ -714,13 +749,13 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
                         type="number" 
                         step="0.01" 
                         placeholder="0,00" 
-                        readOnly={isSuperAdmin() && !!watchedCostPrice}
-                        className={isSuperAdmin() && watchedCostPrice ? 'bg-muted cursor-not-allowed' : ''}
+                        readOnly={isSuperAdmin() && watchedUseAutoPricing}
+                        className={isSuperAdmin() && watchedUseAutoPricing ? 'bg-muted cursor-not-allowed' : ''}
                         {...field}
                       />
                     </FormControl>
                     <FormDescription>
-                      {isSuperAdmin() && watchedCostPrice 
+                      {isSuperAdmin() && watchedUseAutoPricing 
                         ? 'Calculado automaticamente' 
                         : 'Preço principal do produto'}
                     </FormDescription>
@@ -753,7 +788,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
             </div>
 
             {/* Automatic Price Breakdown */}
-            {isSuperAdmin() && priceBreakdown && (
+            {isSuperAdmin() && watchedUseAutoPricing && priceBreakdown && (
               <div className="bg-primary/5 p-4 rounded-lg border border-primary/10">
                 <div className="flex items-center gap-2 mb-3">
                   <RefreshCw className="h-4 w-4 text-primary" />
@@ -781,8 +816,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
               </div>
             )}
 
-            {/* Manual Profit Calculation (for non-super-admin or when no cost_price) */}
-            {(!isSuperAdmin() || !watchedCostPrice) && (() => {
+            {/* Manual Profit Calculation (for non-super-admin or when auto pricing is disabled) */}
+            {(!isSuperAdmin() || !watchedUseAutoPricing) && (() => {
               const costPrice = form.watch('cost_price');
               const salePrice = form.watch('price');
               
