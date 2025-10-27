@@ -786,9 +786,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
                       {/* Linha divisória */}
                       <Separator className="my-3" />
-                      
-                      {/* Lucro dos Produtos */}
-                      
 
                       {/* Informações Adicionais (Frete, Taxas, Receita Total) */}
                       {order.shipping_amount && Number(order.shipping_amount) > 0 && <>
