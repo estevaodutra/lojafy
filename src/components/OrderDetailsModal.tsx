@@ -499,33 +499,40 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
     
     const salePrice = Number(item.unit_price);
     
-    // Percentuais fixos (podem ser obtidos de platform_settings futuramente)
-    const profitMarginPercent = 5;      // Margem de Lucro
-    const contingencyPercent = 1;        // Contingenciamento
+    // Percentuais fixos
     const transactionPercent = 4.5;      // Taxa de Transação
+    const contingencyPercent = 1;        // Contingenciamento
     
-    // Cálculo progressivo (formação de preço)
-    const profitMarginAmount = costPrice * (profitMarginPercent / 100);
-    const priceAfterProfit = costPrice + profitMarginAmount;
+    // DECOMPOSIÇÃO REVERSA: Partir do preço de venda e descontar taxas até chegar no lucro
+    // 1. Preço de Venda
+    const startPrice = salePrice;
     
-    const contingencyAmount = priceAfterProfit * (contingencyPercent / 100);
-    const priceAfterContingency = priceAfterProfit + contingencyAmount;
+    // 2. Subtrair Taxa de Transação
+    const transactionAmount = salePrice * (transactionPercent / 100);
+    const afterTransaction = salePrice - transactionAmount;
     
-    const transactionAmount = priceAfterContingency * (transactionPercent / 100);
-    const finalPrice = priceAfterContingency + transactionAmount;
+    // 3. Subtrair Contingenciamento
+    const contingencyAmount = afterTransaction * (contingencyPercent / 100);
+    const afterContingency = afterTransaction - contingencyAmount;
+    
+    // 4. Subtrair Preço de Custo
+    const afterCost = afterContingency - costPrice;
+    
+    // 5. O que sobra é o Lucro Real
+    const realProfit = afterCost;
     
     return {
       costPrice,
       isEstimated,
-      profitMarginPercent,
-      profitMarginAmount,
-      priceAfterProfit,
-      contingencyPercent,
-      contingencyAmount,
-      priceAfterContingency,
+      salePrice: startPrice,
       transactionPercent,
       transactionAmount,
-      finalPrice: salePrice // usar o preço real de venda
+      afterTransaction,
+      contingencyPercent,
+      contingencyAmount,
+      afterContingency,
+      afterCost,
+      realProfit
     };
   };
 
@@ -714,47 +721,58 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                             )}
                           </div>
                           <div className="space-y-1 text-sm">
-                            <div className="flex justify-between">
-                              <span className="font-medium">Preço de Custo:</span>
-                              <span className="font-semibold">{formatPrice(breakdown.costPrice)}</span>
+                            {/* Preço de Venda */}
+                            <div className="flex justify-between font-semibold">
+                              <span>Preço de Venda:</span>
+                              <span className="text-primary">{formatPrice(breakdown.salePrice)}</span>
                             </div>
-                          
-                          <div className="flex justify-between text-green-600 pl-4">
-                            <span>+ Margem de Lucro ({breakdown.profitMarginPercent}%):</span>
-                            <span>
-                              {formatPrice(breakdown.profitMarginAmount)} 
-                              <span className="text-muted-foreground ml-1">
-                                ({formatPrice(breakdown.priceAfterProfit)})
+                            
+                            {/* (-) Taxa de Transação */}
+                            <div className="flex justify-between text-orange-600 pl-4">
+                              <span>(-) Taxa de Transação ({breakdown.transactionPercent}%):</span>
+                              <span>
+                                {formatPrice(breakdown.transactionAmount)} 
+                                <span className="text-muted-foreground ml-1">
+                                  ({formatPrice(breakdown.afterTransaction)})
+                                </span>
                               </span>
-                            </span>
-                          </div>
-                          
-                          <div className="flex justify-between text-blue-600 pl-4">
-                            <span>+ Contingenciamento de Conta ({breakdown.contingencyPercent}%):</span>
-                            <span>
-                              {formatPrice(breakdown.contingencyAmount)} 
-                              <span className="text-muted-foreground ml-1">
-                                ({formatPrice(breakdown.priceAfterContingency)})
+                            </div>
+                            
+                            {/* (-) Contingenciamento */}
+                            <div className="flex justify-between text-blue-600 pl-4">
+                              <span>(-) Contingenciamento de Conta ({breakdown.contingencyPercent}%):</span>
+                              <span>
+                                {formatPrice(breakdown.contingencyAmount)} 
+                                <span className="text-muted-foreground ml-1">
+                                  ({formatPrice(breakdown.afterContingency)})
+                                </span>
                               </span>
-                            </span>
-                          </div>
-                          
-                          <div className="flex justify-between text-orange-600 pl-4">
-                            <span>+ Taxa de Transação ({breakdown.transactionPercent}%):</span>
-                            <span>
-                              {formatPrice(breakdown.transactionAmount)} 
-                              <span className="text-muted-foreground ml-1">
-                                ({formatPrice(breakdown.finalPrice)})
+                            </div>
+                            
+                            {/* (-) Preço de Custo */}
+                            <div className="flex justify-between text-red-600 pl-4">
+                              <span>(-) Preço de Custo do Produto:</span>
+                              <span>
+                                {formatPrice(breakdown.costPrice)} 
+                                <span className="text-green-600 font-semibold ml-1">
+                                  ({formatPrice(breakdown.afterCost)})
+                                </span>
                               </span>
-                            </span>
-                          </div>
-                          
-                          <div className="flex justify-between font-semibold text-base pt-2 mt-2 border-t border-border">
-                            <span>Preço de Venda Final:</span>
-                            <span className="text-primary">{formatPrice(breakdown.finalPrice)}</span>
+                            </div>
+                            
+                            {/* Linha divisória */}
+                            <div className="border-t border-border my-2"></div>
+                            
+                            {/* Lucro */}
+                            <div className="flex justify-between font-semibold text-base text-green-600">
+                              <span className="flex items-center gap-1">
+                                <TrendingUp className="h-4 w-4" />
+                                Lucro:
+                              </span>
+                              <span>{formatPrice(breakdown.realProfit)}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
                       ) : (
                         <div className="mt-3 ml-20 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-300 dark:border-amber-700">
                           <p className="text-xs text-amber-700 dark:text-amber-400">
@@ -778,27 +796,28 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                 {(() => {
                   const financials = calculateOrderFinancials(order);
                   
-                  // Calcular valores reversos (preço de venda -> custo)
-                  const totalSalePrice = financials.subtotal; // Preço de venda dos produtos
+                  // Calcular totais agregados com decomposição reversa
+                  const totalSalePrice = financials.subtotal; // Soma dos preços de venda
                   
-                  // Taxa de transação sobre o preço de venda
-                  const transactionFeePercent = 4.5;
-                  const transactionFeeAmount = totalSalePrice * (transactionFeePercent / 100);
-                  const afterTransaction = totalSalePrice - transactionFeeAmount;
+                  // Taxa de transação sobre o total
+                  const transactionPercent = 4.5;
+                  const transactionAmount = totalSalePrice * (transactionPercent / 100);
+                  const afterTransaction = totalSalePrice - transactionAmount;
                   
                   // Contingenciamento sobre o que sobrou
                   const contingencyPercent = 1;
                   const contingencyAmount = afterTransaction * (contingencyPercent / 100);
                   const afterContingency = afterTransaction - contingencyAmount;
                   
-                  // Margem de lucro sobre o que sobrou
-                  const profitMarginPercent = 5;
-                  const profitMarginAmount = afterContingency * (profitMarginPercent / 100);
-                  const afterProfit = afterContingency - profitMarginAmount;
+                  // Subtrair custo total
+                  const afterCost = afterContingency - financials.totalCost;
+                  
+                  // Lucro real dos produtos
+                  const productProfit = afterCost;
 
                   return (
                     <>
-                      {/* Preço de Venda */}
+                      {/* Preço de Venda Total */}
                       <div className="flex justify-between font-semibold text-base pb-2 border-b">
                         <span>Preço de Venda:</span>
                         <span className="text-primary">{formatPrice(totalSalePrice)}</span>
@@ -807,9 +826,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                       {/* Deduções */}
                       <div className="space-y-2 pl-4">
                         <div className="flex justify-between text-sm text-orange-600">
-                          <span>(-) Taxa de Transação ({transactionFeePercent}%):</span>
+                          <span>(-) Taxa de Transação ({transactionPercent}%):</span>
                           <span>
-                            {formatPrice(transactionFeeAmount)}
+                            {formatPrice(transactionAmount)}
                             <span className="text-muted-foreground ml-2">
                               ({formatPrice(afterTransaction)})
                             </span>
@@ -826,26 +845,30 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                           </span>
                         </div>
 
-                        <div className="flex justify-between text-sm text-green-600 font-medium">
-                          <span>(-) Margem de Lucro ({profitMarginPercent}%):</span>
+                        <div className="flex justify-between text-sm text-red-600">
+                          <span>(-) Preço de Custo dos Produtos:</span>
                           <span>
-                            {formatPrice(profitMarginAmount)}
-                            <span className="text-muted-foreground ml-2">
-                              ({formatPrice(afterProfit)})
+                            {formatPrice(financials.totalCost)}
+                            <span className="text-green-600 font-semibold ml-2">
+                              ({formatPrice(afterCost)})
                             </span>
                           </span>
                         </div>
                       </div>
 
-                      {/* Preço de Custo Final */}
+                      {/* Linha divisória */}
                       <Separator className="my-3" />
                       
-                      <div className="flex justify-between font-semibold text-base bg-muted/30 p-3 rounded-lg">
-                        <span>Preço de Custo:</span>
-                        <span className="text-red-600">{formatPrice(financials.totalCost)}</span>
+                      {/* Lucro dos Produtos */}
+                      <div className="flex justify-between font-semibold text-base text-green-600 bg-green-50 dark:bg-green-950/20 p-3 rounded-lg">
+                        <span className="flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4" />
+                          Lucro:
+                        </span>
+                        <span>{formatPrice(productProfit)}</span>
                       </div>
 
-                      {/* Informações Adicionais */}
+                      {/* Informações Adicionais (Frete, Taxas, Receita Total) */}
                       {(order.shipping_amount && Number(order.shipping_amount) > 0) && (
                         <>
                           <Separator className="my-3" />
@@ -868,7 +891,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                         </>
                       )}
 
-                      {/* Lucro Líquido */}
+                      {/* Lucro Líquido Final */}
                       <Separator className="my-3" />
                       
                       <div className="space-y-2 bg-green-50 dark:bg-green-950/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
