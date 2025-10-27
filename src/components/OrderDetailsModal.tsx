@@ -10,7 +10,6 @@ import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, C
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-
 interface OrderItem {
   id: string;
   product_id: string;
@@ -19,7 +18,6 @@ interface OrderItem {
   total_price: number;
   product_snapshot?: any;
 }
-
 interface OrderFinancials {
   totalCost: number;
   subtotal: number;
@@ -29,14 +27,12 @@ interface OrderFinancials {
   netProfit: number;
   profitMargin: number;
 }
-
 interface OrderStatusHistory {
   id: string;
   status: string;
   notes?: string;
   created_at: string;
 }
-
 interface Order {
   id: string;
   order_number: string;
@@ -54,14 +50,12 @@ interface Order {
   user_id: string;
   order_items: OrderItem[];
 }
-
 interface CustomerProfile {
   first_name: string;
   last_name: string;
   cpf?: string;
   phone?: string;
 }
-
 interface ShippingFile {
   id: string;
   file_name: string;
@@ -69,7 +63,6 @@ interface ShippingFile {
   file_size: number;
   uploaded_at: string;
 }
-
 interface RefundDocument {
   id: string;
   file_name: string;
@@ -78,14 +71,16 @@ interface RefundDocument {
   uploaded_at: string;
   uploaded_by?: string;
 }
-
 interface OrderDetailsModalProps {
   orderId: string | null;
   isOpen: boolean;
   onClose: () => void;
 }
-
-const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, onClose }) => {
+const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
+  orderId,
+  isOpen,
+  onClose
+}) => {
   const [order, setOrder] = useState<Order | null>(null);
   const [customer, setCustomer] = useState<CustomerProfile | null>(null);
   const [statusHistory, setStatusHistory] = useState<OrderStatusHistory[]>([]);
@@ -97,11 +92,13 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
   const [isUploading, setIsUploading] = useState(false);
   const [isRefundUploading, setIsRefundUploading] = useState(false);
   const [currentProductCosts, setCurrentProductCosts] = useState<Record<string, number>>({});
-  const { toast } = useToast();
-  const { profile } = useAuth();
-
+  const {
+    toast
+  } = useToast();
+  const {
+    profile
+  } = useAuth();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
-
   useEffect(() => {
     if (orderId && isOpen) {
       fetchOrderDetails();
@@ -110,15 +107,14 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
       fetchRefundDocuments();
     }
   }, [orderId, isOpen]);
-
   const fetchOrderDetails = async () => {
     if (!orderId) return;
-
     setLoading(true);
     try {
-    const { data, error } = await supabase
-      .from('orders')
-      .select(`
+      const {
+        data,
+        error
+      } = await supabase.from('orders').select(`
         *,
         order_items (
           id,
@@ -128,36 +124,25 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
           total_price,
           product_snapshot
         )
-      `)
-      .eq('id', orderId)
-      .single();
-
+      `).eq('id', orderId).single();
       if (error) throw error;
       setOrder(data);
 
       // Fetch customer profile
       if (data?.user_id) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('first_name, last_name, cpf, phone')
-          .eq('user_id', data.user_id)
-          .single();
-        
+        const {
+          data: profileData
+        } = await supabase.from('profiles').select('first_name, last_name, cpf, phone').eq('user_id', data.user_id).single();
         setCustomer(profileData);
       }
 
       // Fetch current cost prices for products that don't have it in snapshot
-      const productsNeedingCostPrice = data.order_items.filter(
-        (item: any) => !item.product_snapshot?.cost_price
-      );
-
+      const productsNeedingCostPrice = data.order_items.filter((item: any) => !item.product_snapshot?.cost_price);
       if (productsNeedingCostPrice.length > 0) {
         const productIds = productsNeedingCostPrice.map((item: any) => item.product_id);
-        const { data: productsData } = await supabase
-          .from('products')
-          .select('id, cost_price')
-          .in('id', productIds);
-
+        const {
+          data: productsData
+        } = await supabase.from('products').select('id, cost_price').in('id', productIds);
         if (productsData) {
           const costsMap: Record<string, number> = {};
           productsData.forEach(product => {
@@ -172,47 +157,42 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
       setLoading(false);
     }
   };
-
   const fetchStatusHistory = async () => {
     if (!orderId) return;
-
     try {
-      const { data, error } = await supabase
-        .from('order_status_history')
-        .select('*')
-        .eq('order_id', orderId)
-        .order('created_at', { ascending: false });
-
+      const {
+        data,
+        error
+      } = await supabase.from('order_status_history').select('*').eq('order_id', orderId).order('created_at', {
+        ascending: false
+      });
       if (error) throw error;
       setStatusHistory(data || []);
     } catch (error) {
       console.error('Erro ao buscar histórico:', error);
     }
   };
-
   const fetchShippingFiles = async () => {
     if (!orderId) return;
-
     try {
-      const { data, error } = await supabase
-        .from('order_shipping_files')
-        .select('*')
-        .eq('order_id', orderId)
-        .order('uploaded_at', { ascending: false });
-
+      const {
+        data,
+        error
+      } = await supabase.from('order_shipping_files').select('*').eq('order_id', orderId).order('uploaded_at', {
+        ascending: false
+      });
       if (error) throw error;
       setShippingFiles(data || []);
     } catch (error) {
       console.error('Erro ao buscar arquivos de envio:', error);
     }
   };
-
   const downloadShippingFile = async (filePath: string, fileName: string) => {
     try {
-      const { data, error } = await supabase.storage
-        .from('shipping-files')
-        .download(filePath);
-
+      const {
+        data,
+        error
+      } = await supabase.storage.from('shipping-files').download(filePath);
       if (error) {
         console.error('Error downloading file:', error);
         toast({
@@ -233,10 +213,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-
       toast({
         title: "Sucesso",
-        description: "Arquivo baixado com sucesso.",
+        description: "Arquivo baixado com sucesso."
       });
     } catch (error) {
       console.error('Error downloading file:', error);
@@ -247,27 +226,23 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
       });
     }
   };
-
   const fetchRefundDocuments = async () => {
     if (!orderId) return;
-    
     try {
-      const { data, error } = await supabase
-        .from('order_refund_documents')
-        .select('*')
-        .eq('order_id', orderId)
-        .order('uploaded_at', { ascending: false });
-      
+      const {
+        data,
+        error
+      } = await supabase.from('order_refund_documents').select('*').eq('order_id', orderId).order('uploaded_at', {
+        ascending: false
+      });
       if (error) throw error;
       setRefundDocuments(data || []);
     } catch (error) {
       console.error('Erro ao buscar documentos de reembolso:', error);
     }
   };
-
   const handleFileUpload = async (file: File) => {
     if (!orderId || !isAdmin) return;
-
     setIsUploading(true);
     try {
       // Generate unique filename
@@ -276,37 +251,34 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
       const filePath = `${orderId}/${fileName}`;
 
       // Upload file to Supabase Storage
-      const { data, error: uploadError } = await supabase.storage
-        .from('shipping-files')
-        .upload(filePath, file);
-
+      const {
+        data,
+        error: uploadError
+      } = await supabase.storage.from('shipping-files').upload(filePath, file);
       if (uploadError) {
         throw uploadError;
       }
 
       // Insert file record into database
-      const { error: dbError } = await supabase
-        .from('order_shipping_files')
-        .insert({
-          order_id: orderId,
-          file_name: file.name,
-          file_path: filePath,
-          file_size: file.size,
-        });
-
+      const {
+        error: dbError
+      } = await supabase.from('order_shipping_files').insert({
+        order_id: orderId,
+        file_name: file.name,
+        file_path: filePath,
+        file_size: file.size
+      });
       if (dbError) {
         throw dbError;
       }
-
       toast({
         title: "Sucesso",
-        description: "Arquivo enviado com sucesso.",
+        description: "Arquivo enviado com sucesso."
       });
 
       // Refresh shipping files
       fetchShippingFiles();
       setUploadFile(null);
-
     } catch (error) {
       console.error('Error uploading file:', error);
       toast({
@@ -318,41 +290,35 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
       setIsUploading(false);
     }
   };
-
   const handleRefundFileUpload = async (file: File) => {
     if (!orderId || !isAdmin) return;
-    
     setIsRefundUploading(true);
     try {
       const fileExtension = file.name.split('.').pop();
       const fileName = `refund_${Date.now()}.${fileExtension}`;
       const filePath = `${orderId}/${fileName}`;
-      
+
       // Upload to storage
-      const { error: uploadError } = await supabase.storage
-        .from('refund-documents')
-        .upload(filePath, file);
-      
+      const {
+        error: uploadError
+      } = await supabase.storage.from('refund-documents').upload(filePath, file);
       if (uploadError) throw uploadError;
-      
+
       // Insert record
-      const { error: dbError } = await supabase
-        .from('order_refund_documents')
-        .insert({
-          order_id: orderId,
-          file_name: file.name,
-          file_path: filePath,
-          file_size: file.size,
-          uploaded_by: profile?.user_id
-        });
-      
+      const {
+        error: dbError
+      } = await supabase.from('order_refund_documents').insert({
+        order_id: orderId,
+        file_name: file.name,
+        file_path: filePath,
+        file_size: file.size,
+        uploaded_by: profile?.user_id
+      });
       if (dbError) throw dbError;
-      
       toast({
         title: "Sucesso",
         description: "Comprovante enviado com sucesso."
       });
-      
       fetchRefundDocuments();
       setRefundUploadFile(null);
     } catch (error) {
@@ -366,15 +332,13 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
       setIsRefundUploading(false);
     }
   };
-
   const downloadRefundDocument = async (filePath: string, fileName: string) => {
     try {
-      const { data, error } = await supabase.storage
-        .from('refund-documents')
-        .download(filePath);
-      
+      const {
+        data,
+        error
+      } = await supabase.storage.from('refund-documents').download(filePath);
       if (error) throw error;
-      
       const blob = new Blob([data]);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -384,7 +348,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
       toast({
         title: "Sucesso",
         description: "Documento baixado com sucesso."
@@ -398,7 +361,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
       });
     }
   };
-
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -406,72 +368,85 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
-
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pending': return <Clock className="h-4 w-4" />;
-      case 'processing': return <Package className="h-4 w-4" />;
-      case 'shipped': return <Truck className="h-4 w-4" />;
-      case 'delivered': return <CheckCircle className="h-4 w-4" />;
-      case 'cancelled': return <XCircle className="h-4 w-4" />;
-      case 'refunded': return <CheckCircle className="h-4 w-4" />;
-      default: return <Package className="h-4 w-4" />;
+      case 'pending':
+        return <Clock className="h-4 w-4" />;
+      case 'processing':
+        return <Package className="h-4 w-4" />;
+      case 'shipped':
+        return <Truck className="h-4 w-4" />;
+      case 'delivered':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'cancelled':
+        return <XCircle className="h-4 w-4" />;
+      case 'refunded':
+        return <CheckCircle className="h-4 w-4" />;
+      default:
+        return <Package className="h-4 w-4" />;
     }
   };
-
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'pending': return 'Aguardando pagamento';
-      case 'processing': return 'Processando';
-      case 'shipped': return 'Enviado';
-      case 'delivered': return 'Entregue';
-      case 'cancelled': return 'Cancelado';
-      case 'refunded': return 'Reembolsado';
-      default: return 'Desconhecido';
+      case 'pending':
+        return 'Aguardando pagamento';
+      case 'processing':
+        return 'Processando';
+      case 'shipped':
+        return 'Enviado';
+      case 'delivered':
+        return 'Entregue';
+      case 'cancelled':
+        return 'Cancelado';
+      case 'refunded':
+        return 'Reembolsado';
+      default:
+        return 'Desconhecido';
     }
   };
-
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case 'delivered': return 'default';
-      case 'shipped': return 'secondary';
-      case 'processing': return 'outline';
-      case 'pending': return 'outline';
-      case 'cancelled': return 'destructive';
-      case 'refunded': return 'secondary';
-      default: return 'outline';
+      case 'delivered':
+        return 'default';
+      case 'shipped':
+        return 'secondary';
+      case 'processing':
+        return 'outline';
+      case 'pending':
+        return 'outline';
+      case 'cancelled':
+        return 'destructive';
+      case 'refunded':
+        return 'secondary';
+      default:
+        return 'outline';
     }
   };
-
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL',
+      currency: 'BRL'
     }).format(price);
   };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('pt-BR');
   };
-
   const calculateOrderFinancials = (order: Order): OrderFinancials => {
     // Calcular custo total dos produtos (usando fallback para currentProductCosts)
     const totalCost = order.order_items.reduce((acc: number, item: OrderItem) => {
       let costPrice = Number(item.product_snapshot?.cost_price || 0);
-      
+
       // Fallback para custo atual se não estiver no snapshot
       if (!costPrice && currentProductCosts[item.product_id]) {
         costPrice = currentProductCosts[item.product_id];
       }
-      
-      return acc + (costPrice * item.quantity);
+      return acc + costPrice * item.quantity;
     }, 0);
 
     // Calcular subtotal (preço de venda dos produtos)
     const subtotal = order.order_items.reduce((acc: number, item: OrderItem) => {
       return acc + Number(item.total_price);
     }, 0);
-
     const shippingAmount = Number(order.shipping_amount || 0);
     const taxAmount = Number(order.tax_amount || 0);
     const totalRevenue = Number(order.total_amount);
@@ -480,8 +455,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
     const netProfit = totalRevenue - totalCost;
 
     // Margem de lucro = (Lucro / Receita) * 100
-    const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
-
+    const profitMargin = totalRevenue > 0 ? netProfit / totalRevenue * 100 : 0;
     return {
       totalCost,
       subtotal,
@@ -492,41 +466,37 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
       profitMargin
     };
   };
-
   const calculateProductPriceBreakdown = (item: OrderItem) => {
     // Tentar obter cost_price do snapshot primeiro, depois do produto atual
     let costPrice = Number(item.product_snapshot?.cost_price || 0);
     let isEstimated = false;
-    
     if (!costPrice && currentProductCosts[item.product_id]) {
       costPrice = currentProductCosts[item.product_id];
       isEstimated = true;
     }
-    
     const salePrice = Number(item.unit_price);
-    
+
     // Percentuais fixos
-    const transactionPercent = 4.5;      // Taxa de Transação
-    const contingencyPercent = 1;        // Contingenciamento
-    
+    const transactionPercent = 4.5; // Taxa de Transação
+    const contingencyPercent = 1; // Contingenciamento
+
     // DECOMPOSIÇÃO REVERSA: Partir do preço de venda e descontar taxas até chegar no lucro
     // 1. Preço de Venda
     const startPrice = salePrice;
-    
+
     // 2. Subtrair Taxa de Transação
     const transactionAmount = salePrice * (transactionPercent / 100);
     const afterTransaction = salePrice - transactionAmount;
-    
+
     // 3. Subtrair Contingenciamento
     const contingencyAmount = afterTransaction * (contingencyPercent / 100);
     const afterContingency = afterTransaction - contingencyAmount;
-    
+
     // 4. Subtrair Preço de Custo
     const afterCost = afterContingency - costPrice;
-    
+
     // 5. O que sobra é o Lucro Real
     const realProfit = afterCost;
-    
     return {
       costPrice,
       isEstimated,
@@ -541,43 +511,32 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
       realProfit
     };
   };
-
   if (!order && !loading) {
     return null;
   }
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+  return <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <div>
               <div>Pedido #{order?.order_number}</div>
-              {customer && (
-                <div className="text-sm font-normal text-muted-foreground mt-1">
+              {customer && <div className="text-sm font-normal text-muted-foreground mt-1">
                   Cliente: {customer.first_name} {customer.last_name}
-                </div>
-              )}
+                </div>}
             </div>
-            {order && (
-              <Badge variant={getStatusVariant(order.status)} className="flex items-center gap-1">
+            {order && <Badge variant={getStatusVariant(order.status)} className="flex items-center gap-1">
                 {getStatusIcon(order.status)}
                 {getStatusLabel(order.status)}
-              </Badge>
-            )}
+              </Badge>}
           </DialogTitle>
         </DialogHeader>
 
-        {loading ? (
-          <div className="text-center py-12">
+        {loading ? <div className="text-center py-12">
             <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
             <p className="text-muted-foreground mt-2">Carregando detalhes...</p>
-          </div>
-        ) : order ? (
-          <div className="space-y-6">
+          </div> : order ? <div className="space-y-6">
             {/* Customer Info */}
-            {customer && (
-              <Card>
+            {customer && <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
                     <User className="h-4 w-4" />
@@ -590,26 +549,21 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                       <p className="font-medium text-muted-foreground">Nome</p>
                       <p className="font-semibold">{customer.first_name} {customer.last_name}</p>
                     </div>
-                    {customer.cpf && (
-                      <div>
+                    {customer.cpf && <div>
                         <p className="font-medium text-muted-foreground">CPF</p>
                         <p className="font-semibold">{customer.cpf}</p>
-                      </div>
-                    )}
-                    {customer.phone && (
-                      <div>
+                      </div>}
+                    {customer.phone && <div>
                         <p className="font-medium text-muted-foreground">Telefone</p>
                         <p className="font-semibold">{customer.phone}</p>
-                      </div>
-                    )}
+                      </div>}
                     <div>
                       <p className="font-medium text-muted-foreground">Total do Pedido</p>
                       <p className="font-semibold text-lg text-primary">{formatPrice(Number(order.total_amount))}</p>
                     </div>
                   </div>
                 </CardContent>
-              </Card>
-            )}
+              </Card>}
 
             {/* Order Info */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -635,23 +589,16 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                 <CardContent>
                   <div className="space-y-1">
                     <p className="font-semibold">
-                      {order.payment_method === 'pix' ? 'PIX' : 
-                       order.payment_method === 'credit_card' ? 'Cartão de Crédito' : 
-                       order.payment_method || 'Não informado'}
+                      {order.payment_method === 'pix' ? 'PIX' : order.payment_method === 'credit_card' ? 'Cartão de Crédito' : order.payment_method || 'Não informado'}
                     </p>
-                    <p className={`text-sm ${
-                      order.payment_status === 'paid' 
-                        ? 'text-green-600' 
-                        : 'text-amber-600'
-                    }`}>
+                    <p className={`text-sm ${order.payment_status === 'paid' ? 'text-green-600' : 'text-amber-600'}`}>
                       {order.payment_status === 'paid' ? 'Pago' : 'Pendente'}
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              {order.tracking_number && (
-                <Card>
+              {order.tracking_number && <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm flex items-center gap-2">
                       <Truck className="h-4 w-4" />
@@ -664,8 +611,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                       Rastrear Pedido
                     </Button>
                   </CardContent>
-                </Card>
-              )}
+                </Card>}
             </div>
 
             {/* Products */}
@@ -676,24 +622,14 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
               <CardContent>
                 <div className="space-y-4">
                 {order.order_items.map((item, index) => {
-                  const product = item.product_snapshot;
-                  const breakdown = calculateProductPriceBreakdown(item);
-                  
-                  return (
-                    <div key={index} className="pb-4 border-b border-border last:border-0">
+                const product = item.product_snapshot;
+                const breakdown = calculateProductPriceBreakdown(item);
+                return <div key={index} className="pb-4 border-b border-border last:border-0">
                       <div className="flex items-center gap-4">
-                        {product?.image_url && (
-                          <img 
-                            src={product.image_url} 
-                            alt={product.name}
-                            className="w-16 h-16 object-cover rounded-lg"
-                          />
-                        )}
+                        {product?.image_url && <img src={product.image_url} alt={product.name} className="w-16 h-16 object-cover rounded-lg" />}
                         <div className="flex-1">
                           <h4 className="font-semibold">{product?.name || 'Produto'}</h4>
-                          {product?.brand && (
-                            <p className="text-sm text-muted-foreground">{product.brand}</p>
-                          )}
+                          {product?.brand && <p className="text-sm text-muted-foreground">{product.brand}</p>}
                           <p className="text-sm text-muted-foreground">
                             Quantidade: {item.quantity} • Preço unitário: {formatPrice(Number(item.unit_price))}
                           </p>
@@ -702,29 +638,21 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                           <div className="text-right">
                             <p className="font-semibold">{formatPrice(Number(item.total_price))}</p>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => window.open(`/produto/${item.product_id}`, '_blank')}
-                            title="Ver página do produto"
-                          >
+                          <Button variant="outline" size="sm" onClick={() => window.open(`/produto/${item.product_id}`, '_blank')} title="Ver página do produto">
                             <Eye className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
 
                       {/* Breakdown de Precificação */}
-                      {breakdown.costPrice > 0 ? (
-                        <div className="mt-3 ml-20 p-3 bg-muted/20 rounded-lg border border-border/50">
+                      {breakdown.costPrice > 0 ? <div className="mt-3 ml-20 p-3 bg-muted/20 rounded-lg border border-border/50">
                           <div className="flex items-center justify-between mb-2">
                             <p className="text-xs font-semibold text-muted-foreground">
                               📊 Composição de Preço (por unidade)
                             </p>
-                            {breakdown.isEstimated && (
-                              <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700">
+                            {breakdown.isEstimated && <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700">
                                 ⚠️ Custo Estimado
-                              </Badge>
-                            )}
+                              </Badge>}
                           </div>
                           <div className="space-y-1 text-sm">
                             {/* Preço de Venda */}
@@ -778,17 +706,13 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                               <span>{formatPrice(breakdown.realProfit)}</span>
                             </div>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="mt-3 ml-20 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-300 dark:border-amber-700">
+                        </div> : <div className="mt-3 ml-20 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-300 dark:border-amber-700">
                           <p className="text-xs text-amber-700 dark:text-amber-400">
                             ⚠️ Preço de custo não disponível para este produto
                           </p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        </div>}
+                    </div>;
+              })}
                 </div>
               </CardContent>
             </Card>
@@ -800,29 +724,27 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
               </CardHeader>
               <CardContent className="space-y-3">
                 {(() => {
-                  const financials = calculateOrderFinancials(order);
-                  
-                  // Calcular totais agregados com decomposição reversa
-                  const totalSalePrice = financials.subtotal; // Soma dos preços de venda
-                  
-                  // Taxa de transação sobre o total
-                  const transactionPercent = 4.5;
-                  const transactionAmount = totalSalePrice * (transactionPercent / 100);
-                  const afterTransaction = totalSalePrice - transactionAmount;
-                  
-                  // Contingenciamento sobre o que sobrou
-                  const contingencyPercent = 1;
-                  const contingencyAmount = afterTransaction * (contingencyPercent / 100);
-                  const afterContingency = afterTransaction - contingencyAmount;
-                  
-                  // Subtrair custo total
-                  const afterCost = afterContingency - financials.totalCost;
-                  
-                  // Lucro real dos produtos
-                  const productProfit = afterCost;
+              const financials = calculateOrderFinancials(order);
 
-                  return (
-                    <>
+              // Calcular totais agregados com decomposição reversa
+              const totalSalePrice = financials.subtotal; // Soma dos preços de venda
+
+              // Taxa de transação sobre o total
+              const transactionPercent = 4.5;
+              const transactionAmount = totalSalePrice * (transactionPercent / 100);
+              const afterTransaction = totalSalePrice - transactionAmount;
+
+              // Contingenciamento sobre o que sobrou
+              const contingencyPercent = 1;
+              const contingencyAmount = afterTransaction * (contingencyPercent / 100);
+              const afterContingency = afterTransaction - contingencyAmount;
+
+              // Subtrair custo total
+              const afterCost = afterContingency - financials.totalCost;
+
+              // Lucro real dos produtos
+              const productProfit = afterCost;
+              return <>
                       {/* Preço de Venda Total */}
                       <div className="flex justify-between font-semibold text-base pb-2 border-b">
                         <span>Preço de Venda:</span>
@@ -866,36 +788,26 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                       <Separator className="my-3" />
                       
                       {/* Lucro dos Produtos */}
-                      <div className="flex justify-between font-semibold text-base text-green-600 bg-green-50 dark:bg-green-950/20 p-3 rounded-lg">
-                        <span className="flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4" />
-                          Lucro:
-                        </span>
-                        <span>{formatPrice(productProfit)}</span>
-                      </div>
+                      
 
                       {/* Informações Adicionais (Frete, Taxas, Receita Total) */}
-                      {(order.shipping_amount && Number(order.shipping_amount) > 0) && (
-                        <>
+                      {order.shipping_amount && Number(order.shipping_amount) > 0 && <>
                           <Separator className="my-3" />
                           <div className="space-y-2 text-sm">
                             <div className="flex justify-between text-muted-foreground">
                               <span>+ Frete cobrado:</span>
                               <span className="font-medium">{formatPrice(Number(order.shipping_amount))}</span>
                             </div>
-                            {order.tax_amount && Number(order.tax_amount) > 0 && (
-                              <div className="flex justify-between text-muted-foreground">
+                            {order.tax_amount && Number(order.tax_amount) > 0 && <div className="flex justify-between text-muted-foreground">
                                 <span>+ Taxas adicionais:</span>
                                 <span className="font-medium">{formatPrice(Number(order.tax_amount))}</span>
-                              </div>
-                            )}
+                              </div>}
                             <div className="flex justify-between font-semibold pt-2 border-t">
                               <span>Receita Total:</span>
                               <span className="text-primary">{formatPrice(Number(order.total_amount))}</span>
                             </div>
                           </div>
-                        </>
-                      )}
+                        </>}
 
                       {/* Lucro Líquido Final */}
                       <Separator className="my-3" />
@@ -906,96 +818,63 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                             <TrendingUp className="h-4 w-4 text-green-600" />
                             Lucro Líquido Real:
                           </span>
-                          <span className={
-                            financials.netProfit >= 0 
-                              ? "text-green-600" 
-                              : "text-red-600"
-                          }>
+                          <span className={financials.netProfit >= 0 ? "text-green-600" : "text-red-600"}>
                             {formatPrice(financials.netProfit)}
                           </span>
                         </div>
                         
                         <div className="flex justify-between text-sm text-muted-foreground">
                           <span>Margem de Lucro Real:</span>
-                          <span className={`font-medium ${
-                            financials.profitMargin >= 0 
-                              ? "text-green-600" 
-                              : "text-red-600"
-                          }`}>
+                          <span className={`font-medium ${financials.profitMargin >= 0 ? "text-green-600" : "text-red-600"}`}>
                             {financials.profitMargin.toFixed(2)}%
                           </span>
                         </div>
                       </div>
-                    </>
-                  );
-                })()}
+                    </>;
+            })()}
               </CardContent>
             </Card>
 
             {/* Shipping Files */}
-            {(shippingFiles.length > 0 || isAdmin) && (
-              <Card>
+            {(shippingFiles.length > 0 || isAdmin) && <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4" />
                       Etiquetas de Envio
                     </div>
-                    {isAdmin && (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) setUploadFile(file);
-                          }}
-                          className="hidden"
-                          id="file-upload"
-                        />
-                        <Label
-                          htmlFor="file-upload"
-                          className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 py-2"
-                        >
+                    {isAdmin && <div className="flex items-center gap-2">
+                        <Input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) setUploadFile(file);
+                }} className="hidden" id="file-upload" />
+                        <Label htmlFor="file-upload" className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 py-2">
                           <Upload className="h-4 w-4 mr-2" />
                           Enviar Arquivo
                         </Label>
-                      </div>
-                    )}
+                      </div>}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {uploadFile && isAdmin && (
-                    <div className="mb-4 p-3 border border-border rounded-lg bg-muted/50">
+                  {uploadFile && isAdmin && <div className="mb-4 p-3 border border-border rounded-lg bg-muted/50">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4" />
                           <span className="text-sm font-medium">{uploadFile.name}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleFileUpload(uploadFile)}
-                            disabled={isUploading}
-                          >
+                          <Button size="sm" onClick={() => handleFileUpload(uploadFile)} disabled={isUploading}>
                             {isUploading ? "Enviando..." : "Confirmar"}
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setUploadFile(null)}
-                          >
+                          <Button size="sm" variant="outline" onClick={() => setUploadFile(null)}>
                             Cancelar
                           </Button>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    </div>}
                   
                   <div className="space-y-3">
-                    {shippingFiles.length > 0 ? (
-                      shippingFiles.map((file) => (
-                        <div key={file.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                    {shippingFiles.length > 0 ? shippingFiles.map(file => <div key={file.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
                           <div className="flex items-center gap-3">
                             <div className="flex items-center justify-center w-10 h-10 bg-primary/10 rounded-lg">
                               <FileText className="h-5 w-5 text-primary" />
@@ -1007,102 +886,67 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                               </p>
                             </div>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => downloadShippingFile(file.file_path, file.file_name)}
-                          >
+                          <Button variant="outline" size="sm" onClick={() => downloadShippingFile(file.file_path, file.file_name)}>
                             <Download className="h-4 w-4 mr-2" />
                             Baixar
                           </Button>
-                        </div>
-                      ))
-                    ) : !isAdmin ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">
+                        </div>) : !isAdmin ? <p className="text-sm text-muted-foreground text-center py-4">
                         Nenhuma etiqueta disponível para este pedido.
-                      </p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground text-center py-4">
+                      </p> : <p className="text-sm text-muted-foreground text-center py-4">
                         Nenhuma etiqueta enviada ainda. Use o botão acima para fazer upload.
-                      </p>
-                    )}
+                      </p>}
                   </div>
                 </CardContent>
-              </Card>
-            )}
+              </Card>}
 
             {/* Refund Documents - Only show if order is refunded or if admin */}
-            {(order.status === 'refunded' || isAdmin) && (
-              <Card>
+            {(order.status === 'refunded' || isAdmin) && <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-amber-600" />
                       Comprovantes de Reembolso (PDF)
                     </div>
-                    {isAdmin && (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="file"
-                          accept=".pdf"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file && file.type === 'application/pdf') {
-                              setRefundUploadFile(file);
-                            } else {
-                              toast({
-                                title: "Erro",
-                                description: "Por favor, selecione apenas arquivos PDF.",
-                                variant: "destructive"
-                              });
-                            }
-                          }}
-                          className="hidden"
-                          id="refund-file-upload"
-                        />
-                        <Label
-                          htmlFor="refund-file-upload"
-                          className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 py-2"
-                        >
+                    {isAdmin && <div className="flex items-center gap-2">
+                        <Input type="file" accept=".pdf" onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file && file.type === 'application/pdf') {
+                    setRefundUploadFile(file);
+                  } else {
+                    toast({
+                      title: "Erro",
+                      description: "Por favor, selecione apenas arquivos PDF.",
+                      variant: "destructive"
+                    });
+                  }
+                }} className="hidden" id="refund-file-upload" />
+                        <Label htmlFor="refund-file-upload" className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 py-2">
                           <Upload className="h-4 w-4 mr-2" />
                           Enviar PDF
                         </Label>
-                      </div>
-                    )}
+                      </div>}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {refundUploadFile && isAdmin && (
-                    <div className="mb-4 p-3 border border-amber-200 rounded-lg bg-amber-50">
+                  {refundUploadFile && isAdmin && <div className="mb-4 p-3 border border-amber-200 rounded-lg bg-amber-50">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 text-amber-600" />
                           <span className="text-sm font-medium text-amber-900">{refundUploadFile.name}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleRefundFileUpload(refundUploadFile)}
-                            disabled={isRefundUploading}
-                          >
+                          <Button size="sm" onClick={() => handleRefundFileUpload(refundUploadFile)} disabled={isRefundUploading}>
                             {isRefundUploading ? "Enviando..." : "Confirmar"}
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setRefundUploadFile(null)}
-                          >
+                          <Button size="sm" variant="outline" onClick={() => setRefundUploadFile(null)}>
                             Cancelar
                           </Button>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    </div>}
                   
                   <div className="space-y-3">
-                    {refundDocuments.length > 0 ? (
-                      refundDocuments.map((doc) => (
-                        <div key={doc.id} className="flex items-center justify-between p-3 border border-amber-200 rounded-lg bg-amber-50">
+                    {refundDocuments.length > 0 ? refundDocuments.map(doc => <div key={doc.id} className="flex items-center justify-between p-3 border border-amber-200 rounded-lg bg-amber-50">
                           <div className="flex items-center gap-3">
                             <div className="flex items-center justify-center w-10 h-10 bg-amber-100 rounded-lg">
                               <FileText className="h-5 w-5 text-amber-600" />
@@ -1114,36 +958,22 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                               </p>
                             </div>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => downloadRefundDocument(doc.file_path, doc.file_name)}
-                            className="border-amber-300 hover:bg-amber-100"
-                          >
+                          <Button variant="outline" size="sm" onClick={() => downloadRefundDocument(doc.file_path, doc.file_name)} className="border-amber-300 hover:bg-amber-100">
                             <Download className="h-4 w-4 mr-2" />
                             Baixar PDF
                           </Button>
-                        </div>
-                      ))
-                    ) : !isAdmin ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">
+                        </div>) : !isAdmin ? <p className="text-sm text-muted-foreground text-center py-4">
                         Nenhum comprovante disponível.
-                      </p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground text-center py-4">
+                      </p> : <p className="text-sm text-muted-foreground text-center py-4">
                         Nenhum comprovante enviado. Use o botão acima para fazer upload de PDFs.
-                      </p>
-                    )}
+                      </p>}
                   </div>
                 </CardContent>
-              </Card>
-            )}
+              </Card>}
 
             {/* Addresses */}
-            {(order.shipping_address || order.billing_address) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {order.shipping_address && (
-                  <Card>
+            {(order.shipping_address || order.billing_address) && <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {order.shipping_address && <Card>
                     <CardHeader>
                       <CardTitle className="text-sm flex items-center gap-2">
                         <MapPin className="h-4 w-4" />
@@ -1157,11 +987,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                       <p>{order.shipping_address.city} - {order.shipping_address.state}</p>
                       <p>CEP: {order.shipping_address.zip_code}</p>
                     </CardContent>
-                  </Card>
-                )}
+                  </Card>}
 
-                {order.billing_address && (
-                  <Card>
+                {order.billing_address && <Card>
                     <CardHeader>
                       <CardTitle className="text-sm flex items-center gap-2">
                         <CreditCard className="h-4 w-4" />
@@ -1175,14 +1003,11 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                       <p>{order.billing_address.city} - {order.billing_address.state}</p>
                       <p>CEP: {order.billing_address.zip_code}</p>
                     </CardContent>
-                  </Card>
-                )}
-              </div>
-            )}
+                  </Card>}
+              </div>}
 
             {/* Status History */}
-            {statusHistory.length > 0 && (
-              <Card>
+            {statusHistory.length > 0 && <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Clock className="h-4 w-4" />
@@ -1191,8 +1016,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {statusHistory.map((item) => (
-                      <div key={item.id} className="flex items-start gap-3">
+                    {statusHistory.map(item => <div key={item.id} className="flex items-start gap-3">
                         <div className="flex items-center justify-center w-8 h-8 bg-primary/10 rounded-full mt-0.5">
                           {getStatusIcon(item.status)}
                         </div>
@@ -1201,37 +1025,26 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                             <p className="font-medium">{getStatusLabel(item.status)}</p>
                             <p className="text-sm text-muted-foreground">{formatDate(item.created_at)}</p>
                           </div>
-                          {item.notes && (
-                            <p className="text-sm text-muted-foreground mt-1">{item.notes}</p>
-                          )}
+                          {item.notes && <p className="text-sm text-muted-foreground mt-1">{item.notes}</p>}
                         </div>
-                      </div>
-                    ))}
+                      </div>)}
                   </div>
                 </CardContent>
-              </Card>
-            )}
+              </Card>}
 
             {/* Order Notes */}
-            {order.notes && (
-              <Card>
+            {order.notes && <Card>
                 <CardHeader>
                   <CardTitle>Observações</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm">{order.notes}</p>
                 </CardContent>
-              </Card>
-            )}
-          </div>
-        ) : (
-          <div className="text-center py-12">
+              </Card>}
+          </div> : <div className="text-center py-12">
             <p className="text-muted-foreground">Pedido não encontrado.</p>
-          </div>
-        )}
+          </div>}
       </DialogContent>
-    </Dialog>
-  );
+    </Dialog>;
 };
-
 export default OrderDetailsModal;
