@@ -455,10 +455,16 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
   };
 
   const calculateOrderFinancials = (order: Order): OrderFinancials => {
-    // Calcular custo total dos produtos
+    // Calcular custo total dos produtos (usando fallback para currentProductCosts)
     const totalCost = order.order_items.reduce((acc: number, item: OrderItem) => {
-      const costPrice = item.product_snapshot?.cost_price || 0;
-      return acc + (Number(costPrice) * item.quantity);
+      let costPrice = Number(item.product_snapshot?.cost_price || 0);
+      
+      // Fallback para custo atual se não estiver no snapshot
+      if (!costPrice && currentProductCosts[item.product_id]) {
+        costPrice = currentProductCosts[item.product_id];
+      }
+      
+      return acc + (costPrice * item.quantity);
     }, 0);
 
     // Calcular subtotal (preço de venda dos produtos)
