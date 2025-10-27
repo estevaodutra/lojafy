@@ -44,11 +44,6 @@ const supplierMenuItems = [
     url: '/supplier/vendas',
     icon: TrendingUp,
   },
-  {
-    title: 'Relatórios',
-    url: '/supplier/relatorios',
-    icon: BarChart3,
-  },
 ];
 
 const SupplierSidebar = () => {

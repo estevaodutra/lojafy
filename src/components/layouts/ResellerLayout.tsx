@@ -84,11 +84,6 @@ const resellerMenuItems = [
     url: '/reseller/metas',
     icon: Target,
   },
-  {
-    title: 'Relatórios',
-    url: '/reseller/relatorios',
-    icon: BarChart3,
-  },
 ];
 
 const ResellerSidebar = () => {

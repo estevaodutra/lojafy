@@ -579,60 +579,6 @@ export type Database = {
         }
         Relationships: []
       }
-      daily_sales_reports: {
-        Row: {
-          created_at: string
-          generated_at: string
-          id: string
-          orders_by_status: Json | null
-          profit_margin: number
-          report_date: string
-          top_products: Json | null
-          total_cost: number
-          total_items: number
-          total_orders: number
-          total_profit: number
-          total_revenue: number
-          total_shipping: number
-          total_taxes: number
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          generated_at?: string
-          id?: string
-          orders_by_status?: Json | null
-          profit_margin?: number
-          report_date: string
-          top_products?: Json | null
-          total_cost?: number
-          total_items?: number
-          total_orders?: number
-          total_profit?: number
-          total_revenue?: number
-          total_shipping?: number
-          total_taxes?: number
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          generated_at?: string
-          id?: string
-          orders_by_status?: Json | null
-          profit_margin?: number
-          report_date?: string
-          top_products?: Json | null
-          total_cost?: number
-          total_items?: number
-          total_orders?: number
-          total_profit?: number
-          total_revenue?: number
-          total_shipping?: number
-          total_taxes?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
       demo_order_items: {
         Row: {
           created_at: string
@@ -1833,36 +1779,6 @@ export type Database = {
         }
         Relationships: []
       }
-      report_settings: {
-        Row: {
-          auto_generate_enabled: boolean
-          created_at: string
-          generation_hour: number
-          generation_minute: number
-          id: string
-          notification_email: string | null
-          updated_at: string
-        }
-        Insert: {
-          auto_generate_enabled?: boolean
-          created_at?: string
-          generation_hour?: number
-          generation_minute?: number
-          id?: string
-          notification_email?: string | null
-          updated_at?: string
-        }
-        Update: {
-          auto_generate_enabled?: boolean
-          created_at?: string
-          generation_hour?: number
-          generation_minute?: number
-          id?: string
-          notification_email?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
       reseller_banners: {
         Row: {
           active: boolean
@@ -2659,8 +2575,6 @@ export type Database = {
         }
         Returns: number
       }
-      trigger_daily_report_generation: { Args: never; Returns: undefined }
-      update_report_cron_schedule: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "customer" | "admin" | "super_admin" | "supplier" | "reseller"

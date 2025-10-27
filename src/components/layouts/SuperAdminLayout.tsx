@@ -61,11 +61,6 @@ const superAdminMenuItems = [
     icon: ShoppingCart,
   },
   {
-    title: 'Relatórios',
-    url: '/super-admin/relatorios',
-    icon: FileText,
-  },
-  {
     title: 'Lojafy Academy',
     url: '/super-admin/aulas',
     icon: BookOpen,

@@ -59,13 +59,13 @@ import SupplierDashboard from "./pages/supplier/Dashboard";
 import SupplierProducts from "./pages/supplier/Products";
 import SupplierInventory from "./pages/supplier/Inventory";
 import SupplierSales from "./pages/supplier/Sales";
-import SupplierReports from "./pages/supplier/Reports";
+
 import ResellerDashboard from "./pages/reseller/Dashboard";
 import ResellerSales from "./pages/reseller/Sales";
 import ResellerClients from "./pages/reseller/Clients";
 import ResellerCommissions from "./pages/reseller/Commissions";
 import ResellerGoals from "./pages/reseller/Goals";
-import ResellerReports from "./pages/reseller/Reports";
+
 import ResellerCatalog from "./pages/reseller/Catalog";
 import ResellerProducts from "./pages/reseller/Products";
 import ResellerStoreEditor from "./pages/reseller/StoreEditor";
@@ -98,7 +98,7 @@ import NotificationsManagement from "./pages/admin/NotificationsManagement";
 import PublicStoreProviderRoute from "./components/public-store/PublicStoreProviderRoute";
 import AIKnowledgeBase from "./pages/admin/AIKnowledgeBase";
 import ChatWidget from "@/components/support/ChatWidget";
-import AdminReports from "./pages/admin/Reports";
+
 import SupportManagement from "./pages/admin/SupportManagement";
 import ChatSupport from "./pages/admin/ChatSupport";
 import { MandatoryNotificationModal } from "@/components/MandatoryNotificationModal";
@@ -226,7 +226,7 @@ const App = () => {
                 <Route path="produtos" element={<AdminProducts />} />
                 <Route path="categorias" element={<AdminCategorias />} />
                 <Route path="pedidos" element={<AdminOrders />} />
-                <Route path="relatorios" element={<AdminReports />} />
+                
                 <Route path="clientes" element={<AdminCustomers />} />
                 <Route path="homepage" element={<HomepageManagement />} />
                 <Route path="configuracao-visual" element={<ConfiguracaoVisual />} />
@@ -256,7 +256,7 @@ const App = () => {
                 <Route path="produtos" element={<SupplierProducts />} />
                 <Route path="estoque" element={<SupplierInventory />} />
                 <Route path="vendas" element={<SupplierSales />} />
-                <Route path="relatorios" element={<SupplierReports />} />
+                
               </Route>
 
               {/* Reseller Panel Routes */}
@@ -280,7 +280,7 @@ const App = () => {
                 <Route path="clientes" element={<ResellerClients />} />
                 <Route path="comissoes" element={<ResellerCommissions />} />
                 <Route path="metas" element={<ResellerGoals />} />
-                <Route path="relatorios" element={<ResellerReports />} />
+                
               </Route>
               
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
