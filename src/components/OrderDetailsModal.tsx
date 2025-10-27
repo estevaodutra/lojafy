@@ -815,15 +815,43 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                             <TrendingUp className="h-4 w-4 text-green-600" />
                             Lucro Líquido Real:
                           </span>
-                          <span className={financials.netProfit >= 0 ? "text-green-600" : "text-red-600"}>
-                            {formatPrice(financials.netProfit)}
+                          <span className={(() => {
+                            // Soma dos lucros reais de todos os produtos
+                            const totalRealProfit = order.order_items.reduce((acc, item) => {
+                              const breakdown = calculateProductPriceBreakdown(item);
+                              return acc + (breakdown.realProfit * item.quantity);
+                            }, 0);
+                            return totalRealProfit >= 0 ? "text-green-600" : "text-red-600";
+                          })()}>
+                            {(() => {
+                              // Soma dos lucros reais de todos os produtos
+                              const totalRealProfit = order.order_items.reduce((acc, item) => {
+                                const breakdown = calculateProductPriceBreakdown(item);
+                                return acc + (breakdown.realProfit * item.quantity);
+                              }, 0);
+                              return formatPrice(totalRealProfit);
+                            })()}
                           </span>
                         </div>
                         
                         <div className="flex justify-between text-sm text-muted-foreground">
                           <span>Margem de Lucro Real:</span>
-                          <span className={`font-medium ${financials.profitMargin >= 0 ? "text-green-600" : "text-red-600"}`}>
-                            {financials.profitMargin.toFixed(2)}%
+                          <span className={(() => {
+                            const totalRealProfit = order.order_items.reduce((acc, item) => {
+                              const breakdown = calculateProductPriceBreakdown(item);
+                              return acc + (breakdown.realProfit * item.quantity);
+                            }, 0);
+                            const margin = financials.totalRevenue > 0 ? (totalRealProfit / financials.totalRevenue * 100) : 0;
+                            return `font-medium ${margin >= 0 ? "text-green-600" : "text-red-600"}`;
+                          })()}>
+                            {(() => {
+                              const totalRealProfit = order.order_items.reduce((acc, item) => {
+                                const breakdown = calculateProductPriceBreakdown(item);
+                                return acc + (breakdown.realProfit * item.quantity);
+                              }, 0);
+                              const margin = financials.totalRevenue > 0 ? (totalRealProfit / financials.totalRevenue * 100) : 0;
+                              return margin.toFixed(2);
+                            })()}%
                           </span>
                         </div>
                       </div>
