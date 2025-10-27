@@ -582,7 +582,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => window.open(`/super-admin/produtos?id=${item.product_id}`, '_blank')}
+                          onClick={() => window.open(`/produto/${item.product_id}`, '_blank')}
                           title="Ver página do produto"
                         >
                           <Eye className="h-4 w-4" />
