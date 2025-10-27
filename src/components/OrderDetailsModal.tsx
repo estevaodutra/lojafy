@@ -96,6 +96,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
   const [refundUploadFile, setRefundUploadFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isRefundUploading, setIsRefundUploading] = useState(false);
+  const [currentProductCosts, setCurrentProductCosts] = useState<Record<string, number>>({});
   const { toast } = useToast();
   const { profile } = useAuth();
 
@@ -143,6 +144,27 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
           .single();
         
         setCustomer(profileData);
+      }
+
+      // Fetch current cost prices for products that don't have it in snapshot
+      const productsNeedingCostPrice = data.order_items.filter(
+        (item: any) => !item.product_snapshot?.cost_price
+      );
+
+      if (productsNeedingCostPrice.length > 0) {
+        const productIds = productsNeedingCostPrice.map((item: any) => item.product_id);
+        const { data: productsData } = await supabase
+          .from('products')
+          .select('id, cost_price')
+          .in('id', productIds);
+
+        if (productsData) {
+          const costsMap: Record<string, number> = {};
+          productsData.forEach(product => {
+            costsMap[product.id] = Number(product.cost_price || 0);
+          });
+          setCurrentProductCosts(costsMap);
+        }
       }
     } catch (error) {
       console.error('Erro ao buscar detalhes do pedido:', error);
@@ -466,7 +488,15 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
   };
 
   const calculateProductPriceBreakdown = (item: OrderItem) => {
-    const costPrice = Number(item.product_snapshot?.cost_price || 0);
+    // Tentar obter cost_price do snapshot primeiro, depois do produto atual
+    let costPrice = Number(item.product_snapshot?.cost_price || 0);
+    let isEstimated = false;
+    
+    if (!costPrice && currentProductCosts[item.product_id]) {
+      costPrice = currentProductCosts[item.product_id];
+      isEstimated = true;
+    }
+    
     const salePrice = Number(item.unit_price);
     
     // Percentuais fixos (podem ser obtidos de platform_settings futuramente)
@@ -486,6 +516,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
     
     return {
       costPrice,
+      isEstimated,
       profitMarginPercent,
       profitMarginAmount,
       priceAfterProfit,
@@ -670,15 +701,23 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                       </div>
 
                       {/* Breakdown de Precificação */}
-                      <div className="mt-3 ml-20 p-3 bg-muted/20 rounded-lg border border-border/50">
-                        <p className="text-xs font-semibold text-muted-foreground mb-2">
-                          📊 Composição de Preço (por unidade)
-                        </p>
-                        <div className="space-y-1 text-sm">
-                          <div className="flex justify-between">
-                            <span className="font-medium">Preço de Custo:</span>
-                            <span className="font-semibold">{formatPrice(breakdown.costPrice)}</span>
+                      {breakdown.costPrice > 0 ? (
+                        <div className="mt-3 ml-20 p-3 bg-muted/20 rounded-lg border border-border/50">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-semibold text-muted-foreground">
+                              📊 Composição de Preço (por unidade)
+                            </p>
+                            {breakdown.isEstimated && (
+                              <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700">
+                                ⚠️ Custo Estimado
+                              </Badge>
+                            )}
                           </div>
+                          <div className="space-y-1 text-sm">
+                            <div className="flex justify-between">
+                              <span className="font-medium">Preço de Custo:</span>
+                              <span className="font-semibold">{formatPrice(breakdown.costPrice)}</span>
+                            </div>
                           
                           <div className="flex justify-between text-green-600 pl-4">
                             <span>+ Margem de Lucro ({breakdown.profitMarginPercent}%):</span>
@@ -716,6 +755,13 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                           </div>
                         </div>
                       </div>
+                      ) : (
+                        <div className="mt-3 ml-20 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-300 dark:border-amber-700">
+                          <p className="text-xs text-amber-700 dark:text-amber-400">
+                            ⚠️ Preço de custo não disponível para este produto
+                          </p>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
