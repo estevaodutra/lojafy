@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface OrderItem {
   id: string;
+  product_id: string;
   quantity: number;
   unit_price: number;
   total_price: number;
@@ -104,20 +105,21 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items (
-            id,
-            quantity,
-            unit_price,
-            total_price,
-            product_snapshot
-          )
-        `)
-        .eq('id', orderId)
-        .single();
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        order_items (
+          id,
+          product_id,
+          quantity,
+          unit_price,
+          total_price,
+          product_snapshot
+        )
+      `)
+      .eq('id', orderId)
+      .single();
 
       if (error) throw error;
       setOrder(data);
@@ -553,32 +555,42 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {order.order_items.map((item, index) => {
-                    const product = item.product_snapshot;
-                    return (
-                      <div key={index} className="flex items-center gap-4 pb-4 border-b border-border last:border-0">
-                        {product?.image_url && (
-                          <img 
-                            src={product.image_url} 
-                            alt={product.name}
-                            className="w-16 h-16 object-cover rounded-lg"
-                          />
+                {order.order_items.map((item, index) => {
+                  const product = item.product_snapshot;
+                  return (
+                    <div key={index} className="flex items-center gap-4 pb-4 border-b border-border last:border-0">
+                      {product?.image_url && (
+                        <img 
+                          src={product.image_url} 
+                          alt={product.name}
+                          className="w-16 h-16 object-cover rounded-lg"
+                        />
+                      )}
+                      <div className="flex-1">
+                        <h4 className="font-semibold">{product?.name || 'Produto'}</h4>
+                        {product?.brand && (
+                          <p className="text-sm text-muted-foreground">{product.brand}</p>
                         )}
-                        <div className="flex-1">
-                          <h4 className="font-semibold">{product?.name || 'Produto'}</h4>
-                          {product?.brand && (
-                            <p className="text-sm text-muted-foreground">{product.brand}</p>
-                          )}
-                          <p className="text-sm text-muted-foreground">
-                            Quantidade: {item.quantity} • Preço unitário: {formatPrice(Number(item.unit_price))}
-                          </p>
-                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Quantidade: {item.quantity} • Preço unitário: {formatPrice(Number(item.unit_price))}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
                         <div className="text-right">
                           <p className="font-semibold">{formatPrice(Number(item.total_price))}</p>
                         </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(`/super-admin/produtos?id=${item.product_id}`, '_blank')}
+                          title="Ver página do produto"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
                       </div>
-                    );
-                  })}
+                    </div>
+                  );
+                })}
                 </div>
               </CardContent>
             </Card>
