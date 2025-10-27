@@ -2659,6 +2659,8 @@ export type Database = {
         }
         Returns: number
       }
+      trigger_daily_report_generation: { Args: never; Returns: undefined }
+      update_report_cron_schedule: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "customer" | "admin" | "super_admin" | "supplier" | "reseller"
