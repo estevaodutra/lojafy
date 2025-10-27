@@ -788,14 +788,14 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                       <Separator className="my-3" />
 
                       {/* Informações Adicionais (Frete, Taxas, Receita Total) */}
-                      {order.shipping_amount && Number(order.shipping_amount) > 0 && <>
+                      {Number(order.shipping_amount || 0) > 0 && <>
                           <Separator className="my-3" />
                           <div className="space-y-2 text-sm">
                             <div className="flex justify-between text-muted-foreground">
                               <span>+ Frete cobrado:</span>
                               <span className="font-medium">{formatPrice(Number(order.shipping_amount))}</span>
                             </div>
-                            {order.tax_amount && Number(order.tax_amount) > 0 && <div className="flex justify-between text-muted-foreground">
+                            {Number(order.tax_amount || 0) > 0 && <div className="flex justify-between text-muted-foreground">
                                 <span>+ Taxas adicionais:</span>
                                 <span className="font-medium">{formatPrice(Number(order.tax_amount))}</span>
                               </div>}
