@@ -1,5 +1,8 @@
 project_id = "bbrmjrjorcgsgeztzbsr"
 
+[functions.api-pedidos-listar]
+verify_jwt = false
+
 [functions.create-pix-payment]
 verify_jwt = false
 

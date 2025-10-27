@@ -315,6 +315,127 @@ const endpoints = [
     }
   },
   {
+    title: 'Listar Pedidos Completos',
+    method: 'GET' as const,
+    url: '/functions/v1/api-pedidos-listar',
+    description: 'Retorna a lista completa de pedidos reais com todos os detalhes: informações do cliente (nome, CPF, telefone), produtos com breakdown financeiro completo (custo, taxas, lucro), endereços de entrega e cobrança, dados de pagamento e rastreio. Inclui cálculos detalhados de lucro por produto e resumo financeiro do pedido. Suporta filtros de período e paginação.',
+    queryParams: [
+      { name: 'period', description: 'Período: today, yesterday, 7days, 14days, 30days (padrão: 30days)', example: '7days' },
+      { name: 'limit', description: 'Itens por página (máx: 100, padrão: 50)', example: '50' },
+      { name: 'page', description: 'Número da página (padrão: 1)', example: '1' },
+      { name: 'status', description: 'Filtrar por status: pending, processing, confirmed, shipped, delivered, cancelled, refunded', example: 'confirmed' }
+    ],
+    responseExample: {
+      success: true,
+      data: [
+        {
+          id: 'order_uuid',
+          order_number: 'ORD-1761572020168_76357355',
+          status: 'processing',
+          payment_status: 'paid',
+          payment_method: 'pix',
+          payment_id: 'MP123456789',
+          external_reference: 'REF123',
+          total_amount: 39.96,
+          shipping_amount: 0,
+          tax_amount: 0,
+          created_at: '2025-10-27T10:33:41Z',
+          updated_at: '2025-10-27T11:00:00Z',
+          tracking_number: null,
+          shipping_method_name: null,
+          shipping_estimated_days: null,
+          has_shipping_file: false,
+          customer: {
+            user_id: 'user_uuid',
+            first_name: 'FRANCISCO',
+            last_name: 'DIAS',
+            full_name: 'FRANCISCO DIAS',
+            cpf: '032.658.537-05',
+            phone: '(11) 96226-0258'
+          },
+          shipping_address: {
+            street: 'Rua das Flores',
+            number: '123',
+            complement: 'Apto 45',
+            neighborhood: 'Centro',
+            city: 'São Paulo',
+            state: 'SP',
+            zip_code: '01234-567'
+          },
+          billing_address: {
+            street: 'Rua das Flores',
+            number: '123',
+            complement: 'Apto 45',
+            neighborhood: 'Centro',
+            city: 'São Paulo',
+            state: 'SP',
+            zip_code: '01234-567'
+          },
+          items: [
+            {
+              id: 'item_uuid',
+              product_id: 'product_uuid',
+              product_name: 'Jarra Chaleira Eletrica Retrátil 600ml 110v / 220v Silicone Esquentar Leite Café Chá',
+              product_sku: 'CHALEIRA-001',
+              product_brand: 'GenericBrand',
+              product_image: 'https://...',
+              quantity: 1,
+              unit_price: 39.96,
+              total_price: 39.96,
+              price_breakdown: {
+                cost_price: 36.00,
+                is_estimated: false,
+                sale_price: 39.96,
+                transaction_fee: {
+                  percentage: 4.5,
+                  amount: 1.80,
+                  remaining: 38.16
+                },
+                contingency_fee: {
+                  percentage: 1.0,
+                  amount: 0.38,
+                  remaining: 37.78
+                },
+                after_cost: 1.78,
+                profit: 1.78,
+                profit_margin: 4.45
+              }
+            }
+          ],
+          financial_summary: {
+            subtotal: 39.96,
+            shipping_amount: 0,
+            tax_amount: 0,
+            total_revenue: 39.96,
+            transaction_fee: {
+              percentage: 4.5,
+              amount: 1.80,
+              remaining: 38.16
+            },
+            contingency_fee: {
+              percentage: 1.0,
+              amount: 0.38,
+              remaining: 37.78
+            },
+            total_cost: 36.00,
+            net_profit: 1.78,
+            profit_margin: 4.45
+          },
+          notes: null
+        }
+      ],
+      pagination: {
+        page: 1,
+        limit: 50,
+        total: 1,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false
+      },
+      period: '7days'
+    }
+  },
+  {
     title: 'Cadastrar Pedido Demo',
     method: 'POST' as const,
     url: '/functions/v1/api-demo-pedidos-cadastrar',
