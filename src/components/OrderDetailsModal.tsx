@@ -465,6 +465,39 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
     };
   };
 
+  const calculateProductPriceBreakdown = (item: OrderItem) => {
+    const costPrice = Number(item.product_snapshot?.cost_price || 0);
+    const salePrice = Number(item.unit_price);
+    
+    // Percentuais fixos (podem ser obtidos de platform_settings futuramente)
+    const profitMarginPercent = 5;      // Margem de Lucro
+    const contingencyPercent = 1;        // Contingenciamento
+    const transactionPercent = 4.5;      // Taxa de Transação
+    
+    // Cálculo progressivo (formação de preço)
+    const profitMarginAmount = costPrice * (profitMarginPercent / 100);
+    const priceAfterProfit = costPrice + profitMarginAmount;
+    
+    const contingencyAmount = priceAfterProfit * (contingencyPercent / 100);
+    const priceAfterContingency = priceAfterProfit + contingencyAmount;
+    
+    const transactionAmount = priceAfterContingency * (transactionPercent / 100);
+    const finalPrice = priceAfterContingency + transactionAmount;
+    
+    return {
+      costPrice,
+      profitMarginPercent,
+      profitMarginAmount,
+      priceAfterProfit,
+      contingencyPercent,
+      contingencyAmount,
+      priceAfterContingency,
+      transactionPercent,
+      transactionAmount,
+      finalPrice: salePrice // usar o preço real de venda
+    };
+  };
+
   if (!order && !loading) {
     return null;
   }
@@ -600,36 +633,88 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                 <div className="space-y-4">
                 {order.order_items.map((item, index) => {
                   const product = item.product_snapshot;
+                  const breakdown = calculateProductPriceBreakdown(item);
+                  
                   return (
-                    <div key={index} className="flex items-center gap-4 pb-4 border-b border-border last:border-0">
-                      {product?.image_url && (
-                        <img 
-                          src={product.image_url} 
-                          alt={product.name}
-                          className="w-16 h-16 object-cover rounded-lg"
-                        />
-                      )}
-                      <div className="flex-1">
-                        <h4 className="font-semibold">{product?.name || 'Produto'}</h4>
-                        {product?.brand && (
-                          <p className="text-sm text-muted-foreground">{product.brand}</p>
+                    <div key={index} className="pb-4 border-b border-border last:border-0">
+                      <div className="flex items-center gap-4">
+                        {product?.image_url && (
+                          <img 
+                            src={product.image_url} 
+                            alt={product.name}
+                            className="w-16 h-16 object-cover rounded-lg"
+                          />
                         )}
-                        <p className="text-sm text-muted-foreground">
-                          Quantidade: {item.quantity} • Preço unitário: {formatPrice(Number(item.unit_price))}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <p className="font-semibold">{formatPrice(Number(item.total_price))}</p>
+                        <div className="flex-1">
+                          <h4 className="font-semibold">{product?.name || 'Produto'}</h4>
+                          {product?.brand && (
+                            <p className="text-sm text-muted-foreground">{product.brand}</p>
+                          )}
+                          <p className="text-sm text-muted-foreground">
+                            Quantidade: {item.quantity} • Preço unitário: {formatPrice(Number(item.unit_price))}
+                          </p>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(`/produto/${item.product_id}`, '_blank')}
-                          title="Ver página do produto"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="font-semibold">{formatPrice(Number(item.total_price))}</p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(`/produto/${item.product_id}`, '_blank')}
+                            title="Ver página do produto"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Breakdown de Precificação */}
+                      <div className="mt-3 ml-20 p-3 bg-muted/20 rounded-lg border border-border/50">
+                        <p className="text-xs font-semibold text-muted-foreground mb-2">
+                          📊 Composição de Preço (por unidade)
+                        </p>
+                        <div className="space-y-1 text-sm">
+                          <div className="flex justify-between">
+                            <span className="font-medium">Preço de Custo:</span>
+                            <span className="font-semibold">{formatPrice(breakdown.costPrice)}</span>
+                          </div>
+                          
+                          <div className="flex justify-between text-green-600 pl-4">
+                            <span>+ Margem de Lucro ({breakdown.profitMarginPercent}%):</span>
+                            <span>
+                              {formatPrice(breakdown.profitMarginAmount)} 
+                              <span className="text-muted-foreground ml-1">
+                                ({formatPrice(breakdown.priceAfterProfit)})
+                              </span>
+                            </span>
+                          </div>
+                          
+                          <div className="flex justify-between text-blue-600 pl-4">
+                            <span>+ Contingenciamento de Conta ({breakdown.contingencyPercent}%):</span>
+                            <span>
+                              {formatPrice(breakdown.contingencyAmount)} 
+                              <span className="text-muted-foreground ml-1">
+                                ({formatPrice(breakdown.priceAfterContingency)})
+                              </span>
+                            </span>
+                          </div>
+                          
+                          <div className="flex justify-between text-orange-600 pl-4">
+                            <span>+ Taxa de Transação ({breakdown.transactionPercent}%):</span>
+                            <span>
+                              {formatPrice(breakdown.transactionAmount)} 
+                              <span className="text-muted-foreground ml-1">
+                                ({formatPrice(breakdown.finalPrice)})
+                              </span>
+                            </span>
+                          </div>
+                          
+                          <div className="flex justify-between font-semibold text-base pt-2 mt-2 border-t border-border">
+                            <span>Preço de Venda Final:</span>
+                            <span className="text-primary">{formatPrice(breakdown.finalPrice)}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );
@@ -644,81 +729,131 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
                 <CardTitle>Resumo Financeiro do Pedido</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {/* Custos */}
-                <div className="space-y-2 pb-2 border-b border-border">
-                  <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>💰 Custo dos Produtos:</span>
-                    <span className="font-medium text-red-600">
-                      {formatPrice(calculateOrderFinancials(order).totalCost)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Receitas */}
-                <div className="space-y-2 pb-2 border-b border-border">
-                  <div className="flex justify-between text-sm">
-                    <span>Subtotal (Produtos):</span>
-                    <span className="font-medium">
-                      {formatPrice(calculateOrderFinancials(order).subtotal)}
-                    </span>
-                  </div>
+                {(() => {
+                  const financials = calculateOrderFinancials(order);
                   
-                  {order.shipping_amount && Number(order.shipping_amount) > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span>Frete:</span>
-                      <span className="font-medium">
-                        {formatPrice(Number(order.shipping_amount))}
-                      </span>
-                    </div>
-                  )}
+                  // Calcular valores reversos (preço de venda -> custo)
+                  const totalSalePrice = financials.subtotal; // Preço de venda dos produtos
                   
-                  {order.tax_amount && Number(order.tax_amount) > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span>Taxas:</span>
-                      <span className="font-medium">
-                        {formatPrice(Number(order.tax_amount))}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Total */}
-                <div className="flex justify-between font-semibold text-base pt-1">
-                  <span>Receita Total:</span>
-                  <span className="text-primary">
-                    {formatPrice(Number(order.total_amount))}
-                  </span>
-                </div>
-
-                {/* Lucro */}
-                <Separator className="my-3" />
-                
-                <div className="space-y-2 bg-muted/30 p-3 rounded-lg">
-                  <div className="flex justify-between font-semibold text-base">
-                    <span className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-green-600" />
-                      Lucro Líquido:
-                    </span>
-                    <span className={
-                      calculateOrderFinancials(order).netProfit >= 0 
-                        ? "text-green-600" 
-                        : "text-red-600"
-                    }>
-                      {formatPrice(calculateOrderFinancials(order).netProfit)}
-                    </span>
-                  </div>
+                  // Taxa de transação sobre o preço de venda
+                  const transactionFeePercent = 4.5;
+                  const transactionFeeAmount = totalSalePrice * (transactionFeePercent / 100);
+                  const afterTransaction = totalSalePrice - transactionFeeAmount;
                   
-                  <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>Margem de Lucro:</span>
-                    <span className={`font-medium ${
-                      calculateOrderFinancials(order).profitMargin >= 0 
-                        ? "text-green-600" 
-                        : "text-red-600"
-                    }`}>
-                      {calculateOrderFinancials(order).profitMargin.toFixed(2)}%
-                    </span>
-                  </div>
-                </div>
+                  // Contingenciamento sobre o que sobrou
+                  const contingencyPercent = 1;
+                  const contingencyAmount = afterTransaction * (contingencyPercent / 100);
+                  const afterContingency = afterTransaction - contingencyAmount;
+                  
+                  // Margem de lucro sobre o que sobrou
+                  const profitMarginPercent = 5;
+                  const profitMarginAmount = afterContingency * (profitMarginPercent / 100);
+                  const afterProfit = afterContingency - profitMarginAmount;
+
+                  return (
+                    <>
+                      {/* Preço de Venda */}
+                      <div className="flex justify-between font-semibold text-base pb-2 border-b">
+                        <span>Preço de Venda:</span>
+                        <span className="text-primary">{formatPrice(totalSalePrice)}</span>
+                      </div>
+
+                      {/* Deduções */}
+                      <div className="space-y-2 pl-4">
+                        <div className="flex justify-between text-sm text-orange-600">
+                          <span>(-) Taxa de Transação ({transactionFeePercent}%):</span>
+                          <span>
+                            {formatPrice(transactionFeeAmount)}
+                            <span className="text-muted-foreground ml-2">
+                              ({formatPrice(afterTransaction)})
+                            </span>
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between text-sm text-blue-600">
+                          <span>(-) Contingenciamento de Conta ({contingencyPercent}%):</span>
+                          <span>
+                            {formatPrice(contingencyAmount)}
+                            <span className="text-muted-foreground ml-2">
+                              ({formatPrice(afterContingency)})
+                            </span>
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between text-sm text-green-600 font-medium">
+                          <span>(-) Margem de Lucro ({profitMarginPercent}%):</span>
+                          <span>
+                            {formatPrice(profitMarginAmount)}
+                            <span className="text-muted-foreground ml-2">
+                              ({formatPrice(afterProfit)})
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Preço de Custo Final */}
+                      <Separator className="my-3" />
+                      
+                      <div className="flex justify-between font-semibold text-base bg-muted/30 p-3 rounded-lg">
+                        <span>Preço de Custo:</span>
+                        <span className="text-red-600">{formatPrice(financials.totalCost)}</span>
+                      </div>
+
+                      {/* Informações Adicionais */}
+                      {(order.shipping_amount && Number(order.shipping_amount) > 0) && (
+                        <>
+                          <Separator className="my-3" />
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between text-muted-foreground">
+                              <span>+ Frete cobrado:</span>
+                              <span className="font-medium">{formatPrice(Number(order.shipping_amount))}</span>
+                            </div>
+                            {order.tax_amount && Number(order.tax_amount) > 0 && (
+                              <div className="flex justify-between text-muted-foreground">
+                                <span>+ Taxas adicionais:</span>
+                                <span className="font-medium">{formatPrice(Number(order.tax_amount))}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between font-semibold pt-2 border-t">
+                              <span>Receita Total:</span>
+                              <span className="text-primary">{formatPrice(Number(order.total_amount))}</span>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Lucro Líquido */}
+                      <Separator className="my-3" />
+                      
+                      <div className="space-y-2 bg-green-50 dark:bg-green-950/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
+                        <div className="flex justify-between font-semibold text-base">
+                          <span className="flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4 text-green-600" />
+                            Lucro Líquido Real:
+                          </span>
+                          <span className={
+                            financials.netProfit >= 0 
+                              ? "text-green-600" 
+                              : "text-red-600"
+                          }>
+                            {formatPrice(financials.netProfit)}
+                          </span>
+                        </div>
+                        
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>Margem de Lucro Real:</span>
+                          <span className={`font-medium ${
+                            financials.profitMargin >= 0 
+                              ? "text-green-600" 
+                              : "text-red-600"
+                          }`}>
+                            {financials.profitMargin.toFixed(2)}%
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </CardContent>
             </Card>
 
