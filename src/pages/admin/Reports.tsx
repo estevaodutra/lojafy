@@ -37,10 +37,35 @@ export default function AdminReports() {
   const [generating, setGenerating] = useState(false);
   const [period, setPeriod] = useState('30');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [realtimeActive, setRealtimeActive] = useState(false);
   const { settings, updateSettings } = useReportSettings();
 
   useEffect(() => {
     fetchReports();
+    
+    // Setup realtime subscription
+    setRealtimeActive(true);
+    const channel = supabase
+      .channel('daily_sales_reports_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'daily_sales_reports'
+        },
+        (payload) => {
+          console.log('Relatório atualizado em tempo real:', payload);
+          toast.success('Relatório atualizado!');
+          fetchReports();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      setRealtimeActive(false);
+      supabase.removeChannel(channel);
+    };
   }, [period]);
 
   const fetchReports = async () => {
@@ -52,7 +77,11 @@ export default function AdminReports() {
         .select('*')
         .order('report_date', { ascending: false });
 
-      if (period !== 'all') {
+      if (period === 'today') {
+        query = query.eq('report_date', format(new Date(), 'yyyy-MM-dd'));
+      } else if (period === 'yesterday') {
+        query = query.eq('report_date', format(subDays(new Date(), 1), 'yyyy-MM-dd'));
+      } else if (period !== 'all' && period !== 'custom') {
         const daysAgo = subDays(new Date(), parseInt(period));
         query = query.gte('report_date', format(daysAgo, 'yyyy-MM-dd'));
       }
@@ -139,11 +168,20 @@ export default function AdminReports() {
           </p>
         </div>
         <div className="flex gap-2">
+          {realtimeActive && (
+            <Badge variant="outline" className="text-sm flex items-center gap-1">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              Tempo real ativo
+            </Badge>
+          )}
+          
           <Select value={period} onValueChange={setPeriod}>
             <SelectTrigger className="w-48">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="today">Hoje</SelectItem>
+              <SelectItem value="yesterday">Ontem</SelectItem>
               <SelectItem value="7">Últimos 7 dias</SelectItem>
               <SelectItem value="30">Últimos 30 dias</SelectItem>
               <SelectItem value="90">Últimos 90 dias</SelectItem>
