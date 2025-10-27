@@ -368,19 +368,34 @@ serve(async (req) => {
       );
     }
 
-    // Create order items
+    // Create order items with cost information
     if (orderItems && orderItems.length > 0) {
-      const orderItemsData = orderItems.map(item => ({
-        order_id: orderData.id,
-        product_id: item.productId,
-        quantity: item.quantity,
-        unit_price: item.unitPrice,
-        total_price: item.quantity * item.unitPrice,
-        product_snapshot: {
-          name: item.productName,
-          price: item.unitPrice
-        }
-      }));
+      // Fetch cost_price and additional product data for snapshot
+      const productIds = orderItems.map(item => item.productId);
+      const { data: productsWithCost } = await supabase
+        .from('products')
+        .select('id, cost_price, image_url, brand, sku')
+        .in('id', productIds);
+
+      const orderItemsData = orderItems.map(item => {
+        const productData = productsWithCost?.find(p => p.id === item.productId);
+        
+        return {
+          order_id: orderData.id,
+          product_id: item.productId,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          total_price: item.quantity * item.unitPrice,
+          product_snapshot: {
+            name: item.productName,
+            price: item.unitPrice,
+            cost_price: productData?.cost_price || 0,
+            image_url: productData?.image_url,
+            brand: productData?.brand,
+            sku: productData?.sku
+          }
+        };
+      });
 
       const { error: itemsError } = await supabase
         .from('order_items')

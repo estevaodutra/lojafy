@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User, FileText, Download, Upload } from 'lucide-react';
+import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User, FileText, Download, Upload, TrendingUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,7 +17,17 @@ interface OrderItem {
   quantity: number;
   unit_price: number;
   total_price: number;
-  product_snapshot: any;
+  product_snapshot?: any;
+}
+
+interface OrderFinancials {
+  totalCost: number;
+  subtotal: number;
+  shippingAmount: number;
+  taxAmount: number;
+  totalRevenue: number;
+  netProfit: number;
+  profitMargin: number;
 }
 
 interface OrderStatusHistory {
@@ -422,6 +432,39 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
     return new Date(dateString).toLocaleString('pt-BR');
   };
 
+  const calculateOrderFinancials = (order: Order): OrderFinancials => {
+    // Calcular custo total dos produtos
+    const totalCost = order.order_items.reduce((acc: number, item: OrderItem) => {
+      const costPrice = item.product_snapshot?.cost_price || 0;
+      return acc + (Number(costPrice) * item.quantity);
+    }, 0);
+
+    // Calcular subtotal (preço de venda dos produtos)
+    const subtotal = order.order_items.reduce((acc: number, item: OrderItem) => {
+      return acc + Number(item.total_price);
+    }, 0);
+
+    const shippingAmount = Number(order.shipping_amount || 0);
+    const taxAmount = Number(order.tax_amount || 0);
+    const totalRevenue = Number(order.total_amount);
+
+    // Lucro = Receita Total - Custo dos Produtos
+    const netProfit = totalRevenue - totalCost;
+
+    // Margem de lucro = (Lucro / Receita) * 100
+    const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+    return {
+      totalCost,
+      subtotal,
+      shippingAmount,
+      taxAmount,
+      totalRevenue,
+      netProfit,
+      profitMargin
+    };
+  };
+
   if (!order && !loading) {
     return null;
   }
@@ -595,32 +638,86 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ orderId, isOpen, 
               </CardContent>
             </Card>
 
-            {/* Order Summary */}
+            {/* Order Summary with Financial Breakdown */}
             <Card>
               <CardHeader>
-                <CardTitle>Resumo do Pedido</CardTitle>
+                <CardTitle>Resumo Financeiro do Pedido</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span>{formatPrice(Number(order.total_amount) - Number(order.shipping_amount || 0) - Number(order.tax_amount || 0))}</span>
+              <CardContent className="space-y-3">
+                {/* Custos */}
+                <div className="space-y-2 pb-2 border-b border-border">
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>💰 Custo dos Produtos:</span>
+                    <span className="font-medium text-red-600">
+                      {formatPrice(calculateOrderFinancials(order).totalCost)}
+                    </span>
+                  </div>
                 </div>
-                {order.shipping_amount && Number(order.shipping_amount) > 0 && (
-                  <div className="flex justify-between">
-                    <span>Frete:</span>
-                    <span>{formatPrice(Number(order.shipping_amount))}</span>
+
+                {/* Receitas */}
+                <div className="space-y-2 pb-2 border-b border-border">
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal (Produtos):</span>
+                    <span className="font-medium">
+                      {formatPrice(calculateOrderFinancials(order).subtotal)}
+                    </span>
                   </div>
-                )}
-                {order.tax_amount && Number(order.tax_amount) > 0 && (
-                  <div className="flex justify-between">
-                    <span>Taxas:</span>
-                    <span>{formatPrice(Number(order.tax_amount))}</span>
+                  
+                  {order.shipping_amount && Number(order.shipping_amount) > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span>Frete:</span>
+                      <span className="font-medium">
+                        {formatPrice(Number(order.shipping_amount))}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {order.tax_amount && Number(order.tax_amount) > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span>Taxas:</span>
+                      <span className="font-medium">
+                        {formatPrice(Number(order.tax_amount))}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Total */}
+                <div className="flex justify-between font-semibold text-base pt-1">
+                  <span>Receita Total:</span>
+                  <span className="text-primary">
+                    {formatPrice(Number(order.total_amount))}
+                  </span>
+                </div>
+
+                {/* Lucro */}
+                <Separator className="my-3" />
+                
+                <div className="space-y-2 bg-muted/30 p-3 rounded-lg">
+                  <div className="flex justify-between font-semibold text-base">
+                    <span className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                      Lucro Líquido:
+                    </span>
+                    <span className={
+                      calculateOrderFinancials(order).netProfit >= 0 
+                        ? "text-green-600" 
+                        : "text-red-600"
+                    }>
+                      {formatPrice(calculateOrderFinancials(order).netProfit)}
+                    </span>
                   </div>
-                )}
-                <Separator />
-                <div className="flex justify-between font-semibold text-lg">
-                  <span>Total:</span>
-                  <span>{formatPrice(Number(order.total_amount))}</span>
+                  
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>Margem de Lucro:</span>
+                    <span className={`font-medium ${
+                      calculateOrderFinancials(order).profitMargin >= 0 
+                        ? "text-green-600" 
+                        : "text-red-600"
+                    }`}>
+                      {calculateOrderFinancials(order).profitMargin.toFixed(2)}%
+                    </span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
