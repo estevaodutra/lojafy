@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Eye, Package, Search, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 
 interface Order {
   id: string;
@@ -33,6 +34,8 @@ const AdminOrders = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 20;
   const { toast } = useToast();
 
   useEffect(() => {
@@ -148,10 +151,30 @@ const AdminOrders = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
+  const startIndex = (currentPage - 1) * ordersPerPage;
+  const endIndex = startIndex + ordersPerPage;
+  const currentOrders = filteredOrders.slice(startIndex, endIndex);
+  const showingFrom = filteredOrders.length > 0 ? startIndex + 1 : 0;
+  const showingTo = Math.min(endIndex, filteredOrders.length);
+
   return (
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Gerenciar Pedidos</h1>
+        <div>
+          <h1 className="text-3xl font-bold">Gerenciar Pedidos</h1>
+          {filteredOrders.length > 0 && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Mostrando {showingFrom}-{showingTo} de {filteredOrders.length} pedidos
+            </p>
+          )}
+        </div>
         <Badge variant="outline" className="text-sm">
           <Package className="w-4 h-4 mr-1" />
           {orders.length} pedidos
@@ -224,8 +247,8 @@ const AdminOrders = () => {
                      Nenhum pedido encontrado
                    </TableCell>
                  </TableRow>
-              ) : (
-                filteredOrders.map((order) => (
+               ) : (
+                currentOrders.map((order) => (
                    <TableRow key={order.id}>
                      <TableCell className="font-medium">{order.order_number}</TableCell>
                      <TableCell>
@@ -282,6 +305,55 @@ const AdminOrders = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {totalPages > 1 && (
+        <div className="mt-6">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                if (
+                  page === 1 ||
+                  page === totalPages ||
+                  (page >= currentPage - 1 && page <= currentPage + 1)
+                ) {
+                  return (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                } else if (page === currentPage - 2 || page === currentPage + 2) {
+                  return (
+                    <PaginationItem key={page}>
+                      <span className="px-4">...</span>
+                    </PaginationItem>
+                  );
+                }
+                return null;
+              })}
+              
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
 
       {selectedOrder && (
         <OrderDetailsModal
