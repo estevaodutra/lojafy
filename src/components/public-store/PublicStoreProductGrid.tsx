@@ -13,7 +13,7 @@ const PublicStoreProductGrid = ({ resellerId, storeSlug }: PublicStoreProductGri
   if (isLoading) {
     return (
       <section className="py-16 bg-background">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
           <div className="text-center mb-12">
             <Skeleton className="h-8 w-64 mx-auto mb-4" />
             <Skeleton className="h-4 w-96 mx-auto" />
@@ -34,7 +34,7 @@ const PublicStoreProductGrid = ({ resellerId, storeSlug }: PublicStoreProductGri
 
   return (
     <section className="py-16 bg-background">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
             Produtos em Destaque
@@ -44,7 +44,7 @@ const PublicStoreProductGrid = ({ resellerId, storeSlug }: PublicStoreProductGri
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 max-w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
           {featuredProducts
             .filter(rp => rp.product && rp.product.id && rp.product.name)
             .map((resellerProduct: PublicStoreProductData) => {

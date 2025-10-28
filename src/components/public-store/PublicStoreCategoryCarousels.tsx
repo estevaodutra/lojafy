@@ -18,7 +18,7 @@ const PublicStoreCategoryCarousels = ({ resellerId, storeSlug }: PublicStoreCate
   if (isLoading) {
     return (
       <section className="py-16 bg-muted/50">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
           <div className="space-y-12">
             {Array.from({ length: 2 }).map((_, i) => (
               <div key={i}>
@@ -45,7 +45,7 @@ const PublicStoreCategoryCarousels = ({ resellerId, storeSlug }: PublicStoreCate
 
   return (
     <section className="py-16 bg-muted/50">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
         <div className="space-y-16">
           {categories.map((category: any) => (
             <div key={category.id}>

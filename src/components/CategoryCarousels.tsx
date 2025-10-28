@@ -102,7 +102,7 @@ const CategoryCarousels = () => {
   if (isLoading) {
     return (
       <section className="py-16 bg-background">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
           <div className="space-y-12">
             {[...Array(2)].map((_, i) => (
               <div key={i} className="animate-pulse">
@@ -123,7 +123,7 @@ const CategoryCarousels = () => {
   if (!categories.length) {
     return (
       <section className="py-16 bg-background">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
           <div className="text-center py-12">
             <p className="text-muted-foreground">Nenhuma categoria em destaque configurada.</p>
           </div>
@@ -134,7 +134,7 @@ const CategoryCarousels = () => {
 
   return (
     <section className="py-16 bg-background">
-      <div className="container mx-auto px-4 max-w-full overflow-hidden">
+      <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
         <div className="space-y-16">
           {categories.map((category) => {
             if (!category) return null;
@@ -144,7 +144,7 @@ const CategoryCarousels = () => {
             if (products.length < 5) return null;
 
             return (
-              <div key={category.id} className="space-y-6 max-w-full">
+              <div key={category.id} className="space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 min-w-0">
                   <div className="min-w-0">
                     <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2 truncate">
