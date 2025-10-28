@@ -88,7 +88,7 @@ const CentralAjuda = () => {
       time: "Resposta em até 4h",
       action: "Enviar E-mail",
       variant: "outline" as const,
-      contact: "contato@ecoshop.com.br"
+      contact: "contato@suaempresa.com"
     },
     {
       icon: Phone,

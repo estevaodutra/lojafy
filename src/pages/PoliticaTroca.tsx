@@ -83,7 +83,7 @@ const PoliticaTroca = () => {
                   do produto, sem necessidade de justificativa.
                 </p>
                 <p className="text-muted-foreground">
-                  Além disso, a EcoShop oferece um prazo estendido de <strong>30 dias</strong> 
+                  Além disso, oferecemos um prazo estendido de <strong>30 dias</strong> 
                   para trocas por defeito, produto diferente do anunciado ou insatisfação.
                 </p>
                 <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">

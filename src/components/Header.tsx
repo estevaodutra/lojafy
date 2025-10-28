@@ -90,7 +90,7 @@ const Header = () => {
               </div>
             )}
             <span className="hidden md:block text-2xl font-bold text-foreground">
-              {config?.store_name || 'EcoShop'}
+              {config?.store_name || 'Lojafy'}
             </span>
           </Link>
 

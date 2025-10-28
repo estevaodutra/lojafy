@@ -31,7 +31,7 @@ const TermosUso = () => {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground">
-                Bem-vindo à EcoShop. Estes Termos de Uso regulam o uso de nosso site e serviços. 
+                Bem-vindo à nossa plataforma. Estes Termos de Uso regulam o uso de nosso site e serviços. 
                 Ao acessar ou usar nosso site, você concorda em cumprir estes termos. 
                 Se você não concordar com qualquer parte destes termos, não deve usar nossos serviços.
               </p>
@@ -45,9 +45,9 @@ const TermosUso = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <h4 className="font-semibold text-foreground mb-2">"EcoShop", "nós", "nosso"</h4>
+                <h4 className="font-semibold text-foreground mb-2">"Operador da Plataforma", "nós", "nosso"</h4>
                 <p className="text-muted-foreground">
-                  Refere-se à empresa EcoShop Comércio Eletrônico Ltda., CNPJ: 00.000.000/0001-00.
+                  Refere-se ao responsável por esta loja online.
                 </p>
               </div>
               <div>
@@ -170,7 +170,7 @@ const TermosUso = () => {
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">
                 Todo o conteúdo do site, incluindo textos, imagens, logos, gráficos e software, 
-                é propriedade da EcoShop ou de seus licenciadores e está protegido por leis de 
+                é propriedade do operador desta loja ou de seus licenciadores e está protegido por leis de 
                 direitos autorais e propriedade intelectual.
               </p>
               <p className="text-muted-foreground">
@@ -204,7 +204,7 @@ const TermosUso = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">
-                A EcoShop não se responsabiliza por danos indiretos, incidentais, especiais ou 
+                O operador não se responsabiliza por danos indiretos, incidentais, especiais ou 
                 consequenciais decorrentes do uso ou incapacidade de usar nossos serviços.
               </p>
               <p className="text-muted-foreground">
@@ -246,14 +246,10 @@ const TermosUso = () => {
               <CardTitle>10. Contato</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground mb-4">
-                Se você tiver dúvidas sobre estes Termos de Uso, entre em contato conosco:
+              <p className="text-muted-foreground">
+                Se você tiver dúvidas sobre estes Termos de Uso, entre em contato através dos 
+                canais disponíveis em nosso site.
               </p>
-              <div className="space-y-2 text-muted-foreground">
-                <p><strong>E-mail:</strong> contato@ecoshop.com.br</p>
-                <p><strong>Telefone:</strong> (11) 3000-0000</p>
-                <p><strong>Endereço:</strong> Rua das Flores, 123 - São Paulo, SP</p>
-              </div>
             </CardContent>
           </Card>
         </div>

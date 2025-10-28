@@ -34,7 +34,7 @@ const Footer = () => {
                   <span className="text-white font-bold">{config?.store_name?.[0] || "E"}</span>
                 </div>
               )}
-              <span className="text-xl font-bold text-foreground">{config?.store_name || "EcoShop"}</span>
+              <span className="text-xl font-bold text-foreground">{config?.store_name || "Lojafy"}</span>
             </div>
             <p className="text-muted-foreground">
               {config?.footer_description || "Sua loja online de confiança com os melhores produtos e preços do mercado."}
@@ -165,7 +165,7 @@ const Footer = () => {
 
           {/* Copyright */}
           <div className="text-center text-sm text-muted-foreground">
-            <p>© 2024 {config?.store_name || "EcoShop"}. Todos os direitos reservados.</p>
+            <p>© 2024 {config?.store_name || "Lojafy"}. Todos os direitos reservados.</p>
             <p className="mt-1">
               <span>{config?.footer_developed_text || "Desenvolvido com ❤️ para você"}</span>
             </p>
