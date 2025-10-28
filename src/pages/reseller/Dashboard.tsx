@@ -1,8 +1,20 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShoppingCart, DollarSign, Users, TrendingUp } from 'lucide-react';
+import { SetupChecklist } from '@/components/reseller/SetupChecklist';
+import { useResellerSales } from '@/hooks/useResellerSales';
+import { useSetupProgress } from '@/hooks/useSetupProgress';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const ResellerDashboard = () => {
+  const { data: salesData, isLoading } = useResellerSales();
+  const { data: setupData } = useSetupProgress();
+
+  const calcChange = (curr: number, prev: number) => {
+    if (prev === 0) return curr > 0 ? 100 : 0;
+    return Math.round(((curr - prev) / prev) * 100);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -12,6 +24,8 @@ const ResellerDashboard = () => {
         </p>
       </div>
 
+      {setupData && setupData.progress < 100 && <SetupChecklist />}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -19,10 +33,15 @@ const ResellerDashboard = () => {
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">89</div>
-            <p className="text-xs text-muted-foreground">
-              +15% em relação ao mês anterior
-            </p>
+            {isLoading ? <Skeleton className="h-8 w-16" /> : (
+              <>
+                <div className="text-2xl font-bold">{salesData?.sales_this_month || 0}</div>
+                <p className="text-xs text-muted-foreground">
+                  {calcChange(salesData?.sales_this_month || 0, salesData?.sales_last_month || 0) > 0 ? '+' : ''}
+                  {calcChange(salesData?.sales_this_month || 0, salesData?.sales_last_month || 0)}% vs mês anterior
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -32,10 +51,17 @@ const ResellerDashboard = () => {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 2.450</div>
-            <p className="text-xs text-muted-foreground">
-              +20% em relação ao mês anterior
-            </p>
+            {isLoading ? <Skeleton className="h-8 w-24" /> : (
+              <>
+                <div className="text-2xl font-bold">
+                  {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(salesData?.commissions_this_month || 0)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {calcChange(salesData?.commissions_this_month || 0, salesData?.commissions_last_month || 0) > 0 ? '+' : ''}
+                  {calcChange(salesData?.commissions_this_month || 0, salesData?.commissions_last_month || 0)}% vs mês anterior
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -45,10 +71,12 @@ const ResellerDashboard = () => {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">67</div>
-            <p className="text-xs text-muted-foreground">
-              +5 novos clientes
-            </p>
+            {isLoading ? <Skeleton className="h-8 w-12" /> : (
+              <>
+                <div className="text-2xl font-bold">{salesData?.total_customers || 0}</div>
+                <p className="text-xs text-muted-foreground">Total atendidos</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -58,10 +86,12 @@ const ResellerDashboard = () => {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3.2%</div>
-            <p className="text-xs text-muted-foreground">
-              +0.5% em relação ao mês anterior
-            </p>
+            {isLoading ? <Skeleton className="h-8 w-16" /> : (
+              <>
+                <div className="text-2xl font-bold">{salesData?.conversion_rate?.toFixed(1) || 0}%</div>
+                <p className="text-xs text-muted-foreground">Visitantes convertidos</p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -106,7 +106,7 @@ const ResellerProducts = () => {
 
   // Filter products based on search term
   const filteredProducts = products.filter(product => {
-    const productName = product.product?.name || '';
+    const productName = product.product?.name || product.product_name_snapshot || 'Produto Removido';
     const productSku = product.product?.sku || '';
     return productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
            productSku.toLowerCase().includes(searchTerm.toLowerCase());

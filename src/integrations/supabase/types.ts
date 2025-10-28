@@ -1838,6 +1838,7 @@ export type Database = {
           id: string
           position: number | null
           product_id: string
+          product_name_snapshot: string | null
           reseller_id: string
           updated_at: string | null
         }
@@ -1849,6 +1850,7 @@ export type Database = {
           id?: string
           position?: number | null
           product_id: string
+          product_name_snapshot?: string | null
           reseller_id: string
           updated_at?: string | null
         }
@@ -1860,6 +1862,7 @@ export type Database = {
           id?: string
           position?: number | null
           product_id?: string
+          product_name_snapshot?: string | null
           reseller_id?: string
           updated_at?: string | null
         }

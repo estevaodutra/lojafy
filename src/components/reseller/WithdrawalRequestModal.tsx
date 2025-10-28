@@ -66,7 +66,7 @@ export const WithdrawalRequestModal = ({ open, onOpenChange }: WithdrawalRequest
       : { method: "transfer" as const, bank_name: bankName, agency, account, account_type: accountType };
 
     createWithdrawal.mutate(
-      { amount: amountNum, bank_details },
+      { amount: amountNum, bank_details, fee },
       {
         onSuccess: () => {
           onOpenChange(false);

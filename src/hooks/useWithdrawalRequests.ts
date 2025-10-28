@@ -48,7 +48,10 @@ export const useWithdrawalRequests = () => {
     mutationFn: async (params: {
       amount: number;
       bank_details: WithdrawalRequest["bank_details"];
+      fee: number;
     }) => {
+      const netAmount = params.amount - params.fee;
+      
       const { data, error } = await supabase
         .from("withdrawal_requests")
         .insert({
@@ -61,12 +64,13 @@ export const useWithdrawalRequests = () => {
 
       if (error) throw error;
 
-      // Create financial transaction
+      // Create financial transaction with fee deducted
       await supabase.from("financial_transactions").insert({
         user_id: user?.id,
         transaction_type: "withdrawal",
         amount: params.amount,
-        net_amount: params.amount,
+        fee_amount: params.fee,
+        net_amount: netAmount,
         status: "pending",
         description: `Solicitação de saque - ID: ${data.id}`,
       });
