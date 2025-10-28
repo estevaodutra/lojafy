@@ -18,7 +18,8 @@ import {
   Bell,
   Headphones,
   FileText,
-  MessageSquare
+  MessageSquare,
+  DollarSign
 } from 'lucide-react';
 import {
   Sidebar,
@@ -74,6 +75,11 @@ const superAdminMenuItems = [
     title: 'Plataforma',
     url: '/super-admin/plataforma',
     icon: Shield,
+  },
+  {
+    title: 'Financeiro',
+    url: '/super-admin/financeiro',
+    icon: DollarSign,
   },
   {
     title: 'Integrações',

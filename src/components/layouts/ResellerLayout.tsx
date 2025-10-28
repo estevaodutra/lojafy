@@ -70,8 +70,8 @@ const resellerMenuItems = [
     icon: ShoppingCart,
   },
   {
-    title: 'Comissões',
-    url: '/reseller/comissoes',
+    title: 'Financeiro',
+    url: '/reseller/financeiro',
     icon: DollarSign,
   },
   {

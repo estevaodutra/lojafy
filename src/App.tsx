@@ -44,6 +44,7 @@ import { SupplierLayout } from "./components/layouts/SupplierLayout";
 import { ResellerLayout } from "./components/layouts/ResellerLayout";
 import { SuperAdminLayout } from "./components/layouts/SuperAdminLayout";
 import AdminDashboard from "./pages/admin/Dashboard";
+import AdminFinanceiro from "./pages/admin/Financeiro";
 import AdminProducts from "./pages/admin/Products";
 import AdminBanners from "./pages/admin/Banners";
 import AdminOrders from "./pages/admin/Orders";
@@ -63,7 +64,7 @@ import SupplierSales from "./pages/supplier/Sales";
 import ResellerDashboard from "./pages/reseller/Dashboard";
 import ResellerSales from "./pages/reseller/Sales";
 import ResellerClients from "./pages/reseller/Clients";
-import ResellerCommissions from "./pages/reseller/Commissions";
+import ResellerFinanceiro from "./pages/reseller/Financeiro";
 import ResellerGoals from "./pages/reseller/Goals";
 
 import ResellerCatalog from "./pages/reseller/Catalog";
@@ -241,6 +242,7 @@ const App = () => {
                 <Route path="base-conhecimento" element={<AIKnowledgeBase />} />
                 <Route path="suporte" element={<SupportManagement />} />
                 <Route path="chat-suporte" element={<ChatSupport />} />
+                <Route path="financeiro" element={<AdminFinanceiro />} />
               </Route>
 
               {/* Supplier Panel Routes */}
@@ -278,7 +280,7 @@ const App = () => {
                 <Route path="banners" element={<ResellerBanners />} />
                 <Route path="vendas" element={<ResellerSales />} />
                 <Route path="clientes" element={<ResellerClients />} />
-                <Route path="comissoes" element={<ResellerCommissions />} />
+                <Route path="financeiro" element={<ResellerFinanceiro />} />
                 <Route path="metas" element={<ResellerGoals />} />
                 
               </Route>

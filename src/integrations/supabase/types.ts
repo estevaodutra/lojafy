@@ -2451,11 +2451,80 @@ export type Database = {
         }
         Relationships: []
       }
+      withdrawal_requests: {
+        Row: {
+          amount: number
+          bank_details: Json
+          created_at: string
+          id: string
+          notes: string | null
+          processed_at: string | null
+          processed_by: string | null
+          rejection_reason: string | null
+          requested_at: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          bank_details: Json
+          created_at?: string
+          id?: string
+          notes?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          rejection_reason?: string | null
+          requested_at?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          bank_details?: Json
+          created_at?: string
+          id?: string
+          notes?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          rejection_reason?: string | null
+          requested_at?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      approve_withdrawal: {
+        Args: { p_admin_id: string; p_withdrawal_id: string }
+        Returns: undefined
+      }
+      calculate_available_balance: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
+      calculate_blocked_balance: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
+      calculate_pending_withdrawals: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
+      calculate_total_withdrawn: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
+      complete_withdrawal: {
+        Args: { p_admin_id: string; p_withdrawal_id: string }
+        Returns: undefined
+      }
       generate_api_key: { Args: never; Returns: string }
       generate_gtin_ean13: { Args: never; Returns: string }
       generate_order_number: { Args: never; Returns: string }
@@ -2553,6 +2622,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin_user: { Args: never; Returns: boolean }
+      reject_withdrawal: {
+        Args: { p_admin_id: string; p_reason: string; p_withdrawal_id: string }
+        Returns: undefined
+      }
       send_automatic_notification: {
         Args: {
           p_target_user_ids?: string[]
