@@ -36,6 +36,7 @@ export interface ResellerProduct {
   custom_price?: number;
   custom_description?: string;
   position: number;
+  product_name_snapshot?: string;
   created_at: string;
   updated_at: string;
   product?: any; // Joined product data
