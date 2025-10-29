@@ -90,7 +90,7 @@ import PublicStoreTerms from "./pages/PublicStoreTerms";
 import PublicStoreTrackOrder from "./pages/PublicStoreTrackOrder";
 import PublicStoreHelpCenter from "./pages/PublicStoreHelpCenter";
 import SuperAdminDashboard from "./pages/admin/Dashboard";
-import Usuarios from "./pages/admin/Usuarios";
+import GestaoUsuarios from "./pages/admin/GestaoUsuarios";
 import Plataforma from "./pages/admin/Plataforma";
 import AdminCourses from "./pages/admin/Courses";
 import CourseContent from "./pages/admin/CourseContent";
@@ -221,7 +221,7 @@ const App = () => {
                 }
               >
                 <Route index element={<SuperAdminDashboard />} />
-                <Route path="usuarios" element={<Usuarios />} />
+                <Route path="usuarios" element={<GestaoUsuarios />} />
                 <Route path="notificacoes" element={<NotificationsManagement />} />
                 <Route path="plataforma" element={<Plataforma />} />
                 <Route path="produtos" element={<AdminProducts />} />
