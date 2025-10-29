@@ -19,7 +19,8 @@ import {
   Headphones,
   FileText,
   MessageSquare,
-  DollarSign
+  DollarSign,
+  GraduationCap
 } from 'lucide-react';
 import {
   Sidebar,
@@ -81,6 +82,14 @@ const supportMenuItems = [
   },
 ];
 
+const academyMenuItems = [
+  {
+    title: 'Academy API',
+    url: '/super-admin/academy-api',
+    icon: GraduationCap,
+  },
+];
+
 const SuperAdminSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -126,6 +135,27 @@ const SuperAdminSidebar = () => {
           <SidebarGroupContent>
             <SidebarMenu>
               {supportMenuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton 
+                    asChild
+                    className={currentPath === item.url ? 'bg-sidebar-accent' : ''}
+                  >
+                    <button onClick={() => navigate(item.url)}>
+                      <item.icon className="mr-2 h-4 w-4" />
+                      <span>{item.title}</span>
+                    </button>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Academy</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {academyMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton 
                     asChild

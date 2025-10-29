@@ -611,21 +611,79 @@ const IntegracaoPage: React.FC = () => {
 
           <Separator />
 
-          {/* Endpoints */}
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-semibold mb-4">Endpoints Disponíveis</h2>
-              <p className="text-muted-foreground">
-                Todos os endpoints retornam JSON e incluem tratamento de erros adequado.
-              </p>
-            </div>
+          {/* Endpoints organizados por categoria */}
+          <Tabs defaultValue="catalog" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="catalog">📦 Catálogo</TabsTrigger>
+              <TabsTrigger value="orders">🛒 Pedidos</TabsTrigger>
+              <TabsTrigger value="ranking">📊 Ranking</TabsTrigger>
+              <TabsTrigger value="academy">🎓 Academy</TabsTrigger>
+            </TabsList>
 
-            <div className="grid gap-6">
-              {endpoints.map((endpoint, index) => (
-                <EndpointCard key={index} endpoint={endpoint} />
-              ))}
-            </div>
-          </div>
+            <TabsContent value="catalog" className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-semibold mb-2">Endpoints de Catálogo</h2>
+                <p className="text-muted-foreground mb-6">
+                  Gerencie produtos, categorias e subcategorias da sua loja
+                </p>
+              </div>
+              <div className="grid gap-6">
+                {endpoints.slice(0, 6).map((endpoint, index) => (
+                  <EndpointCard key={index} endpoint={endpoint} />
+                ))}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="orders" className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-semibold mb-2">Endpoints de Pedidos</h2>
+                <p className="text-muted-foreground mb-6">
+                  Consulte pedidos reais e informações de vendas
+                </p>
+              </div>
+              <div className="grid gap-6">
+                {endpoints.slice(6, 9).map((endpoint, index) => (
+                  <EndpointCard key={index} endpoint={endpoint} />
+                ))}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="ranking" className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-semibold mb-2">Endpoints de Ranking & Demo</h2>
+                <p className="text-muted-foreground mb-6">
+                  Gerencie dados de demonstração e ranking de produtos
+                </p>
+              </div>
+              <div className="grid gap-6">
+                {endpoints.slice(9).map((endpoint, index) => (
+                  <EndpointCard key={index} endpoint={endpoint} />
+                ))}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="academy" className="space-y-6">
+              <Card className="border-primary/50">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <Badge variant="secondary" className="text-sm">Novo</Badge>
+                    <CardTitle>API da Loja Fire Academy</CardTitle>
+                  </div>
+                  <CardDescription>
+                    A API da Academy possui uma página dedicada com documentação completa e endpoints especializados para gestão de cursos, matrículas e progresso.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <a 
+                    href="/super-admin/academy-api" 
+                    className="inline-flex items-center gap-2 text-primary hover:underline font-medium"
+                  >
+                    Acessar Documentação Completa da Academy API →
+                  </a>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
     </div>
