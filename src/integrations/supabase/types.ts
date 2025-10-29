@@ -1740,6 +1740,11 @@ export type Database = {
           phone: string | null
           role: Database["public"]["Enums"]["app_role"]
           subdomain: string | null
+          subscription_expires_at: string | null
+          subscription_payment_url: string | null
+          subscription_plan:
+            | Database["public"]["Enums"]["subscription_plan"]
+            | null
           updated_at: string
           user_id: string
         }
@@ -1757,6 +1762,11 @@ export type Database = {
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           subdomain?: string | null
+          subscription_expires_at?: string | null
+          subscription_payment_url?: string | null
+          subscription_plan?:
+            | Database["public"]["Enums"]["subscription_plan"]
+            | null
           updated_at?: string
           user_id: string
         }
@@ -1774,6 +1784,11 @@ export type Database = {
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           subdomain?: string | null
+          subscription_expires_at?: string | null
+          subscription_payment_url?: string | null
+          subscription_plan?:
+            | Database["public"]["Enums"]["subscription_plan"]
+            | null
           updated_at?: string
           user_id?: string
         }
@@ -2662,6 +2677,7 @@ export type Database = {
         | "general"
         | "academy_lesson"
       message_sender_type: "customer" | "ai" | "admin" | "system"
+      subscription_plan: "free" | "premium"
       ticket_priority: "low" | "normal" | "high" | "urgent"
       ticket_status:
         | "open"
@@ -2806,6 +2822,7 @@ export const Constants = {
         "academy_lesson",
       ],
       message_sender_type: ["customer", "ai", "admin", "system"],
+      subscription_plan: ["free", "premium"],
       ticket_priority: ["low", "normal", "high", "urgent"],
       ticket_status: [
         "open",

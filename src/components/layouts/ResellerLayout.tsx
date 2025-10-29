@@ -27,6 +27,7 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
+import { PremiumBadge } from '@/components/premium/PremiumBadge';
 
 const resellerMenuItems = [
   {
@@ -89,7 +90,7 @@ const resellerMenuItems = [
 const ResellerSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, profile } = useAuth();
   const currentPath = location.pathname;
 
   const handleLogout = async () => {
@@ -100,8 +101,11 @@ const ResellerSidebar = () => {
   return (
     <Sidebar className="border-r">
       <SidebarContent>
-        <div className="p-4">
+        <div className="p-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Revendedor</h2>
+          {profile?.subscription_plan && (
+            <PremiumBadge plan={profile.subscription_plan} />
+          )}
         </div>
         
         <SidebarGroup>

@@ -1,14 +1,18 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ShoppingCart, DollarSign, Users, TrendingUp } from 'lucide-react';
+import { ShoppingCart, DollarSign, Users, TrendingUp, Crown } from 'lucide-react';
 import { SetupChecklist } from '@/components/reseller/SetupChecklist';
 import { useResellerSales } from '@/hooks/useResellerSales';
 import { useSetupProgress } from '@/hooks/useSetupProgress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { useSubscriptionCheck } from '@/hooks/useSubscriptionCheck';
 
 const ResellerDashboard = () => {
   const { data: salesData, isLoading } = useResellerSales();
   const { data: setupData } = useSetupProgress();
+  const { isFree, paymentUrl } = useSubscriptionCheck();
 
   const calcChange = (curr: number, prev: number) => {
     if (prev === 0) return curr > 0 ? 100 : 0;
@@ -23,6 +27,28 @@ const ResellerDashboard = () => {
           Acompanhe suas vendas e comissões
         </p>
       </div>
+
+      {isFree && (
+        <Alert className="border-yellow-500 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20">
+          <Crown className="h-5 w-5 text-yellow-600" />
+          <AlertTitle className="text-yellow-900 dark:text-yellow-100">
+            Upgrade para Premium!
+          </AlertTitle>
+          <AlertDescription className="flex items-center justify-between">
+            <span className="text-yellow-800 dark:text-yellow-200">
+              Desbloqueie loja pública, importação de produtos e vendas ilimitadas.
+            </span>
+            <Button 
+              size="sm"
+              className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white ml-4"
+              onClick={() => window.open(paymentUrl, '_blank')}
+            >
+              <Crown className="mr-2 h-4 w-4" />
+              Ver Planos
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {setupData && setupData.progress < 100 && <SetupChecklist />}
 

@@ -25,6 +25,8 @@ import { useCategories } from '@/hooks/useCategories';
 import { useResellerCatalog } from '@/hooks/useResellerCatalog';
 import { useResellerStore } from '@/hooks/useResellerStore';
 import { ProductCalculatorModal } from '@/components/reseller/ProductCalculatorModal';
+import { useSubscriptionCheck } from '@/hooks/useSubscriptionCheck';
+import { PremiumRequiredModal } from '@/components/premium/PremiumRequiredModal';
 
 const ResellerCatalog = () => {
   const { toast } = useToast();
@@ -38,6 +40,8 @@ const ResellerCatalog = () => {
   const [calculatedPrice, setCalculatedPrice] = useState<number | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const { requiresPremium, paymentUrl } = useSubscriptionCheck();
 
   const { data: categories = [], isLoading: categoriesLoading } = useCategories();
   
@@ -119,6 +123,11 @@ const ResellerCatalog = () => {
   };
 
   const handleAddToStore = async (productId: string, customPrice?: number) => {
+    if (!requiresPremium('Importar Produtos')) {
+      setShowPremiumModal(true);
+      return;
+    }
+    
     try {
       const product = products.find(p => p.id === productId);
       if (!product) return;
