@@ -28,6 +28,7 @@ import { PremiumBadge } from '@/components/premium/PremiumBadge';
 import { ImpersonationButton } from '@/components/admin/ImpersonationButton';
 import { EditSubscriptionDialog } from '@/components/admin/EditSubscriptionDialog';
 import { UserCleanupPanel } from '@/components/admin/UserCleanupPanel';
+import { CleanupHistoryTab } from '@/components/admin/CleanupHistoryTab';
 import { useToast } from '@/hooks/use-toast';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import {
@@ -38,6 +39,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -182,224 +184,237 @@ const GestaoUsuarios = () => {
         <CreateUserDialog onSuccess={refetch} />
       </div>
 
-      {/* User Cleanup Panel */}
-      <UserCleanupPanel />
+      <Tabs defaultValue="users" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="users">Usuários</TabsTrigger>
+          <TabsTrigger value="cleanup">Histórico de Limpeza</TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nome ou email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
-            </div>
+        <TabsContent value="users" className="space-y-6 mt-0">
+          {/* User Cleanup Status Cards */}
+          <UserCleanupPanel />
 
-            <Select value={roleFilter} onValueChange={handleFilterChange(setRoleFilter)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todos os Roles" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Roles</SelectItem>
-                <SelectItem value="super_admin">Super Admin</SelectItem>
-                <SelectItem value="admin">Administrador</SelectItem>
-                <SelectItem value="reseller">Revendedores</SelectItem>
-                <SelectItem value="supplier">Fornecedores</SelectItem>
-                <SelectItem value="customer">Clientes</SelectItem>
-              </SelectContent>
-            </Select>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por nome ou email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
 
-            <Select value={planFilter} onValueChange={handleFilterChange(setPlanFilter)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todos os Planos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Planos</SelectItem>
-                <SelectItem value="free">Free</SelectItem>
-                <SelectItem value="premium">Premium</SelectItem>
-              </SelectContent>
-            </Select>
+                <Select value={roleFilter} onValueChange={handleFilterChange(setRoleFilter)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos os Roles" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Roles</SelectItem>
+                    <SelectItem value="super_admin">Super Admin</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="reseller">Revendedores</SelectItem>
+                    <SelectItem value="supplier">Fornecedores</SelectItem>
+                    <SelectItem value="customer">Clientes</SelectItem>
+                  </SelectContent>
+                </Select>
 
-            <Select value={statusFilter} onValueChange={handleFilterChange(setStatusFilter)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="active">Ativos</SelectItem>
-                <SelectItem value="inactive">Inativos</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+                <Select value={planFilter} onValueChange={handleFilterChange(setPlanFilter)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos os Planos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Planos</SelectItem>
+                    <SelectItem value="free">Free</SelectItem>
+                    <SelectItem value="premium">Premium</SelectItem>
+                  </SelectContent>
+                </Select>
 
-      <Card>
-        <CardContent className="pt-6">
-          {isLoading ? (
-            <div className="text-center py-8">Carregando usuários...</div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Plano</TableHead>
-                  <TableHead>Expiração</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Atividade</TableHead>
-                  <TableHead>Data Criação</TableHead>
-                  <TableHead>Último Acesso</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedUsers?.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">
-                      {user.first_name} {user.last_name}
-                    </TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
-                      <Badge variant={getRoleBadgeVariant(user.role)}>
-                        {getRoleLabel(user.role)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {user.role === 'reseller' && user.subscription_plan ? (
-                        <PremiumBadge plan={user.subscription_plan as 'free' | 'premium'} />
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {user.role === 'reseller' && user.subscription_expires_at ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">
-                            {format(new Date(user.subscription_expires_at), 'dd/MM/yyyy')}
-                          </span>
-                          {getExpirationStatus(user.subscription_expires_at) && (
-                            <Badge 
-                              variant={getExpirationStatus(user.subscription_expires_at)!.variant}
-                              className="text-xs"
-                            >
-                              {getExpirationStatus(user.subscription_expires_at)!.type === 'expired' && (
-                                <AlertTriangle className="h-3 w-3 mr-1" />
-                              )}
-                              {getExpirationStatus(user.subscription_expires_at)!.label}
-                            </Badge>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={user.is_active ? 'success' : 'destructive'}>
-                        {user.is_active ? 'Ativo' : 'Inativo'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant={getActivityStatus(user.created_at, user.last_sign_in_at, user.is_active).variant}
-                        className="flex items-center gap-1 w-fit text-xs"
-                      >
-                        {getActivityStatus(user.created_at, user.last_sign_in_at, user.is_active).icon}
-                        {getActivityStatus(user.created_at, user.last_sign_in_at, user.is_active).text}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(user.created_at).toLocaleDateString('pt-BR')}
-                    </TableCell>
-                    <TableCell>
-                      {user.last_sign_in_at ? (
-                        <span className="text-sm">
-                          {format(new Date(user.last_sign_in_at), 'dd/MM/yyyy HH:mm')}
-                        </span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">Nunca acessou</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        {user.role === 'reseller' && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => setEditingUser(user)}
-                            title="Editar plano"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => toggleUserStatus(user.user_id, user.is_active)}
-                          title={user.is_active ? 'Desativar' : 'Ativar'}
-                        >
-                          <Power className="h-4 w-4" />
-                        </Button>
-                        <ImpersonationButton 
-                          userId={user.user_id}
-                          userRole={user.role}
-                          userName={`${user.first_name} ${user.last_name}`}
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {!paginatedUsers?.length && (
-                  <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                      Nenhum usuário encontrado
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          )}
-
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-2 py-4">
-              <div className="text-sm text-muted-foreground">
-                Mostrando {startIndex + 1}-{Math.min(endIndex, totalUsers)} de {totalUsers} usuários
+                <Select value={statusFilter} onValueChange={handleFilterChange(setStatusFilter)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="active">Ativos</SelectItem>
+                    <SelectItem value="inactive">Inativos</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious 
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                    />
-                  </PaginationItem>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <PaginationItem key={page}>
-                      <PaginationLink
-                        onClick={() => setCurrentPage(page)}
-                        isActive={currentPage === page}
-                        className="cursor-pointer"
-                      >
-                        {page}
-                      </PaginationLink>
-                    </PaginationItem>
-                  ))}
-                  <PaginationItem>
-                    <PaginationNext 
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              {isLoading ? (
+                <div className="text-center py-8">Carregando usuários...</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Plano</TableHead>
+                      <TableHead>Expiração</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Atividade</TableHead>
+                      <TableHead>Data Criação</TableHead>
+                      <TableHead>Último Acesso</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedUsers?.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">
+                          {user.first_name} {user.last_name}
+                        </TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          <Badge variant={getRoleBadgeVariant(user.role)}>
+                            {getRoleLabel(user.role)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {user.role === 'reseller' && user.subscription_plan ? (
+                            <PremiumBadge plan={user.subscription_plan as 'free' | 'premium'} />
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {user.role === 'reseller' && user.subscription_expires_at ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-muted-foreground">
+                                {format(new Date(user.subscription_expires_at), 'dd/MM/yyyy')}
+                              </span>
+                              {getExpirationStatus(user.subscription_expires_at) && (
+                                <Badge 
+                                  variant={getExpirationStatus(user.subscription_expires_at)!.variant}
+                                  className="text-xs"
+                                >
+                                  {getExpirationStatus(user.subscription_expires_at)!.type === 'expired' && (
+                                    <AlertTriangle className="h-3 w-3 mr-1" />
+                                  )}
+                                  {getExpirationStatus(user.subscription_expires_at)!.label}
+                                </Badge>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={user.is_active ? 'success' : 'destructive'}>
+                            {user.is_active ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={getActivityStatus(user.created_at, user.last_sign_in_at, user.is_active).variant}
+                            className="flex items-center gap-1 w-fit text-xs"
+                          >
+                            {getActivityStatus(user.created_at, user.last_sign_in_at, user.is_active).icon}
+                            {getActivityStatus(user.created_at, user.last_sign_in_at, user.is_active).text}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(user.created_at).toLocaleDateString('pt-BR')}
+                        </TableCell>
+                        <TableCell>
+                          {user.last_sign_in_at ? (
+                            <span className="text-sm">
+                              {format(new Date(user.last_sign_in_at), 'dd/MM/yyyy HH:mm')}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Nunca acessou</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            {user.role === 'reseller' && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setEditingUser(user)}
+                                title="Editar plano"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => toggleUserStatus(user.user_id, user.is_active)}
+                              title={user.is_active ? 'Desativar' : 'Ativar'}
+                            >
+                              <Power className="h-4 w-4" />
+                            </Button>
+                            <ImpersonationButton 
+                              userId={user.user_id}
+                              userRole={user.role}
+                              userName={`${user.first_name} ${user.last_name}`}
+                            />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {!paginatedUsers?.length && (
+                      <TableRow>
+                        <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                          Nenhum usuário encontrado
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-2 py-4">
+                  <div className="text-sm text-muted-foreground">
+                    Mostrando {startIndex + 1}-{Math.min(endIndex, totalUsers)} de {totalUsers} usuários
+                  </div>
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            onClick={() => setCurrentPage(page)}
+                            isActive={currentPage === page}
+                            className="cursor-pointer"
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ))}
+                      <PaginationItem>
+                        <PaginationNext 
+                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                          className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="cleanup" className="mt-0">
+          <CleanupHistoryTab />
+        </TabsContent>
+      </Tabs>
 
       <EditSubscriptionDialog
         isOpen={!!editingUser}
