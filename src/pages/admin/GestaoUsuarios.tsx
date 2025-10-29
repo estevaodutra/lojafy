@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, UserPlus, Edit, Power, UserCircle } from 'lucide-react';
+import { Search, UserPlus, Edit, Power, UserCircle, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { format, differenceInDays } from 'date-fns';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
 import { PremiumBadge } from '@/components/premium/PremiumBadge';
 import { ImpersonationButton } from '@/components/admin/ImpersonationButton';
+import { EditSubscriptionDialog } from '@/components/admin/EditSubscriptionDialog';
 import { useToast } from '@/hooks/use-toast';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
@@ -34,6 +36,7 @@ const GestaoUsuarios = () => {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [planFilter, setPlanFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [editingUser, setEditingUser] = useState<any>(null);
   const { toast } = useToast();
 
   const { data: users, isLoading, refetch } = useQuery({
@@ -102,6 +105,18 @@ const GestaoUsuarios = () => {
       customer: 'Cliente',
     };
     return labels[role] || role;
+  };
+
+  const getExpirationStatus = (expiresAt?: string) => {
+    if (!expiresAt) return null;
+    const daysUntilExpiration = differenceInDays(new Date(expiresAt), new Date());
+    
+    if (daysUntilExpiration < 0) {
+      return { type: 'expired', label: 'Expirado', variant: 'destructive' as const };
+    } else if (daysUntilExpiration <= 7) {
+      return { type: 'warning', label: `Expira em ${daysUntilExpiration}d`, variant: 'secondary' as const };
+    }
+    return null;
   };
 
   return (
@@ -180,6 +195,7 @@ const GestaoUsuarios = () => {
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Plano</TableHead>
+                  <TableHead>Expiração</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Data Criação</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
@@ -205,6 +221,28 @@ const GestaoUsuarios = () => {
                       )}
                     </TableCell>
                     <TableCell>
+                      {user.role === 'reseller' && user.subscription_expires_at ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">
+                            {format(new Date(user.subscription_expires_at), 'dd/MM/yyyy')}
+                          </span>
+                          {getExpirationStatus(user.subscription_expires_at) && (
+                            <Badge 
+                              variant={getExpirationStatus(user.subscription_expires_at)!.variant}
+                              className="text-xs"
+                            >
+                              {getExpirationStatus(user.subscription_expires_at)!.type === 'expired' && (
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                              )}
+                              {getExpirationStatus(user.subscription_expires_at)!.label}
+                            </Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <Badge variant={user.is_active ? 'success' : 'destructive'}>
                         {user.is_active ? 'Ativo' : 'Inativo'}
                       </Badge>
@@ -212,26 +250,38 @@ const GestaoUsuarios = () => {
                     <TableCell>
                       {new Date(user.created_at).toLocaleDateString('pt-BR')}
                     </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => toggleUserStatus(user.user_id, user.is_active)}
-                        title={user.is_active ? 'Desativar' : 'Ativar'}
-                      >
-                        <Power className="h-4 w-4" />
-                      </Button>
-                      <ImpersonationButton 
-                        userId={user.user_id}
-                        userRole={user.role}
-                        userName={`${user.first_name} ${user.last_name}`}
-                      />
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {user.role === 'reseller' && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setEditingUser(user)}
+                            title="Editar plano"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => toggleUserStatus(user.user_id, user.is_active)}
+                          title={user.is_active ? 'Desativar' : 'Ativar'}
+                        >
+                          <Power className="h-4 w-4" />
+                        </Button>
+                        <ImpersonationButton 
+                          userId={user.user_id}
+                          userRole={user.role}
+                          userName={`${user.first_name} ${user.last_name}`}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
                 {!filteredUsers?.length && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       Nenhum usuário encontrado
                     </TableCell>
                   </TableRow>
@@ -241,6 +291,13 @@ const GestaoUsuarios = () => {
           )}
         </CardContent>
       </Card>
+
+      <EditSubscriptionDialog
+        isOpen={!!editingUser}
+        onClose={() => setEditingUser(null)}
+        user={editingUser || {}}
+        onSuccess={refetch}
+      />
     </div>
   );
 };
