@@ -106,7 +106,6 @@ import Configuracoes from "./pages/admin/Configuracoes";
 
 import SupportManagement from "./pages/admin/SupportManagement";
 import ChatSupport from "./pages/admin/ChatSupport";
-import AcademyAPI from "./pages/admin/AcademyAPI";
 import AdminAcademy from "./pages/admin/Academy";
 import { MandatoryNotificationModal } from "@/components/MandatoryNotificationModal";
 import { useMandatoryNotifications } from "@/hooks/useMandatoryNotifications";
@@ -237,7 +236,6 @@ const App = () => {
                 <Route path="financeiro" element={<AdminFinanceiro />} />
                 <Route path="chat-suporte" element={<ChatSupport />} />
                 <Route path="academy" element={<AdminAcademy />} />
-                <Route path="academy-api" element={<AcademyAPI />} />
                 
                 {/* Rotas antigas mantidas para compatibilidade */}
                 <Route path="usuarios" element={<GestaoUsuarios />} />

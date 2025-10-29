@@ -5,7 +5,7 @@ import { ApiKeyManager } from '@/components/admin/ApiKeyManager';
 import { EndpointCard } from '@/components/admin/EndpointCard';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Shield, Zap, Globe } from 'lucide-react';
+import { Shield, Zap, Globe, GraduationCap, Users, BookOpen, Award } from 'lucide-react';
 
 const endpoints = [
   {
@@ -518,6 +518,258 @@ const endpoints = [
   }
 ];
 
+// Academy API Endpoints
+const academyUserEndpoints = [
+  {
+    title: 'Verificar Usuário',
+    method: 'GET' as const,
+    url: '/functions/v1/api-usuarios-verificar',
+    description: 'Verifica se um usuário existe na plataforma por user_id ou email antes de realizar matrículas.',
+    queryParams: [
+      { name: 'user_id', description: 'ID do usuário (opcional se usar email)', example: 'user123' },
+      { name: 'email', description: 'Email do usuário (opcional se usar user_id)', example: 'aluno@example.com' }
+    ],
+    responseExample: {
+      success: true,
+      exists: true,
+      data: {
+        user_id: 'user123',
+        email: 'aluno@example.com',
+        full_name: 'João Silva',
+        role: 'customer',
+        created_at: '2024-12-01T10:00:00Z'
+      }
+    }
+  },
+  {
+    title: 'Cadastrar Usuário',
+    method: 'POST' as const,
+    url: '/functions/v1/api-usuarios-cadastrar',
+    description: 'Cria um novo usuário na plataforma. Define role padrão como "customer" se não especificado.',
+    requestBody: {
+      email: 'novousuario@example.com',
+      full_name: 'Maria Santos',
+      password: 'senhaSegura123!',
+      role: 'customer'
+    },
+    responseExample: {
+      success: true,
+      message: 'Usuário criado com sucesso',
+      data: {
+        user_id: 'newuser456',
+        email: 'novousuario@example.com',
+        full_name: 'Maria Santos',
+        role: 'customer',
+        created_at: '2025-01-12T15:00:00Z'
+      }
+    }
+  }
+];
+
+const academyCourseEndpoints = [
+  {
+    title: 'Listar Cursos',
+    method: 'GET' as const,
+    url: '/functions/v1/api-cursos-listar',
+    description: 'Retorna a lista de cursos disponíveis na Academy com filtros por nível de publicação e acesso.',
+    queryParams: [
+      { name: 'is_published', description: 'Filtrar por status publicado', example: 'true' },
+      { name: 'access_level', description: 'Nível de acesso (all, customer, supplier, reseller)', example: 'all' },
+      { name: 'page', description: 'Página (padrão: 1)', example: '1' },
+      { name: 'limit', description: 'Itens por página (máx: 100, padrão: 50)', example: '20' }
+    ],
+    responseExample: {
+      success: true,
+      data: [
+        {
+          id: 'course123',
+          title: 'Fundamentos de E-commerce',
+          description: 'Aprenda os conceitos básicos de vendas online',
+          thumbnail_url: 'https://loja.com/courses/ecommerce.jpg',
+          instructor_name: 'João Silva',
+          duration_hours: 8,
+          level: 'beginner',
+          price: 99.90,
+          is_published: true,
+          position: 1,
+          access_level: 'all',
+          created_at: '2025-01-12T10:00:00Z',
+          updated_at: '2025-01-12T10:00:00Z'
+        }
+      ]
+    }
+  },
+  {
+    title: 'Cadastrar Curso',
+    method: 'POST' as const,
+    url: '/functions/v1/api-cursos-cadastrar',
+    description: 'Cria um novo curso na plataforma Academy. O nível (level) pode ser: beginner, intermediate ou advanced.',
+    requestBody: {
+      title: 'Marketing Digital para E-commerce',
+      description: 'Domine as estratégias de marketing digital',
+      instructor_name: 'Maria Santos',
+      duration_hours: 12,
+      level: 'intermediate',
+      price: 199.90
+    },
+    responseExample: {
+      success: true,
+      message: 'Curso criado com sucesso',
+      data: {
+        id: 'course456',
+        title: 'Marketing Digital para E-commerce'
+      }
+    }
+  },
+  {
+    title: 'Detalhe do Curso',
+    method: 'GET' as const,
+    url: '/functions/v1/api-cursos-detalhe',
+    description: 'Retorna informações completas de um curso específico incluindo estatísticas de matrículas e progresso.',
+    queryParams: [
+      { name: 'course_id', description: 'ID do curso (obrigatório)', example: 'course456' }
+    ],
+    responseExample: {
+      success: true,
+      data: {
+        id: 'course456',
+        title: 'Marketing Digital para E-commerce',
+        statistics: {
+          total_enrollments: 145,
+          active_students: 98,
+          completion_rate: 67.5
+        }
+      }
+    }
+  },
+  {
+    title: 'Conteúdo do Curso',
+    method: 'GET' as const,
+    url: '/functions/v1/api-cursos-conteudo',
+    description: 'Lista todos os módulos e aulas de um curso específico com informações de duração e posicionamento.',
+    queryParams: [
+      { name: 'course_id', description: 'ID do curso (obrigatório)', example: 'course456' }
+    ],
+    responseExample: {
+      success: true,
+      data: {
+        course_id: 'course456',
+        course_title: 'Marketing Digital',
+        modules: [],
+        summary: {
+          total_modules: 4,
+          total_lessons: 32
+        }
+      }
+    }
+  }
+];
+
+const academyEnrollmentEndpoints = [
+  {
+    title: 'Listar Matrículas',
+    method: 'GET' as const,
+    url: '/functions/v1/api-matriculas-listar',
+    description: 'Retorna todas as matrículas com informações do curso e progresso.',
+    queryParams: [
+      { name: 'user_id', description: 'Filtrar por ID do usuário', example: 'user123' },
+      { name: 'course_id', description: 'Filtrar por ID do curso', example: 'course456' }
+    ],
+    responseExample: {
+      success: true,
+      data: []
+    }
+  },
+  {
+    title: 'Matricular Usuário',
+    method: 'POST' as const,
+    url: '/functions/v1/api-matriculas-cadastrar',
+    description: 'Matricula um usuário em um curso.',
+    requestBody: {
+      user_id: 'user123',
+      course_id: 'course456',
+      expires_at: '2026-01-12T23:59:59Z'
+    },
+    responseExample: {
+      success: true,
+      message: 'Matrícula realizada com sucesso'
+    }
+  },
+  {
+    title: 'Verificar Matrícula',
+    method: 'GET' as const,
+    url: '/functions/v1/api-matriculas-verificar',
+    description: 'Verifica se um usuário específico já está matriculado em um curso.',
+    queryParams: [
+      { name: 'user_id', description: 'ID do usuário', example: 'user123' },
+      { name: 'course_id', description: 'ID do curso', example: 'course456' }
+    ],
+    responseExample: {
+      success: true,
+      enrolled: true
+    }
+  },
+  {
+    title: 'Cancelar Matrícula',
+    method: 'DELETE' as const,
+    url: '/functions/v1/api-matriculas-cancelar',
+    description: 'Cancela uma matrícula existente.',
+    requestBody: {
+      enrollment_id: 'enrollment123'
+    },
+    responseExample: {
+      success: true,
+      message: 'Matrícula cancelada'
+    }
+  },
+  {
+    title: 'Atualizar Validade',
+    method: 'PUT' as const,
+    url: '/functions/v1/api-matriculas-atualizar-validade',
+    description: 'Atualiza a data de expiração de uma matrícula.',
+    requestBody: {
+      enrollment_id: 'enrollment123',
+      expires_at: '2027-12-31T23:59:59Z'
+    },
+    responseExample: {
+      success: true,
+      message: 'Validade atualizada'
+    }
+  }
+];
+
+const academyProgressEndpoints = [
+  {
+    title: 'Atualizar Progresso',
+    method: 'POST' as const,
+    url: '/functions/v1/api-progresso-atualizar',
+    description: 'Atualiza ou cria o progresso de uma aula específica.',
+    requestBody: {
+      enrollment_id: 'enrollment789',
+      lesson_id: 'lesson101',
+      watch_time_seconds: 1250,
+      is_completed: true
+    },
+    responseExample: {
+      success: true,
+      message: 'Progresso atualizado'
+    }
+  },
+  {
+    title: 'Consultar Progresso',
+    method: 'GET' as const,
+    url: '/functions/v1/api-progresso-usuario',
+    description: 'Retorna o progresso completo de todas as aulas do usuário.',
+    queryParams: [
+      { name: 'user_id', description: 'ID do usuário', example: 'user123' }
+    ],
+    responseExample: {
+      success: true,
+      data: []
+    }
+  }
+];
+
 const IntegracaoPage: React.FC = () => {
   return (
     <div className="space-y-6">
@@ -663,25 +915,144 @@ const IntegracaoPage: React.FC = () => {
             </TabsContent>
 
             <TabsContent value="academy" className="space-y-6">
-              <Card className="border-primary/50">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <Badge variant="secondary" className="text-sm">Novo</Badge>
-                    <CardTitle>API da Loja Fire Academy</CardTitle>
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-4">
+                <GraduationCap className="h-6 w-6 text-primary" />
+                <div>
+                  <h2 className="text-2xl font-semibold">Academy API</h2>
+                  <p className="text-muted-foreground text-sm">
+                    API completa para gestão de cursos, matrículas e progresso de alunos
+                  </p>
+                </div>
+                <Badge variant="secondary" className="ml-auto">Novo</Badge>
+              </div>
+
+              {/* Features */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-primary" />
+                      <CardTitle className="text-base">Usuários</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-muted-foreground">
+                      Crie e verifique usuários
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="h-5 w-5 text-primary" />
+                      <CardTitle className="text-base">Cursos</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-muted-foreground">
+                      Gerencie cursos e conteúdo
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="h-5 w-5 text-primary" />
+                      <CardTitle className="text-base">Matrículas</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-muted-foreground">
+                      Controle completo de matrículas
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <Award className="h-5 w-5 text-primary" />
+                      <CardTitle className="text-base">Progresso</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-muted-foreground">
+                      Acompanhe o progresso dos alunos
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Separator />
+
+              {/* Academy Tabs */}
+              <Tabs defaultValue="users" className="space-y-6">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="users">👤 Usuários</TabsTrigger>
+                  <TabsTrigger value="courses">📚 Cursos</TabsTrigger>
+                  <TabsTrigger value="enrollments">🎓 Matrículas</TabsTrigger>
+                  <TabsTrigger value="progress">📊 Progresso</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="users" className="space-y-6">
+                  <div>
+                    <h3 className="text-xl font-semibold mb-2">Endpoints de Usuários</h3>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      Crie e verifique usuários antes de realizar matrículas
+                    </p>
                   </div>
-                  <CardDescription>
-                    A API da Academy possui uma página dedicada com documentação completa e endpoints especializados para gestão de cursos, matrículas e progresso.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <a 
-                    href="/super-admin/academy-api" 
-                    className="inline-flex items-center gap-2 text-primary hover:underline font-medium"
-                  >
-                    Acessar Documentação Completa da Academy API →
-                  </a>
-                </CardContent>
-              </Card>
+                  <div className="grid gap-6">
+                    {academyUserEndpoints.map((endpoint, index) => (
+                      <EndpointCard key={index} endpoint={endpoint} />
+                    ))}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="courses" className="space-y-6">
+                  <div>
+                    <h3 className="text-xl font-semibold mb-2">Endpoints de Cursos</h3>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      Gerencie cursos, consulte detalhes e acesse todo o conteúdo
+                    </p>
+                  </div>
+                  <div className="grid gap-6">
+                    {academyCourseEndpoints.map((endpoint, index) => (
+                      <EndpointCard key={index} endpoint={endpoint} />
+                    ))}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="enrollments" className="space-y-6">
+                  <div>
+                    <h3 className="text-xl font-semibold mb-2">Endpoints de Matrículas</h3>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      Crie, verifique, cancele e gerencie validade de matrículas
+                    </p>
+                  </div>
+                  <div className="grid gap-6">
+                    {academyEnrollmentEndpoints.map((endpoint, index) => (
+                      <EndpointCard key={index} endpoint={endpoint} />
+                    ))}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="progress" className="space-y-6">
+                  <div>
+                    <h3 className="text-xl font-semibold mb-2">Endpoints de Progresso</h3>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      Acompanhe e atualize o progresso detalhado de cada aluno
+                    </p>
+                  </div>
+                  <div className="grid gap-6">
+                    {academyProgressEndpoints.map((endpoint, index) => (
+                      <EndpointCard key={index} endpoint={endpoint} />
+                    ))}
+                  </div>
+                </TabsContent>
+              </Tabs>
             </TabsContent>
           </Tabs>
         </TabsContent>
