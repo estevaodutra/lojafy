@@ -2469,6 +2469,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_cleanup_logs: {
+        Row: {
+          action: string
+          days_inactive: number
+          email: string
+          id: string
+          performed_at: string
+          performed_by: string | null
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          days_inactive: number
+          email: string
+          id?: string
+          performed_at?: string
+          performed_by?: string | null
+          reason: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          days_inactive?: number
+          email?: string
+          id?: string
+          performed_at?: string
+          performed_by?: string | null
+          reason?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       withdrawal_requests: {
         Row: {
           amount: number
@@ -2543,6 +2576,20 @@ export type Database = {
         Args: { p_admin_id: string; p_withdrawal_id: string }
         Returns: undefined
       }
+      delete_inactive_users: {
+        Args: never
+        Returns: {
+          affected_count: number
+          user_emails: string[]
+        }[]
+      }
+      disable_inactive_users: {
+        Args: never
+        Returns: {
+          affected_count: number
+          user_emails: string[]
+        }[]
+      }
       generate_api_key: { Args: never; Returns: string }
       generate_gtin_ean13: { Args: never; Returns: string }
       generate_order_number: { Args: never; Returns: string }
@@ -2557,6 +2604,18 @@ export type Database = {
       get_customer_display_name: {
         Args: { customer_user_id: string }
         Returns: string
+      }
+      get_inactive_users_for_cleanup: {
+        Args: never
+        Returns: {
+          action_needed: string
+          created_at: string
+          days_since_creation: number
+          email: string
+          is_banned: boolean
+          last_sign_in_at: string
+          user_id: string
+        }[]
       }
       get_last_message_preview: {
         Args: { p_ticket_id: string }
