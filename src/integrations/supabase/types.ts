@@ -2631,6 +2631,9 @@ export type Database = {
           phone: string
           role: Database["public"]["Enums"]["app_role"]
           subdomain: string
+          subscription_expires_at: string
+          subscription_payment_url: string
+          subscription_plan: string
           updated_at: string
           user_id: string
         }[]

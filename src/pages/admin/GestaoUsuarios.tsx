@@ -199,8 +199,8 @@ const GestaoUsuarios = () => {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {user.role === 'reseller' && (user as any).subscription_plan ? (
-                          <PremiumBadge plan={(user as any).subscription_plan} />
+                        {user.role === 'reseller' && user.subscription_plan ? (
+                          <PremiumBadge plan={user.subscription_plan as 'free' | 'premium'} />
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
