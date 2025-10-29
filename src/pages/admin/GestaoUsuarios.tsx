@@ -29,6 +29,16 @@ import { ImpersonationButton } from '@/components/admin/ImpersonationButton';
 import { EditSubscriptionDialog } from '@/components/admin/EditSubscriptionDialog';
 import { useToast } from '@/hooks/use-toast';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
+
+const ITEMS_PER_PAGE = 20;
 
 const GestaoUsuarios = () => {
   useDocumentTitle('Gestão de Usuários');
@@ -37,6 +47,7 @@ const GestaoUsuarios = () => {
   const [planFilter, setPlanFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [editingUser, setEditingUser] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
 
   const { data: users, isLoading, refetch } = useQuery({
@@ -62,6 +73,19 @@ const GestaoUsuarios = () => {
 
     return matchesSearch && matchesRole && matchesPlan && matchesStatus;
   });
+
+  // Pagination calculations
+  const totalUsers = filteredUsers?.length || 0;
+  const totalPages = Math.ceil(totalUsers / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedUsers = filteredUsers?.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  const handleFilterChange = (setter: (value: string) => void) => (value: string) => {
+    setter(value);
+    setCurrentPage(1);
+  };
 
   const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
     try {
@@ -144,7 +168,7 @@ const GestaoUsuarios = () => {
               />
             </div>
 
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <Select value={roleFilter} onValueChange={handleFilterChange(setRoleFilter)}>
               <SelectTrigger>
                 <SelectValue placeholder="Todos os Roles" />
               </SelectTrigger>
@@ -158,7 +182,7 @@ const GestaoUsuarios = () => {
               </SelectContent>
             </Select>
 
-            <Select value={planFilter} onValueChange={setPlanFilter}>
+            <Select value={planFilter} onValueChange={handleFilterChange(setPlanFilter)}>
               <SelectTrigger>
                 <SelectValue placeholder="Todos os Planos" />
               </SelectTrigger>
@@ -169,7 +193,7 @@ const GestaoUsuarios = () => {
               </SelectContent>
             </Select>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={handleFilterChange(setStatusFilter)}>
               <SelectTrigger>
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -198,11 +222,12 @@ const GestaoUsuarios = () => {
                   <TableHead>Expiração</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Data Criação</TableHead>
+                  <TableHead>Último Acesso</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers?.map((user) => (
+                {paginatedUsers?.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">
                       {user.first_name} {user.last_name}
@@ -250,6 +275,15 @@ const GestaoUsuarios = () => {
                     <TableCell>
                       {new Date(user.created_at).toLocaleDateString('pt-BR')}
                     </TableCell>
+                    <TableCell>
+                      {user.last_sign_in_at ? (
+                        <span className="text-sm">
+                          {format(new Date(user.last_sign_in_at), 'dd/MM/yyyy HH:mm')}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Nunca acessou</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         {user.role === 'reseller' && (
@@ -279,15 +313,50 @@ const GestaoUsuarios = () => {
                     </TableCell>
                   </TableRow>
                 ))}
-                {!filteredUsers?.length && (
+                {!paginatedUsers?.length && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       Nenhum usuário encontrado
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
+          )}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-2 py-4">
+              <div className="text-sm text-muted-foreground">
+                Mostrando {startIndex + 1}-{Math.min(endIndex, totalUsers)} de {totalUsers} usuários
+              </div>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
           )}
         </CardContent>
       </Card>

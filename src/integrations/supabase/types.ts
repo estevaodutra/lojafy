@@ -2628,6 +2628,7 @@ export type Database = {
           id: string
           is_active: boolean
           last_name: string
+          last_sign_in_at: string
           phone: string
           role: Database["public"]["Enums"]["app_role"]
           subdomain: string
