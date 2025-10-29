@@ -42,18 +42,8 @@ const superAdminMenuItems = [
     icon: LayoutDashboard,
   },
   {
-    title: 'Usuários',
-    url: '/super-admin/usuarios',
-    icon: Users,
-  },
-  {
-    title: 'Notificações',
-    url: '/super-admin/notificacoes',
-    icon: Bell,
-  },
-  {
-    title: 'Produtos',
-    url: '/super-admin/produtos',
+    title: 'Catálogo',
+    url: '/super-admin/catalogo',
     icon: Package,
   },
   {
@@ -62,29 +52,24 @@ const superAdminMenuItems = [
     icon: ShoppingCart,
   },
   {
-    title: 'Lojafy Academy',
-    url: '/super-admin/aulas',
-    icon: BookOpen,
+    title: 'Clientes',
+    url: '/super-admin/clientes',
+    icon: Users,
   },
   {
-    title: 'Frete',
-    url: '/super-admin/frete',
-    icon: Truck,
+    title: 'Design',
+    url: '/super-admin/design',
+    icon: Palette,
   },
   {
-    title: 'Plataforma',
-    url: '/super-admin/plataforma',
-    icon: Shield,
+    title: 'Configurações',
+    url: '/super-admin/configuracoes',
+    icon: Settings,
   },
   {
     title: 'Financeiro',
     url: '/super-admin/financeiro',
     icon: DollarSign,
-  },
-  {
-    title: 'Integrações',
-    url: '/super-admin/integracoes',
-    icon: Settings,
   },
 ];
 
@@ -93,39 +78,6 @@ const supportMenuItems = [
     title: 'Chat de Suporte',
     url: '/super-admin/chat-suporte',
     icon: MessageSquare,
-  },
-  {
-    title: 'Base de Conhecimento',
-    url: '/super-admin/base-conhecimento',
-    icon: BookOpen,
-  },
-  {
-    title: 'Config. Suporte IA',
-    url: '/super-admin/suporte',
-    icon: Headphones,
-  },
-];
-
-const designMenuItems = [
-  {
-    title: 'Homepage',
-    url: '/super-admin/homepage',
-    icon: Store,
-  },
-  {
-    title: 'Visual',
-    url: '/super-admin/configuracao-visual',
-    icon: Palette,
-  },
-  {
-    title: 'Banners',
-    url: '/super-admin/banners',
-    icon: Megaphone,
-  },
-  {
-    title: 'Categorias',
-    url: '/super-admin/categorias',
-    icon: Package,
   },
 ];
 
@@ -168,26 +120,6 @@ const SuperAdminSidebar = () => {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Design da Loja</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {designMenuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild
-                    className={currentPath === item.url ? 'bg-sidebar-accent' : ''}
-                  >
-                    <button onClick={() => navigate(item.url)}>
-                      <item.icon className="mr-2 h-4 w-4" />
-                      <span>{item.title}</span>
-                    </button>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
 
         <SidebarGroup>
           <SidebarGroupLabel>Suporte</SidebarGroupLabel>
