@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, UserPlus, Edit, Power, UserCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import AdminLayout from '@/components/admin/AdminLayout';
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
@@ -105,145 +105,143 @@ const GestaoUsuarios = () => {
   };
 
   return (
-    <AdminLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Gestão de Usuários</h1>
-            <p className="text-muted-foreground">
-              Gerencie todos os usuários da plataforma
-            </p>
-          </div>
-          <CreateUserDialog onSuccess={refetch} />
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Gestão de Usuários</h1>
+          <p className="text-muted-foreground">
+            Gerencie todos os usuários da plataforma
+          </p>
         </div>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nome ou email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-
-              <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos os Roles" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os Roles</SelectItem>
-                  <SelectItem value="super_admin">Super Admin</SelectItem>
-                  <SelectItem value="admin">Administrador</SelectItem>
-                  <SelectItem value="reseller">Revendedores</SelectItem>
-                  <SelectItem value="supplier">Fornecedores</SelectItem>
-                  <SelectItem value="customer">Clientes</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={planFilter} onValueChange={setPlanFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos os Planos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os Planos</SelectItem>
-                  <SelectItem value="free">Free</SelectItem>
-                  <SelectItem value="premium">Premium</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="active">Ativos</SelectItem>
-                  <SelectItem value="inactive">Inativos</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            {isLoading ? (
-              <div className="text-center py-8">Carregando usuários...</div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Plano</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Data Criação</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers?.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">
-                        {user.first_name} {user.last_name}
-                      </TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>
-                        <Badge variant={getRoleBadgeVariant(user.role)}>
-                          {getRoleLabel(user.role)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {user.role === 'reseller' && user.subscription_plan ? (
-                          <PremiumBadge plan={user.subscription_plan as 'free' | 'premium'} />
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={user.is_active ? 'success' : 'destructive'}>
-                          {user.is_active ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(user.created_at).toLocaleDateString('pt-BR')}
-                      </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => toggleUserStatus(user.user_id, user.is_active)}
-                          title={user.is_active ? 'Desativar' : 'Ativar'}
-                        >
-                          <Power className="h-4 w-4" />
-                        </Button>
-                        <ImpersonationButton 
-                          userId={user.user_id}
-                          userRole={user.role}
-                          userName={`${user.first_name} ${user.last_name}`}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {!filteredUsers?.length && (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                        Nenhum usuário encontrado
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        <CreateUserDialog onSuccess={refetch} />
       </div>
-    </AdminLayout>
+
+      <Card>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome ou email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos os Roles" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Roles</SelectItem>
+                <SelectItem value="super_admin">Super Admin</SelectItem>
+                <SelectItem value="admin">Administrador</SelectItem>
+                <SelectItem value="reseller">Revendedores</SelectItem>
+                <SelectItem value="supplier">Fornecedores</SelectItem>
+                <SelectItem value="customer">Clientes</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={planFilter} onValueChange={setPlanFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos os Planos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Planos</SelectItem>
+                <SelectItem value="free">Free</SelectItem>
+                <SelectItem value="premium">Premium</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="active">Ativos</SelectItem>
+                <SelectItem value="inactive">Inativos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-6">
+          {isLoading ? (
+            <div className="text-center py-8">Carregando usuários...</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Plano</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Data Criação</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers?.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">
+                      {user.first_name} {user.last_name}
+                    </TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <Badge variant={getRoleBadgeVariant(user.role)}>
+                        {getRoleLabel(user.role)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {user.role === 'reseller' && user.subscription_plan ? (
+                        <PremiumBadge plan={user.subscription_plan as 'free' | 'premium'} />
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={user.is_active ? 'success' : 'destructive'}>
+                        {user.is_active ? 'Ativo' : 'Inativo'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {new Date(user.created_at).toLocaleDateString('pt-BR')}
+                    </TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => toggleUserStatus(user.user_id, user.is_active)}
+                        title={user.is_active ? 'Desativar' : 'Ativar'}
+                      >
+                        <Power className="h-4 w-4" />
+                      </Button>
+                      <ImpersonationButton 
+                        userId={user.user_id}
+                        userRole={user.role}
+                        userName={`${user.first_name} ${user.last_name}`}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!filteredUsers?.length && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      Nenhum usuário encontrado
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
