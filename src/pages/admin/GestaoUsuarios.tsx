@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, UserPlus, Edit, Power, UserCircle, AlertTriangle } from 'lucide-react';
+import { Search, UserPlus, Edit, Power, UserCircle, AlertTriangle, Clock, UserX, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, differenceInDays } from 'date-fns';
 
@@ -27,6 +27,7 @@ import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
 import { PremiumBadge } from '@/components/premium/PremiumBadge';
 import { ImpersonationButton } from '@/components/admin/ImpersonationButton';
 import { EditSubscriptionDialog } from '@/components/admin/EditSubscriptionDialog';
+import { UserCleanupPanel } from '@/components/admin/UserCleanupPanel';
 import { useToast } from '@/hooks/use-toast';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import {
@@ -143,6 +144,32 @@ const GestaoUsuarios = () => {
     return null;
   };
 
+  const getActivityStatus = (createdAt: string, lastSignInAt: string | null, isActive: boolean) => {
+    if (lastSignInAt) {
+      return { icon: <Clock className="h-3 w-3" />, text: "Ativo", variant: "default" as const };
+    }
+
+    const created = new Date(createdAt);
+    const daysSinceCreation = Math.floor((Date.now() - created.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysSinceCreation >= 60) {
+      return { icon: <Trash2 className="h-3 w-3" />, text: "Será excluído", variant: "destructive" as const };
+    }
+    if (daysSinceCreation >= 50) {
+      return { icon: <Trash2 className="h-3 w-3" />, text: `Exclusão em ${60 - daysSinceCreation}d`, variant: "destructive" as const };
+    }
+    if (daysSinceCreation >= 30) {
+      if (!isActive) {
+        return { icon: <UserX className="h-3 w-3" />, text: "Desativado", variant: "secondary" as const };
+      }
+      return { icon: <UserX className="h-3 w-3" />, text: `Desativado há ${daysSinceCreation - 30}d`, variant: "secondary" as const };
+    }
+    if (daysSinceCreation >= 20) {
+      return { icon: <Clock className="h-3 w-3" />, text: `${30 - daysSinceCreation}d p/ desativar`, variant: "outline" as const };
+    }
+    return { icon: <Clock className="h-3 w-3" />, text: "Aguardando acesso", variant: "outline" as const };
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -154,6 +181,9 @@ const GestaoUsuarios = () => {
         </div>
         <CreateUserDialog onSuccess={refetch} />
       </div>
+
+      {/* User Cleanup Panel */}
+      <UserCleanupPanel />
 
       <Card>
         <CardContent className="pt-6">
@@ -221,6 +251,7 @@ const GestaoUsuarios = () => {
                   <TableHead>Plano</TableHead>
                   <TableHead>Expiração</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Atividade</TableHead>
                   <TableHead>Data Criação</TableHead>
                   <TableHead>Último Acesso</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
@@ -273,6 +304,15 @@ const GestaoUsuarios = () => {
                       </Badge>
                     </TableCell>
                     <TableCell>
+                      <Badge 
+                        variant={getActivityStatus(user.created_at, user.last_sign_in_at, user.is_active).variant}
+                        className="flex items-center gap-1 w-fit text-xs"
+                      >
+                        {getActivityStatus(user.created_at, user.last_sign_in_at, user.is_active).icon}
+                        {getActivityStatus(user.created_at, user.last_sign_in_at, user.is_active).text}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
                       {new Date(user.created_at).toLocaleDateString('pt-BR')}
                     </TableCell>
                     <TableCell>
@@ -315,7 +355,7 @@ const GestaoUsuarios = () => {
                 ))}
                 {!paginatedUsers?.length && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       Nenhum usuário encontrado
                     </TableCell>
                   </TableRow>
