@@ -84,7 +84,7 @@ const supportMenuItems = [
 
 const academyMenuItems = [
   {
-    title: 'Lojify Academy',
+    title: 'Lojafy Academy',
     url: '/super-admin/academy',
     icon: GraduationCap,
   },

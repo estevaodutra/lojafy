@@ -12,7 +12,7 @@ const Academy = () => {
       <div>
         <h1 className="text-3xl font-bold flex items-center gap-2">
           <GraduationCap className="w-8 h-8" />
-          Lojify Academy
+          Lojafy Academy
         </h1>
         <p className="text-muted-foreground mt-1">
           Gerencie cursos, matrículas, progresso dos alunos e configurações da plataforma de ensino
