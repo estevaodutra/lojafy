@@ -1,5 +1,26 @@
 project_id = "bbrmjrjorcgsgeztzbsr"
 
+[functions.api-usuarios-verificar]
+verify_jwt = false
+
+[functions.api-usuarios-cadastrar]
+verify_jwt = false
+
+[functions.api-matriculas-verificar]
+verify_jwt = false
+
+[functions.api-matriculas-cancelar]
+verify_jwt = false
+
+[functions.api-matriculas-atualizar-validade]
+verify_jwt = false
+
+[functions.api-cursos-detalhe]
+verify_jwt = false
+
+[functions.api-cursos-conteudo]
+verify_jwt = false
+
 [functions.api-pedidos-listar]
 verify_jwt = false
 

@@ -4,7 +4,55 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EndpointSection } from '@/components/admin/EndpointSection';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Shield, GraduationCap, BookOpen, Award } from 'lucide-react';
+import { Shield, GraduationCap, BookOpen, Award, Users } from 'lucide-react';
+
+// Endpoints de Usuários
+const userEndpoints = [
+  {
+    title: 'Verificar Usuário',
+    method: 'GET' as const,
+    url: '/functions/v1/api-usuarios-verificar',
+    description: 'Verifica se um usuário existe na plataforma por user_id ou email antes de realizar matrículas.',
+    queryParams: [
+      { name: 'user_id', description: 'ID do usuário (opcional se usar email)', example: 'user123' },
+      { name: 'email', description: 'Email do usuário (opcional se usar user_id)', example: 'aluno@example.com' }
+    ],
+    responseExample: {
+      success: true,
+      exists: true,
+      data: {
+        user_id: 'user123',
+        email: 'aluno@example.com',
+        full_name: 'João Silva',
+        role: 'customer',
+        created_at: '2024-12-01T10:00:00Z'
+      }
+    }
+  },
+  {
+    title: 'Cadastrar Usuário',
+    method: 'POST' as const,
+    url: '/functions/v1/api-usuarios-cadastrar',
+    description: 'Cria um novo usuário na plataforma. Define role padrão como "customer" se não especificado.',
+    requestBody: {
+      email: 'novousuario@example.com',
+      full_name: 'Maria Santos',
+      password: 'senhaSegura123!',
+      role: 'customer'
+    },
+    responseExample: {
+      success: true,
+      message: 'Usuário criado com sucesso',
+      data: {
+        user_id: 'newuser456',
+        email: 'novousuario@example.com',
+        full_name: 'Maria Santos',
+        role: 'customer',
+        created_at: '2025-01-12T15:00:00Z'
+      }
+    }
+  }
+];
 
 // Endpoints de Cursos
 const courseEndpoints = [
@@ -84,6 +132,77 @@ const courseEndpoints = [
         updated_at: '2025-01-12T11:00:00Z'
       }
     }
+  },
+  {
+    title: 'Detalhe do Curso',
+    method: 'GET' as const,
+    url: '/functions/v1/api-cursos-detalhe',
+    description: 'Retorna informações completas de um curso específico incluindo estatísticas de matrículas e progresso.',
+    queryParams: [
+      { name: 'course_id', description: 'ID do curso (obrigatório)', example: 'course456' }
+    ],
+    responseExample: {
+      success: true,
+      data: {
+        id: 'course456',
+        title: 'Marketing Digital para E-commerce',
+        description: 'Domine as estratégias de marketing digital',
+        thumbnail_url: 'https://loja.com/courses/marketing.jpg',
+        instructor_name: 'Maria Santos',
+        duration_hours: 12,
+        level: 'intermediate',
+        price: 199.90,
+        is_published: true,
+        access_level: 'reseller',
+        statistics: {
+          total_enrollments: 145,
+          active_students: 98,
+          completion_rate: 67.5,
+          average_progress: 42.3
+        }
+      }
+    }
+  },
+  {
+    title: 'Conteúdo do Curso',
+    method: 'GET' as const,
+    url: '/functions/v1/api-cursos-conteudo',
+    description: 'Lista todos os módulos e aulas de um curso específico com informações de duração e posicionamento.',
+    queryParams: [
+      { name: 'course_id', description: 'ID do curso (obrigatório)', example: 'course456' }
+    ],
+    responseExample: {
+      success: true,
+      data: {
+        course_id: 'course456',
+        course_title: 'Marketing Digital para E-commerce',
+        modules: [
+          {
+            id: 'module1',
+            title: 'Módulo 1: Fundamentos',
+            description: 'Aprenda os fundamentos',
+            position: 1,
+            is_published: true,
+            lessons: [
+              {
+                id: 'lesson1',
+                title: 'Introdução ao Marketing',
+                description: 'Aula introdutória',
+                duration_minutes: 25,
+                position: 1,
+                video_url: 'https://vimeo.com/123456',
+                is_published: true
+              }
+            ]
+          }
+        ],
+        summary: {
+          total_modules: 4,
+          total_lessons: 32,
+          total_duration_hours: 12.5
+        }
+      }
+    }
   }
 ];
 
@@ -152,6 +271,63 @@ const enrollmentEndpoints = [
         expires_at: '2026-01-12T23:59:59Z',
         progress_percentage: 0,
         completed_at: null
+      }
+    }
+  },
+  {
+    title: 'Verificar Matrícula',
+    method: 'GET' as const,
+    url: '/functions/v1/api-matriculas-verificar',
+    description: 'Verifica se um usuário específico já está matriculado em um curso e retorna o status da matrícula.',
+    queryParams: [
+      { name: 'user_id', description: 'ID do usuário (obrigatório)', example: 'user123' },
+      { name: 'course_id', description: 'ID do curso (obrigatório)', example: 'course456' }
+    ],
+    responseExample: {
+      success: true,
+      enrolled: true,
+      data: {
+        enrollment_id: 'enrollment123',
+        enrolled_at: '2025-01-01T10:00:00Z',
+        expires_at: '2026-01-01T23:59:59Z',
+        status: 'active',
+        progress_percentage: 35,
+        is_expired: false,
+        is_completed: false,
+        completed_at: null
+      }
+    }
+  },
+  {
+    title: 'Cancelar Matrícula',
+    method: 'DELETE' as const,
+    url: '/functions/v1/api-matriculas-cancelar',
+    description: 'Cancela uma matrícula existente removendo o acesso do usuário ao curso e todo o progresso associado.',
+    requestBody: {
+      enrollment_id: 'enrollment123'
+    },
+    responseExample: {
+      success: true,
+      message: 'Matrícula cancelada com sucesso'
+    }
+  },
+  {
+    title: 'Atualizar Validade',
+    method: 'PUT' as const,
+    url: '/functions/v1/api-matriculas-atualizar-validade',
+    description: 'Atualiza a data de expiração de uma matrícula. Use null para acesso vitalício.',
+    requestBody: {
+      enrollment_id: 'enrollment123',
+      expires_at: '2027-12-31T23:59:59Z'
+    },
+    responseExample: {
+      success: true,
+      message: 'Validade atualizada com sucesso',
+      data: {
+        enrollment_id: 'enrollment123',
+        old_expires_at: '2026-01-01T23:59:59Z',
+        new_expires_at: '2027-12-31T23:59:59Z',
+        updated_at: '2025-01-12T16:00:00Z'
       }
     }
   }
@@ -256,17 +432,31 @@ const AcademyAPI = () => {
       </div>
 
       {/* Features */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">Gestão de Cursos</CardTitle>
+              <Users className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg">Usuários</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Crie, liste e gerencie cursos com múltiplos níveis de acesso e publicação.
+              Crie e verifique usuários antes de realizar matrículas automatizadas.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg">Cursos</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Gerencie cursos, consulte detalhes e acesse todo o conteúdo programaticamente.
             </p>
           </CardContent>
         </Card>
@@ -280,7 +470,7 @@ const AcademyAPI = () => {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Matricule usuários em cursos e gerencie acessos com data de expiração opcional.
+              Crie, verifique, cancele e gerencie validade de matrículas via API.
             </p>
           </CardContent>
         </Card>
@@ -294,7 +484,7 @@ const AcademyAPI = () => {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Acompanhe o progresso detalhado de cada aluno com estatísticas completas.
+              Acompanhe e atualize o progresso detalhado de cada aluno em tempo real.
             </p>
           </CardContent>
         </Card>
@@ -329,17 +519,26 @@ const AcademyAPI = () => {
       <Separator />
 
       {/* Endpoints por Categoria */}
-      <Tabs defaultValue="courses" className="space-y-6">
+      <Tabs defaultValue="users" className="space-y-6">
         <TabsList>
+          <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="courses">Cursos</TabsTrigger>
           <TabsTrigger value="enrollments">Matrículas</TabsTrigger>
           <TabsTrigger value="progress">Progresso</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="users" className="space-y-6">
+          <EndpointSection
+            title="Gestão de Usuários"
+            description="Endpoints para criar e verificar usuários antes de matricular"
+            endpoints={userEndpoints}
+          />
+        </TabsContent>
+
         <TabsContent value="courses" className="space-y-6">
           <EndpointSection
             title="Gestão de Cursos"
-            description="Endpoints para criar, listar e gerenciar cursos da Academy"
+            description="Endpoints para criar, listar e consultar detalhes de cursos da Academy"
             endpoints={courseEndpoints}
           />
         </TabsContent>
@@ -347,7 +546,7 @@ const AcademyAPI = () => {
         <TabsContent value="enrollments" className="space-y-6">
           <EndpointSection
             title="Gestão de Matrículas"
-            description="Endpoints para matricular usuários e consultar matrículas"
+            description="Endpoints para matricular, verificar, cancelar e gerenciar validade de matrículas"
             endpoints={enrollmentEndpoints}
           />
         </TabsContent>
@@ -371,27 +570,38 @@ const AcademyAPI = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <h4 className="font-medium">1. Matrícula Automática após Compra</h4>
+            <h4 className="font-medium">1. Fluxo Completo de Matrícula via N8N</h4>
             <p className="text-sm text-muted-foreground">
-              Configure um webhook no N8N para matricular automaticamente usuários em cursos após confirmação de pagamento via Mercado Pago.
+              <strong>Webhook recebe pagamento confirmado</strong> → Verifica se usuário existe (api-usuarios-verificar) → 
+              Se não existe, cria usuário (api-usuarios-cadastrar) → Verifica se já está matriculado (api-matriculas-verificar) → 
+              Matricula no curso (api-matriculas-cadastrar) → Envia email de boas-vindas com acesso.
             </p>
           </div>
           
           <Separator />
           
           <div className="space-y-2">
-            <h4 className="font-medium">2. Relatórios de Progresso</h4>
+            <h4 className="font-medium">2. Renovação Automática de Matrículas</h4>
             <p className="text-sm text-muted-foreground">
-              Use o endpoint de consulta de progresso para gerar relatórios automatizados de desempenho dos alunos e enviar por email.
+              Use o endpoint api-matriculas-atualizar-validade para estender automaticamente o acesso dos alunos após renovações de assinatura ou novos pagamentos.
             </p>
           </div>
           
           <Separator />
           
           <div className="space-y-2">
-            <h4 className="font-medium">3. Sincronização com LMS Externo</h4>
+            <h4 className="font-medium">3. Relatórios Personalizados</h4>
             <p className="text-sm text-muted-foreground">
-              Integre com plataformas externas de aprendizagem, sincronizando cursos, matrículas e progresso bidirecionalmente.
+              Combine api-cursos-detalhe, api-matriculas-listar e api-progresso-usuario para gerar dashboards e relatórios externos com estatísticas completas de seus cursos.
+            </p>
+          </div>
+
+          <Separator />
+          
+          <div className="space-y-2">
+            <h4 className="font-medium">4. Gestão de Acesso por Período</h4>
+            <p className="text-sm text-muted-foreground">
+              Configure sistemas de assinatura mensal/anual usando api-matriculas-cadastrar com expires_at definido, e cancele automaticamente com api-matriculas-cancelar quando necessário.
             </p>
           </div>
         </CardContent>
