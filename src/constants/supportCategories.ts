@@ -9,6 +9,8 @@ import {
   DollarSign, 
   Settings, 
   HelpCircle,
+  Handshake,
+  Truck,
   LucideIcon
 } from 'lucide-react';
 
@@ -78,6 +80,20 @@ export const SUPPORT_CATEGORIES: SupportCategory[] = [
     description: 'Revendedores - comissões, vendas, repasses'
   },
   {
+    id: 'parceria',
+    label: 'Parceria',
+    icon: Handshake,
+    color: 'hsl(var(--success))',
+    description: 'Informações sobre como se tornar parceiro/revendedor'
+  },
+  {
+    id: 'fornecedor',
+    label: 'Fornecedor',
+    icon: Truck,
+    color: 'hsl(var(--warning))',
+    description: 'Dúvidas sobre fornecimento de produtos'
+  },
+  {
     id: 'tecnico',
     label: 'Técnico',
     icon: Settings,
@@ -140,11 +156,21 @@ export const getCategoryByKeywords = (text: string): SupportCategory => {
     return SUPPORT_CATEGORIES[7];
   }
   
-  // Técnico
-  if (lowerText.match(/erro|bug|problema.*técnico|não.*funciona|travando/)) {
+  // Parceria
+  if (lowerText.match(/parceria|parceiro|revendedor|revenda|como.*vender/)) {
     return SUPPORT_CATEGORIES[8];
   }
   
+  // Fornecedor
+  if (lowerText.match(/fornecedor|fornecimento|fornecer|estoque.*próprio|enviar.*produtos/)) {
+    return SUPPORT_CATEGORIES[9];
+  }
+  
+  // Técnico
+  if (lowerText.match(/erro|bug|problema.*técnico|não.*funciona|travando/)) {
+    return SUPPORT_CATEGORIES[10];
+  }
+  
   // Outros (padrão)
-  return SUPPORT_CATEGORIES[9];
+  return SUPPORT_CATEGORIES[11];
 };

@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Send, User, Bot, Clock, MessageCircle } from 'lucide-react';
+import { X, Send, User, Bot, Clock, MessageCircle, Package } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSupportTickets } from '@/hooks/useSupportTickets';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { SUPPORT_CATEGORIES } from '@/constants/supportCategories';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ChatInterfaceProps {
   isOpen: boolean;
@@ -18,12 +19,15 @@ interface ChatInterfaceProps {
 export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   const [message, setMessage] = useState('');
   const [currentTicketId, setCurrentTicketId] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>('outros');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [showCategorySelector, setShowCategorySelector] = useState(false);
+  const [isCreatingTicket, setIsCreatingTicket] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { tickets, createTicket } = useSupportTickets();
   const { messages, sending, sendMessage } = useChatMessages(currentTicketId);
+  const { profile } = useAuth();
 
   // Buscar ticket existente ou mostrar seletor de categoria
   useEffect(() => {
@@ -46,14 +50,30 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
     }
   }, [messages]);
 
-  const handleCreateTicket = async () => {
-    const category = SUPPORT_CATEGORIES.find(c => c.id === selectedCategory);
+  const handleCategorySelect = async (categoryId: string) => {
+    setSelectedCategory(categoryId);
+    setIsCreatingTicket(true);
+    
+    const category = SUPPORT_CATEGORIES.find(c => c.id === categoryId);
     const newTicket = await createTicket(category?.label || 'Atendimento via Chat');
+    
     if (newTicket) {
       setCurrentTicketId(newTicket.id);
       setShowCategorySelector(false);
+      
+      // Mensagem inicial automática da IA contextualizando a categoria
+      setTimeout(() => {
+        sendMessage(`Olá! Vi que você precisa de ajuda com ${category?.label}. Como posso ajudar?`);
+      }, 500);
     }
+    
+    setIsCreatingTicket(false);
   };
+
+  const filteredCategories = SUPPORT_CATEGORIES.filter(cat => 
+    cat.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    cat.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleSend = async () => {
     if (!message.trim() || sending) return;
@@ -97,46 +117,110 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
 
       {/* Seletor de categoria (primeira interação) */}
       {showCategorySelector ? (
-        <div className="p-6 space-y-4">
-          <div className="text-center space-y-2">
-            <h4 className="font-semibold text-lg">Como podemos ajudar?</h4>
-            <p className="text-sm text-muted-foreground">
-              Selecione o assunto para iniciar o atendimento
-            </p>
-          </div>
-          
-          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione o assunto" />
-            </SelectTrigger>
-            <SelectContent>
-              {SUPPORT_CATEGORIES.map((category) => {
+        <ScrollArea className="flex-1">
+          <div className="p-6 space-y-6">
+            <div className="text-center space-y-3">
+              <h4 className="font-semibold text-lg">Como podemos ajudar?</h4>
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                <span>Tempo médio de resposta: 2 minutos</span>
+              </div>
+              <Badge variant="secondary" className="mt-2">
+                <Bot className="h-3 w-3 mr-1" />
+                IA responde instantaneamente
+              </Badge>
+            </div>
+
+            {/* Busca rápida */}
+            <Input
+              placeholder="Buscar por assunto..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full"
+            />
+            
+            {/* Grid de botões de categorias */}
+            <div className="grid grid-cols-2 gap-3">
+              {filteredCategories.map((category) => {
                 const Icon = category.icon;
                 return (
-                  <SelectItem key={category.id} value={category.id}>
-                    <div className="flex items-center gap-2">
-                      <Icon className="h-4 w-4" style={{ color: category.color }} />
-                      <div className="text-left">
-                        <div className="font-medium">{category.label}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {category.description}
-                        </div>
+                  <Button
+                    key={category.id}
+                    variant="outline"
+                    className="h-auto p-4 flex flex-col items-start gap-2 hover:bg-accent hover:scale-[1.02] transition-all"
+                    onClick={() => handleCategorySelect(category.id)}
+                    disabled={isCreatingTicket}
+                  >
+                    <Icon className="h-6 w-6" style={{ color: category.color }} />
+                    <div className="text-left">
+                      <div className="font-semibold text-sm">{category.label}</div>
+                      <div className="text-xs text-muted-foreground line-clamp-2">
+                        {category.description}
                       </div>
                     </div>
-                  </SelectItem>
+                  </Button>
                 );
               })}
-            </SelectContent>
-          </Select>
+            </div>
 
-          <Button 
-            onClick={handleCreateTicket} 
-            className="w-full"
-            disabled={!selectedCategory}
-          >
-            Iniciar Atendimento
-          </Button>
-        </div>
+            {/* Ações Rápidas */}
+            <div className="pt-4 border-t space-y-3">
+              <p className="text-sm font-medium">Ações Rápidas</p>
+              <div className="flex flex-col gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="justify-start hover:bg-accent" 
+                  asChild
+                  onClick={() => onClose()}
+                >
+                  <Link to="/customer/orders">
+                    <Package className="h-4 w-4 mr-2" />
+                    Ver meus pedidos
+                  </Link>
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="justify-start hover:bg-accent" 
+                  asChild
+                  onClick={() => onClose()}
+                >
+                  <Link to="/rastrear-pedido">
+                    <Package className="h-4 w-4 mr-2" />
+                    Rastrear meu pedido
+                  </Link>
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="justify-start hover:bg-accent" 
+                  asChild
+                  onClick={() => onClose()}
+                >
+                  <Link to="/customer/academy">
+                    <Bot className="h-4 w-4 mr-2" />
+                    Acessar Academia
+                  </Link>
+                </Button>
+                {profile?.role === 'reseller' && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="justify-start hover:bg-accent" 
+                    asChild
+                    onClick={() => onClose()}
+                  >
+                    <Link to="/reseller/financeiro">
+                      <Clock className="h-4 w-4 mr-2" />
+                      Ver minhas comissões
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </ScrollArea>
       ) : (
         <>
           {/* Status do Ticket */}
