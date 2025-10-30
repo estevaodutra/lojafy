@@ -3,23 +3,32 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 
 // Categorias de suporte
 const SUPPORT_CATEGORIES = {
-  pedidos: { keywords: ['pedido', 'compra', 'order', 'status', 'cancelar'] },
-  entrega: { keywords: ['entrega', 'rastreio', 'frete', 'prazo', 'transportadora', 'correios'] },
-  pagamento: { keywords: ['pagamento', 'pagar', 'pix', 'cartão', 'estorno', 'boleto'] },
-  produtos: { keywords: ['produto', 'item', 'estoque', 'disponível', 'especificação'] },
-  trocas: { keywords: ['troca', 'devolução', 'devolver', 'garantia', 'defeito'] },
-  conta: { keywords: ['conta', 'login', 'senha', 'cadastro', 'dados pessoais', 'perfil'] },
-  academia: { keywords: ['academia', 'curso', 'aula', 'vídeo', 'conteúdo educativo'] },
-  comissoes: { keywords: ['comissão', 'repasse', 'vendas', 'ganhos', 'revendedor'] },
-  tecnico: { keywords: ['erro', 'bug', 'problema técnico', 'não funciona', 'travando'] },
-  outros: { keywords: [] }
+  'pedidos': ['pedido', 'compra', 'status', 'rastreio', 'tracking', 'cancelar'],
+  'entrega': ['entrega', 'prazo', 'correios', 'envio', 'frete', 'receber'],
+  'pagamento': ['pix', 'pagamento', 'pagar', 'boleto', 'cartao', 'credito'],
+  'produto': ['produto', 'qualidade', 'defeito', 'descricao', 'tamanho'],
+  'cadastro': ['cadastro', 'conta', 'senha', 'email', 'login', 'acesso'],
+  'revendedor': ['revender', 'parceria', 'comissao', 'catalogo', 'loja'],
+  'outros': ['ajuda', 'informacao', 'duvida']
 };
+
+// Palavras-chave expandidas para escalação
+const ESCALATION_KEYWORDS = [
+  'não sei', 'preciso falar com humano', 'urgente', 'reclamação',
+  'quero falar com', 'falar com atendente', 'falar com alguém',
+  'preciso de ajuda humana', 'transferir para humano',
+  'não está resolvendo', 'não me ajudou', 'não entendeu',
+  'isso não funciona', 'continua com problema',
+  'é urgente', 'preciso agora', 'estou esperando há dias',
+  'quero meu dinheiro de volta', 'reembolso', 'estorno', 'devolução',
+  'desisto', 'isso não adianta', 'já tentei', 'não resolve'
+];
 
 function detectCategory(text: string): string {
   const lowerText = text.toLowerCase();
   
-  for (const [category, config] of Object.entries(SUPPORT_CATEGORIES)) {
-    if (config.keywords.some(keyword => lowerText.includes(keyword))) {
+  for (const [category, keywords] of Object.entries(SUPPORT_CATEGORIES)) {
+    if (keywords.some(keyword => lowerText.includes(keyword))) {
       return category;
     }
   }
@@ -27,17 +36,15 @@ function detectCategory(text: string): string {
   return 'outros';
 }
 
-// Helper function to extract keywords from text
 function extractKeywords(text: string): string[] {
   const stopWords = ['o', 'a', 'de', 'da', 'do', 'em', 'para', 'com', 'por', 'um', 'uma', 'os', 'as', 'dos', 'das', 'e', 'é'];
   const words = text.toLowerCase()
-    .replace(/[^\w\sáàãâäéèêëíìîïóòõôöúùûüç]/g, '')
+    .replace(/[^\\w\\sáàãâäéèêëíìîïóòõôöúùûüç]/g, '')
     .split(/\s+/)
     .filter(word => word.length > 3 && !stopWords.includes(word));
   return [...new Set(words)].slice(0, 5);
 }
 
-// Helper function to calculate text similarity
 function calculateSimilarity(text1: string, text2: string): number {
   const words1 = new Set(extractKeywords(text1));
   const words2 = new Set(extractKeywords(text2));
@@ -46,7 +53,6 @@ function calculateSimilarity(text1: string, text2: string): number {
   return union.size > 0 ? intersection.size / union.size : 0;
 }
 
-// Helper function to detect vague questions
 function isQuestionVague(text: string): { isVague: boolean; suggestions: string[] } {
   const vaguePatterns = [
     /\b(essa|aquela|isso|isto)\s+(aula|curso|produto|pedido)\b/i,
@@ -124,14 +130,53 @@ serve(async (req) => {
       throw insertError;
     }
 
+    // 🆕 Check for escalation keywords first
+    const needsEscalation = ESCALATION_KEYWORDS.some(keyword => 
+      message.toLowerCase().includes(keyword.toLowerCase())
+    );
+
+    if (needsEscalation) {
+      const escalationMessage = "Entendo que você precisa de atenção especial. Estou transferindo seu atendimento para nossa equipe. Em breve um atendente humano entrará em contato com você.";
+      
+      await supabase.from('chat_messages').insert({
+        ticket_id: ticketId,
+        sender_type: 'system',
+        sender_id: null,
+        content: escalationMessage,
+        metadata: { escalation: true },
+        is_internal: false
+      });
+
+      await supabase.from('support_tickets').update({
+        status: 'waiting_admin',
+        priority: 'high',
+        metadata: {
+          escalation_reason: 'User requested human support or expressed frustration',
+          escalated_at: new Date().toISOString()
+        }
+      }).eq('id', ticketId);
+
+      // Notify admins
+      await supabase.functions.invoke('notify-admin-ticket', {
+        body: { ticketId, reason: 'escalation' }
+      });
+
+      return new Response(JSON.stringify({
+        success: true,
+        message: escalationMessage,
+        needsEscalation: true
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     // 🆕 Validação Pré-IA: Detectar perguntas vagas
     console.log('Verificando se a pergunta precisa de clarificação...');
     const vagueCheck = isQuestionVague(message);
     if (vagueCheck.isVague && vagueCheck.suggestions.length > 0) {
       console.log('Pergunta vaga detectada, pedindo contexto adicional');
-      const clarificationMessage = `Para te ajudar melhor, preciso de mais detalhes:\n\n${vagueCheck.suggestions.join('\n')}\n\nPor favor, me forneça essas informações para que eu possa te dar uma resposta precisa! 😊`;
+      const clarificationMessage = `Para te ajudar melhor, preciso de mais detalhes:\\n\\n${vagueCheck.suggestions.join('\\n')}\\n\\nPor favor, me forneça essas informações para que eu possa te dar uma resposta precisa! 😊`;
       
-      // Salvar resposta automática
       await supabase
         .from('chat_messages')
         .insert({
@@ -141,7 +186,6 @@ serve(async (req) => {
           content: clarificationMessage
         });
 
-      // Atualizar ticket
       await supabase
         .from('support_tickets')
         .update({
@@ -160,8 +204,6 @@ serve(async (req) => {
       );
     }
 
-    // 🆕 STEP 1: Check if there's already an answered question matching this message
-    console.log('Searching for answered questions...');
     const { data: answeredQuestions, error: aqError } = await supabase
       .from('ai_pending_questions')
       .select('*')
@@ -169,7 +211,6 @@ serve(async (req) => {
       .not('answer', 'is', null);
 
     if (!aqError && answeredQuestions && answeredQuestions.length > 0) {
-      // Find best match
       let bestMatch = null;
       let bestSimilarity = 0;
 
@@ -181,18 +222,15 @@ serve(async (req) => {
         }
       }
 
-      // If we found a good match (>70% similarity), return the saved answer
       if (bestMatch && bestSimilarity > 0.7) {
         console.log(`Found matching answer with ${(bestSimilarity * 100).toFixed(1)}% similarity`);
         
-        // Save AI response
         await supabase.from('chat_messages').insert({
           ticket_id: ticketId,
           sender_type: 'ai',
           content: bestMatch.answer
         });
 
-        // Update question stats
         await supabase
           .from('ai_pending_questions')
           .update({
@@ -201,7 +239,6 @@ serve(async (req) => {
           })
           .eq('id', bestMatch.id);
 
-        // Update ticket
         await supabase
           .from('support_tickets')
           .update({
@@ -223,7 +260,6 @@ serve(async (req) => {
       }
     }
 
-    // 2. Buscar perfil do usuário para detectar role
     const { data: userProfile } = await supabase
       .from('profiles')
       .select('role')
@@ -232,8 +268,7 @@ serve(async (req) => {
 
     const userRole = userProfile?.role || 'customer';
 
-    // 3. Buscar contexto da base de conhecimento filtrado por target_audience e configuração
-    const [knowledgeResult, configResult, userOrdersResult, academyLessonsResult] = await Promise.all([
+    const [knowledgeResult, configResult, userOrdersResult, academyLessonsResult, chatHistoryResult] = await Promise.all([
       supabase
         .from('ai_knowledge_base')
         .select('*')
@@ -267,21 +302,26 @@ serve(async (req) => {
         `)
         .eq('is_published', true)
         .eq('course_modules.is_published', true)
-        .eq('course_modules.courses.is_published', true)
+        .eq('course_modules.courses.is_published', true),
+      supabase
+        .from('chat_messages')
+        .select('sender_type, content')
+        .eq('ticket_id', ticketId)
+        .order('created_at', { ascending: true })
+        .limit(20)
     ]);
 
     const knowledge = knowledgeResult.data || [];
     const config = configResult.data;
     const userOrders = userOrdersResult.data;
     const allAcademyLessons = academyLessonsResult.data || [];
+    const chatHistory = chatHistoryResult.data || [];
 
-    // Filtrar lições da Academy por access_level do usuário
     const relevantLessons = allAcademyLessons.filter((lesson: any) => {
       const accessLevel = lesson.course_modules.courses.access_level;
       return accessLevel === 'all' || accessLevel === userRole;
     });
 
-    // 4. Construir contexto para a IA
     const knowledgeContext = knowledge.map(k => 
       `[${k.category.toUpperCase()}] ${k.title}: ${k.content}`
     ).join('\n\n');
@@ -296,40 +336,6 @@ serve(async (req) => {
         `[ACADEMY] ${l.course_modules.courses.title} > ${l.title}: ${l.lesson_description || 'Sem descrição'}`
       ).join('\n\n') : '';
 
-    // Validação Pré-IA: Detectar perguntas vagas
-    const vagueCheck = isQuestionVague(message);
-    if (vagueCheck.isVague && vagueCheck.suggestions.length > 0) {
-      const clarificationMessage = `Para te ajudar melhor, preciso de mais detalhes:\n\n${vagueCheck.suggestions.join('\n')}\n\nPor favor, me forneça essas informações para que eu possa te dar uma resposta precisa! 😊`;
-      
-      // Salvar resposta automática
-      await supabase
-        .from('chat_messages')
-        .insert({
-          ticket_id: ticketId,
-          user_id: null,
-          message: clarificationMessage,
-          sender_type: 'ai'
-        });
-
-      // Atualizar ticket
-      await supabase
-        .from('support_tickets')
-        .update({
-          last_message_at: new Date().toISOString(),
-          ai_handled: true
-        })
-        .eq('id', ticketId);
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: clarificationMessage,
-          requiresClarification: true
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const systemPrompt = `Você é um assistente de suporte de e-commerce brasileiro.
 
 Tom de voz: ${config?.ai_tone || 'profissional e amigável'}
@@ -337,6 +343,11 @@ Público-alvo: ${userRole === 'reseller' ? 'Revendedor' : userRole === 'supplier
 
 Contexto da Plataforma:
 ${config?.platform_context || 'E-commerce brasileiro'}
+
+**REGRA CRÍTICA - PRODUTOS DE ALTA ROTATIVIDADE:**
+Se o usuário mencionar problemas para gerar PIX ou pagar com PIX, SEMPRE pergunte primeiro se ele está vendo uma mensagem de "Produto de Alta Rotatividade". 
+Se sim, explique claramente que NÃO É UM BUG - é uma configuração intencional da loja para garantir estoque disponível no momento da compra. 
+Sugira que ele entre em contato conosco para verificar métodos de pagamento alternativos.
 
 Base de Conhecimento (filtrada para ${userRole}):
 ${knowledgeContext}
@@ -353,41 +364,15 @@ INSTRUÇÕES IMPORTANTES:
 - Se não souber responder com certeza, seja honesto e sugira contato com atendimento humano
 - NUNCA invente informações sobre prazos, preços ou políticas
 - Se o cliente demonstrar insatisfação grave, urgência ou reclamação, inicie sua resposta com "ESCALATE:" para transferir para humano
-- Mantenha respostas com no máximo ${config?.max_response_length || 500} caracteres
+- Mantenha respostas com no máximo ${config?.max_response_length || 500} caracteres`;
 
-REGRAS DE CLARIFICAÇÃO (CRÍTICO):
-Sempre que receber uma pergunta vaga ou sem contexto suficiente, você DEVE pedir informações detalhadas antes de responder. Exemplos:
-
-❌ PERGUNTA VAGA: "Onde eu vejo essa aula?"
-✅ RESPOSTA CORRETA: "Claro! Para te direcionar corretamente, preciso de algumas informações:
-- Qual é o nome ou tema da aula que você está procurando?
-- É de algum curso específico (ex: Marketing Digital, Vendas, etc)?
-- Você já está matriculado nesse curso ou está apenas interessado?"
-
-❌ PERGUNTA VAGA: "Meu pedido não chegou"
-✅ RESPOSTA CORRETA: "Vou te ajudar com isso! Para localizar seu pedido rapidamente, por favor me informe:
-- Qual é o número do pedido? (formato: #12345)
-- Quando foi realizada a compra?
-- Qual produto você comprou?"
-
-❌ PERGUNTA VAGA: "Não consigo acessar"
-✅ RESPOSTA CORRETA: "Entendo sua dificuldade. Para ajudar melhor, preciso saber:
-- O que você está tentando acessar? (ex: uma aula, área de revendedor, etc)
-- Qual mensagem de erro aparece (se houver)?
-- Você já fez login na plataforma?"
-
-CRITÉRIOS PARA EXIGIR CONTEXTO:
-- Pronomes demonstrativos vagos ("essa", "aquela", "isso") sem referente claro
-- Perguntas sobre "aula", "curso", "pedido", "produto" sem especificar qual
-- Problemas técnicos sem descrição do erro
-- Qualquer pergunta que você não possa responder com 100% de certeza com as informações fornecidas
-
-IMPORTANTE: Não tente adivinhar ou dar respostas genéricas. É MELHOR pedir contexto e responder com precisão do que responder rápido mas errado.
-
-Palavras-chave para escalação: ${config?.escalation_keywords?.join(', ') || 'não sei, preciso falar com humano, urgente, reclamação'}`;
-
-    // 4. Chamar Lovable AI
     console.log('Chamando Lovable AI...');
+    
+    const conversationMessages = chatHistory.map((msg: any) => ({
+      role: msg.sender_type === 'customer' ? 'user' : 'assistant',
+      content: msg.content
+    }));
+
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -401,31 +386,12 @@ Palavras-chave para escalação: ${config?.escalation_keywords?.join(', ') || 'n
             role: 'system',
             content: systemPrompt
           },
-          // Few-shot examples
-          {
-            role: 'user',
-            content: 'Onde eu vejo essa aula?'
-          },
-          {
-            role: 'assistant',
-            content: 'Claro! Para te direcionar corretamente, preciso de algumas informações:\n- Qual é o nome ou tema da aula que você está procurando?\n- É de algum curso específico?\n- Você já está matriculado nesse curso?'
-          },
-          {
-            role: 'user',
-            content: 'Meu pedido não chegou'
-          },
-          {
-            role: 'assistant',
-            content: 'Vou te ajudar com isso! Para localizar seu pedido rapidamente, por favor me informe:\n- Qual é o número do pedido? (formato: #12345)\n- Quando foi realizada a compra?\n- Qual produto você comprou?'
-          },
-          // Mensagem real do usuário
+          ...conversationMessages,
           {
             role: 'user',
             content: message
           }
-        ],
-        temperature: 0.7,
-        max_tokens: config?.max_response_length || 500
+        ]
       })
     });
 
@@ -444,7 +410,7 @@ Palavras-chave para escalação: ${config?.escalation_keywords?.join(', ') || 'n
     }
 
     const aiData = await aiResponse.json();
-    const aiMessage = aiData.choices?.[0]?.message?.content;
+    let aiMessage = aiData.choices?.[0]?.message?.content;
     
     if (!aiMessage) {
       throw new Error('Resposta da IA vazia');
@@ -452,17 +418,31 @@ Palavras-chave para escalação: ${config?.escalation_keywords?.join(', ') || 'n
 
     console.log('Resposta da IA recebida:', { length: aiMessage.length });
 
-    // 5. Verificar se precisa escalação
-    const needsEscalation = aiMessage.startsWith('ESCALATE:');
-    const cleanMessage = needsEscalation ? aiMessage.replace('ESCALATE:', '').trim() : aiMessage;
-    
-    // 6. Salvar resposta da IA
+    // Check if AI is requesting escalation
+    if (aiMessage.startsWith('ESCALATE:')) {
+      aiMessage = aiMessage.replace('ESCALATE:', '').trim();
+      
+      await supabase.from('support_tickets').update({
+        status: 'waiting_admin',
+        priority: 'high',
+        metadata: {
+          escalation_reason: 'AI detected need for human intervention',
+          escalated_at: new Date().toISOString()
+        }
+      }).eq('id', ticketId);
+
+      // Notify admins
+      await supabase.functions.invoke('notify-admin-ticket', {
+        body: { ticketId, reason: 'ai_escalation' }
+      });
+    }
+
     const { error: aiInsertError } = await supabase
       .from('chat_messages')
       .insert({
         ticket_id: ticketId,
         sender_type: 'ai',
-        content: cleanMessage
+        content: aiMessage
       });
 
     if (aiInsertError) {
@@ -470,10 +450,8 @@ Palavras-chave para escalação: ${config?.escalation_keywords?.join(', ') || 'n
       throw aiInsertError;
     }
 
-    // 7. Detectar categoria automaticamente
     const detectedCategory = detectCategory(message);
 
-    // 8. Buscar tags atuais do ticket
     const { data: currentTicket } = await supabase
       .from('support_tickets')
       .select('tags')
@@ -483,11 +461,8 @@ Palavras-chave para escalação: ${config?.escalation_keywords?.join(', ') || 'n
     const currentTags = currentTicket?.tags || [];
     const updatedTags = currentTags.length === 0 ? [detectedCategory] : currentTags;
 
-    // 🆕 STEP 2: Register as pending question if not found in knowledge base
-    console.log('Checking if question should be registered as pending...');
     const keywords = extractKeywords(message);
     
-    // Check if similar pending question already exists
     const { data: existingPending } = await supabase
       .from('ai_pending_questions')
       .select('*')
@@ -505,7 +480,6 @@ Palavras-chave para escalação: ${config?.escalation_keywords?.join(', ') || 'n
         keywords: keywords
       });
     } else if (existingPending) {
-      // Increment asked count if similar question exists
       await supabase
         .from('ai_pending_questions')
         .update({
@@ -515,13 +489,12 @@ Palavras-chave para escalação: ${config?.escalation_keywords?.join(', ') || 'n
         .eq('id', existingPending.id);
     }
 
-    // 9. Atualizar ticket
     const { error: updateError } = await supabase
       .from('support_tickets')
       .update({
         updated_at: new Date().toISOString(),
         last_message_at: new Date().toISOString(),
-        status: needsEscalation ? 'waiting_admin' : 'waiting_customer',
+        status: aiMessage.includes('ESCALATE:') || needsEscalation ? 'waiting_admin' : 'waiting_customer',
         ai_handled: !needsEscalation,
         tags: updatedTags
       })
@@ -536,7 +509,7 @@ Palavras-chave para escalação: ${config?.escalation_keywords?.join(', ') || 'n
 
     return new Response(JSON.stringify({ 
       success: true, 
-      message: cleanMessage,
+      message: aiMessage,
       needsEscalation 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
