@@ -41,62 +41,53 @@ Deno.serve(async (req) => {
     }
 
     const url = new URL(req.url);
-    const user_id = url.searchParams.get('user_id');
     const email = url.searchParams.get('email');
 
-    if (!user_id && !email) {
+    if (!email) {
       return new Response(
-        JSON.stringify({ success: false, error: 'user_id ou email é obrigatório' }),
+        JSON.stringify({ success: false, error: 'email é obrigatório' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Buscar usuário
-    let query = supabase
-      .from('profiles')
-      .select('user_id, first_name, last_name, role, created_at');
+    // Buscar usuário por email usando método direto
+    const { data: authData, error: authError } = await supabase.auth.admin.getUserByEmail(email);
 
-    if (user_id) {
-      query = query.eq('user_id', user_id);
-    } else if (email) {
-      // Buscar email na tabela auth.users
-      const { data: authData } = await supabase.auth.admin.listUsers();
-      const authUser = authData.users.find(u => u.email === email);
-      
-      if (authUser) {
-        query = query.eq('user_id', authUser.id);
-      } else {
-        return new Response(
-          JSON.stringify({ success: true, exists: false }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
-    const { data, error } = await query.single();
-
-    if (error || !data) {
+    if (authError || !authData.user) {
+      console.log('Usuário não encontrado:', email);
       return new Response(
         JSON.stringify({ success: true, exists: false }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Buscar email do usuário
-    const { data: authUser } = await supabase.auth.admin.getUserById(data.user_id);
+    // Buscar perfil do usuário
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('user_id, first_name, last_name, role, created_at')
+      .eq('user_id', authData.user.id)
+      .single();
 
-    console.log('Usuário encontrado:', data.user_id);
+    if (profileError || !profileData) {
+      console.log('Perfil não encontrado para:', authData.user.id);
+      return new Response(
+        JSON.stringify({ success: true, exists: false }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Usuário encontrado:', profileData.user_id);
 
     return new Response(
       JSON.stringify({
         success: true,
         exists: true,
         data: {
-          user_id: data.user_id,
-          email: authUser?.user?.email || null,
-          full_name: `${data.first_name || ''} ${data.last_name || ''}`.trim(),
-          role: data.role,
-          created_at: data.created_at
+          user_id: profileData.user_id,
+          email: authData.user.email,
+          full_name: `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim(),
+          role: profileData.role,
+          created_at: profileData.created_at
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

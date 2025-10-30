@@ -524,10 +524,9 @@ const academyUserEndpoints = [
     title: 'Verificar Usuário',
     method: 'GET' as const,
     url: '/functions/v1/api-usuarios-verificar',
-    description: 'Verifica se um usuário existe na plataforma por user_id ou email antes de realizar matrículas.',
+    description: 'Verifica se um usuário existe na plataforma através do email.',
     queryParams: [
-      { name: 'user_id', description: 'ID do usuário (opcional se usar email)', example: 'user123' },
-      { name: 'email', description: 'Email do usuário (opcional se usar user_id)', example: 'aluno@example.com' }
+      { name: 'email', description: 'Email do usuário (obrigatório)', example: 'aluno@example.com' }
     ],
     responseExample: {
       success: true,
