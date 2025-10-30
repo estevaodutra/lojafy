@@ -50,10 +50,21 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Buscar usuário por email usando método direto
-    const { data: authData, error: authError } = await supabase.auth.admin.getUserByEmail(email);
+    // Buscar todos os usuários e filtrar por email
+    const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
 
-    if (authError || !authData.user) {
+    if (authError) {
+      console.error('Erro ao buscar usuários:', authError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Erro ao buscar usuários' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Filtrar usuário por email (case-insensitive)
+    const authUser = authData.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+
+    if (!authUser) {
       console.log('Usuário não encontrado:', email);
       return new Response(
         JSON.stringify({ success: true, exists: false }),
@@ -65,11 +76,11 @@ Deno.serve(async (req) => {
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('user_id, first_name, last_name, role, created_at')
-      .eq('user_id', authData.user.id)
+      .eq('user_id', authUser.id)
       .single();
 
     if (profileError || !profileData) {
-      console.log('Perfil não encontrado para:', authData.user.id);
+      console.log('Perfil não encontrado para:', authUser.id);
       return new Response(
         JSON.stringify({ success: true, exists: false }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -84,7 +95,7 @@ Deno.serve(async (req) => {
         exists: true,
         data: {
           user_id: profileData.user_id,
-          email: authData.user.email,
+          email: authUser.email,
           full_name: `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim(),
           role: profileData.role,
           created_at: profileData.created_at
