@@ -1,5 +1,8 @@
 project_id = "bbrmjrjorcgsgeztzbsr"
 
+[functions.notify-admin-ticket]
+verify_jwt = false
+
 [functions.api-usuarios-verificar]
 verify_jwt = false
 

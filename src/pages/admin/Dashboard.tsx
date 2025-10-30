@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { SalesSection } from '@/components/admin/SalesSection';
 import { StoreVisitsSection } from '@/components/admin/StoreVisitsSection';
 import { OrdersManagementSection } from '@/components/admin/OrdersManagementSection';
+import { SupportAlertsWidget } from '@/components/admin/SupportAlertsWidget';
 
 interface DashboardStats {
   monthlyRevenue: number;
@@ -150,6 +151,9 @@ const Dashboard = () => {
 
       {/* New Sections */}
       <div className="space-y-6">
+        {/* Support Alerts Widget */}
+        <SupportAlertsWidget />
+        
         {/* Sales Section */}
         <SalesSection />
         

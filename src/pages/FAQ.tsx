@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { usePublicKnowledgeBase } from "@/hooks/usePublicKnowledgeBase";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,29 +14,18 @@ import { FAQItem } from "@/types";
 const FAQ = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [targetAudience, setTargetAudience] = useState<'customer' | 'reseller'>('customer');
 
-  const { data: faqData = [], isLoading } = useQuery({
-    queryKey: ['public-faqs'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('ai_knowledge_base')
-        .select('*')
-        .eq('category', 'faq')
-        .eq('target_audience', 'customer')
-        .eq('active', true)
-        .order('priority', { ascending: false });
-      
-      if (error) throw error;
-      
-      // Mapear para o formato FAQItem
-      return (data || []).map(faq => ({
-        id: faq.id,
-        question: faq.title,
-        answer: faq.content,
-        category: faq.subcategory?.toLowerCase().replace(/\s+/g, '-') || 'outros'
-      })) as FAQItem[];
-    }
-  });
+  const { data: knowledgeData = [], isLoading } = usePublicKnowledgeBase(targetAudience);
+  
+  const faqData = knowledgeData
+    .filter(item => item.category === 'faq' || item.category === 'product_info')
+    .map(item => ({
+      id: item.id,
+      question: item.title,
+      answer: item.content,
+      category: item.subcategory?.toLowerCase().replace(/\s+/g, '-') || 'outros'
+    })) as FAQItem[];
 
   const categories = [
     { id: "pedidos", name: "Pedidos", icon: ShoppingCart, count: faqData.filter(faq => faq.category === "pedidos").length },
@@ -94,6 +82,22 @@ const FAQ = () => {
                 className="pl-10"
               />
             </div>
+          </div>
+
+          {/* Audience Filter */}
+          <div className="flex justify-center gap-4 mb-8">
+            <Button
+              variant={targetAudience === 'customer' ? 'default' : 'outline'}
+              onClick={() => setTargetAudience('customer')}
+            >
+              Perguntas para Clientes
+            </Button>
+            <Button
+              variant={targetAudience === 'reseller' ? 'default' : 'outline'}
+              onClick={() => setTargetAudience('reseller')}
+            >
+              Perguntas para Revendedores
+            </Button>
           </div>
 
           {/* Categories */}

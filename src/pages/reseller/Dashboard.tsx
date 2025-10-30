@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useSubscriptionCheck } from '@/hooks/useSubscriptionCheck';
+import { OnboardingWizard } from '@/components/reseller/OnboardingWizard';
 
 const ResellerDashboard = () => {
   const { data: salesData, isLoading } = useResellerSales();
@@ -21,6 +22,7 @@ const ResellerDashboard = () => {
 
   return (
     <div className="space-y-6">
+      <OnboardingWizard />
       <div>
         <h1 className="text-3xl font-bold">Dashboard do Revendedor</h1>
         <p className="text-muted-foreground">
