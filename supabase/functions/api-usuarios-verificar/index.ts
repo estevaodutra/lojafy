@@ -42,11 +42,13 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url);
     const email = url.searchParams.get('email');
+    const normalizedEmail = email?.trim();
 
-    if (!email) {
+    if (!normalizedEmail) {
+      console.log('Email vazio ou não fornecido, retornando exists: false');
       return new Response(
-        JSON.stringify({ success: false, error: 'email é obrigatório' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: true, exists: false }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -62,10 +64,10 @@ Deno.serve(async (req) => {
     }
 
     // Filtrar usuário por email (case-insensitive)
-    const authUser = authData.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+    const authUser = authData.users.find(u => u.email?.toLowerCase() === normalizedEmail.toLowerCase());
 
     if (!authUser) {
-      console.log('Usuário não encontrado:', email);
+      console.log('Usuário não encontrado:', normalizedEmail);
       return new Response(
         JSON.stringify({ success: true, exists: false }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
