@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
     const { data: keyData, error: keyError } = await supabase
       .from('api_keys')
       .select('user_id')
-      .eq('key', apiKey)
+      .eq('api_key', apiKey)
       .eq('active', true)
       .single();
 
