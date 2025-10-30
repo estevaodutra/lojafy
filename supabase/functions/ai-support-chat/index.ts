@@ -46,6 +46,45 @@ function calculateSimilarity(text1: string, text2: string): number {
   return union.size > 0 ? intersection.size / union.size : 0;
 }
 
+// Helper function to detect vague questions
+function isQuestionVague(text: string): { isVague: boolean; suggestions: string[] } {
+  const vaguePatterns = [
+    /\b(essa|aquela|isso|isto)\s+(aula|curso|produto|pedido)\b/i,
+    /^(onde|como|quando)\s+\w+\s+(aula|curso|produto|pedido)\??$/i,
+    /\b(meu|minha)\s+(pedido|aula|produto)\b(?!.*#?\d{3,})/i,
+    /\b(não|nao)\s+(consigo|consigo acessar|funciona)\b(?!.{20,})/i,
+  ];
+
+  const suggestions: string[] = [];
+  let isVague = false;
+
+  for (const pattern of vaguePatterns) {
+    if (pattern.test(text)) {
+      isVague = true;
+      
+      if (text.includes('aula') || text.includes('curso')) {
+        suggestions.push('- Qual é o nome ou tema da aula/curso?');
+        suggestions.push('- Você já está matriculado?');
+      }
+      if (text.includes('pedido')) {
+        suggestions.push('- Qual é o número do pedido?');
+        suggestions.push('- Quando foi feita a compra?');
+      }
+      if (text.includes('produto')) {
+        suggestions.push('- Qual produto específico?');
+        suggestions.push('- Você quer informações sobre estoque, preço ou características?');
+      }
+      if (text.includes('não consigo') || text.includes('não funciona')) {
+        suggestions.push('- O que você está tentando fazer?');
+        suggestions.push('- Qual mensagem de erro aparece?');
+      }
+      break;
+    }
+  }
+
+  return { isVague, suggestions };
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -83,6 +122,42 @@ serve(async (req) => {
     if (insertError) {
       console.error('Erro ao salvar mensagem:', insertError);
       throw insertError;
+    }
+
+    // 🆕 Validação Pré-IA: Detectar perguntas vagas
+    console.log('Verificando se a pergunta precisa de clarificação...');
+    const vagueCheck = isQuestionVague(message);
+    if (vagueCheck.isVague && vagueCheck.suggestions.length > 0) {
+      console.log('Pergunta vaga detectada, pedindo contexto adicional');
+      const clarificationMessage = `Para te ajudar melhor, preciso de mais detalhes:\n\n${vagueCheck.suggestions.join('\n')}\n\nPor favor, me forneça essas informações para que eu possa te dar uma resposta precisa! 😊`;
+      
+      // Salvar resposta automática
+      await supabase
+        .from('chat_messages')
+        .insert({
+          ticket_id: ticketId,
+          sender_type: 'ai',
+          sender_id: null,
+          content: clarificationMessage
+        });
+
+      // Atualizar ticket
+      await supabase
+        .from('support_tickets')
+        .update({
+          last_message_at: new Date().toISOString(),
+          ai_handled: true
+        })
+        .eq('id', ticketId);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: clarificationMessage,
+          requiresClarification: true
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // 🆕 STEP 1: Check if there's already an answered question matching this message
@@ -221,6 +296,40 @@ serve(async (req) => {
         `[ACADEMY] ${l.course_modules.courses.title} > ${l.title}: ${l.lesson_description || 'Sem descrição'}`
       ).join('\n\n') : '';
 
+    // Validação Pré-IA: Detectar perguntas vagas
+    const vagueCheck = isQuestionVague(message);
+    if (vagueCheck.isVague && vagueCheck.suggestions.length > 0) {
+      const clarificationMessage = `Para te ajudar melhor, preciso de mais detalhes:\n\n${vagueCheck.suggestions.join('\n')}\n\nPor favor, me forneça essas informações para que eu possa te dar uma resposta precisa! 😊`;
+      
+      // Salvar resposta automática
+      await supabase
+        .from('chat_messages')
+        .insert({
+          ticket_id: ticketId,
+          user_id: null,
+          message: clarificationMessage,
+          sender_type: 'ai'
+        });
+
+      // Atualizar ticket
+      await supabase
+        .from('support_tickets')
+        .update({
+          last_message_at: new Date().toISOString(),
+          ai_handled: true
+        })
+        .eq('id', ticketId);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: clarificationMessage,
+          requiresClarification: true
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const systemPrompt = `Você é um assistente de suporte de e-commerce brasileiro.
 
 Tom de voz: ${config?.ai_tone || 'profissional e amigável'}
@@ -246,6 +355,35 @@ INSTRUÇÕES IMPORTANTES:
 - Se o cliente demonstrar insatisfação grave, urgência ou reclamação, inicie sua resposta com "ESCALATE:" para transferir para humano
 - Mantenha respostas com no máximo ${config?.max_response_length || 500} caracteres
 
+REGRAS DE CLARIFICAÇÃO (CRÍTICO):
+Sempre que receber uma pergunta vaga ou sem contexto suficiente, você DEVE pedir informações detalhadas antes de responder. Exemplos:
+
+❌ PERGUNTA VAGA: "Onde eu vejo essa aula?"
+✅ RESPOSTA CORRETA: "Claro! Para te direcionar corretamente, preciso de algumas informações:
+- Qual é o nome ou tema da aula que você está procurando?
+- É de algum curso específico (ex: Marketing Digital, Vendas, etc)?
+- Você já está matriculado nesse curso ou está apenas interessado?"
+
+❌ PERGUNTA VAGA: "Meu pedido não chegou"
+✅ RESPOSTA CORRETA: "Vou te ajudar com isso! Para localizar seu pedido rapidamente, por favor me informe:
+- Qual é o número do pedido? (formato: #12345)
+- Quando foi realizada a compra?
+- Qual produto você comprou?"
+
+❌ PERGUNTA VAGA: "Não consigo acessar"
+✅ RESPOSTA CORRETA: "Entendo sua dificuldade. Para ajudar melhor, preciso saber:
+- O que você está tentando acessar? (ex: uma aula, área de revendedor, etc)
+- Qual mensagem de erro aparece (se houver)?
+- Você já fez login na plataforma?"
+
+CRITÉRIOS PARA EXIGIR CONTEXTO:
+- Pronomes demonstrativos vagos ("essa", "aquela", "isso") sem referente claro
+- Perguntas sobre "aula", "curso", "pedido", "produto" sem especificar qual
+- Problemas técnicos sem descrição do erro
+- Qualquer pergunta que você não possa responder com 100% de certeza com as informações fornecidas
+
+IMPORTANTE: Não tente adivinhar ou dar respostas genéricas. É MELHOR pedir contexto e responder com precisão do que responder rápido mas errado.
+
 Palavras-chave para escalação: ${config?.escalation_keywords?.join(', ') || 'não sei, preciso falar com humano, urgente, reclamação'}`;
 
     // 4. Chamar Lovable AI
@@ -263,6 +401,24 @@ Palavras-chave para escalação: ${config?.escalation_keywords?.join(', ') || 'n
             role: 'system',
             content: systemPrompt
           },
+          // Few-shot examples
+          {
+            role: 'user',
+            content: 'Onde eu vejo essa aula?'
+          },
+          {
+            role: 'assistant',
+            content: 'Claro! Para te direcionar corretamente, preciso de algumas informações:\n- Qual é o nome ou tema da aula que você está procurando?\n- É de algum curso específico?\n- Você já está matriculado nesse curso?'
+          },
+          {
+            role: 'user',
+            content: 'Meu pedido não chegou'
+          },
+          {
+            role: 'assistant',
+            content: 'Vou te ajudar com isso! Para localizar seu pedido rapidamente, por favor me informe:\n- Qual é o número do pedido? (formato: #12345)\n- Quando foi realizada a compra?\n- Qual produto você comprou?'
+          },
+          // Mensagem real do usuário
           {
             role: 'user',
             content: message
