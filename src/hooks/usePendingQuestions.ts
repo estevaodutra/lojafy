@@ -51,7 +51,8 @@ export const usePendingQuestions = () => {
     id: string, 
     answer: string, 
     relatedContent?: { type: 'course' | 'module' | 'lesson'; id: string },
-    standardAnswerId?: string
+    standardAnswerId?: string,
+    attachments?: any[]
   ) => {
     try {
       const question = questions.find(q => q.id === id);
@@ -67,6 +68,7 @@ export const usePendingQuestions = () => {
         related_course_id: null,
         related_module_id: null,
         related_lesson_id: null,
+        attachments: attachments || [],
       };
 
       if (relatedContent) {
@@ -118,6 +120,7 @@ export const usePendingQuestions = () => {
           related_course_id: updateData.related_course_id,
           related_module_id: updateData.related_module_id,
           related_lesson_id: updateData.related_lesson_id,
+          attachments: attachments || [],
         });
 
       if (kbError) throw kbError;

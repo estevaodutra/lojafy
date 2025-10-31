@@ -71,7 +71,7 @@ export const useStandardAnswers = () => {
     }
   };
 
-  const updateStandardAnswer = async (id: string, updates: Partial<StandardAnswer>) => {
+  const updateStandardAnswer = async (id: string, updates: Partial<StandardAnswer & { attachments?: any[] }>) => {
     try {
       const { error } = await supabase
         .from('ai_standard_answers')

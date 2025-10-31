@@ -482,6 +482,18 @@ export default function AnswerQuestionModal({
                       <p className="text-xs text-muted-foreground mb-2">📱 Preview:</p>
                       <div className="space-y-2">
                         <p className="text-sm whitespace-pre-wrap">{answer || 'Sua resposta aparecerá aqui...'}</p>
+                        {attachments.length > 0 && (
+                          <div className="grid grid-cols-2 gap-2 mt-2">
+                            {attachments.map((att, idx) => (
+                              <img
+                                key={idx}
+                                src={att.url}
+                                alt={att.name}
+                                className="rounded-md max-h-24 w-full object-cover border"
+                              />
+                            ))}
+                          </div>
+                        )}
                         <Button size="sm" className="w-full">
                           {buttonText}
                         </Button>
