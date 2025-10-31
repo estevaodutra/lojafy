@@ -19,6 +19,7 @@ export interface PendingQuestion {
   keywords: string[];
   created_at: string;
   updated_at: string;
+  related_lesson_id: string | null;
 }
 
 export const usePendingQuestions = () => {
@@ -44,7 +45,7 @@ export const usePendingQuestions = () => {
     }
   };
 
-  const answerQuestion = async (id: string, answer: string) => {
+  const answerQuestion = async (id: string, answer: string, lessonId?: string) => {
     try {
       const question = questions.find(q => q.id === id);
       if (!question) return;
@@ -56,7 +57,8 @@ export const usePendingQuestions = () => {
           answer,
           status: 'answered',
           answered_at: new Date().toISOString(),
-          answered_by: user?.id
+          answered_by: user?.id,
+          related_lesson_id: lessonId || null
         })
         .eq('id', id);
 
@@ -73,12 +75,13 @@ export const usePendingQuestions = () => {
           keywords: question.keywords,
           priority: Math.min(10, question.asked_count),
           active: true,
-          created_by: user?.id
+          created_by: user?.id,
+          related_lesson_id: lessonId || null
         });
 
       if (kbError) throw kbError;
 
-      toast.success('Resposta registrada e adicionada à base de conhecimento!');
+      toast.success(lessonId ? 'Resposta registrada com aula relacionada!' : 'Resposta registrada e adicionada à base de conhecimento!');
       await fetchQuestions();
     } catch (error) {
       console.error('Error answering question:', error);

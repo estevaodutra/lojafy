@@ -1,15 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PendingQuestion } from '@/hooks/usePendingQuestions';
+import { useAllLessons } from '@/hooks/useAllLessons';
 
 interface AnswerQuestionModalProps {
   question: PendingQuestion | null;
   open: boolean;
   onClose: () => void;
-  onSave: (id: string, answer: string) => Promise<void>;
+  onSave: (id: string, answer: string, lessonId?: string) => Promise<void>;
 }
 
 export default function AnswerQuestionModal({
@@ -19,16 +21,26 @@ export default function AnswerQuestionModal({
   onSave
 }: AnswerQuestionModalProps) {
   const [answer, setAnswer] = useState(question?.answer || '');
+  const [selectedLessonId, setSelectedLessonId] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
+  const { data: lessons, isLoading: loadingLessons } = useAllLessons();
+
+  useEffect(() => {
+    if (question) {
+      setAnswer(question.answer || '');
+      setSelectedLessonId(undefined);
+    }
+  }, [question]);
 
   const handleSave = async () => {
     if (!question || !answer.trim()) return;
     
     setSaving(true);
     try {
-      await onSave(question.id, answer);
+      await onSave(question.id, answer, selectedLessonId);
       onClose();
       setAnswer('');
+      setSelectedLessonId(undefined);
     } finally {
       setSaving(false);
     }
@@ -69,6 +81,30 @@ export default function AnswerQuestionModal({
             <p className="text-xs text-muted-foreground mt-2">
               Esta resposta será automaticamente copiada para a base de conhecimento e 
               a IA a usará sempre que encontrar esta pergunta novamente.
+            </p>
+          </div>
+
+          <div>
+            <Label htmlFor="lesson">Aula Relacionada (Opcional)</Label>
+            <Select 
+              value={selectedLessonId} 
+              onValueChange={(value) => setSelectedLessonId(value === 'none' ? undefined : value)}
+              disabled={loadingLessons}
+            >
+              <SelectTrigger className="mt-2">
+                <SelectValue placeholder="Nenhuma aula selecionada" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Nenhuma aula</SelectItem>
+                {lessons?.map(lesson => (
+                  <SelectItem key={lesson.lesson_id} value={lesson.lesson_id}>
+                    {lesson.course_title} › {lesson.module_title} › {lesson.lesson_title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-2">
+              Se selecionada, a IA enviará um botão para o usuário acessar esta aula
             </p>
           </div>
         </div>

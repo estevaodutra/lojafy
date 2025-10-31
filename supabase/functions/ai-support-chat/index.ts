@@ -206,7 +206,18 @@ serve(async (req) => {
 
     const { data: answeredQuestions, error: aqError } = await supabase
       .from('ai_pending_questions')
-      .select('*')
+      .select(`
+        *,
+        related_lesson:course_lessons!related_lesson_id (
+          id,
+          title,
+          course_modules!inner(
+            courses!inner(
+              title
+            )
+          )
+        )
+      `)
       .eq('status', 'answered')
       .not('answer', 'is', null);
 
@@ -225,10 +236,22 @@ serve(async (req) => {
       if (bestMatch && bestSimilarity > 0.7) {
         console.log(`Found matching answer with ${(bestSimilarity * 100).toFixed(1)}% similarity`);
         
+        let finalMessage = bestMatch.answer;
+        
+        // Se tem aula relacionada, adicionar botão
+        if (bestMatch.related_lesson) {
+          const lesson = bestMatch.related_lesson as any;
+          const courseName = lesson.course_modules.courses.title;
+          const lessonTitle = lesson.title;
+          const lessonUrl = `/customer/academy/lesson/${lesson.id}`;
+          
+          finalMessage += `\n\n📚 **Aula Recomendada:** ${courseName} - ${lessonTitle}\n[Ver Aula Agora](${lessonUrl})`;
+        }
+        
         await supabase.from('chat_messages').insert({
           ticket_id: ticketId,
           sender_type: 'ai',
-          content: bestMatch.answer
+          content: finalMessage
         });
 
         await supabase
@@ -271,7 +294,18 @@ serve(async (req) => {
     const [knowledgeResult, configResult, userOrdersResult, academyLessonsResult, chatHistoryResult] = await Promise.all([
       supabase
         .from('ai_knowledge_base')
-        .select('*')
+        .select(`
+          *,
+          related_lesson:course_lessons!related_lesson_id (
+            id,
+            title,
+            course_modules!inner(
+              courses!inner(
+                title
+              )
+            )
+          )
+        `)
         .eq('active', true)
         .or(`target_audience.eq.all,target_audience.eq.${userRole}`)
         .order('priority', { ascending: false }),
@@ -322,9 +356,17 @@ serve(async (req) => {
       return accessLevel === 'all' || accessLevel === userRole;
     });
 
-    const knowledgeContext = knowledge.map(k => 
-      `[${k.category.toUpperCase()}] ${k.title}: ${k.content}`
-    ).join('\n\n');
+    const knowledgeContext = knowledge.map(k => {
+      let text = `[${k.category.toUpperCase()}] ${k.title}: ${k.content}`;
+      
+      // Se tem aula relacionada, informar à IA
+      if (k.related_lesson) {
+        const lesson = k.related_lesson as any;
+        text += `\n[AULA RELACIONADA: ${lesson.course_modules.courses.title} - ${lesson.title} (ID: ${lesson.id})]`;
+      }
+      
+      return text;
+    }).join('\n\n');
 
     const ordersContext = userOrders ? 
       userOrders.map((o: any) => 
@@ -364,6 +406,13 @@ INSTRUÇÕES IMPORTANTES:
 - Se não souber responder com certeza, seja honesto e sugira contato com atendimento humano
 - NUNCA invente informações sobre prazos, preços ou políticas
 - Se o cliente demonstrar insatisfação grave, urgência ou reclamação, inicie sua resposta com "ESCALATE:" para transferir para humano
+
+**REGRA DE AULAS DA ACADEMIA:**
+- Se a resposta da base de conhecimento contém [AULA RELACIONADA: ...], você DEVE incluir um botão clicável no final da sua resposta
+- Formato do botão: "📚 **Aula Recomendada:** [Nome do Curso] - [Nome da Aula]\\n[Ver Aula Agora](/customer/academy/lesson/[ID])"
+- Sempre use Markdown para o link: [Texto](URL)
+- Exemplo: "📚 **Aula Recomendada:** Primeiros Passos - Como Adicionar Produtos\\n[Ver Aula Agora](/customer/academy/lesson/abc-123)"
+
 - Mantenha respostas com no máximo ${config?.max_response_length || 500} caracteres`;
 
     console.log('Chamando Lovable AI...');

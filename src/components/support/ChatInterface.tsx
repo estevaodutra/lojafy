@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Send, User, Bot, Clock, MessageCircle, Package } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -279,7 +280,39 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted'
                   }`}>
-                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    {msg.sender_type === 'ai' || msg.sender_type === 'admin' ? (
+                      <div className="text-sm prose prose-sm max-w-none prose-p:my-1 prose-strong:font-semibold prose-a:no-underline">
+                        <ReactMarkdown
+                          components={{
+                            a: ({ node, ...props }) => {
+                              // Se o link é de aula, renderizar como botão
+                              if (props.href?.startsWith('/customer/academy/lesson/')) {
+                                return (
+                                  <Button
+                                    asChild
+                                    size="sm"
+                                    className="w-full mt-2 mb-1"
+                                    variant="default"
+                                  >
+                                    <a href={props.href} onClick={(e) => { e.preventDefault(); window.location.href = props.href!; }}>
+                                      {props.children} 🎓
+                                    </a>
+                                  </Button>
+                                );
+                              }
+                              // Links normais
+                              return <a className="text-blue-600 underline hover:text-blue-700" target="_blank" rel="noopener noreferrer" {...props} />;
+                            },
+                            p: ({ node, ...props }) => <p className="whitespace-pre-wrap break-words" {...props} />,
+                            strong: ({ node, ...props }) => <strong className="font-semibold" {...props} />
+                          }}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     {new Date(msg.created_at).toLocaleTimeString('pt-BR', {

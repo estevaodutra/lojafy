@@ -1,9 +1,11 @@
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import ReactMarkdown from 'react-markdown';
 import { cn } from '@/lib/utils';
 import { ChatAvatar } from './ChatAvatar';
 import { MessageAttachment } from './MessageAttachment';
 import { Check, CheckCheck } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ChatMessage {
   id: string;
@@ -92,10 +94,42 @@ export const ChatMessage = ({ message, customerName, customerEmail }: ChatMessag
             </div>
           )}
 
-          {/* Conteúdo da mensagem */}
-          <p className="text-sm whitespace-pre-wrap break-words">
-            {message.content}
-          </p>
+          {/* Conteúdo da mensagem - Renderizar Markdown para IA */}
+          {isAI ? (
+            <div className="text-sm prose prose-sm max-w-none prose-p:my-1 prose-strong:font-semibold prose-a:no-underline">
+              <ReactMarkdown
+                components={{
+                  a: ({ node, ...props }) => {
+                    // Se o link é de aula, renderizar como botão
+                    if (props.href?.startsWith('/customer/academy/lesson/')) {
+                      return (
+                        <Button
+                          asChild
+                          size="sm"
+                          className="w-full mt-2 mb-1"
+                          variant="default"
+                        >
+                          <a href={props.href} target="_blank" rel="noopener noreferrer">
+                            {props.children} 🎓
+                          </a>
+                        </Button>
+                      );
+                    }
+                    // Links normais
+                    return <a className="text-blue-600 underline hover:text-blue-700" {...props} />;
+                  },
+                  p: ({ node, ...props }) => <p className="whitespace-pre-wrap break-words" {...props} />,
+                  strong: ({ node, ...props }) => <strong className="font-semibold" {...props} />
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+            </div>
+          ) : (
+            <p className="text-sm whitespace-pre-wrap break-words">
+              {message.content}
+            </p>
+          )}
 
           {/* Anexos */}
           {message.attachments && message.attachments.length > 0 && (

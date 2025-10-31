@@ -72,6 +72,7 @@ export type Database = {
           id: string
           keywords: string[] | null
           priority: number | null
+          related_lesson_id: string | null
           subcategory: string | null
           target_audience: string
           title: string
@@ -86,6 +87,7 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           priority?: number | null
+          related_lesson_id?: string | null
           subcategory?: string | null
           target_audience?: string
           title: string
@@ -100,6 +102,7 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           priority?: number | null
+          related_lesson_id?: string | null
           subcategory?: string | null
           target_audience?: string
           title?: string
@@ -112,6 +115,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "ai_knowledge_base_related_lesson_id_fkey"
+            columns: ["related_lesson_id"]
+            isOneToOne: false
+            referencedRelation: "course_lessons"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -127,6 +137,7 @@ export type Database = {
           keywords: string[] | null
           last_asked_at: string | null
           question: string
+          related_lesson_id: string | null
           similar_questions: Json | null
           status: string
           ticket_id: string | null
@@ -144,6 +155,7 @@ export type Database = {
           keywords?: string[] | null
           last_asked_at?: string | null
           question: string
+          related_lesson_id?: string | null
           similar_questions?: Json | null
           status?: string
           ticket_id?: string | null
@@ -161,6 +173,7 @@ export type Database = {
           keywords?: string[] | null
           last_asked_at?: string | null
           question?: string
+          related_lesson_id?: string | null
           similar_questions?: Json | null
           status?: string
           ticket_id?: string | null
@@ -168,6 +181,13 @@ export type Database = {
           user_role?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ai_pending_questions_related_lesson_id_fkey"
+            columns: ["related_lesson_id"]
+            isOneToOne: false
+            referencedRelation: "course_lessons"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ai_pending_questions_ticket_id_fkey"
             columns: ["ticket_id"]
