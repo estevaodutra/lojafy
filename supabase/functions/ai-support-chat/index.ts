@@ -45,6 +45,15 @@ function extractKeywords(text: string): string[] {
   return [...new Set(words)].slice(0, 5);
 }
 
+function extractProductKeywords(text: string): string[] {
+  const stopWords = ['qual', 'sobre', 'tem', 'onde', 'como', 'quando', 'porque', 'preciso', 'quero', 'gostaria', 'está', 'estou', 'vocês', 'você', 'seu', 'sua', 'meu', 'minha'];
+  const cleaned = text.toLowerCase().replace(/[^a-záàãâäéèêëíìîïóòõôöúùûüç\s]/g, ' ');
+  const words = cleaned.split(/\s+/)
+    .filter(w => w.length > 3)
+    .filter(w => !stopWords.includes(w));
+  return words.slice(0, 3);
+}
+
 function calculateSimilarity(text1: string, text2: string): number {
   const words1 = new Set(extractKeywords(text1));
   const words2 = new Set(extractKeywords(text2));
@@ -315,6 +324,35 @@ serve(async (req) => {
 
     const userRole = userProfile?.role || 'customer';
 
+    // Buscar produtos relevantes baseado nas palavras-chave da mensagem
+    const productKeywords = extractProductKeywords(message);
+    let productsResult = { data: null };
+    
+    if (productKeywords.length > 0) {
+      const orConditions = productKeywords
+        .map(kw => `name.ilike.%${kw}%,description.ilike.%${kw}%`)
+        .join(',');
+      
+      productsResult = await supabase
+        .from('products')
+        .select(`
+          id,
+          name,
+          price,
+          original_price,
+          stock_quantity,
+          description,
+          badge,
+          high_rotation,
+          categories:category_id (name),
+          subcategories:subcategory_id (name)
+        `)
+        .eq('active', true)
+        .or(orConditions)
+        .order('stock_quantity', { ascending: false })
+        .limit(10);
+    }
+
     const [knowledgeResult, configResult, userOrdersResult, academyLessonsResult, chatHistoryResult] = await Promise.all([
       supabase
         .from('ai_knowledge_base')
@@ -386,6 +424,7 @@ serve(async (req) => {
     const userOrders = userOrdersResult.data;
     const allAcademyLessons = academyLessonsResult.data || [];
     const chatHistory = chatHistoryResult.data || [];
+    const relevantProducts = productsResult.data || [];
 
     const relevantLessons = allAcademyLessons.filter((lesson: any) => {
       const accessLevel = lesson.course_modules.courses.access_level;
@@ -424,6 +463,20 @@ serve(async (req) => {
         `[ACADEMY] ${l.course_modules.courses.title} > ${l.title}: ${l.lesson_description || 'Sem descrição'}`
       ).join('\n\n') : '';
 
+    const productsContext = relevantProducts.length > 0 ?
+      relevantProducts.map((p: any) => {
+        const category = p.categories?.name || 'Não categorizado';
+        const subcategory = p.subcategories?.name || '';
+        const priceInfo = p.original_price 
+          ? `R$ ${p.price.toFixed(2)} (de R$ ${p.original_price.toFixed(2)})`
+          : `R$ ${p.price.toFixed(2)}`;
+        
+        return `[PRODUTO] ${p.name}
+- Preço: ${priceInfo}
+- Estoque: ${p.stock_quantity} unidades
+- Categoria: ${category}${subcategory ? ` > ${subcategory}` : ''}${p.badge ? `\n- Destaque: ${p.badge}` : ''}${p.high_rotation ? '\n- ⚠️ PRODUTO DE ALTA ROTATIVIDADE (Pagamento somente após confirmação)' : ''}${p.description ? `\n- Descrição: ${p.description.substring(0, 150)}${p.description.length > 150 ? '...' : ''}` : ''}`;
+      }).join('\n\n') : '';
+
     const systemPrompt = `Você é um assistente de suporte de e-commerce brasileiro.
 
 Tom de voz: ${config?.ai_tone || 'profissional e amigável'}
@@ -439,6 +492,19 @@ Sugira que ele entre em contato conosco para verificar métodos de pagamento alt
 
 Base de Conhecimento (filtrada para ${userRole}):
 ${knowledgeContext}
+
+${productsContext ? `📦 PRODUTOS DISPONÍVEIS NO CATÁLOGO (filtrados pela sua pergunta):
+${productsContext}
+
+INSTRUÇÕES SOBRE PRODUTOS:
+- Se o usuário perguntar sobre preço, estoque ou disponibilidade, consulte esta lista
+- Para produtos de ALTA ROTATIVIDADE, explique que o pagamento PIX só é liberado após confirmação de estoque
+- Sempre mencione se há promoção (comparar price vs original_price)
+- Se o produto não estiver na lista, informe que não encontrou mas sugira contato com atendente
+- NUNCA invente preços ou informações que não estejam aqui
+- Sempre inclua o link do produto: [Ver Produto](/produto/[ID])
+
+` : ''}
 
 ${academyContext ? `Conteúdo da Lojafy Academy:\n${academyContext}\n\n` : ''}
 
