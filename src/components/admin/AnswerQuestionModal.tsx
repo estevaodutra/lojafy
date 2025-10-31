@@ -6,12 +6,15 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Sparkles, Check, Edit3, RefreshCw, X } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Card, CardContent } from '@/components/ui/card';
+import { Loader2, Sparkles, Check, Edit3, RefreshCw, X, BookOpen } from 'lucide-react';
 import { PendingQuestion } from '@/hooks/usePendingQuestions';
 import { useAllLessons } from '@/hooks/useAllLessons';
 import { useAllCourses } from '@/hooks/useAllCourses';
 import { useAllModules } from '@/hooks/useAllModules';
 import { useSuggestAnswer, SuggestionResponse } from '@/hooks/useSuggestAnswer';
+import { useStandardAnswers } from '@/hooks/useStandardAnswers';
 
 interface AnswerQuestionModalProps {
   question: PendingQuestion | null;
@@ -23,7 +26,8 @@ interface AnswerQuestionModalProps {
     relatedContent?: {
       type: 'course' | 'module' | 'lesson';
       id: string;
-    }
+    },
+    standardAnswerId?: string
   ) => Promise<void>;
 }
 
@@ -33,7 +37,9 @@ export default function AnswerQuestionModal({
   onClose,
   onSave
 }: AnswerQuestionModalProps) {
-  const [answer, setAnswer] = useState(question?.answer || '');
+  const [answerType, setAnswerType] = useState<'new' | 'standard'>('new');
+  const [selectedStandardAnswerId, setSelectedStandardAnswerId] = useState<string | undefined>();
+  const [answer, setAnswer] = useState('');
   const [selectedType, setSelectedType] = useState<'none' | 'course' | 'module' | 'lesson'>('none');
   const [selectedCourseId, setSelectedCourseId] = useState<string | undefined>(undefined);
   const [selectedModuleId, setSelectedModuleId] = useState<string | undefined>(undefined);
@@ -49,31 +55,61 @@ export default function AnswerQuestionModal({
   const { data: modules, isLoading: loadingModules } = useAllModules();
   const { data: lessons, isLoading: loadingLessons } = useAllLessons();
   const { getSuggestion, loading: loadingSuggestion, error: suggestionError } = useSuggestAnswer();
+  const { standardAnswers } = useStandardAnswers();
 
   useEffect(() => {
     if (question) {
-      // Extrair botão da resposta existente se houver
+      // Extract button info if exists
       const buttonMatch = question.answer?.match(/\[BUTTON:(.*?):(.*?)\]/);
       if (buttonMatch) {
-        const [fullMatch, text, link] = buttonMatch;
-        const cleanAnswer = question.answer!.replace(fullMatch, '').trim();
-        setAnswer(cleanAnswer);
+        const existingAnswer = question.answer.replace(/\[BUTTON:.*?\]/, '').trim();
+        setAnswer(existingAnswer);
         setButtonEnabled(true);
-        setButtonText(text);
-        setButtonLink(link);
+        setButtonText(buttonMatch[1]);
+        setButtonLink(buttonMatch[2]);
       } else {
         setAnswer(question.answer || '');
         setButtonEnabled(false);
         setButtonText('');
         setButtonLink('');
       }
+
+      // ✅ CORREÇÃO: Carregar conteúdo relacionado existente
+      if (question.related_lesson_id) {
+        setSelectedType('lesson');
+        setSelectedLessonId(question.related_lesson_id);
+        setSelectedCourseId(undefined);
+        setSelectedModuleId(undefined);
+      } else if (question.related_module_id) {
+        setSelectedType('module');
+        setSelectedModuleId(question.related_module_id);
+        setSelectedCourseId(undefined);
+        setSelectedLessonId(undefined);
+      } else if (question.related_course_id) {
+        setSelectedType('course');
+        setSelectedCourseId(question.related_course_id);
+        setSelectedModuleId(undefined);
+        setSelectedLessonId(undefined);
+      } else {
+        setSelectedType('none');
+        setSelectedCourseId(undefined);
+        setSelectedModuleId(undefined);
+        setSelectedLessonId(undefined);
+      }
       
+      setSuggestion(null);
+      setShowSuggestion(true);
+      setAnswerType('new');
+      setSelectedStandardAnswerId(undefined);
+    } else {
+      setAnswer('');
+      setButtonText('');
+      setButtonLink('');
+      setButtonEnabled(false);
       setSelectedType('none');
       setSelectedCourseId(undefined);
       setSelectedModuleId(undefined);
       setSelectedLessonId(undefined);
-      setSuggestion(null);
-      setShowSuggestion(true);
     }
   }, [question]);
 
@@ -96,7 +132,6 @@ export default function AnswerQuestionModal({
         }
       }
     } else if (suggestionError) {
-      // Mostrar mensagem mais amigável quando houver erro
       setShowSuggestion(false);
     }
   };
@@ -136,10 +171,30 @@ export default function AnswerQuestionModal({
   };
 
   const handleSave = async () => {
-    if (!question || !answer.trim()) return;
+    if (!question) return;
+    if (answerType === 'standard' && !selectedStandardAnswerId) return;
+    if (answerType === 'new' && !answer.trim()) return;
     
     setSaving(true);
     try {
+      let finalAnswer = answer.trim();
+      let standardAnswerId: string | undefined = undefined;
+      
+      if (answerType === 'standard' && selectedStandardAnswerId) {
+        standardAnswerId = selectedStandardAnswerId;
+        const standardAnswer = standardAnswers.find(a => a.id === selectedStandardAnswerId);
+        if (standardAnswer) {
+          finalAnswer = standardAnswer.answer;
+          if (standardAnswer.button_text && standardAnswer.button_link) {
+            finalAnswer += `\n\n[BUTTON:${standardAnswer.button_text}:${standardAnswer.button_link}]`;
+          }
+        }
+      } else if (answerType === 'new') {
+        if (buttonEnabled && buttonText.trim() && buttonLink.trim()) {
+          finalAnswer += `\n\n[BUTTON:${buttonText.trim()}:${buttonLink.trim()}]`;
+        }
+      }
+      
       let relatedContent = undefined;
       
       if (selectedType === 'course' && selectedCourseId) {
@@ -150,14 +205,10 @@ export default function AnswerQuestionModal({
         relatedContent = { type: 'lesson' as const, id: selectedLessonId };
       }
       
-      // Incluir botão na resposta se estiver habilitado
-      let finalAnswer = answer.trim();
-      if (buttonEnabled && buttonText.trim() && buttonLink.trim()) {
-        finalAnswer = `${finalAnswer}\n\n[BUTTON:${buttonText.trim()}:${buttonLink.trim()}]`;
-      }
-      
-      await onSave(question.id, finalAnswer, relatedContent);
+      await onSave(question.id, finalAnswer, relatedContent, standardAnswerId);
       onClose();
+      
+      // Reset form
       setAnswer('');
       setSelectedType('none');
       setSelectedCourseId(undefined);
@@ -166,6 +217,8 @@ export default function AnswerQuestionModal({
       setButtonEnabled(false);
       setButtonText('');
       setButtonLink('');
+      setAnswerType('new');
+      setSelectedStandardAnswerId(undefined);
     } finally {
       setSaving(false);
     }
@@ -173,7 +226,7 @@ export default function AnswerQuestionModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {question?.status === 'answered' ? 'Editar Resposta' : 'Responder Pergunta'}
@@ -194,8 +247,121 @@ export default function AnswerQuestionModal({
             </div>
           </div>
 
-          {/* Botão para gerar sugestão */}
-          {!suggestion && showSuggestion && (
+          {/* Answer Type Selection */}
+          <div className="space-y-2">
+            <Label>Tipo de Resposta</Label>
+            <RadioGroup value={answerType} onValueChange={(value: 'new' | 'standard') => {
+              setAnswerType(value);
+              if (value === 'standard') {
+                setSuggestion(null);
+                setShowSuggestion(false);
+              } else {
+                setShowSuggestion(true);
+              }
+            }}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="new" id="new" />
+                <Label htmlFor="new" className="cursor-pointer">Criar Nova Resposta</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="standard" id="standard" />
+                <Label htmlFor="standard" className="cursor-pointer">Usar Resposta Padrão Existente</Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          {/* Standard Answer Selection */}
+          {answerType === 'standard' && (
+            <div className="space-y-3">
+              <Label htmlFor="standard-answer">Selecione uma Resposta Padrão</Label>
+              <Select
+                value={selectedStandardAnswerId}
+                onValueChange={(value) => {
+                  setSelectedStandardAnswerId(value);
+                  const standardAnswer = standardAnswers.find(a => a.id === value);
+                  if (standardAnswer) {
+                    // Load related content from standard answer
+                    if (standardAnswer.related_lesson_id) {
+                      setSelectedType('lesson');
+                      setSelectedLessonId(standardAnswer.related_lesson_id);
+                      setSelectedCourseId(undefined);
+                      setSelectedModuleId(undefined);
+                    } else if (standardAnswer.related_module_id) {
+                      setSelectedType('module');
+                      setSelectedModuleId(standardAnswer.related_module_id);
+                      setSelectedCourseId(undefined);
+                      setSelectedLessonId(undefined);
+                    } else if (standardAnswer.related_course_id) {
+                      setSelectedType('course');
+                      setSelectedCourseId(standardAnswer.related_course_id);
+                      setSelectedModuleId(undefined);
+                      setSelectedLessonId(undefined);
+                    } else {
+                      setSelectedType('none');
+                      setSelectedCourseId(undefined);
+                      setSelectedModuleId(undefined);
+                      setSelectedLessonId(undefined);
+                    }
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Buscar resposta padrão..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {standardAnswers.filter(a => a.active).map((stdAnswer) => (
+                    <SelectItem key={stdAnswer.id} value={stdAnswer.id}>
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="h-4 w-4" />
+                        <span>{stdAnswer.name}</span>
+                        <Badge variant="secondary" className="text-xs ml-2">
+                          {stdAnswer.usage_count}x
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {selectedStandardAnswerId && (() => {
+                const selected = standardAnswers.find(a => a.id === selectedStandardAnswerId);
+                if (!selected) return null;
+                
+                return (
+                  <Card className="bg-muted/50">
+                    <CardContent className="pt-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium flex items-center gap-2">
+                          <BookOpen className="h-4 w-4" />
+                          Preview: {selected.name}
+                        </h4>
+                        <Badge variant="secondary">{selected.usage_count}x usado</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                        {selected.answer}
+                      </p>
+                      {selected.button_text && (
+                        <div className="text-sm">
+                          <strong>Botão:</strong> "{selected.button_text}" → {selected.button_link}
+                        </div>
+                      )}
+                      {(selected.related_course_id || selected.related_module_id || selected.related_lesson_id) && (
+                        <div className="text-sm">
+                          <strong>Conteúdo:</strong>{' '}
+                          {selected.related_lesson_id && lessons?.find(l => l.lesson_id === selected.related_lesson_id)?.lesson_title}
+                          {selected.related_module_id && modules?.find(m => m.module_id === selected.related_module_id)?.module_title}
+                          {selected.related_course_id && courses?.find(c => c.course_id === selected.related_course_id)?.course_title}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* AI Suggestion Section (only for new answers) */}
+          {answerType === 'new' && !suggestion && showSuggestion && (
             <Button
               type="button"
               variant="outline"
@@ -217,194 +383,118 @@ export default function AnswerQuestionModal({
             </Button>
           )}
 
-          {/* Sugestão da IA */}
-          {showSuggestion && suggestion && (
+          {answerType === 'new' && showSuggestion && suggestion && (
             <div className="space-y-3">
-              {suggestionError && (
-                <div className="rounded-lg border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/20 p-4">
-                  <div className="text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-1">
-                    ⚠️ Função de IA temporariamente indisponível
+              <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                      💡 Resposta Sugerida pela IA
+                    </span>
                   </div>
-                  <div className="text-xs text-yellow-700 dark:text-yellow-300 mb-3">
-                    A sugestão automática não está disponível no momento. Você pode escrever a resposta manualmente abaixo ou tentar novamente.
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={generateNewSuggestion}
-                      className="gap-1"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      Tentar Novamente
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={writeFromScratch}
-                      className="gap-1"
-                    >
-                      Escrever Manualmente
-                    </Button>
-                  </div>
+                  <Badge className={getConfidenceBadge(suggestion.confidence).className}>
+                    {getConfidenceBadge(suggestion.confidence).label}
+                  </Badge>
                 </div>
-              )}
 
-              {(
-                <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                        💡 Resposta Sugerida pela IA
-                      </span>
-                    </div>
-                    <Badge className={getConfidenceBadge(suggestion.confidence).className}>
-                      {getConfidenceBadge(suggestion.confidence).label}
-                    </Badge>
+                <div className="bg-white dark:bg-gray-900 rounded-md p-3 text-sm text-foreground whitespace-pre-wrap">
+                  {suggestion.suggestedAnswer}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" onClick={useSuggestion} className="gap-1">
+                    <Check className="h-3 w-3" />
+                    Usar Esta Sugestão
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={editSuggestion} className="gap-1">
+                    <Edit3 className="h-3 w-3" />
+                    Editar e Usar
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={generateNewSuggestion} className="gap-1">
+                    <RefreshCw className="h-3 w-3" />
+                    Gerar Nova
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={writeFromScratch} className="gap-1 text-muted-foreground">
+                    <X className="h-3 w-3" />
+                    Escrever do Zero
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Answer Input Section (only for new answers) */}
+          {answerType === 'new' && !showSuggestion && (
+            <div>
+              <Label htmlFor="answer">Sua Resposta Final *</Label>
+              <Textarea
+                id="answer"
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                placeholder="Digite a resposta que a IA deve usar para esta pergunta..."
+                className="min-h-[200px] mt-2"
+              />
+            </div>
+          )}
+
+          {/* Button Builder (only for new answers) */}
+          {answerType === 'new' && (
+            <div className="space-y-3 border rounded-lg p-4 bg-muted/30">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="button-enabled"
+                  checked={buttonEnabled}
+                  onChange={(e) => setButtonEnabled(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="button-enabled" className="cursor-pointer font-medium">
+                  ➕ Adicionar botão na resposta
+                </Label>
+              </div>
+
+              {buttonEnabled && (
+                <div className="space-y-3 pl-6">
+                  <div>
+                    <Label htmlFor="button-text">🔘 Texto do Botão</Label>
+                    <Input
+                      id="button-text"
+                      value={buttonText}
+                      onChange={(e) => setButtonText(e.target.value)}
+                      placeholder="Ver Produto, Acessar Curso, etc..."
+                      className="mt-2"
+                    />
                   </div>
 
-                  {suggestion.confidence === 'medium' && (
-                    <div className="text-xs text-yellow-700 dark:text-yellow-300 bg-yellow-100/50 dark:bg-yellow-950/30 rounded p-2">
-                      ⚠️ Revise a resposta antes de usar
+                  <div>
+                    <Label htmlFor="button-link">🔗 Link do Botão</Label>
+                    <Input
+                      id="button-link"
+                      value={buttonLink}
+                      onChange={(e) => setButtonLink(e.target.value)}
+                      placeholder="/produto/123, https://exemplo.com, etc..."
+                      className="mt-2"
+                    />
+                  </div>
+
+                  {buttonText.trim() && buttonLink.trim() && (
+                    <div className="mt-3 p-3 bg-white dark:bg-gray-900 rounded-md border">
+                      <p className="text-xs text-muted-foreground mb-2">📱 Preview:</p>
+                      <div className="space-y-2">
+                        <p className="text-sm">{answer || 'Sua resposta aparecerá aqui...'}</p>
+                        <Button size="sm" className="w-full">
+                          {buttonText}
+                        </Button>
+                      </div>
                     </div>
                   )}
-
-                  <div className="bg-white dark:bg-gray-900 rounded-md p-3 text-sm text-foreground whitespace-pre-wrap">
-                    {suggestion.suggestedAnswer}
-                  </div>
-
-                  {suggestion.relatedContent && (
-                    <div className="text-xs text-blue-700 dark:text-blue-300 bg-blue-100/50 dark:bg-blue-950/50 rounded p-2">
-                      📚 Conteúdo sugerido: {suggestion.relatedContent.type === 'course' ? 'Curso' : suggestion.relatedContent.type === 'module' ? 'Módulo' : 'Aula'} "{suggestion.relatedContent.title}"
-                    </div>
-                  )}
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={useSuggestion}
-                      className="gap-1"
-                    >
-                      <Check className="h-3 w-3" />
-                      Usar Esta Sugestão
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={editSuggestion}
-                      className="gap-1"
-                    >
-                      <Edit3 className="h-3 w-3" />
-                      Editar e Usar
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={generateNewSuggestion}
-                      className="gap-1"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      Gerar Nova
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={writeFromScratch}
-                      className="gap-1 text-muted-foreground"
-                    >
-                      <X className="h-3 w-3" />
-                      Escrever do Zero
-                    </Button>
-                  </div>
                 </div>
               )}
             </div>
           )}
 
-          <div>
-            <Label htmlFor="answer">
-              Sua Resposta Final *
-              {suggestion && !showSuggestion && (
-                <Badge variant="outline" className="ml-2 text-xs">
-                  ✅ Usando sugestão da IA (editável)
-                </Badge>
-              )}
-            </Label>
-            <Textarea
-              id="answer"
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              placeholder="Digite a resposta que a IA deve usar para esta pergunta..."
-              className="min-h-[200px] mt-2"
-            />
-            <p className="text-xs text-muted-foreground mt-2">
-              Esta resposta será automaticamente copiada para a base de conhecimento e 
-              a IA a usará sempre que encontrar esta pergunta novamente.
-            </p>
-          </div>
-
-          {/* Sistema de Botões Personalizados */}
-          <div className="space-y-3 border rounded-lg p-4 bg-muted/30">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="button-enabled"
-                checked={buttonEnabled}
-                onChange={(e) => setButtonEnabled(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              <Label htmlFor="button-enabled" className="cursor-pointer font-medium">
-                ➕ Adicionar botão na resposta
-              </Label>
-            </div>
-
-            {buttonEnabled && (
-              <div className="space-y-3 pl-6">
-                <div>
-                  <Label htmlFor="button-text">🔘 Texto do Botão</Label>
-                  <Input
-                    id="button-text"
-                    value={buttonText}
-                    onChange={(e) => setButtonText(e.target.value)}
-                    placeholder="Ver Produto, Acessar Curso, etc..."
-                    className="mt-2"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="button-link">🔗 Link do Botão</Label>
-                  <Input
-                    id="button-link"
-                    value={buttonLink}
-                    onChange={(e) => setButtonLink(e.target.value)}
-                    placeholder="/produto/123, https://exemplo.com, etc..."
-                    className="mt-2"
-                  />
-                </div>
-
-                {/* Preview do botão */}
-                {buttonText.trim() && buttonLink.trim() && (
-                  <div className="mt-3 p-3 bg-white dark:bg-gray-900 rounded-md border">
-                    <p className="text-xs text-muted-foreground mb-2">📱 Preview:</p>
-                    <div className="space-y-2">
-                      <p className="text-sm">{answer || 'Sua resposta aparecerá aqui...'}</p>
-                      <Button size="sm" className="w-full">
-                        {buttonText}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
+          {/* Related Content */}
           <div>
             <Label htmlFor="content-type">Conteúdo Relacionado (Opcional)</Label>
             
@@ -459,7 +549,7 @@ export default function AnswerQuestionModal({
                 <SelectContent>
                   {modules?.map(module => (
                     <SelectItem key={module.module_id} value={module.module_id}>
-                      {module.course_title} › {module.module_title}
+                      {module.module_title}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -469,40 +559,40 @@ export default function AnswerQuestionModal({
             {selectedType === 'lesson' && (
               <Select 
                 value={selectedLessonId} 
-                onValueChange={setSelectedLessonId}
+                onValueChange={setSelectedLessonId} 
                 disabled={loadingLessons}
               >
                 <SelectTrigger className="mt-2">
                   <SelectValue placeholder="Selecione uma aula" />
                 </SelectTrigger>
                 <SelectContent>
-                  {lessons?.map((lesson) => (
+                  {lessons?.map(lesson => (
                     <SelectItem key={lesson.lesson_id} value={lesson.lesson_id}>
-                      {lesson.course_title} › {lesson.module_title} › {lesson.lesson_title}
+                      {lesson.lesson_title}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             )}
-
-            <p className="text-xs text-muted-foreground mt-2">
-              {selectedType === 'course' && 'A IA enviará um botão para acessar o curso completo'}
-              {selectedType === 'module' && 'A IA enviará um botão para acessar o módulo'}
-              {selectedType === 'lesson' && 'A IA enviará um botão para acessar esta aula'}
-              {selectedType === 'none' && 'Nenhum botão será enviado'}
-            </p>
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+        <DialogFooter className="gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>
             Cancelar
           </Button>
           <Button 
             onClick={handleSave} 
-            disabled={!answer.trim() || saving}
+            disabled={saving || (answerType === 'new' && !answer.trim()) || (answerType === 'standard' && !selectedStandardAnswerId)}
           >
-            {saving ? 'Salvando...' : 'Salvar Resposta Válida'}
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              'Salvar Resposta'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

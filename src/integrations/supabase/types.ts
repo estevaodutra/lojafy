@@ -161,6 +161,7 @@ export type Database = {
           related_lesson_id: string | null
           related_module_id: string | null
           similar_questions: Json | null
+          standard_answer_id: string | null
           status: string
           ticket_id: string | null
           updated_at: string | null
@@ -181,6 +182,7 @@ export type Database = {
           related_lesson_id?: string | null
           related_module_id?: string | null
           similar_questions?: Json | null
+          standard_answer_id?: string | null
           status?: string
           ticket_id?: string | null
           updated_at?: string | null
@@ -201,6 +203,7 @@ export type Database = {
           related_lesson_id?: string | null
           related_module_id?: string | null
           similar_questions?: Json | null
+          standard_answer_id?: string | null
           status?: string
           ticket_id?: string | null
           updated_at?: string | null
@@ -229,10 +232,90 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ai_pending_questions_standard_answer_id_fkey"
+            columns: ["standard_answer_id"]
+            isOneToOne: false
+            referencedRelation: "ai_standard_answers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ai_pending_questions_ticket_id_fkey"
             columns: ["ticket_id"]
             isOneToOne: false
             referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_standard_answers: {
+        Row: {
+          active: boolean | null
+          answer: string
+          button_link: string | null
+          button_text: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          keywords: string[] | null
+          name: string
+          related_course_id: string | null
+          related_lesson_id: string | null
+          related_module_id: string | null
+          updated_at: string | null
+          usage_count: number | null
+        }
+        Insert: {
+          active?: boolean | null
+          answer: string
+          button_link?: string | null
+          button_text?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          keywords?: string[] | null
+          name: string
+          related_course_id?: string | null
+          related_lesson_id?: string | null
+          related_module_id?: string | null
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Update: {
+          active?: boolean | null
+          answer?: string
+          button_link?: string | null
+          button_text?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          keywords?: string[] | null
+          name?: string
+          related_course_id?: string | null
+          related_lesson_id?: string | null
+          related_module_id?: string | null
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_standard_answers_related_course_id_fkey"
+            columns: ["related_course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_standard_answers_related_lesson_id_fkey"
+            columns: ["related_lesson_id"]
+            isOneToOne: false
+            referencedRelation: "course_lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_standard_answers_related_module_id_fkey"
+            columns: ["related_module_id"]
+            isOneToOne: false
+            referencedRelation: "course_modules"
             referencedColumns: ["id"]
           },
         ]

@@ -50,7 +50,8 @@ export const usePendingQuestions = () => {
   const answerQuestion = async (
     id: string, 
     answer: string, 
-    relatedContent?: { type: 'course' | 'module' | 'lesson'; id: string }
+    relatedContent?: { type: 'course' | 'module' | 'lesson'; id: string },
+    standardAnswerId?: string
   ) => {
     try {
       const question = questions.find(q => q.id === id);
@@ -62,6 +63,7 @@ export const usePendingQuestions = () => {
         status: 'answered',
         answered_at: new Date().toISOString(),
         answered_by: user?.id,
+        standard_answer_id: standardAnswerId || null,
         related_course_id: null,
         related_module_id: null,
         related_lesson_id: null,
@@ -74,6 +76,22 @@ export const usePendingQuestions = () => {
           updateData.related_module_id = relatedContent.id;
         } else if (relatedContent.type === 'lesson') {
           updateData.related_lesson_id = relatedContent.id;
+        }
+      }
+      
+      // Increment usage count if standard answer is used
+      if (standardAnswerId) {
+        const { data: standardAnswer } = await supabase
+          .from('ai_standard_answers')
+          .select('usage_count')
+          .eq('id', standardAnswerId)
+          .single();
+
+        if (standardAnswer) {
+          await supabase
+            .from('ai_standard_answers')
+            .update({ usage_count: standardAnswer.usage_count + 1 })
+            .eq('id', standardAnswerId);
         }
       }
 

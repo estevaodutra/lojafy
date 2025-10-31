@@ -18,6 +18,7 @@ import { TicketList } from '@/components/admin/TicketList';
 import { TicketChatView } from '@/components/admin/TicketChatView';
 import PendingQuestionsTab from '@/components/admin/PendingQuestionsTab';
 import { SupportTicket } from '@/hooks/useSupportTickets';
+import StandardAnswersTab from '@/components/admin/StandardAnswersTab';
 
 export default function SupportManagement() {
   const { knowledge, config, loading, createKnowledge, updateKnowledge, deleteKnowledge, updateConfig, refetch } = useKnowledgeBase();
@@ -391,7 +392,7 @@ export default function SupportManagement() {
       </div>
 
       <Tabs defaultValue="customers" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 max-w-4xl">
+        <TabsList className="grid w-full grid-cols-6 max-w-5xl">
           <TabsTrigger value="customers">
             <Users className="h-4 w-4 mr-2" />
             Clientes
@@ -408,6 +409,10 @@ export default function SupportManagement() {
                 {pendingCount}
               </Badge>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="standard-answers">
+            <BookOpen className="h-4 w-4 mr-2" />
+            Respostas
           </TabsTrigger>
           <TabsTrigger value="chat">
             <MessageSquare className="h-4 w-4 mr-2" />
@@ -434,6 +439,11 @@ export default function SupportManagement() {
         {/* Tab: Perguntas Pendentes */}
         <TabsContent value="pending" className="space-y-6">
           <PendingQuestionsTab />
+        </TabsContent>
+
+        {/* Tab: Respostas Padrão */}
+        <TabsContent value="standard-answers" className="space-y-6">
+          <StandardAnswersTab />
         </TabsContent>
 
         {/* Tab: Chat */}
