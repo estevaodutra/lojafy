@@ -18,6 +18,8 @@ export interface StandardAnswer {
   created_at: string;
   updated_at: string;
   attachments?: any[];
+  auto_trigger_enabled?: boolean;
+  trigger_keywords?: string[];
 }
 
 export const useStandardAnswers = () => {

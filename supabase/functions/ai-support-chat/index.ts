@@ -74,6 +74,43 @@ function processAnswerWithButton(answer: string) {
   return { text: answer, button: null };
 }
 
+/**
+ * Busca e verifica respostas com auto-trigger habilitado
+ */
+async function findAutoTriggerMatch(
+  supabase: any,
+  message: string
+): Promise<any | null> {
+  const lowerMessage = message.toLowerCase();
+  
+  // Buscar respostas com auto-trigger ativo
+  const { data: autoTriggers, error } = await supabase
+    .from('ai_standard_answers')
+    .select('id, name, answer, button_text, button_link, attachments, trigger_keywords')
+    .eq('active', true)
+    .eq('auto_trigger_enabled', true);
+  
+  if (error || !autoTriggers || autoTriggers.length === 0) {
+    return null;
+  }
+  
+  // Verificar se a mensagem contém alguma palavra-chave
+  for (const trigger of autoTriggers) {
+    if (!trigger.trigger_keywords || trigger.trigger_keywords.length === 0) continue;
+    
+    const hasKeyword = trigger.trigger_keywords.some(
+      (kw: string) => lowerMessage.includes(kw.toLowerCase())
+    );
+    
+    if (hasKeyword) {
+      console.log(`✅ Auto-trigger match found: "${trigger.name}"`);
+      return trigger;
+    }
+  }
+  
+  return null;
+}
+
 // Generate contextualized question based on conversation history
 async function generateContextualizedQuestion(
   supabase: any,
@@ -288,6 +325,97 @@ serve(async (req) => {
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
+    }
+
+    // 🆕 DETECÇÃO AUTOMÁTICA: Respostas com auto-trigger
+    console.log('🔍 Verificando respostas com auto-trigger...');
+    const autoTriggerAnswer = await findAutoTriggerMatch(supabase, message);
+    
+    if (autoTriggerAnswer) {
+      console.log(`✅ Auto-trigger detectado: "${autoTriggerAnswer.name}"`);
+      
+      // Processar resposta com botão se houver
+      const { text: answerText, button: customButton } = processAnswerWithButton(autoTriggerAnswer.answer);
+      let finalMessage = answerText;
+      
+      // Adicionar botão customizado se existir
+      if (customButton) {
+        finalMessage = `${answerText}\n\n[BUTTON:${customButton.text}:${customButton.url}]`;
+      } else if (autoTriggerAnswer.button_text && autoTriggerAnswer.button_link) {
+        finalMessage += `\n\n[BUTTON:${autoTriggerAnswer.button_text}:${autoTriggerAnswer.button_link}]`;
+      }
+      
+      // Adicionar imagens anexadas se houver
+      if (autoTriggerAnswer.attachments && Array.isArray(autoTriggerAnswer.attachments) && autoTriggerAnswer.attachments.length > 0) {
+        finalMessage += '\n\n';
+        autoTriggerAnswer.attachments.forEach((att: any) => {
+          if (att.url) {
+            finalMessage += `\n![${att.name || 'Imagem'}](${att.url})`;
+          }
+        });
+      }
+      
+      // Salvar resposta no chat
+      await supabase.from('chat_messages').insert({
+        ticket_id: ticketId,
+        sender_type: 'ai',
+        sender_id: null,
+        content: finalMessage,
+        metadata: { 
+          standard_answer_id: autoTriggerAnswer.id,
+          auto_triggered: true,
+          trigger_name: autoTriggerAnswer.name,
+          keywords_matched: autoTriggerAnswer.trigger_keywords.filter(
+            (kw: string) => message.toLowerCase().includes(kw.toLowerCase())
+          )
+        }
+      });
+      
+      // Incrementar contador de uso
+      await supabase
+        .from('ai_standard_answers')
+        .update({ usage_count: supabase.sql`usage_count + 1` })
+        .eq('id', autoTriggerAnswer.id);
+      
+      // Detectar categoria e atualizar tags
+      const category = detectCategory(message);
+      const { data: existingTicket } = await supabase
+        .from('support_tickets')
+        .select('tags')
+        .eq('id', ticketId)
+        .single();
+      
+      const currentTags = existingTicket?.tags || [];
+      if (category !== 'outros' && !currentTags.includes(category)) {
+        await supabase
+          .from('support_tickets')
+          .update({ tags: [...currentTags, category] })
+          .eq('id', ticketId);
+      }
+      
+      // Atualizar ticket
+      await supabase
+        .from('support_tickets')
+        .update({
+          last_message: autoTriggerAnswer.answer.substring(0, 200),
+          last_message_at: new Date().toISOString(),
+          status: 'waiting_customer',
+          updated_at: new Date().toISOString(),
+          ai_handled: true
+        })
+        .eq('id', ticketId);
+      
+      console.log('✅ Resposta auto-trigger enviada com sucesso!');
+      
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'Resposta automática enviada',
+          autoTriggered: true,
+          triggerName: autoTriggerAnswer.name
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // 🆕 Validação Pré-IA: Detectar perguntas vagas

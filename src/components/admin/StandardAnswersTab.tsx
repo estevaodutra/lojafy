@@ -34,12 +34,19 @@ export default function StandardAnswersTab() {
     related_module_id: undefined as string | undefined,
     related_lesson_id: undefined as string | undefined,
     attachments: [] as any[],
+    auto_trigger_enabled: false,
+    trigger_keywords: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const keywordsArray = formData.keywords
+      .split(',')
+      .map(k => k.trim())
+      .filter(k => k);
+
+    const triggerKeywordsArray = formData.trigger_keywords
       .split(',')
       .map(k => k.trim())
       .filter(k => k);
@@ -55,6 +62,8 @@ export default function StandardAnswersTab() {
       related_module_id: formData.selectedType === 'module' ? formData.related_module_id : undefined,
       related_lesson_id: formData.selectedType === 'lesson' ? formData.related_lesson_id : undefined,
       attachments: formData.attachments,
+      auto_trigger_enabled: formData.auto_trigger_enabled,
+      trigger_keywords: triggerKeywordsArray,
     };
 
     try {
@@ -78,6 +87,8 @@ export default function StandardAnswersTab() {
         related_module_id: undefined,
         related_lesson_id: undefined,
         attachments: [],
+        auto_trigger_enabled: false,
+        trigger_keywords: '',
       });
     } catch (error) {
       // Error already handled in hook
@@ -104,6 +115,8 @@ export default function StandardAnswersTab() {
       related_module_id: item.related_module_id,
       related_lesson_id: item.related_lesson_id,
       attachments: item.attachments || [],
+      auto_trigger_enabled: item.auto_trigger_enabled || false,
+      trigger_keywords: (item.trigger_keywords || []).join(', '),
     });
   };
 
@@ -125,6 +138,8 @@ export default function StandardAnswersTab() {
       related_module_id: undefined,
       related_lesson_id: undefined,
       attachments: [],
+      auto_trigger_enabled: false,
+      trigger_keywords: '',
     });
   };
 
@@ -308,6 +323,44 @@ export default function StandardAnswersTab() {
               />
             </div>
 
+            <div className="border-t pt-4 space-y-4">
+              <div className="flex items-center gap-3">
+                <Switch
+                  id="auto-trigger"
+                  checked={formData.auto_trigger_enabled}
+                  onCheckedChange={(checked) => setFormData({ ...formData, auto_trigger_enabled: checked })}
+                />
+                <div className="flex-1">
+                  <Label htmlFor="auto-trigger" className="text-base font-semibold">
+                    🤖 Resposta Automática (Auto-Trigger)
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Quando ativado, esta resposta será enviada automaticamente quando o cliente usar as palavras-chave de gatilho, sem precisar da IA
+                  </p>
+                </div>
+              </div>
+
+              {formData.auto_trigger_enabled && (
+                <div className="ml-11 space-y-2">
+                  <Label htmlFor="trigger_keywords">
+                    Palavras-chave de Gatilho (separadas por vírgula) *
+                  </Label>
+                  <Textarea
+                    id="trigger_keywords"
+                    value={formData.trigger_keywords}
+                    onChange={(e) => setFormData({ ...formData, trigger_keywords: e.target.value })}
+                    placeholder="cor, cores, preço, valor, estoque, disponível, tamanho, foto, catálogo"
+                    rows={3}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    💡 Quando o cliente mencionar qualquer uma dessas palavras, esta resposta será enviada automaticamente. 
+                    Exemplo: se você colocar "preço, valor, quanto", sempre que alguém perguntar "quanto custa?" a resposta será automática.
+                  </p>
+                </div>
+              )}
+            </div>
+
             <div className="flex items-center gap-2">
               <Switch
                 id="active"
@@ -346,6 +399,7 @@ export default function StandardAnswersTab() {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>Resposta</TableHead>
+                <TableHead>Auto-Trigger</TableHead>
                 <TableHead>Conteúdo Relacionado</TableHead>
                 <TableHead>Anexos</TableHead>
                 <TableHead>Usado</TableHead>
@@ -356,8 +410,34 @@ export default function StandardAnswersTab() {
             <TableBody>
               {standardAnswers.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.name}</TableCell>
+                  <TableCell className="font-medium">
+                    {item.name}
+                    {item.auto_trigger_enabled && (
+                      <Badge variant="outline" className="ml-2 text-xs">
+                        🤖 Auto
+                      </Badge>
+                    )}
+                  </TableCell>
                   <TableCell className="max-w-xs truncate">{item.answer}</TableCell>
+                  <TableCell>
+                    {item.auto_trigger_enabled ? (
+                      <div className="space-y-1">
+                        <Badge variant="default" className="bg-green-600">
+                          ✓ Ativo
+                        </Badge>
+                        {item.trigger_keywords && item.trigger_keywords.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {item.trigger_keywords.slice(0, 3).join(', ')}
+                            {item.trigger_keywords.length > 3 && ` +${item.trigger_keywords.length - 3}`}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <Badge variant="secondary" className="text-xs">
+                        Manual
+                      </Badge>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs">
                       <GraduationCap className="h-3 w-3 mr-1" />

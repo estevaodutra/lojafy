@@ -258,6 +258,7 @@ export type Database = {
           active: boolean | null
           answer: string
           attachments: Json | null
+          auto_trigger_enabled: boolean | null
           button_link: string | null
           button_text: string | null
           created_at: string | null
@@ -268,6 +269,7 @@ export type Database = {
           related_course_id: string | null
           related_lesson_id: string | null
           related_module_id: string | null
+          trigger_keywords: string[] | null
           updated_at: string | null
           usage_count: number | null
         }
@@ -275,6 +277,7 @@ export type Database = {
           active?: boolean | null
           answer: string
           attachments?: Json | null
+          auto_trigger_enabled?: boolean | null
           button_link?: string | null
           button_text?: string | null
           created_at?: string | null
@@ -285,6 +288,7 @@ export type Database = {
           related_course_id?: string | null
           related_lesson_id?: string | null
           related_module_id?: string | null
+          trigger_keywords?: string[] | null
           updated_at?: string | null
           usage_count?: number | null
         }
@@ -292,6 +296,7 @@ export type Database = {
           active?: boolean | null
           answer?: string
           attachments?: Json | null
+          auto_trigger_enabled?: boolean | null
           button_link?: string | null
           button_text?: string | null
           created_at?: string | null
@@ -302,6 +307,7 @@ export type Database = {
           related_course_id?: string | null
           related_lesson_id?: string | null
           related_module_id?: string | null
+          trigger_keywords?: string[] | null
           updated_at?: string | null
           usage_count?: number | null
         }
