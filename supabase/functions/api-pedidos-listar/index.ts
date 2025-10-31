@@ -240,12 +240,14 @@ Deno.serve(async (req) => {
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
     const page = Math.max(parseInt(url.searchParams.get('page') || '1'), 1);
     const status = url.searchParams.get('status');
+    const paymentStatus = url.searchParams.get('payment_status');
 
     console.log('[api-pedidos-listar] Request received', {
       period,
       limit,
       page,
       status,
+      paymentStatus,
       apiKeyUserId: apiKeyData.user_id
     });
 
@@ -276,6 +278,10 @@ Deno.serve(async (req) => {
 
     if (status) {
       query = query.eq('status', status);
+    }
+
+    if (paymentStatus) {
+      query = query.eq('payment_status', paymentStatus);
     }
 
     const { data: ordersData, error: ordersError, count } = await query
@@ -408,7 +414,11 @@ Deno.serve(async (req) => {
           hasNext: page < totalPages,
           hasPrev: page > 1
         },
-        period
+        period,
+        filters: {
+          status: status || null,
+          payment_status: paymentStatus || null
+        }
       }),
       { 
         status: 200, 
