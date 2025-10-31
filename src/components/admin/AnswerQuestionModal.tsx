@@ -157,7 +157,6 @@ export default function AnswerQuestionModal({
 
   const writeFromScratch = () => {
     setSuggestion(null);
-    setShowSuggestion(false);
     setAnswer('');
   };
 
@@ -361,7 +360,7 @@ export default function AnswerQuestionModal({
           )}
 
           {/* AI Suggestion Section (only for new answers) */}
-          {answerType === 'new' && !suggestion && showSuggestion && (
+          {answerType === 'new' && !suggestion && (
             <Button
               type="button"
               variant="outline"
@@ -425,7 +424,7 @@ export default function AnswerQuestionModal({
           )}
 
           {/* Answer Input Section (only for new answers) */}
-          {answerType === 'new' && !showSuggestion && (
+          {answerType === 'new' && (
             <div>
               <Label htmlFor="answer">Sua Resposta Final *</Label>
               <Textarea
