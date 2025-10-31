@@ -22,6 +22,7 @@ export interface PendingQuestion {
   related_lesson_id: string | null;
   related_module_id: string | null;
   related_course_id: string | null;
+  attachments?: any[];
 }
 
 export const usePendingQuestions = () => {

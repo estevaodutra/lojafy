@@ -15,6 +15,7 @@ import { useAllCourses } from '@/hooks/useAllCourses';
 import { useAllModules } from '@/hooks/useAllModules';
 import { useSuggestAnswer, SuggestionResponse } from '@/hooks/useSuggestAnswer';
 import { useStandardAnswers } from '@/hooks/useStandardAnswers';
+import { AnswerImageUpload } from './AnswerImageUpload';
 
 interface AnswerQuestionModalProps {
   question: PendingQuestion | null;
@@ -27,7 +28,8 @@ interface AnswerQuestionModalProps {
       type: 'course' | 'module' | 'lesson';
       id: string;
     },
-    standardAnswerId?: string
+    standardAnswerId?: string,
+    attachments?: any[]
   ) => Promise<void>;
 }
 
@@ -50,6 +52,7 @@ export default function AnswerQuestionModal({
   const [buttonEnabled, setButtonEnabled] = useState(false);
   const [buttonText, setButtonText] = useState('');
   const [buttonLink, setButtonLink] = useState('');
+  const [attachments, setAttachments] = useState<any[]>([]);
   
   const { data: courses, isLoading: loadingCourses } = useAllCourses();
   const { data: modules, isLoading: loadingModules } = useAllModules();
@@ -74,7 +77,10 @@ export default function AnswerQuestionModal({
         setButtonLink('');
       }
 
-      // ✅ CORREÇÃO: Carregar conteúdo relacionado existente
+      // Load existing attachments
+      setAttachments(question.attachments || []);
+
+      // Load related content
       if (question.related_lesson_id) {
         setSelectedType('lesson');
         setSelectedLessonId(question.related_lesson_id);
@@ -110,6 +116,7 @@ export default function AnswerQuestionModal({
       setSelectedCourseId(undefined);
       setSelectedModuleId(undefined);
       setSelectedLessonId(undefined);
+      setAttachments([]);
     }
   }, [question]);
 
@@ -120,7 +127,6 @@ export default function AnswerQuestionModal({
     if (result) {
       setSuggestion(result);
       
-      // Pré-selecionar conteúdo relacionado se a IA sugerir
       if (result.relatedContent) {
         setSelectedType(result.relatedContent.type);
         if (result.relatedContent.type === 'course') {
@@ -204,7 +210,7 @@ export default function AnswerQuestionModal({
         relatedContent = { type: 'lesson' as const, id: selectedLessonId };
       }
       
-      await onSave(question.id, finalAnswer, relatedContent, standardAnswerId);
+      await onSave(question.id, finalAnswer, relatedContent, standardAnswerId, attachments);
       onClose();
       
       // Reset form
@@ -218,6 +224,7 @@ export default function AnswerQuestionModal({
       setButtonLink('');
       setAnswerType('new');
       setSelectedStandardAnswerId(undefined);
+      setAttachments([]);
     } finally {
       setSaving(false);
     }
@@ -420,6 +427,19 @@ export default function AnswerQuestionModal({
                   </Button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Image Upload (only for new answers) */}
+          {answerType === 'new' && (
+            <div className="space-y-2">
+              <Label>📎 Anexar Imagens (opcional)</Label>
+              <AnswerImageUpload
+                attachments={attachments}
+                onUpload={setAttachments}
+                maxFiles={5}
+                maxSize={5 * 1024 * 1024}
+              />
             </div>
           )}
 

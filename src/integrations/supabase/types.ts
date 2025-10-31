@@ -65,6 +65,7 @@ export type Database = {
       ai_knowledge_base: {
         Row: {
           active: boolean | null
+          attachments: Json | null
           category: Database["public"]["Enums"]["knowledge_category"]
           content: string
           created_at: string | null
@@ -82,6 +83,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean | null
+          attachments?: Json | null
           category: Database["public"]["Enums"]["knowledge_category"]
           content: string
           created_at?: string | null
@@ -99,6 +101,7 @@ export type Database = {
         }
         Update: {
           active?: boolean | null
+          attachments?: Json | null
           category?: Database["public"]["Enums"]["knowledge_category"]
           content?: string
           created_at?: string | null
@@ -151,6 +154,7 @@ export type Database = {
           answered_at: string | null
           answered_by: string | null
           asked_count: number | null
+          attachments: Json | null
           created_at: string | null
           first_asked_at: string | null
           id: string
@@ -172,6 +176,7 @@ export type Database = {
           answered_at?: string | null
           answered_by?: string | null
           asked_count?: number | null
+          attachments?: Json | null
           created_at?: string | null
           first_asked_at?: string | null
           id?: string
@@ -193,6 +198,7 @@ export type Database = {
           answered_at?: string | null
           answered_by?: string | null
           asked_count?: number | null
+          attachments?: Json | null
           created_at?: string | null
           first_asked_at?: string | null
           id?: string
@@ -251,6 +257,7 @@ export type Database = {
         Row: {
           active: boolean | null
           answer: string
+          attachments: Json | null
           button_link: string | null
           button_text: string | null
           created_at: string | null
@@ -267,6 +274,7 @@ export type Database = {
         Insert: {
           active?: boolean | null
           answer: string
+          attachments?: Json | null
           button_link?: string | null
           button_text?: string | null
           created_at?: string | null
@@ -283,6 +291,7 @@ export type Database = {
         Update: {
           active?: boolean | null
           answer?: string
+          attachments?: Json | null
           button_link?: string | null
           button_text?: string | null
           created_at?: string | null

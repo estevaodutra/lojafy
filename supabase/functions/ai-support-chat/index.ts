@@ -401,6 +401,16 @@ serve(async (req) => {
           }
         }
         
+        // ✅ Add attachments if available
+        if (bestMatch.attachments && Array.isArray(bestMatch.attachments) && bestMatch.attachments.length > 0) {
+          finalMessage += '\n\n';
+          bestMatch.attachments.forEach((att: any) => {
+            if (att.url) {
+              finalMessage += `\n![${att.name || 'Imagem'}](${att.url})`;
+            }
+          });
+        }
+        
         await supabase.from('chat_messages').insert({
           ticket_id: ticketId,
           sender_type: 'ai',
