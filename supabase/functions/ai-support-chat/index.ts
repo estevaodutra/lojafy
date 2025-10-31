@@ -74,6 +74,97 @@ function processAnswerWithButton(answer: string) {
   return { text: answer, button: null };
 }
 
+// Generate contextualized question based on conversation history
+async function generateContextualizedQuestion(
+  supabase: any,
+  ticketId: string,
+  currentMessage: string
+): Promise<string> {
+  console.log('🔍 Gerando pergunta contextualizada...');
+  
+  // Fetch last 5 customer messages
+  const { data: recentMessages } = await supabase
+    .from('chat_messages')
+    .select('content, sender_type, created_at')
+    .eq('ticket_id', ticketId)
+    .eq('sender_type', 'customer')
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  if (!recentMessages || recentMessages.length === 0) {
+    console.log('⚠️ Sem histórico, usando mensagem atual');
+    return currentMessage;
+  }
+
+  // Build message history context
+  const messageHistory = recentMessages
+    .reverse() // Chronological order
+    .map((msg: any, idx: number) => `[${idx + 1}] Cliente: ${msg.content}`)
+    .join('\n');
+
+  // Prompt for AI to generate contextualized question
+  const contextPrompt = `Você é um assistente que analisa conversas de suporte e gera perguntas claras e contextualizadas.
+
+Analise o histórico da conversa abaixo e gere UMA ÚNICA PERGUNTA que resuma o problema ou necessidade do cliente de forma completa e contextualizada.
+
+HISTÓRICO DA CONVERSA:
+${messageHistory}
+
+INSTRUÇÕES:
+- Gere uma pergunta clara, objetiva e completa (máximo 150 caracteres)
+- Inclua o contexto necessário para que alguém entenda o problema sem ler toda a conversa
+- Mantenha o tom natural do cliente
+- Foque no problema principal, não em detalhes secundários
+- Se o cliente mencionou produto específico, inclua na pergunta
+- Se mencionou problema técnico (PIX, pagamento, acesso), especifique
+
+EXEMPLOS:
+- ❌ Ruim: "não esta gerando o pix"
+- ✅ Bom: "Cliente não consegue gerar PIX para comprar balança inteligente"
+
+- ❌ Ruim: "Nao tem opção la"
+- ✅ Bom: "Não aparece opção de débito Nubank no checkout"
+
+Retorne APENAS a pergunta contextualizada, sem explicações adicionais.`;
+
+  try {
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('LOVABLE_API_KEY')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: contextPrompt },
+          { role: 'user', content: 'Gere a pergunta contextualizada agora.' }
+        ],
+        max_tokens: 100  // Short question
+      })
+    });
+
+    if (!aiResponse.ok) {
+      console.error('❌ Erro ao gerar pergunta contextualizada, usando mensagem original');
+      return currentMessage;
+    }
+
+    const aiData = await aiResponse.json();
+    const contextualizedQuestion = aiData.choices?.[0]?.message?.content?.trim();
+
+    if (!contextualizedQuestion) {
+      console.warn('⚠️ IA não retornou pergunta, usando mensagem original');
+      return currentMessage;
+    }
+
+    console.log(`✅ Pergunta contextualizada: "${contextualizedQuestion}"`);
+    return contextualizedQuestion;
+  } catch (error) {
+    console.error('❌ Erro ao gerar pergunta contextualizada:', error);
+    return currentMessage;
+  }
+}
+
 function calculateSimilarity(text1: string, text2: string): number {
   const words1 = new Set(extractKeywords(text1));
   const words2 = new Set(extractKeywords(text2));
@@ -679,13 +770,25 @@ Sempre use Markdown para os links: [Texto](URL)
       .single();
 
     if (!existingPending && keywords.length > 0) {
-      console.log('Registering new pending question');
+      console.log('Registering new pending question with context...');
+      
+      // Generate contextualized question with AI
+      const contextualizedQuestion = await generateContextualizedQuestion(
+        supabase,
+        ticketId,
+        message
+      );
+      
       await supabase.from('ai_pending_questions').insert({
-        question: message,
+        question: contextualizedQuestion,
         status: 'pending',
         ticket_id: ticketId,
         user_role: userRole,
-        keywords: keywords
+        keywords: keywords,
+        metadata: {
+          original_message: message,
+          contextualized: true
+        }
       });
     } else if (existingPending) {
       await supabase
