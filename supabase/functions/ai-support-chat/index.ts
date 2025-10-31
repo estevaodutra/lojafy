@@ -54,6 +54,26 @@ function extractProductKeywords(text: string): string[] {
   return words.slice(0, 3);
 }
 
+function processAnswerWithButton(answer: string) {
+  const buttonRegex = /\[BUTTON:(.*?):(.*?)\]/;
+  const match = answer.match(buttonRegex);
+  
+  if (match) {
+    const [fullMatch, buttonText, buttonLink] = match;
+    const cleanAnswer = answer.replace(fullMatch, '').trim();
+    
+    return {
+      text: cleanAnswer,
+      button: {
+        text: buttonText,
+        url: buttonLink
+      }
+    };
+  }
+  
+  return { text: answer, button: null };
+}
+
 function calculateSimilarity(text1: string, text2: string): number {
   const words1 = new Set(extractKeywords(text1));
   const words2 = new Set(extractKeywords(text2));
@@ -257,28 +277,37 @@ serve(async (req) => {
       if (bestMatch && bestSimilarity > 0.7) {
         console.log(`Found matching answer with ${(bestSimilarity * 100).toFixed(1)}% similarity`);
         
-        let finalMessage = bestMatch.answer;
+        // Processar resposta com botão customizado se houver
+        const { text: answerText, button: customButton } = processAnswerWithButton(bestMatch.answer);
+        let finalMessage = answerText;
         
-        // ✅ Botão para CURSO
-        if (bestMatch.related_course) {
-          const course = bestMatch.related_course as any;
-          const courseUrl = `/customer/academy/course/${course.id}`;
-          finalMessage += `\n\n📚 **Curso Recomendado:** ${course.title}\n[Ver Curso Completo](${courseUrl})`;
+        // Se houver botão customizado, adicionar
+        if (customButton) {
+          finalMessage = `${answerText}\n\n[BUTTON:${customButton.text}:${customButton.url}]`;
         }
-        // ✅ Botão para MÓDULO
-        else if (bestMatch.related_module) {
-          const module = bestMatch.related_module as any;
-          const courseName = module.courses.title;
-          const moduleUrl = `/customer/academy/course/${module.courses.id}/module/${module.id}`;
-          finalMessage += `\n\n📖 **Módulo Recomendado:** ${courseName} - ${module.title}\n[Ver Módulo](${moduleUrl})`;
-        }
-        // ✅ Botão para AULA
-        else if (bestMatch.related_lesson) {
-          const lesson = bestMatch.related_lesson as any;
-          const courseName = lesson.course_modules.courses.title;
-          const lessonTitle = lesson.title;
-          const lessonUrl = `/customer/academy/lesson/${lesson.id}`;
-          finalMessage += `\n\n🎓 **Aula Recomendada:** ${courseName} - ${lessonTitle}\n[Ver Aula Agora](${lessonUrl})`;
+        // Se não houver botão customizado, verificar conteúdo relacionado
+        else {
+          // ✅ Botão para CURSO
+          if (bestMatch.related_course) {
+            const course = bestMatch.related_course as any;
+            const courseUrl = `/customer/academy/course/${course.id}`;
+            finalMessage += `\n\n📚 **Curso Recomendado:** ${course.title}\n[Ver Curso Completo](${courseUrl})`;
+          }
+          // ✅ Botão para MÓDULO
+          else if (bestMatch.related_module) {
+            const module = bestMatch.related_module as any;
+            const courseName = module.courses.title;
+            const moduleUrl = `/customer/academy/course/${module.courses.id}/module/${module.id}`;
+            finalMessage += `\n\n📖 **Módulo Recomendado:** ${courseName} - ${module.title}\n[Ver Módulo](${moduleUrl})`;
+          }
+          // ✅ Botão para AULA
+          else if (bestMatch.related_lesson) {
+            const lesson = bestMatch.related_lesson as any;
+            const courseName = lesson.course_modules.courses.title;
+            const lessonTitle = lesson.title;
+            const lessonUrl = `/customer/academy/lesson/${lesson.id}`;
+            finalMessage += `\n\n🎓 **Aula Recomendada:** ${courseName} - ${lessonTitle}\n[Ver Aula Agora](${lessonUrl})`;
+          }
         }
         
         await supabase.from('chat_messages').insert({
@@ -505,6 +534,13 @@ INSTRUÇÕES SOBRE PRODUTOS:
 - Sempre inclua o link do produto: [Ver Produto](/produto/[ID])
 
 ` : ''}
+
+IMPORTANTE SOBRE BOTÕES NAS RESPOSTAS:
+- Se uma resposta da base de conhecimento incluir [BUTTON:texto:link], você DEVE incluir esse botão na sua mensagem
+- Formato: termine sua mensagem com \\n\\n[BUTTON:texto:link]
+- Exemplo: "Aqui está sua resposta...\\n\\n[BUTTON:Ver Produto:/produto/123]"
+- NÃO modifique o texto ou link do botão original
+- Botões aparecem como botões clicáveis para o usuário
 
 ${academyContext ? `Conteúdo da Lojafy Academy:\n${academyContext}\n\n` : ''}
 

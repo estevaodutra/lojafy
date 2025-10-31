@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Send, User, Bot, Clock, MessageCircle, Package } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,24 @@ interface ChatInterfaceProps {
   onClose: () => void;
 }
 
+// Função para extrair botão da mensagem
+function extractButton(content: string) {
+  const buttonRegex = /\[BUTTON:(.*?):(.*?)\]/;
+  const match = content.match(buttonRegex);
+  
+  if (match) {
+    return {
+      text: content.replace(match[0], '').trim(),
+      button: {
+        text: match[1],
+        url: match[2]
+      }
+    };
+  }
+  
+  return { text: content, button: null };
+}
+
 export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   const [message, setMessage] = useState('');
   const [currentTicketId, setCurrentTicketId] = useState<string | null>(null);
@@ -29,6 +47,7 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   const { tickets, createTicket } = useSupportTickets();
   const { messages, sending, sendMessage } = useChatMessages(currentTicketId);
   const { profile } = useAuth();
+  const navigate = useNavigate();
 
   // Buscar ticket existente ou mostrar seletor de categoria
   useEffect(() => {
@@ -275,45 +294,72 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
                   )}
                 </div>
                 <div className={`flex-1 ${msg.sender_type === 'customer' ? 'text-right' : ''}`}>
-                  <div className={`inline-block px-4 py-2 rounded-lg max-w-[85%] ${
-                    msg.sender_type === 'customer'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted'
-                  }`}>
-                    {msg.sender_type === 'ai' || msg.sender_type === 'admin' ? (
-                      <div className="text-sm prose prose-sm max-w-none prose-p:my-1 prose-strong:font-semibold prose-a:no-underline">
-                        <ReactMarkdown
-                          components={{
-                            a: ({ node, ...props }) => {
-                              // Se o link é de aula, renderizar como botão
-                              if (props.href?.startsWith('/customer/academy/lesson/')) {
-                                return (
-                                  <Button
-                                    asChild
-                                    size="sm"
-                                    className="w-full mt-2 mb-1"
-                                    variant="default"
-                                  >
-                                    <a href={props.href} onClick={(e) => { e.preventDefault(); window.location.href = props.href!; }}>
-                                      {props.children} 🎓
-                                    </a>
-                                  </Button>
-                                );
-                              }
-                              // Links normais
-                              return <a className="text-blue-600 underline hover:text-blue-700" target="_blank" rel="noopener noreferrer" {...props} />;
-                            },
-                            p: ({ node, ...props }) => <p className="whitespace-pre-wrap break-words" {...props} />,
-                            strong: ({ node, ...props }) => <strong className="font-semibold" {...props} />
-                          }}
-                        >
-                          {msg.content}
-                        </ReactMarkdown>
-                      </div>
-                    ) : (
-                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                    )}
-                  </div>
+                  {(() => {
+                    const { text, button } = extractButton(msg.content);
+                    return (
+                      <>
+                        <div className={`inline-block px-4 py-2 rounded-lg max-w-[85%] ${
+                          msg.sender_type === 'customer'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted'
+                        }`}>
+                          {msg.sender_type === 'ai' || msg.sender_type === 'admin' ? (
+                            <div className="text-sm prose prose-sm max-w-none prose-p:my-1 prose-strong:font-semibold prose-a:no-underline">
+                              <ReactMarkdown
+                                components={{
+                                  a: ({ node, ...props }) => {
+                                    // Se o link é de aula, renderizar como botão
+                                    if (props.href?.startsWith('/customer/academy/lesson/')) {
+                                      return (
+                                        <Button
+                                          asChild
+                                          size="sm"
+                                          className="w-full mt-2 mb-1"
+                                          variant="default"
+                                        >
+                                          <a href={props.href} onClick={(e) => { e.preventDefault(); window.location.href = props.href!; }}>
+                                            {props.children} 🎓
+                                          </a>
+                                        </Button>
+                                      );
+                                    }
+                                    // Links normais
+                                    return <a className="text-blue-600 underline hover:text-blue-700" target="_blank" rel="noopener noreferrer" {...props} />;
+                                  },
+                                  p: ({ node, ...props }) => <p className="whitespace-pre-wrap break-words" {...props} />,
+                                  strong: ({ node, ...props }) => <strong className="font-semibold" {...props} />
+                                }}
+                              >
+                                {text}
+                              </ReactMarkdown>
+                            </div>
+                          ) : (
+                            <p className="text-sm whitespace-pre-wrap">{text}</p>
+                          )}
+                        </div>
+                        
+                        {/* Renderizar botão customizado se houver */}
+                        {button && (
+                          <div className={msg.sender_type === 'customer' ? 'text-right' : ''}>
+                            <Button
+                              size="sm"
+                              className="mt-2 inline-block"
+                              onClick={() => {
+                                if (button.url.startsWith('http')) {
+                                  window.open(button.url, '_blank');
+                                } else {
+                                  navigate(button.url);
+                                  onClose();
+                                }
+                              }}
+                            >
+                              {button.text}
+                            </Button>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                   <p className="text-xs text-muted-foreground mt-1">
                     {new Date(msg.created_at).toLocaleTimeString('pt-BR', {
                       hour: '2-digit',

@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Sparkles, Check, Edit3, RefreshCw, X } from 'lucide-react';
@@ -40,6 +41,9 @@ export default function AnswerQuestionModal({
   const [saving, setSaving] = useState(false);
   const [suggestion, setSuggestion] = useState<SuggestionResponse | null>(null);
   const [showSuggestion, setShowSuggestion] = useState(true);
+  const [buttonEnabled, setButtonEnabled] = useState(false);
+  const [buttonText, setButtonText] = useState('');
+  const [buttonLink, setButtonLink] = useState('');
   
   const { data: courses, isLoading: loadingCourses } = useAllCourses();
   const { data: modules, isLoading: loadingModules } = useAllModules();
@@ -48,16 +52,28 @@ export default function AnswerQuestionModal({
 
   useEffect(() => {
     if (question) {
-      setAnswer(question.answer || '');
+      // Extrair botão da resposta existente se houver
+      const buttonMatch = question.answer?.match(/\[BUTTON:(.*?):(.*?)\]/);
+      if (buttonMatch) {
+        const [fullMatch, text, link] = buttonMatch;
+        const cleanAnswer = question.answer!.replace(fullMatch, '').trim();
+        setAnswer(cleanAnswer);
+        setButtonEnabled(true);
+        setButtonText(text);
+        setButtonLink(link);
+      } else {
+        setAnswer(question.answer || '');
+        setButtonEnabled(false);
+        setButtonText('');
+        setButtonLink('');
+      }
+      
       setSelectedType('none');
       setSelectedCourseId(undefined);
       setSelectedModuleId(undefined);
       setSelectedLessonId(undefined);
       setSuggestion(null);
       setShowSuggestion(true);
-      
-      // Carregar sugestão automaticamente
-      loadSuggestion();
     }
   }, [question]);
 
@@ -134,13 +150,22 @@ export default function AnswerQuestionModal({
         relatedContent = { type: 'lesson' as const, id: selectedLessonId };
       }
       
-      await onSave(question.id, answer, relatedContent);
+      // Incluir botão na resposta se estiver habilitado
+      let finalAnswer = answer.trim();
+      if (buttonEnabled && buttonText.trim() && buttonLink.trim()) {
+        finalAnswer = `${finalAnswer}\n\n[BUTTON:${buttonText.trim()}:${buttonLink.trim()}]`;
+      }
+      
+      await onSave(question.id, finalAnswer, relatedContent);
       onClose();
       setAnswer('');
       setSelectedType('none');
       setSelectedCourseId(undefined);
       setSelectedModuleId(undefined);
       setSelectedLessonId(undefined);
+      setButtonEnabled(false);
+      setButtonText('');
+      setButtonLink('');
     } finally {
       setSaving(false);
     }
@@ -169,21 +194,32 @@ export default function AnswerQuestionModal({
             </div>
           </div>
 
-          {/* Sugestão da IA */}
-          {showSuggestion && (
-            <div className="space-y-3">
-              {loadingSuggestion && (
-                <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 p-4">
-                  <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="font-medium">🤖 Gerando sugestão com IA...</span>
-                  </div>
-                  <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
-                    Analisando pergunta e buscando conteúdo relevante...
-                  </div>
-                </div>
+          {/* Botão para gerar sugestão */}
+          {!suggestion && showSuggestion && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={loadSuggestion}
+              disabled={loadingSuggestion}
+              className="w-full gap-2"
+            >
+              {loadingSuggestion ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Gerando sugestão com IA...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  🤖 Gerar Sugestão com IA
+                </>
               )}
+            </Button>
+          )}
 
+          {/* Sugestão da IA */}
+          {showSuggestion && suggestion && (
+            <div className="space-y-3">
               {suggestionError && (
                 <div className="rounded-lg border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/20 p-4">
                   <div className="text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-1">
@@ -216,7 +252,7 @@ export default function AnswerQuestionModal({
                 </div>
               )}
 
-              {suggestion && !loadingSuggestion && (
+              {(
                 <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
@@ -312,6 +348,61 @@ export default function AnswerQuestionModal({
               Esta resposta será automaticamente copiada para a base de conhecimento e 
               a IA a usará sempre que encontrar esta pergunta novamente.
             </p>
+          </div>
+
+          {/* Sistema de Botões Personalizados */}
+          <div className="space-y-3 border rounded-lg p-4 bg-muted/30">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="button-enabled"
+                checked={buttonEnabled}
+                onChange={(e) => setButtonEnabled(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="button-enabled" className="cursor-pointer font-medium">
+                ➕ Adicionar botão na resposta
+              </Label>
+            </div>
+
+            {buttonEnabled && (
+              <div className="space-y-3 pl-6">
+                <div>
+                  <Label htmlFor="button-text">🔘 Texto do Botão</Label>
+                  <Input
+                    id="button-text"
+                    value={buttonText}
+                    onChange={(e) => setButtonText(e.target.value)}
+                    placeholder="Ver Produto, Acessar Curso, etc..."
+                    className="mt-2"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="button-link">🔗 Link do Botão</Label>
+                  <Input
+                    id="button-link"
+                    value={buttonLink}
+                    onChange={(e) => setButtonLink(e.target.value)}
+                    placeholder="/produto/123, https://exemplo.com, etc..."
+                    className="mt-2"
+                  />
+                </div>
+
+                {/* Preview do botão */}
+                {buttonText.trim() && buttonLink.trim() && (
+                  <div className="mt-3 p-3 bg-white dark:bg-gray-900 rounded-md border">
+                    <p className="text-xs text-muted-foreground mb-2">📱 Preview:</p>
+                    <div className="space-y-2">
+                      <p className="text-sm">{answer || 'Sua resposta aparecerá aqui...'}</p>
+                      <Button size="sm" className="w-full">
+                        {buttonText}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div>
