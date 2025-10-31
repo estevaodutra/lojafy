@@ -53,7 +53,9 @@ export const usePendingQuestions = () => {
     answer: string, 
     relatedContent?: { type: 'course' | 'module' | 'lesson'; id: string },
     standardAnswerId?: string,
-    attachments?: any[]
+    attachments?: any[],
+    createAsStandard?: boolean,
+    standardAnswerName?: string
   ) => {
     try {
       const question = questions.find(q => q.id === id);
@@ -126,7 +128,33 @@ export const usePendingQuestions = () => {
 
       if (kbError) throw kbError;
 
-      toast.success('Resposta registrada com conteúdo relacionado!');
+      // 3. Criar resposta padrão se solicitado
+      if (createAsStandard && standardAnswerName) {
+        const { error: standardError } = await supabase
+          .from('ai_standard_answers')
+          .insert({
+            name: standardAnswerName,
+            answer: answer,
+            keywords: question.keywords || [],
+            active: true,
+            created_by: user?.id,
+            related_course_id: updateData.related_course_id,
+            related_module_id: updateData.related_module_id,
+            related_lesson_id: updateData.related_lesson_id,
+            attachments: attachments || [],
+            usage_count: 1,
+          });
+
+        if (standardError) {
+          console.error('Erro ao criar resposta padrão:', standardError);
+          toast.error('Resposta salva, mas não foi possível criar resposta padrão');
+        } else {
+          toast.success('Resposta registrada e salva como padrão!');
+        }
+      } else {
+        toast.success('Resposta registrada com conteúdo relacionado!');
+      }
+
       await fetchQuestions();
     } catch (error) {
       console.error('Error answering question:', error);

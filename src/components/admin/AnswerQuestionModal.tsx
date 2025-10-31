@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 import { Loader2, Sparkles, Check, Edit3, RefreshCw, X, BookOpen } from 'lucide-react';
 import { PendingQuestion } from '@/hooks/usePendingQuestions';
 import { useAllLessons } from '@/hooks/useAllLessons';
@@ -29,7 +30,9 @@ interface AnswerQuestionModalProps {
       id: string;
     },
     standardAnswerId?: string,
-    attachments?: any[]
+    attachments?: any[],
+    createAsStandard?: boolean,
+    standardAnswerName?: string
   ) => Promise<void>;
 }
 
@@ -53,6 +56,8 @@ export default function AnswerQuestionModal({
   const [buttonText, setButtonText] = useState('');
   const [buttonLink, setButtonLink] = useState('');
   const [attachments, setAttachments] = useState<any[]>([]);
+  const [createAsStandard, setCreateAsStandard] = useState(false);
+  const [standardAnswerName, setStandardAnswerName] = useState('');
   
   const { data: courses, isLoading: loadingCourses } = useAllCourses();
   const { data: modules, isLoading: loadingModules } = useAllModules();
@@ -79,6 +84,8 @@ export default function AnswerQuestionModal({
 
       // Load existing attachments
       setAttachments(question.attachments || []);
+      setCreateAsStandard(false);
+      setStandardAnswerName(question.question.substring(0, 100));
 
       // Load related content
       if (question.related_lesson_id) {
@@ -117,6 +124,8 @@ export default function AnswerQuestionModal({
       setSelectedModuleId(undefined);
       setSelectedLessonId(undefined);
       setAttachments([]);
+      setCreateAsStandard(false);
+      setStandardAnswerName('');
     }
   }, [question]);
 
@@ -210,7 +219,7 @@ export default function AnswerQuestionModal({
         relatedContent = { type: 'lesson' as const, id: selectedLessonId };
       }
       
-      await onSave(question.id, finalAnswer, relatedContent, standardAnswerId, attachments);
+      await onSave(question.id, finalAnswer, relatedContent, standardAnswerId, attachments, createAsStandard, createAsStandard ? standardAnswerName : undefined);
       onClose();
       
       // Reset form
@@ -225,6 +234,8 @@ export default function AnswerQuestionModal({
       setAnswerType('new');
       setSelectedStandardAnswerId(undefined);
       setAttachments([]);
+      setCreateAsStandard(false);
+      setStandardAnswerName('');
     } finally {
       setSaving(false);
     }
@@ -520,6 +531,38 @@ export default function AnswerQuestionModal({
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Create as Standard Answer Option (only for new answers) */}
+          {answerType === 'new' && (
+            <div className="space-y-3 p-4 bg-muted/50 rounded-lg border border-border">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="create-standard"
+                  checked={createAsStandard}
+                  onCheckedChange={setCreateAsStandard}
+                />
+                <Label htmlFor="create-standard" className="cursor-pointer">
+                  💾 Salvar como Resposta Padrão (pode ser reutilizada no futuro)
+                </Label>
+              </div>
+
+              {createAsStandard && (
+                <div>
+                  <Label htmlFor="standard-name">Nome da Resposta Padrão</Label>
+                  <Input
+                    id="standard-name"
+                    value={standardAnswerName}
+                    onChange={(e) => setStandardAnswerName(e.target.value)}
+                    placeholder="Ex: Como processar pedidos"
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Este nome facilitará encontrar esta resposta depois
+                  </p>
                 </div>
               )}
             </div>

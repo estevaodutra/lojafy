@@ -13,6 +13,7 @@ import { useAllCourses } from '@/hooks/useAllCourses';
 import { useAllModules } from '@/hooks/useAllModules';
 import { useAllLessons } from '@/hooks/useAllLessons';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AnswerImageUpload } from './AnswerImageUpload';
 
 export default function StandardAnswersTab() {
   const { standardAnswers, loading, createStandardAnswer, updateStandardAnswer, deleteStandardAnswer } = useStandardAnswers();
@@ -32,6 +33,7 @@ export default function StandardAnswersTab() {
     related_course_id: undefined as string | undefined,
     related_module_id: undefined as string | undefined,
     related_lesson_id: undefined as string | undefined,
+    attachments: [] as any[],
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,6 +54,7 @@ export default function StandardAnswersTab() {
       related_course_id: formData.selectedType === 'course' ? formData.related_course_id : undefined,
       related_module_id: formData.selectedType === 'module' ? formData.related_module_id : undefined,
       related_lesson_id: formData.selectedType === 'lesson' ? formData.related_lesson_id : undefined,
+      attachments: formData.attachments,
     };
 
     try {
@@ -74,6 +77,7 @@ export default function StandardAnswersTab() {
         related_course_id: undefined,
         related_module_id: undefined,
         related_lesson_id: undefined,
+        attachments: [],
       });
     } catch (error) {
       // Error already handled in hook
@@ -99,6 +103,7 @@ export default function StandardAnswersTab() {
       related_course_id: item.related_course_id,
       related_module_id: item.related_module_id,
       related_lesson_id: item.related_lesson_id,
+      attachments: item.attachments || [],
     });
   };
 
@@ -119,6 +124,7 @@ export default function StandardAnswersTab() {
       related_course_id: undefined,
       related_module_id: undefined,
       related_lesson_id: undefined,
+      attachments: [],
     });
   };
 
@@ -180,6 +186,16 @@ export default function StandardAnswersTab() {
                 placeholder="Digite a resposta completa..."
                 rows={6}
                 required
+              />
+            </div>
+
+            <div>
+              <Label>📎 Anexar Imagens (opcional)</Label>
+              <AnswerImageUpload
+                attachments={formData.attachments}
+                onUpload={(newAttachments) => setFormData({ ...formData, attachments: newAttachments })}
+                maxFiles={5}
+                maxSize={5 * 1024 * 1024}
               />
             </div>
 
@@ -331,6 +347,7 @@ export default function StandardAnswersTab() {
                 <TableHead>Nome</TableHead>
                 <TableHead>Resposta</TableHead>
                 <TableHead>Conteúdo Relacionado</TableHead>
+                <TableHead>Anexos</TableHead>
                 <TableHead>Usado</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -346,6 +363,15 @@ export default function StandardAnswersTab() {
                       <GraduationCap className="h-3 w-3 mr-1" />
                       {getRelatedContentLabel(item)}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {item.attachments && item.attachments.length > 0 ? (
+                      <Badge variant="secondary">
+                        📎 {item.attachments.length}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary">{item.usage_count}x</Badge>

@@ -17,6 +17,7 @@ export interface StandardAnswer {
   created_by?: string;
   created_at: string;
   updated_at: string;
+  attachments?: any[];
 }
 
 export const useStandardAnswers = () => {
@@ -32,7 +33,7 @@ export const useStandardAnswers = () => {
         .order('usage_count', { ascending: false });
 
       if (error) throw error;
-      setStandardAnswers(data || []);
+      setStandardAnswers((data || []) as StandardAnswer[]);
     } catch (error) {
       console.error('Erro ao carregar respostas padrão:', error);
       toast.error('Erro ao carregar respostas padrão');
