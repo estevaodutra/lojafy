@@ -72,7 +72,9 @@ export type Database = {
           id: string
           keywords: string[] | null
           priority: number | null
+          related_course_id: string | null
           related_lesson_id: string | null
+          related_module_id: string | null
           subcategory: string | null
           target_audience: string
           title: string
@@ -87,7 +89,9 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           priority?: number | null
+          related_course_id?: string | null
           related_lesson_id?: string | null
+          related_module_id?: string | null
           subcategory?: string | null
           target_audience?: string
           title: string
@@ -102,7 +106,9 @@ export type Database = {
           id?: string
           keywords?: string[] | null
           priority?: number | null
+          related_course_id?: string | null
           related_lesson_id?: string | null
+          related_module_id?: string | null
           subcategory?: string | null
           target_audience?: string
           title?: string
@@ -117,10 +123,24 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
           {
+            foreignKeyName: "ai_knowledge_base_related_course_id_fkey"
+            columns: ["related_course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ai_knowledge_base_related_lesson_id_fkey"
             columns: ["related_lesson_id"]
             isOneToOne: false
             referencedRelation: "course_lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_knowledge_base_related_module_id_fkey"
+            columns: ["related_module_id"]
+            isOneToOne: false
+            referencedRelation: "course_modules"
             referencedColumns: ["id"]
           },
         ]
@@ -137,7 +157,9 @@ export type Database = {
           keywords: string[] | null
           last_asked_at: string | null
           question: string
+          related_course_id: string | null
           related_lesson_id: string | null
+          related_module_id: string | null
           similar_questions: Json | null
           status: string
           ticket_id: string | null
@@ -155,7 +177,9 @@ export type Database = {
           keywords?: string[] | null
           last_asked_at?: string | null
           question: string
+          related_course_id?: string | null
           related_lesson_id?: string | null
+          related_module_id?: string | null
           similar_questions?: Json | null
           status?: string
           ticket_id?: string | null
@@ -173,7 +197,9 @@ export type Database = {
           keywords?: string[] | null
           last_asked_at?: string | null
           question?: string
+          related_course_id?: string | null
           related_lesson_id?: string | null
+          related_module_id?: string | null
           similar_questions?: Json | null
           status?: string
           ticket_id?: string | null
@@ -182,10 +208,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "ai_pending_questions_related_course_id_fkey"
+            columns: ["related_course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ai_pending_questions_related_lesson_id_fkey"
             columns: ["related_lesson_id"]
             isOneToOne: false
             referencedRelation: "course_lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_pending_questions_related_module_id_fkey"
+            columns: ["related_module_id"]
+            isOneToOne: false
+            referencedRelation: "course_modules"
             referencedColumns: ["id"]
           },
           {

@@ -20,6 +20,8 @@ export interface PendingQuestion {
   created_at: string;
   updated_at: string;
   related_lesson_id: string | null;
+  related_module_id: string | null;
+  related_course_id: string | null;
 }
 
 export const usePendingQuestions = () => {
@@ -45,21 +47,40 @@ export const usePendingQuestions = () => {
     }
   };
 
-  const answerQuestion = async (id: string, answer: string, lessonId?: string) => {
+  const answerQuestion = async (
+    id: string, 
+    answer: string, 
+    relatedContent?: { type: 'course' | 'module' | 'lesson'; id: string }
+  ) => {
     try {
       const question = questions.find(q => q.id === id);
       if (!question) return;
 
+      // Determinar qual campo preencher
+      const updateData: any = {
+        answer,
+        status: 'answered',
+        answered_at: new Date().toISOString(),
+        answered_by: user?.id,
+        related_course_id: null,
+        related_module_id: null,
+        related_lesson_id: null,
+      };
+
+      if (relatedContent) {
+        if (relatedContent.type === 'course') {
+          updateData.related_course_id = relatedContent.id;
+        } else if (relatedContent.type === 'module') {
+          updateData.related_module_id = relatedContent.id;
+        } else if (relatedContent.type === 'lesson') {
+          updateData.related_lesson_id = relatedContent.id;
+        }
+      }
+
       // 1. Atualizar pergunta pendente
       const { error: updateError } = await supabase
         .from('ai_pending_questions')
-        .update({
-          answer,
-          status: 'answered',
-          answered_at: new Date().toISOString(),
-          answered_by: user?.id,
-          related_lesson_id: lessonId || null
-        })
+        .update(updateData)
         .eq('id', id);
 
       if (updateError) throw updateError;
@@ -76,12 +97,14 @@ export const usePendingQuestions = () => {
           priority: Math.min(10, question.asked_count),
           active: true,
           created_by: user?.id,
-          related_lesson_id: lessonId || null
+          related_course_id: updateData.related_course_id,
+          related_module_id: updateData.related_module_id,
+          related_lesson_id: updateData.related_lesson_id,
         });
 
       if (kbError) throw kbError;
 
-      toast.success(lessonId ? 'Resposta registrada com aula relacionada!' : 'Resposta registrada e adicionada à base de conhecimento!');
+      toast.success('Resposta registrada com conteúdo relacionado!');
       await fetchQuestions();
     } catch (error) {
       console.error('Error answering question:', error);

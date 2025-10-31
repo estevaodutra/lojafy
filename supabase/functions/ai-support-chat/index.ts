@@ -216,6 +216,18 @@ serve(async (req) => {
               title
             )
           )
+        ),
+        related_module:course_modules!related_module_id (
+          id,
+          title,
+          courses!inner(
+            id,
+            title
+          )
+        ),
+        related_course:courses!related_course_id (
+          id,
+          title
         )
       `)
       .eq('status', 'answered')
@@ -238,14 +250,26 @@ serve(async (req) => {
         
         let finalMessage = bestMatch.answer;
         
-        // Se tem aula relacionada, adicionar botão
-        if (bestMatch.related_lesson) {
+        // ✅ Botão para CURSO
+        if (bestMatch.related_course) {
+          const course = bestMatch.related_course as any;
+          const courseUrl = `/customer/academy/course/${course.id}`;
+          finalMessage += `\n\n📚 **Curso Recomendado:** ${course.title}\n[Ver Curso Completo](${courseUrl})`;
+        }
+        // ✅ Botão para MÓDULO
+        else if (bestMatch.related_module) {
+          const module = bestMatch.related_module as any;
+          const courseName = module.courses.title;
+          const moduleUrl = `/customer/academy/course/${module.courses.id}/module/${module.id}`;
+          finalMessage += `\n\n📖 **Módulo Recomendado:** ${courseName} - ${module.title}\n[Ver Módulo](${moduleUrl})`;
+        }
+        // ✅ Botão para AULA
+        else if (bestMatch.related_lesson) {
           const lesson = bestMatch.related_lesson as any;
           const courseName = lesson.course_modules.courses.title;
           const lessonTitle = lesson.title;
           const lessonUrl = `/customer/academy/lesson/${lesson.id}`;
-          
-          finalMessage += `\n\n📚 **Aula Recomendada:** ${courseName} - ${lessonTitle}\n[Ver Aula Agora](${lessonUrl})`;
+          finalMessage += `\n\n🎓 **Aula Recomendada:** ${courseName} - ${lessonTitle}\n[Ver Aula Agora](${lessonUrl})`;
         }
         
         await supabase.from('chat_messages').insert({
@@ -304,6 +328,18 @@ serve(async (req) => {
                 title
               )
             )
+          ),
+          related_module:course_modules!related_module_id (
+            id,
+            title,
+            courses!inner(
+              id,
+              title
+            )
+          ),
+          related_course:courses!related_course_id (
+            id,
+            title
           )
         `)
         .eq('active', true)
@@ -359,8 +395,18 @@ serve(async (req) => {
     const knowledgeContext = knowledge.map(k => {
       let text = `[${k.category.toUpperCase()}] ${k.title}: ${k.content}`;
       
-      // Se tem aula relacionada, informar à IA
-      if (k.related_lesson) {
+      // ✅ Informar curso relacionado
+      if (k.related_course) {
+        const course = k.related_course as any;
+        text += `\n[CURSO RELACIONADO: ${course.title} (ID: ${course.id})]`;
+      }
+      // ✅ Informar módulo relacionado
+      else if (k.related_module) {
+        const module = k.related_module as any;
+        text += `\n[MÓDULO RELACIONADO: ${module.courses.title} - ${module.title} (COURSE_ID: ${module.courses.id}, MODULE_ID: ${module.id})]`;
+      }
+      // ✅ Informar aula relacionada
+      else if (k.related_lesson) {
         const lesson = k.related_lesson as any;
         text += `\n[AULA RELACIONADA: ${lesson.course_modules.courses.title} - ${lesson.title} (ID: ${lesson.id})]`;
       }
@@ -407,11 +453,22 @@ INSTRUÇÕES IMPORTANTES:
 - NUNCA invente informações sobre prazos, preços ou políticas
 - Se o cliente demonstrar insatisfação grave, urgência ou reclamação, inicie sua resposta com "ESCALATE:" para transferir para humano
 
-**REGRA DE AULAS DA ACADEMIA:**
-- Se a resposta da base de conhecimento contém [AULA RELACIONADA: ...], você DEVE incluir um botão clicável no final da sua resposta
-- Formato do botão: "📚 **Aula Recomendada:** [Nome do Curso] - [Nome da Aula]\\n[Ver Aula Agora](/customer/academy/lesson/[ID])"
-- Sempre use Markdown para o link: [Texto](URL)
-- Exemplo: "📚 **Aula Recomendada:** Primeiros Passos - Como Adicionar Produtos\\n[Ver Aula Agora](/customer/academy/lesson/abc-123)"
+**REGRA DE CONTEÚDO DA ACADEMIA:**
+Se a resposta da base de conhecimento contém informações sobre cursos, módulos ou aulas, você DEVE incluir um botão clicável no final da sua resposta:
+
+1. **[CURSO RELACIONADO: ...]** → Use o formato:
+   "📚 **Curso Recomendado:** [Nome do Curso]
+   [Ver Curso Completo](/customer/academy/course/[ID])"
+
+2. **[MÓDULO RELACIONADO: ...]** → Use o formato:
+   "📖 **Módulo Recomendado:** [Nome do Curso] - [Nome do Módulo]
+   [Ver Módulo](/customer/academy/course/[COURSE_ID]/module/[MODULE_ID])"
+
+3. **[AULA RELACIONADA: ...]** → Use o formato:
+   "🎓 **Aula Recomendada:** [Nome do Curso] - [Nome da Aula]
+   [Ver Aula Agora](/customer/academy/lesson/[ID])"
+
+Sempre use Markdown para os links: [Texto](URL)
 
 - Mantenha respostas com no máximo ${config?.max_response_length || 500} caracteres`;
 

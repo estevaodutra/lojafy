@@ -6,12 +6,21 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PendingQuestion } from '@/hooks/usePendingQuestions';
 import { useAllLessons } from '@/hooks/useAllLessons';
+import { useAllCourses } from '@/hooks/useAllCourses';
+import { useAllModules } from '@/hooks/useAllModules';
 
 interface AnswerQuestionModalProps {
   question: PendingQuestion | null;
   open: boolean;
   onClose: () => void;
-  onSave: (id: string, answer: string, lessonId?: string) => Promise<void>;
+  onSave: (
+    id: string, 
+    answer: string, 
+    relatedContent?: {
+      type: 'course' | 'module' | 'lesson';
+      id: string;
+    }
+  ) => Promise<void>;
 }
 
 export default function AnswerQuestionModal({
@@ -21,13 +30,22 @@ export default function AnswerQuestionModal({
   onSave
 }: AnswerQuestionModalProps) {
   const [answer, setAnswer] = useState(question?.answer || '');
+  const [selectedType, setSelectedType] = useState<'none' | 'course' | 'module' | 'lesson'>('none');
+  const [selectedCourseId, setSelectedCourseId] = useState<string | undefined>(undefined);
+  const [selectedModuleId, setSelectedModuleId] = useState<string | undefined>(undefined);
   const [selectedLessonId, setSelectedLessonId] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
+  
+  const { data: courses, isLoading: loadingCourses } = useAllCourses();
+  const { data: modules, isLoading: loadingModules } = useAllModules();
   const { data: lessons, isLoading: loadingLessons } = useAllLessons();
 
   useEffect(() => {
     if (question) {
       setAnswer(question.answer || '');
+      setSelectedType('none');
+      setSelectedCourseId(undefined);
+      setSelectedModuleId(undefined);
       setSelectedLessonId(undefined);
     }
   }, [question]);
@@ -37,9 +55,22 @@ export default function AnswerQuestionModal({
     
     setSaving(true);
     try {
-      await onSave(question.id, answer, selectedLessonId);
+      let relatedContent = undefined;
+      
+      if (selectedType === 'course' && selectedCourseId) {
+        relatedContent = { type: 'course' as const, id: selectedCourseId };
+      } else if (selectedType === 'module' && selectedModuleId) {
+        relatedContent = { type: 'module' as const, id: selectedModuleId };
+      } else if (selectedType === 'lesson' && selectedLessonId) {
+        relatedContent = { type: 'lesson' as const, id: selectedLessonId };
+      }
+      
+      await onSave(question.id, answer, relatedContent);
       onClose();
       setAnswer('');
+      setSelectedType('none');
+      setSelectedCourseId(undefined);
+      setSelectedModuleId(undefined);
       setSelectedLessonId(undefined);
     } finally {
       setSaving(false);
@@ -85,26 +116,90 @@ export default function AnswerQuestionModal({
           </div>
 
           <div>
-            <Label htmlFor="lesson">Aula Relacionada (Opcional)</Label>
+            <Label htmlFor="content-type">Conteúdo Relacionado (Opcional)</Label>
+            
             <Select 
-              value={selectedLessonId} 
-              onValueChange={(value) => setSelectedLessonId(value === 'none' ? undefined : value)}
-              disabled={loadingLessons}
+              value={selectedType} 
+              onValueChange={(value: any) => {
+                setSelectedType(value);
+                setSelectedCourseId(undefined);
+                setSelectedModuleId(undefined);
+                setSelectedLessonId(undefined);
+              }}
             >
               <SelectTrigger className="mt-2">
-                <SelectValue placeholder="Nenhuma aula selecionada" />
+                <SelectValue placeholder="Nenhum conteúdo selecionado" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">Nenhuma aula</SelectItem>
-                {lessons?.map(lesson => (
-                  <SelectItem key={lesson.lesson_id} value={lesson.lesson_id}>
-                    {lesson.course_title} › {lesson.module_title} › {lesson.lesson_title}
-                  </SelectItem>
-                ))}
+                <SelectItem value="none">Nenhum conteúdo</SelectItem>
+                <SelectItem value="course">📚 Curso Completo</SelectItem>
+                <SelectItem value="module">📖 Módulo Específico</SelectItem>
+                <SelectItem value="lesson">🎓 Aula Específica</SelectItem>
               </SelectContent>
             </Select>
+
+            {selectedType === 'course' && (
+              <Select 
+                value={selectedCourseId} 
+                onValueChange={setSelectedCourseId} 
+                disabled={loadingCourses}
+              >
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder="Selecione um curso" />
+                </SelectTrigger>
+                <SelectContent>
+                  {courses?.map(course => (
+                    <SelectItem key={course.course_id} value={course.course_id}>
+                      {course.course_title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {selectedType === 'module' && (
+              <Select 
+                value={selectedModuleId} 
+                onValueChange={setSelectedModuleId} 
+                disabled={loadingModules}
+              >
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder="Selecione um módulo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {modules?.map(module => (
+                    <SelectItem key={module.module_id} value={module.module_id}>
+                      {module.course_title} › {module.module_title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {selectedType === 'lesson' && (
+              <Select 
+                value={selectedLessonId} 
+                onValueChange={setSelectedLessonId}
+                disabled={loadingLessons}
+              >
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder="Selecione uma aula" />
+                </SelectTrigger>
+                <SelectContent>
+                  {lessons?.map((lesson) => (
+                    <SelectItem key={lesson.lesson_id} value={lesson.lesson_id}>
+                      {lesson.course_title} › {lesson.module_title} › {lesson.lesson_title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
             <p className="text-xs text-muted-foreground mt-2">
-              Se selecionada, a IA enviará um botão para o usuário acessar esta aula
+              {selectedType === 'course' && 'A IA enviará um botão para acessar o curso completo'}
+              {selectedType === 'module' && 'A IA enviará um botão para acessar o módulo'}
+              {selectedType === 'lesson' && 'A IA enviará um botão para acessar esta aula'}
+              {selectedType === 'none' && 'Nenhum botão será enviado'}
             </p>
           </div>
         </div>
