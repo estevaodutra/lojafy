@@ -481,7 +481,7 @@ export default function AnswerQuestionModal({
                     <div className="mt-3 p-3 bg-white dark:bg-gray-900 rounded-md border">
                       <p className="text-xs text-muted-foreground mb-2">📱 Preview:</p>
                       <div className="space-y-2">
-                        <p className="text-sm">{answer || 'Sua resposta aparecerá aqui...'}</p>
+                        <p className="text-sm whitespace-pre-wrap">{answer || 'Sua resposta aparecerá aqui...'}</p>
                         <Button size="sm" className="w-full">
                           {buttonText}
                         </Button>
