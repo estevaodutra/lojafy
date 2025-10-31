@@ -79,6 +79,9 @@ export default function AnswerQuestionModal({
           setSelectedLessonId(result.relatedContent.id);
         }
       }
+    } else if (suggestionError) {
+      // Mostrar mensagem mais amigável quando houver erro
+      setShowSuggestion(false);
     }
   };
 
@@ -182,20 +185,34 @@ export default function AnswerQuestionModal({
               )}
 
               {suggestionError && (
-                <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20 p-4">
-                  <div className="text-sm text-red-700 dark:text-red-300">
-                    ❌ Não foi possível gerar sugestão: {suggestionError}
+                <div className="rounded-lg border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/20 p-4">
+                  <div className="text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-1">
+                    ⚠️ Função de IA temporariamente indisponível
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={generateNewSuggestion}
-                    className="mt-2"
-                  >
-                    <RefreshCw className="h-3 w-3 mr-1" />
-                    Tentar Novamente
-                  </Button>
+                  <div className="text-xs text-yellow-700 dark:text-yellow-300 mb-3">
+                    A sugestão automática não está disponível no momento. Você pode escrever a resposta manualmente abaixo ou tentar novamente.
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={generateNewSuggestion}
+                      className="gap-1"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      Tentar Novamente
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={writeFromScratch}
+                      className="gap-1"
+                    >
+                      Escrever Manualmente
+                    </Button>
+                  </div>
                 </div>
               )}
 

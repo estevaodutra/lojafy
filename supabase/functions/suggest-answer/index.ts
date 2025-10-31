@@ -14,6 +14,8 @@ serve(async (req) => {
 
   try {
     const { question, keywords = [] } = await req.json();
+    console.log('🤖 Suggest-answer invoked for question:', question);
+    console.log('📝 Keywords:', keywords);
 
     if (!question) {
       return new Response(
@@ -48,8 +50,9 @@ serve(async (req) => {
       .or(keywords.length > 0 ? `keywords.cs.{${keywords.join(',')}}` : 'id.not.is.null')
       .limit(5);
 
+    console.log('📚 Found KB results:', kbResults?.length || 0);
     if (kbError) {
-      console.error('Error fetching knowledge base:', kbError);
+      console.error('❌ Error fetching knowledge base:', kbError);
     }
 
     // 2. Buscar perguntas similares já respondidas
@@ -60,8 +63,9 @@ serve(async (req) => {
       .not('answer', 'is', null)
       .limit(3);
 
+    console.log('❓ Found similar questions:', similarQuestions?.length || 0);
     if (sqError) {
-      console.error('Error fetching similar questions:', sqError);
+      console.error('❌ Error fetching similar questions:', sqError);
     }
 
     // 3. Montar contexto para a IA
@@ -103,6 +107,7 @@ FORMATO DE SAÍDA:
 - Seja direto e acionável`;
 
     // 4. Chamar Lovable AI
+    console.log('🤖 Calling Lovable AI...');
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -121,7 +126,7 @@ FORMATO DE SAÍDA:
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('Lovable AI error:', aiResponse.status, errorText);
+      console.error('❌ Lovable AI error:', aiResponse.status, errorText);
       
       if (aiResponse.status === 429) {
         return new Response(
@@ -142,6 +147,7 @@ FORMATO DE SAÍDA:
 
     const aiData = await aiResponse.json();
     const suggestedAnswer = aiData.choices?.[0]?.message?.content || '';
+    console.log('✅ AI response generated successfully');
 
     // 5. Detectar conteúdo relacionado mais relevante
     let relatedContent = null;
@@ -178,6 +184,12 @@ FORMATO DE SAÍDA:
       }
     }
 
+    console.log('✅ Response prepared:', { 
+      hasAnswer: !!suggestedAnswer,
+      hasRelatedContent: !!relatedContent,
+      confidence 
+    });
+
     return new Response(
       JSON.stringify({
         suggestedAnswer,
@@ -190,7 +202,7 @@ FORMATO DE SAÍDA:
     );
 
   } catch (error) {
-    console.error('Error in suggest-answer function:', error);
+    console.error('❌ Error in suggest-answer function:', error);
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : 'Unknown error occurred'
