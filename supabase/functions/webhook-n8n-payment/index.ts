@@ -121,6 +121,18 @@ serve(async (req) => {
         console.log('Unknown payment status:', webhookData.status, '- keeping current status');
     }
 
+    // Verificar se o pedido já foi cancelado por expiração
+    if (orderData.status === 'cancelled' && orderData.payment_status === 'expired') {
+      console.log('⚠️ Order was already cancelled due to expiration');
+      return new Response(
+        JSON.stringify({ 
+          message: 'Order expired and cancelled', 
+          order_id: orderData.id 
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     console.log('Updating order status:', { 
       orderId: orderData.id,
       from: { status: orderData.status, payment_status: orderData.payment_status },

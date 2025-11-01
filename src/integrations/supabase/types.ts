@@ -2733,6 +2733,7 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: number
       }
+      cancel_expired_order: { Args: { p_order_id: string }; Returns: boolean }
       complete_withdrawal: {
         Args: { p_admin_id: string; p_withdrawal_id: string }
         Returns: undefined
@@ -2765,6 +2766,16 @@ export type Database = {
       get_customer_display_name: {
         Args: { customer_user_id: string }
         Returns: string
+      }
+      get_expired_orders: {
+        Args: never
+        Returns: {
+          created_at: string
+          minutes_expired: number
+          order_id: string
+          order_number: string
+          payment_expires_at: string
+        }[]
       }
       get_inactive_users_for_cleanup: {
         Args: never

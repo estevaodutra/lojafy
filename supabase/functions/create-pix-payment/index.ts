@@ -346,7 +346,8 @@ serve(async (req) => {
       pix_qr_code: pixData.qrCodeCopyPaste,
       pix_qr_code_base64: pixData.qrCodeBase64,
       shipping_address: shippingAddress,
-      external_reference: externalReference
+      external_reference: externalReference,
+      payment_expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutos
     };
 
     // Only add user_id if we have an authenticated user
