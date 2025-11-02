@@ -170,7 +170,7 @@ export default function Academy() {
                       asChild 
                       className="w-full bg-green-600 hover:bg-green-700"
                     >
-                      <Link to={`/minha-conta/aulas/${course.id}`}>
+                      <Link to={`/minha-conta/curso/${course.id}`}>
                         <PlayCircle className="w-4 h-4 mr-2" />
                         Assistir Aulas
                       </Link>

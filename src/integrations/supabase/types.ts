@@ -604,6 +604,7 @@ export type Database = {
           lesson_description: string | null
           module_id: string
           position: number | null
+          thumbnail_url: string | null
           title: string
           updated_at: string | null
           video_url: string | null
@@ -619,6 +620,7 @@ export type Database = {
           lesson_description?: string | null
           module_id: string
           position?: number | null
+          thumbnail_url?: string | null
           title: string
           updated_at?: string | null
           video_url?: string | null
@@ -634,6 +636,7 @@ export type Database = {
           lesson_description?: string | null
           module_id?: string
           position?: number | null
+          thumbnail_url?: string | null
           title?: string
           updated_at?: string | null
           video_url?: string | null
@@ -656,6 +659,7 @@ export type Database = {
           id: string
           is_published: boolean | null
           position: number | null
+          thumbnail_url: string | null
           title: string
           updated_at: string | null
         }
@@ -666,6 +670,7 @@ export type Database = {
           id?: string
           is_published?: boolean | null
           position?: number | null
+          thumbnail_url?: string | null
           title: string
           updated_at?: string | null
         }
@@ -676,6 +681,7 @@ export type Database = {
           id?: string
           is_published?: boolean | null
           position?: number | null
+          thumbnail_url?: string | null
           title?: string
           updated_at?: string | null
         }

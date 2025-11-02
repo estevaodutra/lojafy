@@ -25,10 +25,12 @@ import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CourseModule } from '@/types/courses';
+import { SimpleImageUpload } from './SimpleImageUpload';
 
 const moduleSchema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
   description: z.string().optional(),
+  thumbnail_url: z.string().optional(),
   position: z.coerce.number().min(1).default(1),
   is_published: z.boolean().default(false),
 });
@@ -55,6 +57,7 @@ export function CourseModuleForm({
     defaultValues: {
       title: '',
       description: '',
+      thumbnail_url: '',
       position: 1,
       is_published: false,
     },
@@ -65,6 +68,7 @@ export function CourseModuleForm({
       form.reset({
         title: module.title,
         description: module.description || '',
+        thumbnail_url: module.thumbnail_url || '',
         position: module.position,
         is_published: module.is_published,
       });
@@ -72,6 +76,7 @@ export function CourseModuleForm({
       form.reset({
         title: '',
         description: '',
+        thumbnail_url: '',
         position: 1,
         is_published: false,
       });
@@ -83,6 +88,7 @@ export function CourseModuleForm({
       const moduleData = {
         title: data.title,
         description: data.description || null,
+        thumbnail_url: data.thumbnail_url || null,
         position: data.position,
         is_published: data.is_published,
         course_id: courseId,
@@ -149,6 +155,28 @@ export function CourseModuleForm({
                       {...field}
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="thumbnail_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Imagem de Capa (Thumbnail)</FormLabel>
+                  <FormControl>
+                    <SimpleImageUpload
+                      onImageUploaded={field.onChange}
+                      currentImage={field.value}
+                      accept="image/*"
+                      maxSize={5}
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    Recomendado: 1280x720px (16:9). Imagem exibida no card do módulo.
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}

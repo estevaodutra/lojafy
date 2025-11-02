@@ -26,10 +26,12 @@ import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CourseLesson } from '@/types/courses';
+import { SimpleImageUpload } from './SimpleImageUpload';
 
 const lessonSchema = z.object({
   title: z.string().min(1, 'Título é obrigatório'),
   description: z.string().optional(),
+  thumbnail_url: z.string().optional(),
   lesson_description: z.string().optional(),
   content: z.string().optional(),
   video_url: z.string().url('URL inválida').optional().or(z.literal('')),
@@ -60,6 +62,7 @@ export function CourseLessonForm({
     defaultValues: {
       title: '',
       description: '',
+      thumbnail_url: '',
       lesson_description: '',
       content: '',
       video_url: '',
@@ -74,6 +77,7 @@ export function CourseLessonForm({
       form.reset({
         title: lesson.title,
         description: lesson.description || '',
+        thumbnail_url: lesson.thumbnail_url || '',
         lesson_description: (lesson as any).lesson_description || '',
         content: lesson.content || '',
         video_url: lesson.video_url || '',
@@ -85,6 +89,7 @@ export function CourseLessonForm({
       form.reset({
         title: '',
         description: '',
+        thumbnail_url: '',
         lesson_description: '',
         content: '',
         video_url: '',
@@ -100,6 +105,7 @@ export function CourseLessonForm({
       const lessonData = {
         title: data.title,
         description: data.description || null,
+        thumbnail_url: data.thumbnail_url || null,
         lesson_description: data.lesson_description || null,
         content: data.content || null,
         video_url: data.video_url || null,
@@ -171,6 +177,28 @@ export function CourseLessonForm({
                       {...field}
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="thumbnail_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Imagem de Capa (Thumbnail)</FormLabel>
+                  <FormControl>
+                    <SimpleImageUpload
+                      onImageUploaded={field.onChange}
+                      currentImage={field.value}
+                      accept="image/*"
+                      maxSize={5}
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    Recomendado: 1280x720px (16:9). Imagem exibida no card da aula.
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}

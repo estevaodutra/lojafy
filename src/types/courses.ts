@@ -19,6 +19,7 @@ export interface CourseModule {
   course_id: string;
   title: string;
   description?: string;
+  thumbnail_url?: string;
   position: number;
   is_published: boolean;
   created_at: string;
@@ -31,6 +32,7 @@ export interface CourseLesson {
   module_id: string;
   title: string;
   description?: string;
+  thumbnail_url?: string;
   content?: string;
   video_url?: string;
   duration_minutes?: number;
