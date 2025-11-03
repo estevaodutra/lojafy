@@ -1863,6 +1863,7 @@ export type Database = {
           original_price: number | null
           price: number
           rating: number | null
+          reference_ad_url: string | null
           review_count: number | null
           sku: string | null
           specifications: Json | null
@@ -1897,6 +1898,7 @@ export type Database = {
           original_price?: number | null
           price: number
           rating?: number | null
+          reference_ad_url?: string | null
           review_count?: number | null
           sku?: string | null
           specifications?: Json | null
@@ -1931,6 +1933,7 @@ export type Database = {
           original_price?: number | null
           price?: number
           rating?: number | null
+          reference_ad_url?: string | null
           review_count?: number | null
           sku?: string | null
           specifications?: Json | null

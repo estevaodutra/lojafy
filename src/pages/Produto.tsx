@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { ImageZoomModal } from "@/components/ImageZoomModal";
-import { ChevronRight, Star, Heart, ShoppingCart, Truck, Shield, RotateCcw, Plus, Minus, Share2, ZoomIn, Package, Info } from "lucide-react";
+import { ChevronRight, Star, Heart, ShoppingCart, Truck, Shield, RotateCcw, Plus, Minus, Share2, ZoomIn, Package, Info, ExternalLink } from "lucide-react";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { useCart } from "@/contexts/CartContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -384,6 +384,18 @@ const Produto = ({
               <Button size="lg" onClick={handleBuyNow} disabled={(product.stock_quantity || 0) <= 0} className="w-full btn-buy-now h-12 text-slate-50 text-base bg-[3dba54] bg-[#3fc356]">
                 <span className="text-base font-semibold">Comprar Agora</span>
               </Button>
+
+              {product.reference_ad_url && (
+                <Button 
+                  size="lg" 
+                  variant="outline"
+                  onClick={() => window.open(product.reference_ad_url, '_blank')}
+                  className="w-full h-12"
+                >
+                  <ExternalLink className="h-5 w-5 mr-2" />
+                  Ver Anúncio de Referência
+                </Button>
+              )}
 
             </div>
 

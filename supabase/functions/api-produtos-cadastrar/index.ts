@@ -99,7 +99,8 @@ Deno.serve(async (req) => {
       comprimento,
       produto_destaque,
       badge,
-      alta_rotatividade
+      alta_rotatividade,
+      anuncio_referencia
     } = body;
 
     // Normalize data
@@ -109,6 +110,7 @@ Deno.serve(async (req) => {
     const normalizedGtin = gtin === "" ? null : gtin;
     const normalizedMarca = marca === "" ? null : marca;
     const normalizedBadge = badge === "" ? null : badge;
+    const normalizedAnuncioReferencia = anuncio_referencia === "" || anuncio_referencia === undefined ? null : anuncio_referencia;
     const normalizedImagemPrincipal = imagem_principal === "" || imagem_principal === "null" ? null : imagem_principal;
     const normalizedImagens = (imagens && imagens.length > 0) ? imagens.filter((img: string) => img && img !== "" && img !== "null") : [];
     const normalizedEspecificacoes = especificacoes && Object.keys(especificacoes).length > 0 ? especificacoes : {};
@@ -164,6 +166,21 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Validate reference ad URL if provided
+    if (normalizedAnuncioReferencia) {
+      try {
+        new URL(normalizedAnuncioReferencia);
+      } catch {
+        return new Response(
+          JSON.stringify({ 
+            error: 'anuncio_referencia deve ser uma URL válida',
+            received: { anuncio_referencia: normalizedAnuncioReferencia }
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // Validate subcategory belongs to category if both are provided
     if (normalizedSubcategoriaId && normalizedCategoriaId) {
       const { data: subcategory, error: subcategoryError } = await supabase
@@ -204,9 +221,10 @@ Deno.serve(async (req) => {
       width: largura,
       height: altura,
       length: comprimento,
-      featured: produto_destaque || false,
+      featured: normalizedAnuncioReferencia ? true : (produto_destaque || false),
       badge: normalizedBadge,
       high_rotation: alta_rotatividade || false,
+      reference_ad_url: normalizedAnuncioReferencia,
       active: true
     };
 
@@ -277,6 +295,7 @@ Deno.serve(async (req) => {
           produto_destaque: product.featured,
           badge: product.badge,
           alta_rotatividade: product.high_rotation,
+          anuncio_referencia: product.reference_ad_url,
           imagens: product.images,
           imagem_principal: product.main_image_url,
           especificacoes: product.specifications,

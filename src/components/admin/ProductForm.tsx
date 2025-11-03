@@ -11,7 +11,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, X, RefreshCw } from 'lucide-react';
+import { Loader2, Plus, X, RefreshCw, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
@@ -48,6 +48,7 @@ const productSchema = z.object({
   active: z.boolean().default(true),
   featured: z.boolean().default(false),
   badge: z.string().optional(),
+  reference_ad_url: z.string().url('URL inválida').optional().or(z.literal('')),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -163,12 +164,14 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       active: product?.active ?? true,
       featured: product?.featured ?? false,
       badge: product?.badge || '',
+      reference_ad_url: product?.reference_ad_url || '',
     },
   });
 
   const selectedCategoryId = form.watch('category_id');
   const watchedCostPrice = form.watch('cost_price');
   const watchedUseAutoPricing = form.watch('use_auto_pricing');
+  const watchedReferenceUrl = form.watch('reference_ad_url');
 
   // Auto-calculate price based on cost_price (only for super_admin with auto pricing enabled)
   useEffect(() => {
@@ -186,6 +189,13 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       }
     }
   }, [watchedCostPrice, watchedUseAutoPricing, settings, isSuperAdmin, form]);
+
+  // Auto-set featured when reference_ad_url is filled
+  useEffect(() => {
+    if (watchedReferenceUrl && watchedReferenceUrl.trim() !== '') {
+      form.setValue('featured', true);
+    }
+  }, [watchedReferenceUrl, form]);
 
   // Calculate price based on cost and fees
   // Formula: (cost + profit_margin + additional_costs) / (1 - gateway_fee/100)
@@ -355,8 +365,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         main_image_url: mainImage?.url || mainImage?.preview || null,
         image_url: mainImage?.url || mainImage?.preview || null, // Backward compatibility
         active: data.active,
-        featured: data.featured,
+        featured: data.reference_ad_url && data.reference_ad_url.trim() !== '' ? true : data.featured,
         badge: data.badge || null,
+        reference_ad_url: data.reference_ad_url || null,
         specifications: specificationsObj,
         images: imageUrls,
         updated_at: new Date().toISOString(),
@@ -738,6 +749,30 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
                   </FormControl>
                   <FormDescription>
                     Etiqueta de destaque que aparecerá no produto (opcional)
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="reference_ad_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    Anúncio de Referência
+                  </FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="url"
+                      placeholder="https://exemplo.com/produto" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Link para anúncio externo onde o produto está mais barato. <strong>Quando preenchido, o produto será automaticamente marcado como destaque.</strong>
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -1137,7 +1172,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
               <div className="space-y-0.5">
                 <FormLabel>Produto em Destaque</FormLabel>
                 <FormDescription>
-                  Produto será exibido em seções especiais
+                  {watchedReferenceUrl && watchedReferenceUrl.trim() !== '' 
+                    ? '✓ Ativado automaticamente pelo Anúncio de Referência' 
+                    : 'Produto será exibido em seções especiais'}
                 </FormDescription>
               </div>
               <FormField
@@ -1149,6 +1186,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
                       <Switch
                         checked={field.value}
                         onCheckedChange={field.onChange}
+                        disabled={watchedReferenceUrl && watchedReferenceUrl.trim() !== ''}
                       />
                     </FormControl>
                   </FormItem>
