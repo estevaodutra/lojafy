@@ -83,8 +83,36 @@ export const SimpleImageUpload: React.FC<SimpleImageUploadProps> = ({
     }
   }, [onImageUploaded, toast, uploadImage]);
 
+  const onDropRejected = useCallback((fileRejections: any[]) => {
+    const maxMB = Math.round(maxSize / (1024 * 1024));
+    fileRejections.forEach(rejection => {
+      rejection.errors.forEach((err: any) => {
+        if (err.code === 'file-too-large') {
+          toast({
+            title: "Arquivo muito grande",
+            description: `O limite é ${maxMB} MB.`,
+            variant: "destructive",
+          });
+        } else if (err.code === 'file-invalid-type') {
+          toast({
+            title: "Tipo de arquivo inválido",
+            description: "Envie uma imagem (JPG, PNG ou WEBP).",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Não foi possível enviar",
+            description: err.message || "Tente novamente com outro arquivo.",
+            variant: "destructive",
+          });
+        }
+      });
+    });
+  }, [toast, maxSize]);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    onDropRejected,
     accept: { [accept]: [] },
     maxSize,
     multiple: false,
@@ -138,6 +166,7 @@ export const SimpleImageUpload: React.FC<SimpleImageUploadProps> = ({
           </p>
           <p className="text-xs text-muted-foreground">
             {dimensions ? `Recomendado: ${dimensions.width}x${dimensions.height}px` : 'Clique ou arraste para selecionar'}
+            {maxSize && ` • Máximo: ${Math.round(maxSize / (1024 * 1024))}MB`}
           </p>
           {dimensions && (
             <p className="text-xs text-muted-foreground mt-1">

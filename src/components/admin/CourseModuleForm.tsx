@@ -171,7 +171,7 @@ export function CourseModuleForm({
                       onImageUploaded={field.onChange}
                       currentImage={field.value}
                       accept="image/*"
-                      maxSize={5}
+                      maxSize={10 * 1024 * 1024}
                     />
                   </FormControl>
                   <p className="text-xs text-muted-foreground">
