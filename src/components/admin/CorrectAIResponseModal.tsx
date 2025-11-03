@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { AlertCircle, CheckCircle } from 'lucide-react';
 import { useAICorrections } from '@/hooks/useAICorrections';
 import { useStandardAnswers } from '@/hooks/useStandardAnswers';
+import { toast } from 'sonner';
 
 interface ChatMessage {
   id: string;
@@ -46,21 +47,50 @@ export const CorrectAIResponseModal = ({
   const [knowledgeCategory, setKnowledgeCategory] = useState('');
   const [keywords, setKeywords] = useState<string[]>([]);
 
+  const extractKeywords = (text: string): string[] => {
+    const words = text.toLowerCase()
+      .replace(/[^\w\sáàâãéèêíïóôõöúçñ]/g, ' ')
+      .split(/\s+/)
+      .filter(word => word.length > 4);
+    
+    const stopWords = [
+      'para', 'sobre', 'como', 'quando', 'onde', 'porque', 'qual', 'quais',
+      'essa', 'esse', 'esta', 'este', 'aquela', 'aquele',
+      'tinha', 'tem', 'teve', 'ter', 'mais', 'menos', 'muito', 'pouco',
+      'grande', 'pequeno', 'maior', 'menor', 'novo', 'nova', 'novos', 'novas',
+      'todo', 'toda', 'todos', 'todas', 'cada', 'algum', 'alguns', 'nenhum',
+      'outro', 'outra', 'outros', 'outras'
+    ];
+    return [...new Set(words.filter(word => !stopWords.includes(word)))].slice(0, 10);
+  };
+
   useEffect(() => {
     if (open) {
-      // Auto-extract keywords from customer question
-      const extractedKeywords = customerQuestion
-        .toLowerCase()
-        .split(/\s+/)
-        .filter(word => word.length > 3)
-        .filter(word => !['sobre', 'qual', 'como', 'quando', 'onde', 'porque', 'para'].includes(word))
-        .slice(0, 5);
-      setKeywords(extractedKeywords);
+      setKeywords(extractKeywords(customerQuestion));
     }
   }, [open, customerQuestion]);
 
   const handleSave = async () => {
-    if (!correctResponse.trim()) return;
+    // Validações
+    if (!correctResponse.trim()) {
+      toast.error('Digite uma resposta corrigida');
+      return;
+    }
+
+    if (createStandardAnswer && !standardAnswerName.trim()) {
+      toast.error('Digite um nome para a resposta padrão');
+      return;
+    }
+
+    if (updateExisting && !selectedAnswerId) {
+      toast.error('Selecione uma resposta padrão para atualizar');
+      return;
+    }
+
+    if (addToKnowledgeBase && (!knowledgeTitle.trim() || !knowledgeCategory)) {
+      toast.error('Preencha o título e selecione uma categoria para a base de conhecimento');
+      return;
+    }
 
     const success = await saveCorrection({
       ticketId,

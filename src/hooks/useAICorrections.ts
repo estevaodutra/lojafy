@@ -23,8 +23,32 @@ export const useAICorrections = () => {
   const saveCorrection = async (data: AICorrection) => {
     setSaving(true);
     try {
+      // Validações iniciais
+      if (!data.correctResponse?.trim()) {
+        toast.error('Resposta corrigida é obrigatória');
+        return false;
+      }
+
+      if (data.createStandardAnswer && !data.standardAnswerName?.trim()) {
+        toast.error('Nome da resposta padrão é obrigatório');
+        return false;
+      }
+
+      if (data.updateStandardAnswerId && !data.updateStandardAnswerId.trim()) {
+        toast.error('ID da resposta padrão para atualizar é obrigatório');
+        return false;
+      }
+
+      if (data.addToKnowledgeBase && (!data.knowledgeBaseTitle?.trim() || !data.knowledgeBaseCategory?.trim())) {
+        toast.error('Título e categoria da base de conhecimento são obrigatórios');
+        return false;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
+      if (!user) {
+        toast.error('Usuário não autenticado');
+        return false;
+      }
 
       let createdStandardAnswerId = null;
       let createdKnowledgeId = null;
@@ -124,9 +148,20 @@ export const useAICorrections = () => {
 
       toast.success('Correção salva e resposta enviada ao cliente!');
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving correction:', error);
-      toast.error('Erro ao salvar correção');
+      
+      // Mensagens de erro mais específicas
+      if (error?.code === '23503') {
+        toast.error('Erro de referência: verifique se todos os IDs são válidos');
+      } else if (error?.code === '23505') {
+        toast.error('Esta correção já existe');
+      } else if (error?.message) {
+        toast.error(`Erro ao salvar: ${error.message}`);
+      } else {
+        toast.error('Erro ao salvar correção');
+      }
+      
       return false;
     } finally {
       setSaving(false);
