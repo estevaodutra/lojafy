@@ -35,6 +35,62 @@ Esta API requer autenticação via API Key no header `X-API-Key`.
 | `alta_rotatividade` | boolean | ❌ Não | Marca produto com alta rotatividade |
 | **`anuncio_referencia`** | string (URL) | ❌ Não | **Link para anúncio de referência externo** |
 
+## 📝 Formatação da Descrição com Markdown
+
+A descrição do produto (`descricao`) suporta formatação **Markdown** para melhor apresentação visual na página do produto.
+
+### Recursos suportados:
+
+**Negrito**: `**texto em negrito**` ou `__texto em negrito__`
+- Resultado: **texto em negrito**
+
+**Itálico**: `*texto em itálico*` ou `_texto em itálico_`
+- Resultado: *texto em itálico*
+
+**Quebra de linha**: Use `\n` para quebrar linha
+```json
+{
+  "descricao": "Primeira linha\nSegunda linha\nTerceira linha"
+}
+```
+
+**Listas não ordenadas**:
+```json
+{
+  "descricao": "Características:\n- Item 1\n- Item 2\n- Item 3"
+}
+```
+
+**Listas ordenadas**:
+```json
+{
+  "descricao": "Passo a passo:\n1. Primeiro passo\n2. Segundo passo\n3. Terceiro passo"
+}
+```
+
+**Links**: `[texto do link](https://exemplo.com)` - links abrem automaticamente em nova aba
+```json
+{
+  "descricao": "Veja mais em [nosso site](https://exemplo.com)"
+}
+```
+
+**Combinação completa**:
+```json
+{
+  "descricao": "**Notebook de alta performance**\n\nCaracterísticas principais:\n- Processador Intel i7\n- 16GB RAM DDR5\n- SSD 512GB NVMe\n\n*Ideal para jogos e trabalho pesado*\n\nMais informações: [clique aqui](https://exemplo.com)"
+}
+```
+
+### ⚠️ Observações importantes:
+- ✅ Texto simples sem Markdown continua funcionando normalmente
+- ✅ Links sempre abrem em nova aba (atributo `target="_blank"` e `rel="noopener noreferrer"`)
+- ✅ Quebras de linha (`\n`) são respeitadas
+- ⚠️ HTML inline NÃO é suportado por questões de segurança
+- ⚠️ Títulos (#, ##, ###) são suportados mas devem ser usados com moderação na descrição
+
+---
+
 ## Campo Especial: `anuncio_referencia`
 
 ### Descrição

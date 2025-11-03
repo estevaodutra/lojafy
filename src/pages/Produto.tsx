@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
+import ReactMarkdown from 'react-markdown';
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -345,11 +346,41 @@ const Produto = ({
             </div>
 
             {/* Description */}
-            {product.description && <div>
-                <p className="text-muted-foreground leading-relaxed">
-                  {product.description}
-                </p>
-              </div>}
+            {product.description && (
+              <div>
+                <div className="text-muted-foreground leading-relaxed prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1">
+                  <ReactMarkdown
+                    components={{
+                      a: ({ node, ...props }) => (
+                        <a 
+                          className="text-primary underline hover:text-primary/80" 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          {...props} 
+                        />
+                      ),
+                      p: ({ node, ...props }) => (
+                        <p className="whitespace-pre-wrap break-words mb-2" {...props} />
+                      ),
+                      strong: ({ node, ...props }) => (
+                        <strong className="font-semibold" {...props} />
+                      ),
+                      ul: ({ node, ...props }) => (
+                        <ul className="list-disc list-inside space-y-1" {...props} />
+                      ),
+                      ol: ({ node, ...props }) => (
+                        <ol className="list-decimal list-inside space-y-1" {...props} />
+                      ),
+                      li: ({ node, ...props }) => (
+                        <li className="ml-2" {...props} />
+                      ),
+                    }}
+                  >
+                    {product.description}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            )}
 
             {/* Quantity and Actions */}
             <div className="space-y-4">
