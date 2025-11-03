@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,11 @@ export const SimpleImageUpload: React.FC<SimpleImageUploadProps> = ({
 }) => {
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPreviewUrl(currentImage || null);
+  }, [currentImage]);
 
   const uploadImage = useCallback(async (file: File) => {
     try {
@@ -61,6 +66,7 @@ export const SimpleImageUpload: React.FC<SimpleImageUploadProps> = ({
 
     try {
       const url = await uploadImage(file);
+      setPreviewUrl(url);
       onImageUploaded(url);
       toast({
         title: "Imagem enviada",
@@ -86,15 +92,16 @@ export const SimpleImageUpload: React.FC<SimpleImageUploadProps> = ({
   });
 
   const removeImage = () => {
+    setPreviewUrl(null);
     onImageUploaded('');
   };
 
   return (
     <div className="space-y-4">
-      {currentImage ? (
+      {(previewUrl || currentImage) ? (
         <div className="relative inline-block">
           <img
-            src={currentImage}
+            src={previewUrl || currentImage || ''}
             alt="Upload preview"
             className="max-w-32 max-h-32 object-cover rounded-lg border"
             style={dimensions ? {
