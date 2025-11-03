@@ -137,6 +137,27 @@ export const useStandardAnswers = () => {
     }
   };
 
+  const incrementUsage = async (id: string) => {
+    try {
+      const answer = standardAnswers.find(a => a.id === id);
+      if (answer) {
+        // Optimistic update
+        setStandardAnswers(prev => 
+          prev.map(a => a.id === id ? { ...a, usage_count: a.usage_count + 1 } : a)
+        );
+        
+        await supabase
+          .from('ai_standard_answers')
+          .update({ usage_count: answer.usage_count + 1 })
+          .eq('id', id);
+      }
+    } catch (error) {
+      console.error('Error incrementing usage:', error);
+      // Revert on error
+      await fetchStandardAnswers();
+    }
+  };
+
   return {
     standardAnswers,
     loading,
@@ -144,6 +165,7 @@ export const useStandardAnswers = () => {
     updateStandardAnswer,
     deleteStandardAnswer,
     incrementUsageCount,
+    incrementUsage,
     refetch: fetchStandardAnswers
   };
 };

@@ -62,6 +62,80 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_corrections: {
+        Row: {
+          ai_response: string
+          correct_response: string
+          corrected_by: string | null
+          created_at: string | null
+          created_knowledge_id: string | null
+          created_standard_answer_id: string | null
+          customer_question: string
+          id: string
+          keywords: string[] | null
+          original_message_id: string | null
+          ticket_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ai_response: string
+          correct_response: string
+          corrected_by?: string | null
+          created_at?: string | null
+          created_knowledge_id?: string | null
+          created_standard_answer_id?: string | null
+          customer_question: string
+          id?: string
+          keywords?: string[] | null
+          original_message_id?: string | null
+          ticket_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ai_response?: string
+          correct_response?: string
+          corrected_by?: string | null
+          created_at?: string | null
+          created_knowledge_id?: string | null
+          created_standard_answer_id?: string | null
+          customer_question?: string
+          id?: string
+          keywords?: string[] | null
+          original_message_id?: string | null
+          ticket_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_corrections_created_knowledge_id_fkey"
+            columns: ["created_knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "ai_knowledge_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_corrections_created_standard_answer_id_fkey"
+            columns: ["created_standard_answer_id"]
+            isOneToOne: false
+            referencedRelation: "ai_standard_answers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_corrections_original_message_id_fkey"
+            columns: ["original_message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_corrections_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_knowledge_base: {
         Row: {
           active: boolean | null
