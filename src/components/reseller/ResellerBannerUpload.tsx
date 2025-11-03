@@ -17,12 +17,15 @@ export const ResellerBannerUpload: React.FC<ResellerBannerUploadProps> = ({
   bannerType,
 }) => {
   const dimensions = bannerType === 'carousel' 
-    ? { width: 1920, height: 600, description: 'Banner Rotativo Desktop', recommendedFormat: 'JPG, PNG ou WEBP' }
-    : { width: 800, height: 400, description: 'Banner Destaque Desktop', recommendedFormat: 'JPG, PNG ou WEBP' };
+    ? { width: 1920, height: 1080, description: 'Banner Rotativo Desktop (16:9)', recommendedFormat: 'JPG, PNG ou WEBP' }
+    : { width: 1600, height: 900, description: 'Banner Destaque Desktop (16:9)', recommendedFormat: 'JPG, PNG ou WEBP' };
 
-  const mobileDimensions = bannerType === 'carousel'
-    ? { width: 768, height: 500, description: 'Banner Rotativo Mobile', recommendedFormat: 'JPG, PNG ou WEBP' }
-    : { width: 768, height: 400, description: 'Banner Destaque Mobile', recommendedFormat: 'JPG, PNG ou WEBP' };
+  const mobileDimensions = { 
+    width: 768, 
+    height: 432, 
+    description: `Banner ${bannerType === 'carousel' ? 'Rotativo' : 'Destaque'} Mobile (16:9)`, 
+    recommendedFormat: 'JPG, PNG ou WEBP' 
+  };
 
   return (
     <div className="space-y-6">
