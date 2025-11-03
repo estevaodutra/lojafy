@@ -12,7 +12,7 @@ const endpoints = [
     title: 'Cadastrar Produto',
     method: 'POST' as const,
     url: '/functions/v1/api-produtos-cadastrar',
-    description: 'Cria um novo produto no sistema com suporte completo a preços promocionais, controle de estoque e dimensões. SKU e GTIN são gerados automaticamente se não fornecidos. Peso deve ser informado em quilogramas (kg). O campo alta_rotatividade indica produtos com alta demanda. IMPORTANTE: Sequências \\r\\n na descrição são automaticamente convertidas em quebras de linha.',
+    description: 'Cria um novo produto no sistema com suporte completo a preços promocionais, controle de estoque e dimensões. SKU e GTIN são gerados automaticamente se não fornecidos. Peso deve ser informado em quilogramas (kg). O campo alta_rotatividade indica produtos com alta demanda. IMPORTANTE: Sequências \\r\\n na descrição são automaticamente convertidas em quebras de linha. O campo anuncio_referencia (URL opcional) marca automaticamente o produto como destaque e exibe um botão "Ver Anúncio de Referência" na página do produto.',
     requestBody: {
       nome: 'Colete Postural Coluna Cervical Hérnia De Disco Cinta Leve Discreta Correção Postura Costas Corretor Feminino Masculino',
       descricao: 'Modelo\\r\\nPeitoral: 75-100cm Altura: 155-180cm\\r\\n\\r\\nEste colete é uma simples forma para corrigir e melhorar a postura, e ajudar aliviar as dores nos ombros e nas costas.\\r\\n\\r\\nBenefícios:\\r\\n\\r\\n* Alívio da dor muscular. Mantém o equilíbrio gravidade do corpo, reduz a carga sobre os músculos, corrige más posturas e alivia dores de pescoço e ombros, e até mesmo dores de cabeça.',
@@ -42,7 +42,8 @@ const endpoints = [
       peso: 0.3,
       largura: 16,
       altura: 16,
-      comprimento: 12
+      comprimento: 12,
+      anuncio_referencia: 'https://www.mercadolivre.com.br/colete-postural-exemplo'
     },
     responseExample: {
       success: true,
@@ -62,7 +63,7 @@ const endpoints = [
         categoria_id: 'dd2ee6ab-f376-4876-8d53-9ffc6fb831ff',
         subcategoria_id: '36ab7b10-cad6-4d21-8a41-525695f77ba5',
         marca: null,
-        produto_destaque: false,
+        produto_destaque: true,
         high_rotation: false,
         badge: null,
         imagens: [],
@@ -78,6 +79,7 @@ const endpoints = [
         largura: 16,
         altura: 16,
         comprimento: 12,
+        reference_ad_url: 'https://www.mercadolivre.com.br/colete-postural-exemplo',
         ativo: true,
         criado_em: '2025-01-12T10:00:00Z',
         atualizado_em: '2025-01-12T10:00:00Z'
