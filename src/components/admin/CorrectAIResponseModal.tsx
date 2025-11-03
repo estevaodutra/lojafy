@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CheckCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Info } from 'lucide-react';
 import { useAICorrections } from '@/hooks/useAICorrections';
 import { useStandardAnswers } from '@/hooks/useStandardAnswers';
 import { toast } from 'sonner';
@@ -46,6 +46,8 @@ export const CorrectAIResponseModal = ({
   const [knowledgeTitle, setKnowledgeTitle] = useState('');
   const [knowledgeCategory, setKnowledgeCategory] = useState('');
   const [keywords, setKeywords] = useState<string[]>([]);
+  const [useExistingAnswer, setUseExistingAnswer] = useState(false);
+  const [selectedExistingAnswerId, setSelectedExistingAnswerId] = useState('');
 
   const normalizeCategory = (value: string): string => {
     const mapping: Record<string, string> = {
@@ -144,6 +146,8 @@ export const CorrectAIResponseModal = ({
       setAddToKnowledgeBase(false);
       setKnowledgeTitle('');
       setKnowledgeCategory('');
+      setUseExistingAnswer(false);
+      setSelectedExistingAnswerId('');
     }
   };
 
@@ -188,7 +192,92 @@ export const CorrectAIResponseModal = ({
               onChange={(e) => setCorrectResponse(e.target.value)}
               placeholder="Digite a resposta correta que deveria ter sido enviada..."
               className="min-h-[120px]"
+              disabled={useExistingAnswer && !!selectedExistingAnswerId}
             />
+            {useExistingAnswer && selectedExistingAnswerId && (
+              <p className="text-xs text-muted-foreground mt-1">
+                ℹ️ Desmarque "Usar resposta padrão existente" para editar manualmente
+              </p>
+            )}
+          </div>
+
+          {/* Use Existing Standard Answer */}
+          <div className="space-y-2 border-t pt-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="use-existing-answer"
+                checked={useExistingAnswer}
+                onCheckedChange={(checked) => {
+                  setUseExistingAnswer(checked as boolean);
+                  if (!checked) {
+                    setSelectedExistingAnswerId('');
+                  }
+                }}
+              />
+              <Label htmlFor="use-existing-answer" className="font-normal cursor-pointer flex items-center gap-1">
+                Usar resposta padrão existente
+                <Info className="h-3 w-3 text-muted-foreground" />
+              </Label>
+            </div>
+            {useExistingAnswer && (
+              <>
+                {standardAnswers.filter(a => a.active).length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic ml-6">
+                    Nenhuma resposta padrão disponível
+                  </p>
+                ) : (
+                  <>
+                    <Select 
+                      value={selectedExistingAnswerId} 
+                      onValueChange={(value) => {
+                        setSelectedExistingAnswerId(value);
+                        const selected = standardAnswers.find(a => a.id === value);
+                        if (selected) {
+                          setCorrectResponse(selected.answer);
+                          toast.success('Resposta preenchida automaticamente');
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-full ml-6">
+                        <SelectValue placeholder="Selecione uma resposta padrão" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {standardAnswers
+                          .filter(a => a.active)
+                          .sort((a, b) => {
+                            if (b.usage_count !== a.usage_count) {
+                              return b.usage_count - a.usage_count;
+                            }
+                            return a.name.localeCompare(b.name);
+                          })
+                          .map((answer) => (
+                            <SelectItem key={answer.id} value={answer.id}>
+                              <div className="flex items-center justify-between w-full">
+                                <span>{answer.name}</span>
+                                <Badge variant="secondary" className="ml-2 text-xs">
+                                  {answer.usage_count} usos
+                                </Badge>
+                              </div>
+                            </SelectItem>
+                          ))
+                        }
+                      </SelectContent>
+                    </Select>
+                    {selectedExistingAnswerId && (
+                      <div className="ml-6 mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                        <div className="font-medium text-blue-900 mb-1">Prévia da resposta:</div>
+                        <div className="text-blue-700 line-clamp-3">
+                          {standardAnswers.find(a => a.id === selectedExistingAnswerId)?.answer}
+                        </div>
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground ml-6">
+                      💡 Selecione uma resposta já cadastrada para usar como base
+                    </p>
+                  </>
+                )}
+              </>
+            )}
           </div>
 
           {/* Keywords */}
