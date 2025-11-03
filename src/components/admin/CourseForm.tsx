@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -65,6 +65,37 @@ export function CourseForm({ open, onOpenChange, course, onSuccess }: CourseForm
   });
 
   const isPublished = watch('is_published');
+
+  // Sincronizar valores do formulário quando o curso mudar
+  useEffect(() => {
+    if (course) {
+      reset({
+        title: course.title || '',
+        description: course.description || '',
+        thumbnail_url: course.thumbnail_url || '',
+        instructor_name: course.instructor_name || '',
+        duration_hours: course.duration_hours || 0,
+        level: course.level || undefined,
+        price: course.price ? Number(course.price) : 0,
+        is_published: course.is_published || false,
+        position: course.position || 1,
+        access_level: (course as any).access_level || 'all',
+      });
+    } else {
+      reset({
+        title: '',
+        description: '',
+        thumbnail_url: '',
+        instructor_name: '',
+        duration_hours: 0,
+        level: undefined,
+        price: 0,
+        is_published: false,
+        position: 1,
+        access_level: 'all',
+      });
+    }
+  }, [course, reset]);
 
   const saveMutation = useMutation({
     mutationFn: async (data: CourseFormData) => {
