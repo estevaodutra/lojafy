@@ -47,6 +47,23 @@ export const CorrectAIResponseModal = ({
   const [knowledgeCategory, setKnowledgeCategory] = useState('');
   const [keywords, setKeywords] = useState<string[]>([]);
 
+  const normalizeCategory = (value: string): string => {
+    const mapping: Record<string, string> = {
+      'geral': 'general',
+      'produto': 'product_info',
+      'politica': 'policy',
+      'faq': 'faq',
+      'aulas': 'academy_lesson',
+      'academy': 'academy_lesson',
+      'pedidos': 'general',
+      'entrega': 'general',
+      'pagamento': 'general',
+      'conta': 'general',
+      'devolucao': 'policy'
+    };
+    return mapping[value.toLowerCase()] || value;
+  };
+
   const extractKeywords = (text: string): string[] => {
     const words = text.toLowerCase()
       .replace(/[^\w\sáàâãéèêíïóôõöúçñ]/g, ' ')
@@ -92,6 +109,15 @@ export const CorrectAIResponseModal = ({
       return;
     }
 
+    // Normalize and validate category
+    const normalizedCategory = addToKnowledgeBase ? normalizeCategory(knowledgeCategory) : undefined;
+    const allowedCategories = ['faq', 'policy', 'product_info', 'general', 'academy_lesson'];
+    
+    if (addToKnowledgeBase && (!normalizedCategory || !allowedCategories.includes(normalizedCategory))) {
+      toast.error('Categoria inválida. Escolha uma das opções: FAQ, Política, Informação de Produto, Geral ou Aulas da Academia.');
+      return;
+    }
+
     const success = await saveCorrection({
       ticketId,
       messageId: message.id,
@@ -104,7 +130,7 @@ export const CorrectAIResponseModal = ({
       updateStandardAnswerId: updateExisting ? selectedAnswerId : undefined,
       addToKnowledgeBase,
       knowledgeBaseTitle: addToKnowledgeBase ? knowledgeTitle : undefined,
-      knowledgeBaseCategory: addToKnowledgeBase ? knowledgeCategory : undefined
+      knowledgeBaseCategory: normalizedCategory
     });
 
     if (success) {
@@ -239,7 +265,12 @@ export const CorrectAIResponseModal = ({
                 <Checkbox
                   id="add-knowledge"
                   checked={addToKnowledgeBase}
-                  onCheckedChange={(checked) => setAddToKnowledgeBase(checked as boolean)}
+                  onCheckedChange={(checked) => {
+                    setAddToKnowledgeBase(checked as boolean);
+                    if (checked && !knowledgeCategory) {
+                      setKnowledgeCategory('general');
+                    }
+                  }}
                 />
                 <Label htmlFor="add-knowledge" className="font-normal cursor-pointer">
                   Adicionar à base de conhecimento
@@ -257,13 +288,11 @@ export const CorrectAIResponseModal = ({
                       <SelectValue placeholder="Categoria" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="pedidos">Pedidos</SelectItem>
-                      <SelectItem value="entrega">Entrega</SelectItem>
-                      <SelectItem value="pagamento">Pagamento</SelectItem>
-                      <SelectItem value="produto">Produto</SelectItem>
-                      <SelectItem value="conta">Conta</SelectItem>
-                      <SelectItem value="devolucao">Devolução</SelectItem>
-                      <SelectItem value="geral">Geral</SelectItem>
+                      <SelectItem value="faq">FAQ</SelectItem>
+                      <SelectItem value="policy">Política</SelectItem>
+                      <SelectItem value="product_info">Informação de Produto</SelectItem>
+                      <SelectItem value="general">Geral</SelectItem>
+                      <SelectItem value="academy_lesson">Aulas da Academia</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
