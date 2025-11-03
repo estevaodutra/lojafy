@@ -62,7 +62,7 @@ export const useAICorrections = () => {
             answer: data.correctResponse,
             keywords: data.keywords,
             active: true,
-            auto_trigger: false,
+            auto_trigger_enabled: false,
             created_by: user.id
           })
           .select()
