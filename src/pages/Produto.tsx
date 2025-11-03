@@ -366,13 +366,13 @@ const Produto = ({
                         <strong className="font-semibold" {...props} />
                       ),
                       ul: ({ node, ...props }) => (
-                        <ul className="list-disc list-inside space-y-1" {...props} />
+                        <ul className="list-disc list-outside ml-6 space-y-1" {...props} />
                       ),
                       ol: ({ node, ...props }) => (
-                        <ol className="list-decimal list-inside space-y-1" {...props} />
+                        <ol className="list-decimal list-outside ml-6 space-y-1" {...props} />
                       ),
                       li: ({ node, ...props }) => (
-                        <li className="ml-2" {...props} />
+                        <li className="pl-2" {...props} />
                       ),
                     }}
                   >
