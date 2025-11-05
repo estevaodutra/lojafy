@@ -339,6 +339,24 @@ const GestaoUsuarios = () => {
                           </Select>
                         </TableCell>
                         <TableCell>
+                          <Select
+                            value={user.role}
+                            onValueChange={(newRole) => updateUserRole(user.user_id, newRole)}
+                            disabled={updatingUsers.includes(user.user_id)}
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="customer">Cliente</SelectItem>
+                              <SelectItem value="reseller">Revendedor</SelectItem>
+                              <SelectItem value="supplier">Fornecedor</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="super_admin">Super Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
                           {user.role === 'reseller' && user.subscription_plan ? (
                             <PremiumBadge plan={user.subscription_plan as 'free' | 'premium'} />
                           ) : (
