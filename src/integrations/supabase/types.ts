@@ -2746,6 +2746,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          granted_at: string | null
+          granted_by: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string | null
+          granted_by?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          granted_at?: string | null
+          granted_by?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       withdrawal_requests: {
         Row: {
           amount: number
@@ -2928,6 +2952,10 @@ export type Database = {
           total_amount: number
         }[]
       }
+      get_user_role: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
       get_users_with_email: {
         Args: never
         Returns: {
@@ -2953,10 +2981,18 @@ export type Database = {
           user_id: string
         }[]
       }
-      has_role: {
-        Args: { user_role: Database["public"]["Enums"]["app_role"] }
-        Returns: boolean
-      }
+      has_role:
+        | {
+            Args: { user_role: Database["public"]["Enums"]["app_role"] }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              _role: Database["public"]["Enums"]["app_role"]
+              _user_id: string
+            }
+            Returns: boolean
+          }
       is_admin_user: { Args: never; Returns: boolean }
       reject_withdrawal: {
         Args: { p_admin_id: string; p_reason: string; p_withdrawal_id: string }

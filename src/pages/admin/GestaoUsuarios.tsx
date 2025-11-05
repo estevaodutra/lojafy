@@ -51,6 +51,7 @@ const GestaoUsuarios = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [editingUser, setEditingUser] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [updatingUsers, setUpdatingUsers] = useState<string[]>([]);
   const { toast } = useToast();
 
   const { data: users, isLoading, refetch } = useQuery({
@@ -88,6 +89,46 @@ const GestaoUsuarios = () => {
   const handleFilterChange = (setter: (value: string) => void) => (value: string) => {
     setter(value);
     setCurrentPage(1);
+  };
+
+  const updateUserRole = async (userId: string, newRole: string) => {
+    setUpdatingUsers(prev => [...prev, userId]);
+    
+    try {
+      // Usar tabela user_roles (segura) em vez de profiles
+      const { error: deleteError } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId);
+
+      if (deleteError) throw deleteError;
+
+      const { data: currentUser } = await supabase.auth.getUser();
+      
+      const { error: insertError } = await supabase
+        .from('user_roles')
+        .insert({ 
+          user_id: userId, 
+          role: newRole as any,
+          granted_by: currentUser.user?.id
+        } as any);
+
+      if (insertError) throw insertError;
+
+      toast({
+        title: 'Role atualizado',
+        description: `Role do usuário alterado para ${getRoleLabel(newRole)} com sucesso.`,
+      });
+      refetch();
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao atualizar role',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingUsers(prev => prev.filter(id => id !== userId));
+    }
   };
 
   const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
@@ -257,6 +298,7 @@ const GestaoUsuarios = () => {
                       <TableHead>Nome</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Role</TableHead>
+                      <TableHead>Alterar Role</TableHead>
                       <TableHead>Plano</TableHead>
                       <TableHead>Expiração</TableHead>
                       <TableHead>Status</TableHead>
@@ -277,6 +319,24 @@ const GestaoUsuarios = () => {
                           <Badge variant={getRoleBadgeVariant(user.role)}>
                             {getRoleLabel(user.role)}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={user.role}
+                            onValueChange={(newRole) => updateUserRole(user.user_id, newRole)}
+                            disabled={updatingUsers.includes(user.user_id)}
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="customer">Cliente</SelectItem>
+                              <SelectItem value="reseller">Revendedor</SelectItem>
+                              <SelectItem value="supplier">Fornecedor</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="super_admin">Super Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </TableCell>
                         <TableCell>
                           {user.role === 'reseller' && user.subscription_plan ? (
@@ -364,7 +424,7 @@ const GestaoUsuarios = () => {
                     ))}
                     {!paginatedUsers?.length && (
                       <TableRow>
-                        <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                           Nenhum usuário encontrado
                         </TableCell>
                       </TableRow>
