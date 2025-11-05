@@ -66,15 +66,22 @@ serve(async (req) => {
 
     console.log('N8N Response status:', n8nResponse.status);
 
+    // Log N8N errors but don't fail the auth event
     if (!n8nResponse.ok) {
-      console.error('N8N webhook failed:', n8nResponse.status, await n8nResponse.text());
+      const errorText = await n8nResponse.text();
+      console.warn('N8N webhook failed (non-critical):', n8nResponse.status, errorText);
+      
+      // Return success even if N8N fails - auth event is still valid
       return new Response(
         JSON.stringify({ 
-          error: 'Failed to send to N8N webhook',
-          status: n8nResponse.status 
+          success: true, 
+          message: 'Auth event processed (N8N notification failed)',
+          event_type,
+          email,
+          n8n_status: 'failed',
+          n8n_error: n8nResponse.status
         }),
         { 
-          status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
@@ -88,7 +95,8 @@ serve(async (req) => {
         success: true, 
         message: 'Auth event sent to N8N successfully',
         event_type,
-        email
+        email,
+        n8n_status: 'success'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
