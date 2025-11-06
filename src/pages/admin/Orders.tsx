@@ -54,45 +54,77 @@ const AdminOrders = () => {
 
       if (ordersError) throw ordersError;
 
+      // Early return if no orders found
+      if (!ordersData || ordersData.length === 0) {
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
+
       // Get order IDs to check for shipping files
-      const orderIds = (ordersData || []).map(order => order.id);
+      const orderIds = ordersData.map(order => order.id);
       
-      // Get shipping files for these orders
-      const { data: shippingFilesData } = await supabase
-        .from('order_shipping_files')
-        .select('order_id')
-        .in('order_id', orderIds);
+      // Get shipping files for these orders (only if we have orders)
+      let shippingFilesData: Array<{ order_id: string }> = [];
+      if (orderIds.length > 0) {
+        try {
+          const { data } = await supabase
+            .from('order_shipping_files')
+            .select('order_id')
+            .in('order_id', orderIds);
+          shippingFilesData = data || [];
+        } catch (error) {
+          console.error('Error fetching shipping files:', error);
+          toast({
+            title: "Aviso",
+            description: "Não foi possível carregar status dos arquivos de envio.",
+            variant: "default",
+          });
+        }
+      }
 
       // Create a set of order IDs that have shipping files
       const ordersWithShippingFiles = new Set(
-        (shippingFilesData || []).map(file => file.order_id)
+        shippingFilesData.map(file => file.order_id)
       );
 
-      // Get profiles for all unique user_ids
-      const userIds = [...new Set((ordersData || []).map(order => order.user_id))];
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('user_id, first_name, last_name')
-        .in('user_id', userIds);
+      // Get profiles for all unique user_ids (only if we have user IDs)
+      const userIds = [...new Set(ordersData.map(order => order.user_id).filter(Boolean))];
+      let profilesData: Array<{ user_id: string; first_name: string | null; last_name: string | null }> = [];
+      if (userIds.length > 0) {
+        try {
+          const { data } = await supabase
+            .from('profiles')
+            .select('user_id, first_name, last_name')
+            .in('user_id', userIds);
+          profilesData = data || [];
+        } catch (error) {
+          console.error('Error fetching profiles:', error);
+          toast({
+            title: "Aviso",
+            description: "Não foi possível carregar informações de clientes.",
+            variant: "default",
+          });
+        }
+      }
 
       // Create a profiles map for quick lookup
       const profilesMap = new Map(
-        (profilesData || []).map(profile => [profile.user_id, profile])
+        profilesData.map(profile => [profile.user_id, profile])
       );
 
       // Combine orders with profiles and shipping file status
-      const ordersWithProfiles = (ordersData || [])
-        .map(order => {
-          const profile = profilesMap.get(order.user_id);
-          return {
-            ...order,
-            has_shipping_file: ordersWithShippingFiles.has(order.id),
-            profiles: profile ? {
-              first_name: profile.first_name,
-              last_name: profile.last_name
-            } : { first_name: '', last_name: '' }
-          };
-        }) as Order[];
+      const ordersWithProfiles = ordersData.map(order => {
+        const profile = profilesMap.get(order.user_id);
+        return {
+          ...order,
+          has_shipping_file: ordersWithShippingFiles.has(order.id),
+          profiles: profile ? {
+            first_name: profile.first_name,
+            last_name: profile.last_name
+          } : { first_name: '', last_name: '' }
+        };
+      }) as Order[];
       
       setOrders(ordersWithProfiles);
     } catch (error) {

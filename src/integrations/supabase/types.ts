@@ -3055,7 +3055,15 @@ export type Database = {
             }
             Returns: boolean
           }
+      has_supplier_access_to_order: {
+        Args: { _order_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_admin_user: { Args: never; Returns: boolean }
+      is_users_order: {
+        Args: { _order_id: string; _user_id: string }
+        Returns: boolean
+      }
       reject_withdrawal: {
         Args: { p_admin_id: string; p_reason: string; p_withdrawal_id: string }
         Returns: undefined
