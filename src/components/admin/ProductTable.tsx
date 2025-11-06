@@ -196,6 +196,16 @@ const ProductTable: React.FC<ProductTableProps> = ({
         description: `${selectedProducts.length} produto(s) ${newStatus ? 'ativado(s)' : 'desativado(s)'} com sucesso.`,
       });
 
+      // Invalidate all product-related queries to force refetch
+      const queryClient = (window as any).__REACT_QUERY_CLIENT__;
+      if (queryClient) {
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        queryClient.invalidateQueries({ queryKey: ['featured-products'] });
+        queryClient.invalidateQueries({ queryKey: ['category-products'] });
+        queryClient.invalidateQueries({ queryKey: ['public-store-products'] });
+        queryClient.invalidateQueries({ queryKey: ['homepage-categories-with-count'] });
+      }
+
       setSelectedProducts([]);
       setIsSelectAllChecked(false);
       onRefresh();
@@ -290,6 +300,16 @@ const ProductTable: React.FC<ProductTableProps> = ({
         title: "Status atualizado",
         description: `Produto ${product.active ? 'desativado' : 'ativado'} com sucesso.`,
       });
+
+      // Invalidate all product-related queries to force refetch
+      const queryClient = (window as any).__REACT_QUERY_CLIENT__;
+      if (queryClient) {
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        queryClient.invalidateQueries({ queryKey: ['featured-products'] });
+        queryClient.invalidateQueries({ queryKey: ['category-products'] });
+        queryClient.invalidateQueries({ queryKey: ['public-store-products'] });
+        queryClient.invalidateQueries({ queryKey: ['homepage-categories-with-count'] });
+      }
 
       onRefresh();
     } catch (error) {

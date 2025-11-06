@@ -46,7 +46,7 @@ const PublicStoreProductGrid = ({ resellerId, storeSlug }: PublicStoreProductGri
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
           {featuredProducts
-            .filter(rp => rp.product && rp.product.id && rp.product.name)
+            .filter(rp => rp.product && rp.product.id && rp.product.name && rp.product.active === true)
             .map((resellerProduct: PublicStoreProductData) => {
             const product = resellerProduct.product;
             const displayPrice = resellerProduct.custom_price || product.price;

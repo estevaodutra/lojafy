@@ -58,6 +58,7 @@ const PublicStoreProducts = () => {
   // Filter products by category, price and brand
   const filteredProducts = products.filter(resellerProduct => {
     if (!resellerProduct.product) return false;
+    if (!resellerProduct.product.active) return false; // Only active products
     
     const product = resellerProduct.product;
     const displayPrice = resellerProduct.custom_price || product.price;

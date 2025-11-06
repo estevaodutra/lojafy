@@ -170,8 +170,8 @@ const CategoryCarousels = () => {
                     }}
                     className="w-full"
                   >
-                    <CarouselContent className="-ml-2 md:-ml-4">
-                      {products.map((product) => (
+                  <CarouselContent className="-ml-2 md:-ml-4">
+                      {products.filter(p => p.active === true).map((product) => (
                         <CarouselItem key={product.id} className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3 xl:basis-1/4 min-w-0">
                           <ProductCard product={product} />
                         </CarouselItem>

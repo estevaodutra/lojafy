@@ -23,6 +23,7 @@ export interface PublicStoreProductData {
     category_id: string;
     featured: boolean;
     high_rotation: boolean;
+    active: boolean;
   };
 }
 
@@ -47,7 +48,8 @@ export const usePublicStoreProducts = (resellerId?: string) => {
             badge,
             category_id,
             featured,
-            high_rotation
+            high_rotation,
+            active
           )
         `)
         .eq('reseller_id', resellerId)
@@ -83,7 +85,8 @@ export const usePublicStoreFeaturedProducts = (resellerId?: string) => {
             badge,
             category_id,
             featured,
-            high_rotation
+            high_rotation,
+            active
           )
         `)
         .eq('reseller_id', resellerId)
@@ -110,10 +113,11 @@ export const usePublicStoreCategories = (resellerId?: string) => {
       const { data: resellerProducts, error: productsError } = await supabase
         .from('reseller_products')
         .select(`
-          product:products(category_id, categories(id, name, slug, icon, color, image_url))
+          product:products!inner(category_id, active, categories(id, name, slug, icon, color, image_url))
         `)
         .eq('reseller_id', resellerId)
-        .eq('active', true);
+        .eq('active', true)
+        .eq('product.active', true);
 
       if (productsError) throw productsError;
 
@@ -144,7 +148,8 @@ export const usePublicStoreCategories = (resellerId?: string) => {
                 images,
                 rating,
                 badge,
-                category_id
+                category_id,
+                active
               )
             `)
             .eq('reseller_id', resellerId)

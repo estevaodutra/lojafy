@@ -77,7 +77,9 @@ const PublicStoreCategory = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {category.products.map((resellerProduct: any) => {
+          {category.products
+            .filter((rp: any) => rp.product && rp.product.active === true)
+            .map((resellerProduct: any) => {
             const product = resellerProduct.product;
             const displayPrice = resellerProduct.custom_price || product.price;
             
