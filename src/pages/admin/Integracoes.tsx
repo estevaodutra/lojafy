@@ -139,6 +139,206 @@ const endpoints = [
     }
   },
   {
+    title: 'Listar Produtos Aguardando Aprovação',
+    method: 'GET' as const,
+    url: '/functions/v1/api-produtos-aguardando-aprovacao',
+    description: 'Retorna todos os produtos com status "pending_approval" incluindo informações completas do fornecedor, categoria, subcategoria, imagens, especificações e preços. Ideal para sistemas de gestão de aprovação e integrações externas. Permite filtrar por fornecedor, criador ou busca textual. Retorna também um resumo com total de produtos aguardando e contagem por fornecedor.',
+    queryParams: [
+      { 
+        name: 'page', 
+        description: 'Número da página para paginação (padrão: 1)', 
+        example: '1' 
+      },
+      { 
+        name: 'limit', 
+        description: 'Quantidade de itens por página (máximo: 100, padrão: 50)', 
+        example: '20' 
+      },
+      { 
+        name: 'supplier_id', 
+        description: 'Filtrar produtos de um fornecedor específico pelo UUID', 
+        example: 'abc-123-def-456' 
+      },
+      { 
+        name: 'created_by', 
+        description: 'Filtrar produtos criados por um super admin específico pelo UUID', 
+        example: 'xyz-789-ghi-012' 
+      },
+      { 
+        name: 'search', 
+        description: 'Busca textual por nome, descrição ou SKU (case-insensitive)', 
+        example: 'notebook' 
+      }
+    ],
+    responseExample: {
+      success: true,
+      data: [
+        {
+          id: 'prod-123-uuid',
+          name: 'Notebook Dell Inspiron 15 3000',
+          description: 'Notebook Dell Inspiron com processador Intel Core i5 de 11ª geração, 8GB RAM, SSD 256GB, tela Full HD 15.6 polegadas.',
+          price: 2999.00,
+          original_price: 3499.00,
+          cost_price: null,
+          stock_quantity: 10,
+          sku: 'NB-DELL-I15-3000',
+          gtin_ean13: '7891234567890',
+          brand: 'Dell',
+          active: false,
+          high_rotation: false,
+          approval_status: 'pending_approval',
+          requires_approval: true,
+          rejection_reason: null,
+          approved_by: null,
+          approved_at: null,
+          rejected_at: null,
+          created_by: 'admin-456-uuid',
+          supplier_id: 'supplier-789-uuid',
+          reference_ad_url: null,
+          image_url: 'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/notebook-main.jpg',
+          main_image_url: 'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/notebook-main.jpg',
+          images: [
+            'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/notebook-1.jpg',
+            'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/notebook-2.jpg'
+          ],
+          specifications: {
+            processador: 'Intel Core i5 11ª Geração',
+            memoria_ram: '8GB DDR4',
+            armazenamento: 'SSD 256GB',
+            tela: '15.6" Full HD',
+            sistema_operacional: 'Windows 11 Home'
+          },
+          badge: 'Novo',
+          rating: 0,
+          review_count: 0,
+          featured: false,
+          height: 2.5,
+          width: 35.8,
+          length: 24.2,
+          weight: 1.85,
+          min_stock_level: 5,
+          low_stock_alert: false,
+          use_auto_pricing: false,
+          category_id: 'cat-111-uuid',
+          subcategory_id: 'subcat-999-uuid',
+          categories: {
+            id: 'cat-111-uuid',
+            name: 'Eletrônicos',
+            slug: 'eletronicos',
+            image_url: 'https://loja.com/categorias/eletronicos.jpg',
+            active: true
+          },
+          subcategories: {
+            id: 'subcat-999-uuid',
+            name: 'Notebooks',
+            slug: 'notebooks'
+          },
+          supplier: {
+            id: 'supplier-789-uuid',
+            full_name: 'João Fornecedor da Silva'
+          },
+          created_by_user: {
+            id: 'admin-456-uuid',
+            full_name: 'Admin Sistema'
+          },
+          created_at: '2025-01-12T10:00:00Z',
+          updated_at: '2025-01-12T10:00:00Z'
+        },
+        {
+          id: 'prod-456-uuid',
+          name: 'Mouse Gamer RGB Logitech G502',
+          description: 'Mouse gamer profissional com sensor HERO 25K, 11 botões programáveis e iluminação RGB.',
+          price: 349.90,
+          original_price: 449.90,
+          cost_price: null,
+          stock_quantity: 25,
+          sku: 'MOUSE-LG-G502',
+          gtin_ean13: '7891234567891',
+          brand: 'Logitech',
+          active: false,
+          high_rotation: true,
+          approval_status: 'pending_approval',
+          requires_approval: true,
+          rejection_reason: null,
+          approved_by: null,
+          approved_at: null,
+          rejected_at: null,
+          created_by: 'admin-456-uuid',
+          supplier_id: 'supplier-222-uuid',
+          reference_ad_url: null,
+          image_url: 'https://loja.com/produtos/mouse-logitech.jpg',
+          main_image_url: 'https://loja.com/produtos/mouse-logitech.jpg',
+          images: [
+            'https://loja.com/produtos/mouse-1.jpg'
+          ],
+          specifications: {
+            sensor: 'HERO 25K DPI',
+            botoes: '11 programáveis',
+            iluminacao: 'RGB LIGHTSYNC'
+          },
+          badge: 'Alta Rotação',
+          rating: 0,
+          review_count: 0,
+          featured: false,
+          height: 4.0,
+          width: 7.5,
+          length: 13.2,
+          weight: 0.121,
+          min_stock_level: 10,
+          low_stock_alert: false,
+          use_auto_pricing: false,
+          category_id: 'cat-111-uuid',
+          subcategory_id: 'subcat-888-uuid',
+          categories: {
+            id: 'cat-111-uuid',
+            name: 'Eletrônicos',
+            slug: 'eletronicos',
+            image_url: 'https://loja.com/categorias/eletronicos.jpg',
+            active: true
+          },
+          subcategories: {
+            id: 'subcat-888-uuid',
+            name: 'Periféricos',
+            slug: 'perifericos'
+          },
+          supplier: {
+            id: 'supplier-222-uuid',
+            full_name: 'Maria Fornecedora Tech'
+          },
+          created_by_user: {
+            id: 'admin-456-uuid',
+            full_name: 'Admin Sistema'
+          },
+          created_at: '2025-01-11T14:30:00Z',
+          updated_at: '2025-01-11T14:30:00Z'
+        }
+      ],
+      pagination: {
+        page: 1,
+        limit: 50,
+        total: 15,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false
+      },
+      summary: {
+        total_aguardando: 15,
+        por_fornecedor: [
+          {
+            supplier_id: 'supplier-789-uuid',
+            name: 'João Fornecedor da Silva',
+            total: 8
+          },
+          {
+            supplier_id: 'supplier-222-uuid',
+            name: 'Maria Fornecedora Tech',
+            total: 7
+          }
+        ]
+      }
+    }
+  },
+  {
     title: 'Listar Categorias',
     method: 'GET' as const,
     url: '/functions/v1/api-categorias-listar',
