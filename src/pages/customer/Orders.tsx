@@ -7,6 +7,7 @@ import { useEffectiveUser } from '@/hooks/useEffectiveUser';
 import { supabase } from '@/integrations/supabase/client';
 import OrderDetailsModal from '@/components/OrderDetailsModal';
 import { Link } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 interface OrderItem {
   id: string;
   quantity: number;
@@ -27,6 +28,7 @@ interface Order {
 }
 const Orders = () => {
   const { effectiveUserId } = useEffectiveUser();
+  const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -61,6 +63,11 @@ const Orders = () => {
         setOrders(data || []);
       } catch (error) {
         console.error('Erro ao buscar pedidos:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Erro ao carregar pedidos',
+          description: (error as any)?.message ?? 'Não foi possível carregar seus pedidos. Tente novamente mais tarde.',
+        });
       } finally {
         setLoading(false);
       }
