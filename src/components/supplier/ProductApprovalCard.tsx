@@ -26,31 +26,45 @@ interface ProductApprovalCardProps {
 
 const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCardProps) => {
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
-  const [amazonReferenceUrl, setAmazonReferenceUrl] = useState("");
+  const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false);
+  const [referenceUrl, setReferenceUrl] = useState("");
+  const [suggestedPrice, setSuggestedPrice] = useState("");
+  const [costPrice, setCostPrice] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const isValidAmazonUrl = (url: string): boolean => {
+  const isValidUrl = (url: string): boolean => {
     if (!url.trim()) return false;
     
-    const amazonDomains = [
-      'amazon.com.br',
-      'amazon.com',
-      'amzn.to',
-      'a.co'
-    ];
-    
     try {
-      const urlObj = new URL(url);
-      return amazonDomains.some(domain => urlObj.hostname.includes(domain));
+      new URL(url);
+      return true;
     } catch {
       return false;
     }
   };
 
+  const isValidPrice = (price: string): boolean => {
+    if (!price.trim()) return false;
+    const numericPrice = parseFloat(price.replace(',', '.'));
+    return !isNaN(numericPrice) && numericPrice > 0;
+  };
+
   const handleApprove = async () => {
+    if (!isValidPrice(costPrice)) {
+      toast.error('Por favor, informe um preço de custo válido');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const { data: userData } = await supabase.auth.getUser();
+      const costPriceValue = parseFloat(costPrice.replace(',', '.'));
+      
+      if (costPriceValue >= product.price) {
+        toast.error('O preço de custo não pode ser maior ou igual ao preço de venda');
+        setIsLoading(false);
+        return;
+      }
       
       const { error } = await supabase
         .from('products')
@@ -58,37 +72,43 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
           approval_status: 'approved',
           approved_by: userData.user?.id,
           approved_at: new Date().toISOString(),
+          cost_price: costPriceValue,
           active: true
         })
         .eq('id', product.id);
 
       if (error) throw error;
 
-      // Registrar no histórico
       await supabase.from('product_approval_history').insert({
         product_id: product.id,
         action: 'approved',
         performed_by: userData.user?.id,
         previous_status: 'pending_approval',
-        new_status: 'approved'
+        new_status: 'approved',
+        notes: `Aprovado com preço de custo: R$ ${costPriceValue.toFixed(2)}`
       });
 
-      // Notificar super admin
       if (product.created_by) {
+        const marginPercent = ((product.price - costPriceValue) / product.price * 100).toFixed(1);
+        
         await supabase.from('notifications').insert({
           user_id: product.created_by,
           title: '✅ Produto Aprovado',
-          message: `O produto "${product.name}" foi aprovado pelo fornecedor.`,
+          message: `O produto "${product.name}" foi aprovado com preço de custo R$ ${costPriceValue.toFixed(2)} (margem de ${marginPercent}%).`,
           type: 'product_approved',
           action_url: '/super-admin/catalogo',
           metadata: {
             product_id: product.id,
-            supplier_id: product.supplier_id
+            supplier_id: product.supplier_id,
+            cost_price: costPriceValue,
+            margin_percent: parseFloat(marginPercent)
           }
         });
       }
 
-      toast.success('Produto aprovado com sucesso!');
+      toast.success('Produto aprovado com preço de custo registrado!');
+      setIsApproveDialogOpen(false);
+      setCostPrice("");
       onRefresh();
     } catch (error) {
       console.error('Error approving product:', error);
@@ -99,20 +119,26 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
   };
 
   const handleReject = async () => {
-    if (!isValidAmazonUrl(amazonReferenceUrl)) {
-      toast.error('Por favor, informe um link válido da Amazon');
+    if (!isValidUrl(referenceUrl)) {
+      toast.error('Por favor, informe um link válido');
+      return;
+    }
+
+    if (!isValidPrice(suggestedPrice)) {
+      toast.error('Por favor, informe um preço válido');
       return;
     }
 
     setIsLoading(true);
     try {
       const { data: userData } = await supabase.auth.getUser();
+      const priceValue = parseFloat(suggestedPrice.replace(',', '.'));
       
       const { error } = await supabase
         .from('products')
         .update({
           approval_status: 'rejected',
-          rejection_reason: `Link de referência Amazon: ${amazonReferenceUrl}`,
+          rejection_reason: `Link de referência: ${referenceUrl} | Preço sugerido: R$ ${priceValue.toFixed(2)}`,
           rejected_at: new Date().toISOString(),
           active: false
         })
@@ -120,35 +146,35 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
 
       if (error) throw error;
 
-      // Registrar no histórico
       await supabase.from('product_approval_history').insert({
         product_id: product.id,
         action: 'rejected',
         performed_by: userData.user?.id,
         previous_status: 'pending_approval',
         new_status: 'rejected',
-        notes: `Link de referência Amazon: ${amazonReferenceUrl}`
+        notes: `Link de referência: ${referenceUrl} | Preço sugerido: R$ ${priceValue.toFixed(2)}`
       });
 
-      // Notificar super admin
       if (product.created_by) {
         await supabase.from('notifications').insert({
           user_id: product.created_by,
-          title: '🔄 Produto Rejeitado - Referência Sugerida',
-          message: `O produto "${product.name}" foi rejeitado. Uma referência da Amazon foi fornecida para comparação.`,
+          title: '🔄 Produto Rejeitado - Referência e Preço Sugeridos',
+          message: `O produto "${product.name}" foi rejeitado. O fornecedor sugeriu um produto similar por R$ ${priceValue.toFixed(2)}.`,
           type: 'product_rejected',
           action_url: '/super-admin/catalogo',
           metadata: {
             product_id: product.id,
             supplier_id: product.supplier_id,
-            amazon_reference_url: amazonReferenceUrl
+            reference_url: referenceUrl,
+            suggested_price: priceValue
           }
         });
       }
 
-      toast.success('Produto rejeitado e referência enviada ao administrador');
+      toast.success('Produto rejeitado, referência e preço enviados ao administrador');
       setIsRejectDialogOpen(false);
-      setAmazonReferenceUrl("");
+      setReferenceUrl("");
+      setSuggestedPrice("");
       onRefresh();
     } catch (error) {
       console.error('Error rejecting product:', error);
@@ -217,7 +243,7 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
               <Button 
                 size="sm" 
                 variant="default" 
-                onClick={handleApprove} 
+                onClick={() => setIsApproveDialogOpen(true)} 
                 className="flex-1"
                 disabled={isLoading}
               >
@@ -238,56 +264,148 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
           )}
 
           {product.approval_status === 'rejected' && product.rejection_reason && (
-            <div className="pt-2 border-t space-y-1">
-              <p className="text-xs text-muted-foreground">Produto de referência sugerido:</p>
-              {product.rejection_reason.includes('amazon.com') || product.rejection_reason.includes('amzn.to') || product.rejection_reason.includes('a.co') ? (
+            <div className="pt-2 border-t space-y-2">
+              <p className="text-xs text-muted-foreground font-medium">Produto de referência sugerido:</p>
+              
+              {product.rejection_reason.includes('Link de referência:') && (
                 <a 
-                  href={product.rejection_reason.replace('Link de referência Amazon: ', '')} 
+                  href={product.rejection_reason.split('|')[0].replace('Link de referência: ', '').trim()} 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-sm text-blue-600 hover:underline flex items-center gap-1"
                 >
-                  Ver produto na Amazon
+                  Ver produto de referência
                   <ExternalLink className="w-3 h-3" />
                 </a>
-              ) : (
-                <p className="text-sm mt-1">{product.rejection_reason}</p>
+              )}
+              
+              {product.rejection_reason.includes('Preço sugerido:') && (
+                <div className="flex items-center gap-2 bg-green-50 p-2 rounded">
+                  <span className="text-xs text-muted-foreground">Preço que a Lojafy pagará:</span>
+                  <span className="text-sm font-bold text-green-700">
+                    {product.rejection_reason.split('Preço sugerido:')[1]?.trim() || 'N/A'}
+                  </span>
+                </div>
               )}
             </div>
           )}
         </CardContent>
       </Card>
 
+      <AlertDialog open={isApproveDialogOpen} onOpenChange={setIsApproveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Aprovar Produto</AlertDialogTitle>
+            <AlertDialogDescription>
+              Informe o valor que a Lojafy vai pagar por este produto. Este será o preço de custo registrado no sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm font-medium text-blue-900">Produto: {product.name}</p>
+              <p className="text-xs text-blue-700 mt-1">Preço de venda: R$ {product.price?.toFixed(2)}</p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="cost-price">Preço de Custo (que a Lojafy vai pagar) *</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">R$</span>
+                <Input
+                  id="cost-price"
+                  type="text"
+                  placeholder="0,00"
+                  value={costPrice}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^\d.,]/g, '');
+                    setCostPrice(value);
+                  }}
+                  className={`pl-10 ${costPrice && !isValidPrice(costPrice) ? 'border-red-500' : ''}`}
+                />
+              </div>
+              {costPrice && !isValidPrice(costPrice) && (
+                <p className="text-xs text-red-500">Por favor, insira um preço válido (ex: 99,90)</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                💡 Este será o valor de custo para cálculo de margem de lucro
+              </p>
+            </div>
+            
+            {costPrice && isValidPrice(costPrice) && product.price && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                <p className="text-xs text-green-700">
+                  Margem de lucro: {(((product.price - parseFloat(costPrice.replace(',', '.'))) / product.price) * 100).toFixed(1)}%
+                </p>
+              </div>
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleApprove} 
+              disabled={isLoading || !isValidPrice(costPrice)}
+            >
+              Confirmar Aprovação
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Rejeitar e Sugerir Alternativa</AlertDialogTitle>
             <AlertDialogDescription>
-              Informe o link de um produto similar da Amazon. Este produto será usado como referência pelo administrador para correções.
+              Informe o link de um produto similar de qualquer loja online e o preço que a Lojafy vai pagar. Essas informações serão usadas como referência pelo administrador.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="amazon-url">Link do Produto na Amazon *</Label>
-            <Input
-              id="amazon-url"
-              type="url"
-              placeholder="https://www.amazon.com.br/produto-similar..."
-              value={amazonReferenceUrl}
-              onChange={(e) => setAmazonReferenceUrl(e.target.value)}
-              className={amazonReferenceUrl && !isValidAmazonUrl(amazonReferenceUrl) ? 'border-red-500' : ''}
-            />
-            {amazonReferenceUrl && !isValidAmazonUrl(amazonReferenceUrl) && (
-              <p className="text-xs text-red-500">Por favor, insira um link válido da Amazon</p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              ✓ amazon.com.br | ✓ amazon.com | ✓ amzn.to | ✓ a.co
-            </p>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="reference-url">Link do Produto de Referência *</Label>
+              <Input
+                id="reference-url"
+                type="url"
+                placeholder="https://www.exemplo.com.br/produto-similar..."
+                value={referenceUrl}
+                onChange={(e) => setReferenceUrl(e.target.value)}
+                className={referenceUrl && !isValidUrl(referenceUrl) ? 'border-red-500' : ''}
+              />
+              {referenceUrl && !isValidUrl(referenceUrl) && (
+                <p className="text-xs text-red-500">Por favor, insira um link válido</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                💡 Pode ser de qualquer loja online (Amazon, Mercado Livre, etc.)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="suggested-price">Preço que a Lojafy vai pagar *</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">R$</span>
+                <Input
+                  id="suggested-price"
+                  type="text"
+                  placeholder="0,00"
+                  value={suggestedPrice}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^\d.,]/g, '');
+                    setSuggestedPrice(value);
+                  }}
+                  className={`pl-10 ${suggestedPrice && !isValidPrice(suggestedPrice) ? 'border-red-500' : ''}`}
+                />
+              </div>
+              {suggestedPrice && !isValidPrice(suggestedPrice) && (
+                <p className="text-xs text-red-500">Por favor, insira um preço válido (ex: 99,90)</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                💡 Este será o preço de custo que a Lojafy pagará ao fornecedor
+              </p>
+            </div>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleReject} 
-              disabled={isLoading || !isValidAmazonUrl(amazonReferenceUrl)}
+              disabled={isLoading || !isValidUrl(referenceUrl) || !isValidPrice(suggestedPrice)}
             >
               Confirmar Rejeição
             </AlertDialogAction>
