@@ -58,6 +58,7 @@ import ConfiguracaoVisual from "./pages/admin/ConfiguracaoVisual";
 import Frete from "./pages/admin/Frete";
 import SupplierDashboard from "./pages/supplier/Dashboard";
 import SupplierProductManagement from "./pages/supplier/ProductManagement";
+import SupplierProductApproval from "./pages/supplier/ProductApproval";
 import SupplierOrderManagement from "./pages/supplier/OrderManagement";
 import SupplierInventory from "./pages/supplier/Inventory";
 import SupplierSales from "./pages/supplier/Sales";
@@ -275,6 +276,7 @@ const App = () => {
               >
                 <Route index element={<SupplierDashboard />} />
                 <Route path="produtos" element={<SupplierProductManagement />} />
+                <Route path="produtos/aprovacao" element={<SupplierProductApproval />} />
                 <Route path="pedidos" element={<SupplierOrderManagement />} />
                 <Route path="estoque" element={<SupplierInventory />} />
                 <Route path="vendas" element={<SupplierSales />} />

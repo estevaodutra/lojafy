@@ -1,12 +1,17 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package, TrendingUp, DollarSign, AlertTriangle } from 'lucide-react';
+import { Package, TrendingUp, DollarSign, AlertTriangle, Clock } from 'lucide-react';
 import { useSupplierProductStats } from '@/hooks/useSupplierProducts';
 import { useSupplierOrderStats } from '@/hooks/useSupplierOrders';
+import { useSupplierApprovalStats } from '@/hooks/useSupplierPendingProducts';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 
 const SupplierDashboard = () => {
+  const navigate = useNavigate();
   const { data: productStats } = useSupplierProductStats();
   const { data: orderStats } = useSupplierOrderStats();
+  const { data: approvalStats } = useSupplierApprovalStats();
 
   return (
     <div className="space-y-6">
@@ -57,15 +62,18 @@ const SupplierDashboard = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card 
+          className="cursor-pointer hover:bg-accent transition-colors" 
+          onClick={() => navigate('/supplier/produtos/aprovacao')}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Estoque Baixo</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Aguardando Aprovação</CardTitle>
+            <Clock className="h-4 w-4 text-yellow-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{productStats?.lowStock || 0}</div>
+            <div className="text-2xl font-bold text-yellow-600">{approvalStats?.pending || 0}</div>
             <p className="text-xs text-muted-foreground">
-              Produtos precisam de reposição
+              Produtos pendentes
             </p>
           </CardContent>
         </Card>

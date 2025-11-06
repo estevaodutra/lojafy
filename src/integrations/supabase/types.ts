@@ -1745,6 +1745,47 @@ export type Database = {
         }
         Relationships: []
       }
+      product_approval_history: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          new_status: string
+          notes: string | null
+          performed_by: string
+          previous_status: string | null
+          product_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          new_status: string
+          notes?: string | null
+          performed_by: string
+          previous_status?: string | null
+          product_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          new_status?: string
+          notes?: string | null
+          performed_by?: string
+          previous_status?: string | null
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_approval_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_ranking: {
         Row: {
           average_profit: number
@@ -1842,11 +1883,15 @@ export type Database = {
       products: {
         Row: {
           active: boolean | null
+          approval_status: string | null
+          approved_at: string | null
+          approved_by: string | null
           badge: string | null
           brand: string | null
           category_id: string | null
           cost_price: number | null
           created_at: string
+          created_by: string | null
           description: string | null
           featured: boolean | null
           gtin_ean13: string | null
@@ -1864,6 +1909,9 @@ export type Database = {
           price: number
           rating: number | null
           reference_ad_url: string | null
+          rejected_at: string | null
+          rejection_reason: string | null
+          requires_approval: boolean | null
           review_count: number | null
           sku: string | null
           specifications: Json | null
@@ -1877,11 +1925,15 @@ export type Database = {
         }
         Insert: {
           active?: boolean | null
+          approval_status?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           badge?: string | null
           brand?: string | null
           category_id?: string | null
           cost_price?: number | null
           created_at?: string
+          created_by?: string | null
           description?: string | null
           featured?: boolean | null
           gtin_ean13?: string | null
@@ -1899,6 +1951,9 @@ export type Database = {
           price: number
           rating?: number | null
           reference_ad_url?: string | null
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          requires_approval?: boolean | null
           review_count?: number | null
           sku?: string | null
           specifications?: Json | null
@@ -1912,11 +1967,15 @@ export type Database = {
         }
         Update: {
           active?: boolean | null
+          approval_status?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           badge?: string | null
           brand?: string | null
           category_id?: string | null
           cost_price?: number | null
           created_at?: string
+          created_by?: string | null
           description?: string | null
           featured?: boolean | null
           gtin_ean13?: string | null
@@ -1934,6 +1993,9 @@ export type Database = {
           price?: number
           rating?: number | null
           reference_ad_url?: string | null
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          requires_approval?: boolean | null
           review_count?: number | null
           sku?: string | null
           specifications?: Json | null

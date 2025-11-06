@@ -34,6 +34,8 @@ Esta API requer autenticação via API Key no header `X-API-Key`.
 | `badge` | string | ❌ Não | Etiqueta/badge do produto (ex: "Novo", "Promoção") |
 | `alta_rotatividade` | boolean | ❌ Não | Marca produto com alta rotatividade |
 | **`anuncio_referencia`** | string (URL) | ❌ Não | **Link para anúncio de referência externo** |
+| **`fornecedor_id`** | string (UUID) | ❌ Não | **ID do fornecedor ao qual o produto será atribuído** |
+| **`requer_aprovacao`** | boolean | ❌ Não | **Se `true`, produto fica pendente até fornecedor aprovar (padrão: `false`)** |
 
 ## 📝 Formatação da Descrição com Markdown
 
@@ -117,6 +119,72 @@ Link para um anúncio de referência externo onde o produto está disponível (g
 ```
 
 **Resultado**: O produto será criado e automaticamente marcado como destaque, independente do valor de `produto_destaque`.
+
+---
+
+## 🔐 Sistema de Aprovação de Produtos por Fornecedor
+
+### Como funciona?
+
+Quando um **Super Admin** cadastra um produto para um fornecedor específico e marca como `requer_aprovacao = true`:
+
+1. ✅ O produto é criado com `approval_status = 'pending_approval'`
+2. ✅ O produto fica **INATIVO** (`active = false`) até ser aprovado
+3. ✅ Uma **notificação** é enviada ao fornecedor
+4. ✅ O fornecedor vê o produto na lista "Produtos para Aprovação"
+5. ✅ Após aprovação, o produto é **publicado automaticamente** (`active = true`)
+
+### Campos do Sistema de Aprovação
+
+- **`fornecedor_id`**: UUID do fornecedor que receberá o produto
+- **`requer_aprovacao`**: Se `true`, ativa o fluxo de aprovação
+- **`approval_status`**: Status automático baseado no fluxo
+  - `draft`: Produto em rascunho (sem fornecedor)
+  - `pending_approval`: Aguardando aprovação do fornecedor
+  - `approved`: Aprovado pelo fornecedor
+  - `rejected`: Rejeitado pelo fornecedor
+
+### Exemplo de Uso
+
+```bash
+curl -X POST https://seu-projeto.supabase.co/functions/v1/api-produtos-cadastrar \
+  -H "X-API-Key: sua-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nome": "Notebook HP 14",
+    "preco": 2999.90,
+    "fornecedor_id": "550e8400-e29b-41d4-a716-446655440000",
+    "requer_aprovacao": true,
+    "categoria_id": "123e4567-e89b-12d3-a456-426614174000"
+  }'
+```
+
+**Resposta:**
+
+```json
+{
+  "success": true,
+  "message": "Produto criado com sucesso e enviado para aprovação do fornecedor",
+  "data": {
+    "id": "produto-uuid",
+    "nome": "Notebook HP 14",
+    "fornecedor_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status_aprovacao": "pending_approval",
+    "requer_aprovacao": true,
+    "ativo": false,
+    "mensagem": "Produto aguardando aprovação do fornecedor"
+  }
+}
+```
+
+### ⚠️ Importante
+
+- ✅ Se `fornecedor_id` for fornecido SEM `requer_aprovacao=true`, o produto é criado normalmente (ativo)
+- ✅ Se `requer_aprovacao=true` mas SEM `fornecedor_id`, retorna erro
+- ✅ Apenas fornecedores com `role='supplier'` e `is_active=true` podem receber produtos
+- ✅ O fornecedor recebe notificação automática no painel
+
+---
 
 ## Exemplo de Requisição Completa
 

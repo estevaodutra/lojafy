@@ -7,7 +7,8 @@ import {
   Warehouse,
   Store,
   LogOut,
-  ShoppingCart
+  ShoppingCart,
+  CheckCircle
 } from 'lucide-react';
 import {
   Sidebar,
@@ -33,6 +34,11 @@ const supplierMenuItems = [
     title: 'Meus Produtos',
     url: '/supplier/produtos',
     icon: Package,
+  },
+  {
+    title: 'Produtos para Aprovação',
+    url: '/supplier/produtos/aprovacao',
+    icon: CheckCircle,
   },
   {
     title: 'Pedidos',
