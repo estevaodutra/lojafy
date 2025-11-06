@@ -1,8 +1,13 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Package, TrendingUp, DollarSign, AlertTriangle } from 'lucide-react';
+import { useSupplierProductStats } from '@/hooks/useSupplierProducts';
+import { useSupplierOrderStats } from '@/hooks/useSupplierOrders';
 
 const SupplierDashboard = () => {
+  const { data: productStats } = useSupplierProductStats();
+  const { data: orderStats } = useSupplierOrderStats();
+
   return (
     <div className="space-y-6">
       <div>
@@ -19,35 +24,35 @@ const SupplierDashboard = () => {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">45</div>
+            <div className="text-2xl font-bold">{productStats?.active || 0}</div>
             <p className="text-xs text-muted-foreground">
-              +2 novos esta semana
+              de {productStats?.total || 0} produtos
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Vendas do Mês</CardTitle>
+            <CardTitle className="text-sm font-medium">Pedidos do Mês</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">156</div>
+            <div className="text-2xl font-bold">{orderStats?.totalOrders || 0}</div>
             <p className="text-xs text-muted-foreground">
-              +12% em relação ao mês anterior
+              {orderStats?.totalItems || 0} itens vendidos
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receita</CardTitle>
+            <CardTitle className="text-sm font-medium">Receita do Mês</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 12.540</div>
+            <div className="text-2xl font-bold">R$ {(orderStats?.totalRevenue || 0).toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">
-              +8% em relação ao mês anterior
+              vendas confirmadas
             </p>
           </CardContent>
         </Card>
@@ -58,7 +63,7 @@ const SupplierDashboard = () => {
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3</div>
+            <div className="text-2xl font-bold">{productStats?.lowStock || 0}</div>
             <p className="text-xs text-muted-foreground">
               Produtos precisam de reposição
             </p>
@@ -69,47 +74,50 @@ const SupplierDashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Produtos Mais Vendidos</CardTitle>
-            <CardDescription>Top 5 produtos do mês</CardDescription>
+            <CardTitle>Visão Geral</CardTitle>
+            <CardDescription>Resumo da sua operação</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[1, 2, 3, 4, 5].map((item) => (
-                <div key={item} className="flex items-center space-x-4">
-                  <div className="w-10 h-10 bg-gray-200 rounded"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Produto {item}</p>
-                    <p className="text-xs text-muted-foreground">{20 - item * 2} vendas</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium">R$ {(500 - item * 50).toFixed(2)}</p>
-                  </div>
-                </div>
-              ))}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Total de Produtos</span>
+                <span className="text-sm font-medium">{productStats?.total || 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Produtos Ativos</span>
+                <span className="text-sm font-medium text-green-600">{productStats?.active || 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Estoque Baixo</span>
+                <span className="text-sm font-medium text-yellow-600">{productStats?.lowStock || 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Sem Estoque</span>
+                <span className="text-sm font-medium text-red-600">{productStats?.outOfStock || 0}</span>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Produtos com Estoque Baixo</CardTitle>
-            <CardDescription>Produtos que precisam de reposição</CardDescription>
+            <CardTitle>Vendas do Mês</CardTitle>
+            <CardDescription>Performance das suas vendas</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[1, 2, 3].map((item) => (
-                <div key={item} className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">Produto {item}</p>
-                    <p className="text-xs text-muted-foreground">Estoque: {5 - item} unidades</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
-                      Crítico
-                    </span>
-                  </div>
-                </div>
-              ))}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Pedidos com seus produtos</span>
+                <span className="text-sm font-medium">{orderStats?.totalOrders || 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Itens vendidos</span>
+                <span className="text-sm font-medium">{orderStats?.totalItems || 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Receita total</span>
+                <span className="text-sm font-medium text-green-600">R$ {(orderStats?.totalRevenue || 0).toFixed(2)}</span>
+              </div>
             </div>
           </CardContent>
         </Card>

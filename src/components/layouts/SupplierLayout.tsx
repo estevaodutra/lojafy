@@ -3,11 +3,11 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Package, 
-  BarChart3, 
   TrendingUp,
   Warehouse,
   Store,
-  LogOut
+  LogOut,
+  ShoppingCart
 } from 'lucide-react';
 import {
   Sidebar,
@@ -26,13 +26,18 @@ import { useAuth } from '@/contexts/AuthContext';
 const supplierMenuItems = [
   {
     title: 'Dashboard',
-    url: '/supplier/dashboard',
+    url: '/supplier',
     icon: LayoutDashboard,
   },
   {
     title: 'Meus Produtos',
     url: '/supplier/produtos',
     icon: Package,
+  },
+  {
+    title: 'Pedidos',
+    url: '/supplier/pedidos',
+    icon: ShoppingCart,
   },
   {
     title: 'Estoque',
