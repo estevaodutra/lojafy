@@ -107,3 +107,6 @@ verify_jwt = false
 
 [functions.api-progresso-usuario]
 verify_jwt = false
+
+[functions.api-produtos-aguardando-aprovacao]
+verify_jwt = false

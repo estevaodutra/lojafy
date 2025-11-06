@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EndpointSection } from '@/components/admin/EndpointSection';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Shield, GraduationCap, BookOpen, Award, Users } from 'lucide-react';
+import { Shield, GraduationCap, BookOpen, Award, Users, Package } from 'lucide-react';
 
 // Endpoints de Usuários
 const userEndpoints = [
@@ -416,6 +416,77 @@ const progressEndpoints = [
   }
 ];
 
+// Endpoints de Produtos
+const productEndpoints = [
+  {
+    title: 'Listar Produtos Aguardando Aprovação',
+    method: 'GET' as const,
+    url: '/functions/v1/api-produtos-aguardando-aprovacao',
+    description: 'Retorna todos os produtos com status "pending_approval" incluindo informações completas do fornecedor, categoria, subcategoria e especificações.',
+    queryParams: [
+      { name: 'page', description: 'Página (padrão: 1)', example: '1' },
+      { name: 'limit', description: 'Itens por página (máx: 100, padrão: 50)', example: '20' },
+      { name: 'supplier_id', description: 'Filtrar por ID do fornecedor', example: 'abc-123-def' },
+      { name: 'created_by', description: 'Filtrar por ID do criador (super admin)', example: 'xyz-789-ghi' },
+      { name: 'search', description: 'Buscar por nome, descrição ou SKU', example: 'notebook' }
+    ],
+    responseExample: {
+      success: true,
+      data: [
+        {
+          id: 'prod-123',
+          name: 'Notebook Dell Inspiron',
+          description: 'Notebook com processador Intel i5...',
+          price: 2999.00,
+          cost_price: null,
+          stock_quantity: 10,
+          sku: 'NB-DELL-001',
+          approval_status: 'pending_approval',
+          supplier_id: 'supplier-789',
+          supplier: {
+            id: 'supplier-789',
+            full_name: 'João Fornecedor'
+          },
+          categories: {
+            id: 'cat-111',
+            name: 'Eletrônicos',
+            slug: 'eletronicos',
+            active: true
+          },
+          subcategories: {
+            id: 'subcat-999',
+            name: 'Notebooks',
+            slug: 'notebooks'
+          },
+          created_by_user: {
+            id: 'admin-456',
+            full_name: 'Admin Sistema'
+          },
+          created_at: '2025-01-12T10:00:00Z'
+        }
+      ],
+      pagination: {
+        page: 1,
+        limit: 50,
+        total: 15,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false
+      },
+      summary: {
+        total_aguardando: 15,
+        por_fornecedor: [
+          {
+            supplier_id: 'supplier-789',
+            name: 'João Fornecedor',
+            total: 8
+          }
+        ]
+      }
+    }
+  }
+];
+
 const AcademyAPI = () => {
   return (
     <div className="space-y-6">
@@ -432,7 +503,7 @@ const AcademyAPI = () => {
       </div>
 
       {/* Features */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
@@ -488,6 +559,20 @@ const AcademyAPI = () => {
             </p>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg">Produtos</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Consulte produtos aguardando aprovação com todas as informações.
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <Separator />
@@ -525,6 +610,7 @@ const AcademyAPI = () => {
           <TabsTrigger value="courses">Cursos</TabsTrigger>
           <TabsTrigger value="enrollments">Matrículas</TabsTrigger>
           <TabsTrigger value="progress">Progresso</TabsTrigger>
+          <TabsTrigger value="products">Produtos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users" className="space-y-6">
@@ -556,6 +642,14 @@ const AcademyAPI = () => {
             title="Gestão de Progresso"
             description="Endpoints para atualizar e consultar progresso dos alunos"
             endpoints={progressEndpoints}
+          />
+        </TabsContent>
+
+        <TabsContent value="products" className="space-y-6">
+          <EndpointSection
+            title="Gestão de Produtos"
+            description="Endpoints para consultar produtos aguardando aprovação com informações completas"
+            endpoints={productEndpoints}
           />
         </TabsContent>
       </Tabs>
