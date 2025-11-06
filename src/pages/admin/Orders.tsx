@@ -49,10 +49,24 @@ const AdminOrders = () => {
       // Get orders first
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select('*, has_shipping_file')
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (ordersError) throw ordersError;
+
+      // Get order IDs to check for shipping files
+      const orderIds = (ordersData || []).map(order => order.id);
+      
+      // Get shipping files for these orders
+      const { data: shippingFilesData } = await supabase
+        .from('order_shipping_files')
+        .select('order_id')
+        .in('order_id', orderIds);
+
+      // Create a set of order IDs that have shipping files
+      const ordersWithShippingFiles = new Set(
+        (shippingFilesData || []).map(file => file.order_id)
+      );
 
       // Get profiles for all unique user_ids
       const userIds = [...new Set((ordersData || []).map(order => order.user_id))];
@@ -66,12 +80,13 @@ const AdminOrders = () => {
         (profilesData || []).map(profile => [profile.user_id, profile])
       );
 
-      // Combine orders with profiles
+      // Combine orders with profiles and shipping file status
       const ordersWithProfiles = (ordersData || [])
         .map(order => {
           const profile = profilesMap.get(order.user_id);
           return {
             ...order,
+            has_shipping_file: ordersWithShippingFiles.has(order.id),
             profiles: profile ? {
               first_name: profile.first_name,
               last_name: profile.last_name
