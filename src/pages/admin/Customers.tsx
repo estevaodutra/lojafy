@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Eye, Search, Mail, Phone, MapPin, Calendar, ShoppingBag } from "lucide-react";
+import { Users, Eye, Search, Mail, Phone, MapPin, Calendar, ShoppingBag, Copy, IdCard } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -276,6 +276,24 @@ const AdminCustomers = () => {
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-muted-foreground" />
                     <span>Cliente desde {format(new Date(selectedCustomer.created_at), "dd/MM/yyyy", { locale: ptBR })}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <IdCard className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-mono">{selectedCustomer.user_id}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => {
+                        navigator.clipboard.writeText(selectedCustomer.user_id);
+                        toast({
+                          title: "ID copiado!",
+                          description: "ID do cliente copiado para área de transferência",
+                        });
+                      }}
+                    >
+                      <Copy className="w-3 h-3" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

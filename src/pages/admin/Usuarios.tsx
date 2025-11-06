@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { ImpersonationButton } from '@/components/admin/ImpersonationButton';
 import { UserRole } from '@/hooks/useUserRole';
-import { Search, X } from 'lucide-react';
+import { Search, X, Copy } from 'lucide-react';
 import { 
   Pagination, 
   PaginationContent, 
@@ -186,6 +186,7 @@ const Usuarios = () => {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>E-mail</TableHead>
+                <TableHead>ID</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Cadastro</TableHead>
@@ -196,7 +197,7 @@ const Usuarios = () => {
             <TableBody>
               {paginatedUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     {searchTerm ? 'Nenhum usuário encontrado com esse critério de busca.' : 'Nenhum usuário cadastrado.'}
                   </TableCell>
                 </TableRow>
@@ -207,6 +208,27 @@ const Usuarios = () => {
                     {user.first_name} {user.last_name}
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <code className="text-xs font-mono bg-muted px-2 py-1 rounded">
+                        {user.user_id.substring(0, 8)}...
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => {
+                          navigator.clipboard.writeText(user.user_id);
+                          toast({
+                            title: "ID copiado!",
+                            description: "ID do usuário copiado para área de transferência",
+                          });
+                        }}
+                      >
+                        <Copy className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <Badge variant={getRoleBadgeVariant(user.role)}>
                       {getRoleLabel(user.role)}
