@@ -12,7 +12,7 @@ const endpoints = [
     title: 'Cadastrar Produto',
     method: 'POST' as const,
     url: '/functions/v1/api-produtos-cadastrar',
-    description: 'Cria um novo produto no sistema com suporte completo a preços promocionais, controle de estoque e dimensões. SKU e GTIN são gerados automaticamente se não fornecidos. Peso deve ser informado em quilogramas (kg). O campo alta_rotatividade indica produtos com alta demanda. IMPORTANTE: Sequências \\r\\n na descrição são automaticamente convertidas em quebras de linha. O campo anuncio_referencia (URL opcional) marca automaticamente o produto como destaque e exibe um botão "Ver Anúncio de Referência" na página do produto.',
+    description: 'Cria um novo produto no sistema com suporte completo a preços promocionais, controle de estoque e dimensões. SKU e GTIN são gerados automaticamente se não fornecidos. Peso deve ser informado em quilogramas (kg). O campo alta_rotatividade indica produtos com alta demanda. IMPORTANTE: Sequências \\r\\n na descrição são automaticamente convertidas em quebras de linha. O campo anuncio_referencia (URL opcional) marca automaticamente o produto como destaque e exibe um botão "Ver Anúncio de Referência" na página do produto. SISTEMA DE APROVAÇÃO: Se fornecedor_id for fornecido com requer_aprovacao=true, o produto será enviado para aprovação do fornecedor antes de ser publicado (status: pending_approval, ativo: false). O fornecedor receberá notificação e poderá aprovar ou rejeitar. Se requer_aprovacao=false ou não fornecido, o produto é publicado diretamente (status: draft, ativo: true). Campos somente leitura retornados na resposta: status_aprovacao, aprovado_por, aprovado_em, motivo_rejeicao, rejeitado_em, criado_por.',
     requestBody: {
       nome: 'Colete Postural Coluna Cervical Hérnia De Disco Cinta Leve Discreta Correção Postura Costas Corretor Feminino Masculino',
       descricao: 'Modelo\\r\\nPeitoral: 75-100cm Altura: 155-180cm\\r\\n\\r\\nEste colete é uma simples forma para corrigir e melhorar a postura, e ajudar aliviar as dores nos ombros e nas costas.\\r\\n\\r\\nBenefícios:\\r\\n\\r\\n* Alívio da dor muscular. Mantém o equilíbrio gravidade do corpo, reduz a carga sobre os músculos, corrige más posturas e alivia dores de pescoço e ombros, e até mesmo dores de cabeça.',
@@ -43,11 +43,13 @@ const endpoints = [
       largura: 16,
       altura: 16,
       comprimento: 12,
+      fornecedor_id: '550e8400-e29b-41d4-a716-446655440000',
+      requer_aprovacao: true,
       anuncio_referencia: 'https://www.mercadolivre.com.br/colete-postural-exemplo'
     },
     responseExample: {
       success: true,
-      message: 'Produto criado com sucesso',
+      message: 'Produto criado com sucesso e enviado para aprovação do fornecedor',
       data: {
         id: 'prod123',
         nome: 'Colete Postural Coluna Cervical Hérnia De Disco Cinta Leve Discreta Correção Postura Costas Corretor Feminino Masculino',
@@ -79,8 +81,16 @@ const endpoints = [
         largura: 16,
         altura: 16,
         comprimento: 12,
+        fornecedor_id: '550e8400-e29b-41d4-a716-446655440000',
+        requer_aprovacao: true,
+        status_aprovacao: 'pending_approval',
+        aprovado_por: null,
+        aprovado_em: null,
+        motivo_rejeicao: null,
+        rejeitado_em: null,
+        criado_por: 'admin-user-uuid',
         reference_ad_url: 'https://www.mercadolivre.com.br/colete-postural-exemplo',
-        ativo: true,
+        ativo: false,
         criado_em: '2025-01-12T10:00:00Z',
         atualizado_em: '2025-01-12T10:00:00Z'
       }
