@@ -95,7 +95,6 @@ const ResellerSidebar = () => {
 
   const handleLogout = async () => {
     await signOut();
-    navigate('/');
   };
 
   return (

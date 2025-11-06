@@ -65,7 +65,6 @@ const SupplierSidebar = () => {
 
   const handleLogout = async () => {
     await signOut();
-    navigate('/');
   };
 
   return (

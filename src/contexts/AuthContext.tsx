@@ -279,13 +279,47 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
+      // Limpar dados de impersonation ANTES do logout
+      sessionStorage.removeItem('impersonation_data');
+      setImpersonationData(null);
+      
+      // Fazer logout no Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Error signing out:', error);
+        toast({
+          variant: "destructive",
+          title: "Erro ao sair",
+          description: "Não foi possível fazer logout. Tente novamente.",
+        });
+        return;
+      }
+      
+      // Limpar estado local
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+      
+      // Mostrar toast de sucesso
       toast({
         title: "Logout realizado",
         description: "Até logo!",
       });
+      
+      // Redirecionar para home com hard reload (garante limpeza completa)
+      // Aguardar um pouco para o toast ser exibido
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 500);
+      
     } catch (error) {
       console.error('Error signing out:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao sair",
+        description: "Ocorreu um erro inesperado.",
+      });
     }
   };
 
