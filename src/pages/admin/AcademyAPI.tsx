@@ -422,47 +422,204 @@ const productEndpoints = [
     title: 'Listar Produtos Aguardando Aprovação',
     method: 'GET' as const,
     url: '/functions/v1/api-produtos-aguardando-aprovacao',
-    description: 'Retorna todos os produtos com status "pending_approval" incluindo informações completas do fornecedor, categoria, subcategoria e especificações.',
+    description: 'Retorna todos os produtos com status "pending_approval" incluindo informações completas do fornecedor, categoria, subcategoria, imagens, especificações e preços. Ideal para integrações externas e sistemas de gestão de aprovação.',
+    headers: [
+      { 
+        name: 'X-API-Key', 
+        description: 'Chave de autenticação da API (obrigatório)', 
+        example: 'sk_live_abc123...', 
+        required: true 
+      },
+      { 
+        name: 'Content-Type', 
+        description: 'Tipo do conteúdo', 
+        example: 'application/json', 
+        required: true 
+      }
+    ],
     queryParams: [
-      { name: 'page', description: 'Página (padrão: 1)', example: '1' },
-      { name: 'limit', description: 'Itens por página (máx: 100, padrão: 50)', example: '20' },
-      { name: 'supplier_id', description: 'Filtrar por ID do fornecedor', example: 'abc-123-def' },
-      { name: 'created_by', description: 'Filtrar por ID do criador (super admin)', example: 'xyz-789-ghi' },
-      { name: 'search', description: 'Buscar por nome, descrição ou SKU', example: 'notebook' }
+      { 
+        name: 'page', 
+        description: 'Número da página para paginação (padrão: 1)', 
+        example: '1',
+        required: false
+      },
+      { 
+        name: 'limit', 
+        description: 'Quantidade de itens por página (máximo: 100, padrão: 50)', 
+        example: '20',
+        required: false
+      },
+      { 
+        name: 'supplier_id', 
+        description: 'Filtrar produtos de um fornecedor específico pelo UUID', 
+        example: 'abc-123-def-456-ghi',
+        required: false
+      },
+      { 
+        name: 'created_by', 
+        description: 'Filtrar produtos criados por um super admin específico pelo UUID', 
+        example: 'xyz-789-ghi-012-jkl',
+        required: false
+      },
+      { 
+        name: 'search', 
+        description: 'Busca textual por nome, descrição ou SKU do produto (case-insensitive)', 
+        example: 'notebook dell',
+        required: false
+      }
     ],
     responseExample: {
       success: true,
       data: [
         {
-          id: 'prod-123',
-          name: 'Notebook Dell Inspiron',
-          description: 'Notebook com processador Intel i5...',
+          id: 'prod-123-uuid',
+          name: 'Notebook Dell Inspiron 15 3000',
+          description: 'Notebook Dell Inspiron com processador Intel Core i5 de 11ª geração, 8GB RAM, SSD 256GB, tela Full HD 15.6 polegadas. Ideal para trabalho e estudos.',
           price: 2999.00,
+          original_price: 3499.00,
           cost_price: null,
           stock_quantity: 10,
-          sku: 'NB-DELL-001',
+          sku: 'NB-DELL-I15-3000',
+          gtin_ean13: '7891234567890',
+          brand: 'Dell',
+          active: false,
+          high_rotation: false,
           approval_status: 'pending_approval',
-          supplier_id: 'supplier-789',
-          supplier: {
-            id: 'supplier-789',
-            full_name: 'João Fornecedor'
+          requires_approval: true,
+          rejection_reason: null,
+          approved_by: null,
+          approved_at: null,
+          rejected_at: null,
+          created_by: 'admin-456-uuid',
+          supplier_id: 'supplier-789-uuid',
+          reference_ad_url: null,
+          image_url: 'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/notebook-dell-main.jpg',
+          main_image_url: 'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/notebook-dell-main.jpg',
+          images: [
+            'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/notebook-dell-1.jpg',
+            'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/notebook-dell-2.jpg',
+            'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/notebook-dell-3.jpg'
+          ],
+          specifications: {
+            processador: 'Intel Core i5 11ª Geração',
+            memoria_ram: '8GB DDR4',
+            armazenamento: 'SSD 256GB',
+            tela: '15.6" Full HD (1920x1080)',
+            placa_video: 'Intel UHD Graphics',
+            sistema_operacional: 'Windows 11 Home',
+            conectividade: 'Wi-Fi 6, Bluetooth 5.1',
+            portas: '2x USB 3.2, 1x USB-C, HDMI, Leitor SD'
           },
+          badge: 'Novo',
+          rating: 0,
+          review_count: 0,
+          featured: false,
+          height: 2.5,
+          width: 35.8,
+          length: 24.2,
+          weight: 1.85,
+          min_stock_level: 5,
+          low_stock_alert: false,
+          use_auto_pricing: false,
+          subcategory_id: 'subcat-999-uuid',
           categories: {
-            id: 'cat-111',
+            id: 'cat-111-uuid',
             name: 'Eletrônicos',
             slug: 'eletronicos',
+            image_url: 'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/cat-eletronicos.jpg',
             active: true
           },
           subcategories: {
-            id: 'subcat-999',
+            id: 'subcat-999-uuid',
             name: 'Notebooks',
             slug: 'notebooks'
           },
-          created_by_user: {
-            id: 'admin-456',
-            full_name: 'Admin Sistema'
+          supplier: {
+            id: 'supplier-789-uuid',
+            full_name: 'João Fornecedor da Silva',
+            email: 'joao.fornecedor@example.com'
           },
-          created_at: '2025-01-12T10:00:00Z'
+          created_by_user: {
+            id: 'admin-456-uuid',
+            full_name: 'Admin Sistema Lojafy',
+            email: 'admin@lojafy.com'
+          },
+          created_at: '2025-01-12T10:00:00Z',
+          updated_at: '2025-01-12T10:00:00Z'
+        },
+        {
+          id: 'prod-456-uuid',
+          name: 'Mouse Gamer RGB Logitech G502',
+          description: 'Mouse gamer profissional com sensor HERO 25K, 11 botões programáveis, iluminação RGB personalizável e sistema de pesos ajustáveis.',
+          price: 349.90,
+          original_price: 449.90,
+          cost_price: null,
+          stock_quantity: 25,
+          sku: 'MOUSE-LG-G502',
+          gtin_ean13: '7891234567891',
+          brand: 'Logitech',
+          active: false,
+          high_rotation: true,
+          approval_status: 'pending_approval',
+          requires_approval: true,
+          rejection_reason: null,
+          approved_by: null,
+          approved_at: null,
+          rejected_at: null,
+          created_by: 'admin-456-uuid',
+          supplier_id: 'supplier-222-uuid',
+          reference_ad_url: null,
+          image_url: 'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/mouse-logitech-main.jpg',
+          main_image_url: 'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/mouse-logitech-main.jpg',
+          images: [
+            'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/mouse-logitech-1.jpg',
+            'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/mouse-logitech-2.jpg'
+          ],
+          specifications: {
+            sensor: 'HERO 25K DPI',
+            botoes: '11 programáveis',
+            iluminacao: 'RGB LIGHTSYNC',
+            conectividade: 'USB com fio',
+            peso: '121g (ajustável)',
+            compatibilidade: 'Windows, macOS, Linux'
+          },
+          badge: 'Alta Rotação',
+          rating: 0,
+          review_count: 0,
+          featured: false,
+          height: 4.0,
+          width: 7.5,
+          length: 13.2,
+          weight: 0.121,
+          min_stock_level: 10,
+          low_stock_alert: false,
+          use_auto_pricing: false,
+          subcategory_id: 'subcat-888-uuid',
+          categories: {
+            id: 'cat-111-uuid',
+            name: 'Eletrônicos',
+            slug: 'eletronicos',
+            image_url: 'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/cat-eletronicos.jpg',
+            active: true
+          },
+          subcategories: {
+            id: 'subcat-888-uuid',
+            name: 'Periféricos',
+            slug: 'perifericos'
+          },
+          supplier: {
+            id: 'supplier-222-uuid',
+            full_name: 'Maria Fornecedora Tech',
+            email: 'maria.tech@example.com'
+          },
+          created_by_user: {
+            id: 'admin-456-uuid',
+            full_name: 'Admin Sistema Lojafy',
+            email: 'admin@lojafy.com'
+          },
+          created_at: '2025-01-11T14:30:00Z',
+          updated_at: '2025-01-11T14:30:00Z'
         }
       ],
       pagination: {
@@ -477,13 +634,51 @@ const productEndpoints = [
         total_aguardando: 15,
         por_fornecedor: [
           {
-            supplier_id: 'supplier-789',
-            name: 'João Fornecedor',
+            supplier_id: 'supplier-789-uuid',
+            name: 'João Fornecedor da Silva',
             total: 8
+          },
+          {
+            supplier_id: 'supplier-222-uuid',
+            name: 'Maria Fornecedora Tech',
+            total: 7
           }
         ]
       }
-    }
+    },
+    errorExamples: [
+      {
+        code: 401,
+        title: 'Não Autenticado',
+        description: 'API Key ausente ou inválida',
+        example: {
+          success: false,
+          error: 'API key inválida ou ausente',
+          code: 401
+        }
+      },
+      {
+        code: 403,
+        title: 'Sem Permissão',
+        description: 'API Key não tem permissão para leitura de produtos',
+        example: {
+          success: false,
+          error: 'Permissão negada para leitura de produtos',
+          code: 403
+        }
+      },
+      {
+        code: 500,
+        title: 'Erro Interno',
+        description: 'Erro no servidor ao processar requisição',
+        example: {
+          success: false,
+          error: 'Erro interno do servidor',
+          details: 'Database connection timeout',
+          code: 500
+        }
+      }
+    ]
   }
 ];
 
@@ -646,6 +841,46 @@ const AcademyAPI = () => {
         </TabsContent>
 
         <TabsContent value="products" className="space-y-6">
+          <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+            <CardHeader>
+              <CardTitle className="text-base">📋 Campos Retornados</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <strong>Identificação:</strong> id, sku, gtin_ean13, name, brand
+                </div>
+                <div>
+                  <strong>Preços:</strong> price, original_price, cost_price
+                </div>
+                <div>
+                  <strong>Estoque:</strong> stock_quantity, min_stock_level, low_stock_alert
+                </div>
+                <div>
+                  <strong>Status:</strong> approval_status, active, requires_approval
+                </div>
+                <div>
+                  <strong>Aprovação:</strong> rejection_reason, approved_by, approved_at, rejected_at
+                </div>
+                <div>
+                  <strong>Mídia:</strong> image_url, main_image_url, images[]
+                </div>
+                <div>
+                  <strong>Dimensões:</strong> height, width, length, weight
+                </div>
+                <div>
+                  <strong>Relacionamentos:</strong> supplier, categories, subcategories, created_by_user
+                </div>
+                <div>
+                  <strong>Especificações:</strong> specifications (JSON object)
+                </div>
+                <div>
+                  <strong>Marketing:</strong> badge, rating, review_count, featured, high_rotation
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
           <EndpointSection
             title="Gestão de Produtos"
             description="Endpoints para consultar produtos aguardando aprovação com informações completas"
@@ -697,6 +932,26 @@ const AcademyAPI = () => {
             <p className="text-sm text-muted-foreground">
               Configure sistemas de assinatura mensal/anual usando api-matriculas-cadastrar com expires_at definido, e cancele automaticamente com api-matriculas-cancelar quando necessário.
             </p>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <h4 className="font-medium">5. Integração de Aprovação de Produtos</h4>
+            <p className="text-sm text-muted-foreground">
+              <strong>Sistema externo monitora produtos pendentes</strong> → 
+              Lista produtos com api-produtos-aguardando-aprovacao → 
+              Aplica regras de negócio automatizadas → 
+              Aprova ou rejeita via webhook/API → 
+              Notifica fornecedor automaticamente → 
+              Atualiza catálogo em tempo real.
+            </p>
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-200 dark:border-blue-800 mt-2">
+              <p className="text-xs text-blue-900 dark:text-blue-300">
+                💡 <strong>Dica:</strong> Use o filtro <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">supplier_id</code>
+                {' '}para criar dashboards específicos por fornecedor e automatizar fluxos de aprovação baseados em histórico e performance.
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
