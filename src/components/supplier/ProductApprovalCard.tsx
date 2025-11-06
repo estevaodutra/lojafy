@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Check, X, Clock, CheckCircle, XCircle } from "lucide-react";
+import { Eye, Check, X, Clock, CheckCircle, XCircle, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -15,7 +15,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface ProductApprovalCardProps {
   product: any;
@@ -25,8 +26,26 @@ interface ProductApprovalCardProps {
 
 const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCardProps) => {
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState("");
+  const [amazonReferenceUrl, setAmazonReferenceUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const isValidAmazonUrl = (url: string): boolean => {
+    if (!url.trim()) return false;
+    
+    const amazonDomains = [
+      'amazon.com.br',
+      'amazon.com',
+      'amzn.to',
+      'a.co'
+    ];
+    
+    try {
+      const urlObj = new URL(url);
+      return amazonDomains.some(domain => urlObj.hostname.includes(domain));
+    } catch {
+      return false;
+    }
+  };
 
   const handleApprove = async () => {
     setIsLoading(true);
@@ -80,8 +99,8 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
   };
 
   const handleReject = async () => {
-    if (!rejectionReason.trim()) {
-      toast.error('Por favor, informe o motivo da rejeição');
+    if (!isValidAmazonUrl(amazonReferenceUrl)) {
+      toast.error('Por favor, informe um link válido da Amazon');
       return;
     }
 
@@ -93,7 +112,7 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
         .from('products')
         .update({
           approval_status: 'rejected',
-          rejection_reason: rejectionReason,
+          rejection_reason: `Link de referência Amazon: ${amazonReferenceUrl}`,
           rejected_at: new Date().toISOString(),
           active: false
         })
@@ -108,28 +127,28 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
         performed_by: userData.user?.id,
         previous_status: 'pending_approval',
         new_status: 'rejected',
-        notes: rejectionReason
+        notes: `Link de referência Amazon: ${amazonReferenceUrl}`
       });
 
       // Notificar super admin
       if (product.created_by) {
         await supabase.from('notifications').insert({
           user_id: product.created_by,
-          title: '❌ Produto Rejeitado',
-          message: `O produto "${product.name}" foi rejeitado pelo fornecedor.`,
+          title: '🔄 Produto Rejeitado - Referência Sugerida',
+          message: `O produto "${product.name}" foi rejeitado. Uma referência da Amazon foi fornecida para comparação.`,
           type: 'product_rejected',
           action_url: '/super-admin/catalogo',
           metadata: {
             product_id: product.id,
             supplier_id: product.supplier_id,
-            rejection_reason: rejectionReason
+            amazon_reference_url: amazonReferenceUrl
           }
         });
       }
 
-      toast.success('Produto rejeitado');
+      toast.success('Produto rejeitado e referência enviada ao administrador');
       setIsRejectDialogOpen(false);
-      setRejectionReason("");
+      setAmazonReferenceUrl("");
       onRefresh();
     } catch (error) {
       console.error('Error rejecting product:', error);
@@ -219,9 +238,21 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
           )}
 
           {product.approval_status === 'rejected' && product.rejection_reason && (
-            <div className="pt-2 border-t">
-              <p className="text-xs text-muted-foreground">Motivo da rejeição:</p>
-              <p className="text-sm mt-1">{product.rejection_reason}</p>
+            <div className="pt-2 border-t space-y-1">
+              <p className="text-xs text-muted-foreground">Produto de referência sugerido:</p>
+              {product.rejection_reason.includes('amazon.com') || product.rejection_reason.includes('amzn.to') || product.rejection_reason.includes('a.co') ? (
+                <a 
+                  href={product.rejection_reason.replace('Link de referência Amazon: ', '')} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                >
+                  Ver produto na Amazon
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              ) : (
+                <p className="text-sm mt-1">{product.rejection_reason}</p>
+              )}
             </div>
           )}
         </CardContent>
@@ -230,20 +261,34 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
       <AlertDialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Rejeitar Produto</AlertDialogTitle>
+            <AlertDialogTitle>Rejeitar e Sugerir Alternativa</AlertDialogTitle>
             <AlertDialogDescription>
-              Por favor, informe o motivo da rejeição deste produto. Esta informação será enviada ao administrador.
+              Informe o link de um produto similar da Amazon. Este produto será usado como referência pelo administrador para correções.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <Textarea
-            placeholder="Ex: Preço muito alto, descrição incompleta, imagens de baixa qualidade..."
-            value={rejectionReason}
-            onChange={(e) => setRejectionReason(e.target.value)}
-            rows={4}
-          />
+          <div className="space-y-2">
+            <Label htmlFor="amazon-url">Link do Produto na Amazon *</Label>
+            <Input
+              id="amazon-url"
+              type="url"
+              placeholder="https://www.amazon.com.br/produto-similar..."
+              value={amazonReferenceUrl}
+              onChange={(e) => setAmazonReferenceUrl(e.target.value)}
+              className={amazonReferenceUrl && !isValidAmazonUrl(amazonReferenceUrl) ? 'border-red-500' : ''}
+            />
+            {amazonReferenceUrl && !isValidAmazonUrl(amazonReferenceUrl) && (
+              <p className="text-xs text-red-500">Por favor, insira um link válido da Amazon</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              ✓ amazon.com.br | ✓ amazon.com | ✓ amzn.to | ✓ a.co
+            </p>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleReject} disabled={isLoading || !rejectionReason.trim()}>
+            <AlertDialogAction 
+              onClick={handleReject} 
+              disabled={isLoading || !isValidAmazonUrl(amazonReferenceUrl)}
+            >
               Confirmar Rejeição
             </AlertDialogAction>
           </AlertDialogFooter>
