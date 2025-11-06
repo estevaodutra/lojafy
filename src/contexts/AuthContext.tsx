@@ -279,47 +279,77 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signOut = async () => {
     try {
-      // Limpar dados de impersonation ANTES do logout
+      // Evitar cliques múltiplos
+      if ((signOut as any)._running) return;
+      (signOut as any)._running = true;
+
+      // Limpa impersonation local
       sessionStorage.removeItem('impersonation_data');
       setImpersonationData(null);
-      
-      // Fazer logout no Supabase
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        console.error('Error signing out:', error);
-        toast({
-          variant: "destructive",
-          title: "Erro ao sair",
-          description: "Não foi possível fazer logout. Tente novamente.",
-        });
-        return;
+
+      let globalError: any = null;
+      try {
+        const { error } = await supabase.auth.signOut(); // global (revoga no servidor)
+        if (error) globalError = error;
+      } catch (err) {
+        globalError = err;
       }
-      
-      // Limpar estado local
+
+      if (globalError) {
+        console.error('Global signOut failed, applying local fallback:', globalError);
+
+        // Tenta logout local (não usa rede)
+        try {
+          await supabase.auth.signOut({ scope: 'local' } as any);
+        } catch (e) {
+          console.warn('Local signOut fallback failed, purging storage keys:', e);
+        }
+
+        // Purga as chaves do Supabase para garantir remoção do token
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key) continue;
+            if (key.startsWith('sb-') || key.includes('bbrmjrjorcgsgeztzbsr')) {
+              localStorage.removeItem(key);
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to purge localStorage keys:', e);
+        }
+      }
+
+      // Zera estados locais
       setUser(null);
       setSession(null);
       setProfile(null);
-      
-      // Mostrar toast de sucesso
-      toast({
-        title: "Logout realizado",
-        description: "Até logo!",
-      });
-      
-      // Redirecionar para home com hard reload (garante limpeza completa)
-      // Aguardar um pouco para o toast ser exibido
+
+      toast({ title: 'Logout realizado', description: 'Até logo!' });
+
       setTimeout(() => {
+        (signOut as any)._running = false;
         window.location.href = '/';
-      }, 500);
-      
+      }, 700);
     } catch (error) {
-      console.error('Error signing out:', error);
+      (signOut as any)._running = false;
+      console.error('Error signing out (unexpected):', error);
       toast({
-        variant: "destructive",
-        title: "Erro ao sair",
-        description: "Ocorreu um erro inesperado.",
+        variant: 'destructive',
+        title: 'Erro ao sair',
+        description: 'Ocorreu um erro inesperado. Limpamos sua sessão local.',
       });
+      // Última linha de defesa: limpar tudo e recarregar
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (!key) continue;
+          if (key.startsWith('sb-') || key.includes('bbrmjrjorcgsgeztzbsr')) {
+            localStorage.removeItem(key);
+          }
+        }
+      } catch {}
+      sessionStorage.removeItem('impersonation_data');
+      setTimeout(() => (window.location.href = '/'), 400);
     }
   };
 
