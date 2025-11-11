@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Check, X, Clock, CheckCircle, XCircle, ExternalLink } from "lucide-react";
+import { Eye, Check, X, Clock, CheckCircle, XCircle, ExternalLink, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface ProductApprovalCardProps {
   product: any;
@@ -27,9 +28,11 @@ interface ProductApprovalCardProps {
 const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCardProps) => {
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [referenceUrl, setReferenceUrl] = useState("");
   const [suggestedPrice, setSuggestedPrice] = useState("");
   const [costPrice, setCostPrice] = useState("");
+  const [approveAsInactive, setApproveAsInactive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const isValidUrl = (url: string): boolean => {
@@ -73,7 +76,7 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
           approved_by: userData.user?.id,
           approved_at: new Date().toISOString(),
           cost_price: costPriceValue,
-          active: true
+          active: !approveAsInactive
         })
         .eq('id', product.id);
 
@@ -85,7 +88,7 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
         performed_by: userData.user?.id,
         previous_status: 'pending_approval',
         new_status: 'approved',
-        notes: `Aprovado com preço de custo: R$ ${costPriceValue.toFixed(2)}`
+        notes: `Aprovado com preço de custo: R$ ${costPriceValue.toFixed(2)}${approveAsInactive ? ' (aprovado como inativo)' : ''}`
       });
 
       if (product.created_by) {
@@ -94,14 +97,15 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
         await supabase.from('notifications').insert({
           user_id: product.created_by,
           title: '✅ Produto Aprovado',
-          message: `O produto "${product.name}" foi aprovado com preço de custo R$ ${costPriceValue.toFixed(2)} (margem de ${marginPercent}%).`,
+          message: `O produto "${product.name}" foi aprovado com preço de custo R$ ${costPriceValue.toFixed(2)} (margem de ${marginPercent}%)${approveAsInactive ? '. O produto foi aprovado mas permanece inativo no catálogo.' : '.'}`,
           type: 'product_approved',
           action_url: '/super-admin/catalogo',
           metadata: {
             product_id: product.id,
             supplier_id: product.supplier_id,
             cost_price: costPriceValue,
-            margin_percent: parseFloat(marginPercent)
+            margin_percent: parseFloat(marginPercent),
+            approved_as_inactive: approveAsInactive
           }
         });
       }
@@ -109,6 +113,7 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
       toast.success('Produto aprovado com preço de custo registrado!');
       setIsApproveDialogOpen(false);
       setCostPrice("");
+      setApproveAsInactive(false);
       onRefresh();
     } catch (error) {
       console.error('Error approving product:', error);
@@ -184,6 +189,53 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
     }
   };
 
+  const handleDelete = async () => {
+    setIsLoading(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      
+      await supabase.from('product_approval_history').insert({
+        product_id: product.id,
+        action: 'deleted',
+        performed_by: userData.user?.id,
+        previous_status: product.approval_status,
+        new_status: 'deleted',
+        notes: `Produto excluído pelo fornecedor`
+      });
+
+      if (product.created_by) {
+        await supabase.from('notifications').insert({
+          user_id: product.created_by,
+          title: '🗑️ Produto Excluído pelo Fornecedor',
+          message: `O produto "${product.name}" foi excluído pelo fornecedor e removido da lista de aprovação.`,
+          type: 'product_deleted',
+          action_url: '/super-admin/catalogo',
+          metadata: {
+            product_id: product.id,
+            supplier_id: product.supplier_id,
+            deleted_by: userData.user?.id
+          }
+        });
+      }
+
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', product.id);
+
+      if (error) throw error;
+
+      toast.success('Produto excluído com sucesso');
+      setIsDeleteDialogOpen(false);
+      onRefresh();
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast.error('Erro ao excluir produto');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const getStatusBadge = () => {
     switch (product.approval_status) {
       case 'pending_approval':
@@ -239,28 +291,40 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
           </div>
 
           {product.approval_status === 'pending_approval' && (
-            <div className="flex gap-2 pt-2 border-t">
+            <>
+              <div className="flex gap-2 pt-2 border-t">
+                <Button 
+                  size="sm" 
+                  variant="default" 
+                  onClick={() => setIsApproveDialogOpen(true)} 
+                  className="flex-1"
+                  disabled={isLoading}
+                >
+                  <Check className="w-4 h-4 mr-1" />
+                  Aprovar
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="destructive" 
+                  onClick={() => setIsRejectDialogOpen(true)} 
+                  className="flex-1"
+                  disabled={isLoading}
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Rejeitar
+                </Button>
+              </div>
               <Button 
                 size="sm" 
-                variant="default" 
-                onClick={() => setIsApproveDialogOpen(true)} 
-                className="flex-1"
+                variant="outline" 
+                onClick={() => setIsDeleteDialogOpen(true)} 
+                className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
                 disabled={isLoading}
               >
-                <Check className="w-4 h-4 mr-1" />
-                Aprovar
+                <Trash2 className="w-4 h-4 mr-1" />
+                Excluir Produto
               </Button>
-              <Button 
-                size="sm" 
-                variant="destructive" 
-                onClick={() => setIsRejectDialogOpen(true)} 
-                className="flex-1"
-                disabled={isLoading}
-              >
-                <X className="w-4 h-4 mr-1" />
-                Rejeitar
-              </Button>
-            </div>
+            </>
           )}
 
           {product.approval_status === 'rejected' && product.rejection_reason && (
@@ -337,6 +401,25 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
                 </p>
               </div>
             )}
+            
+            <div className="flex items-start space-x-2 p-3 border rounded-md bg-amber-50 border-amber-200">
+              <Checkbox
+                id="approve-inactive"
+                checked={approveAsInactive}
+                onCheckedChange={(checked) => setApproveAsInactive(checked === true)}
+              />
+              <div className="grid gap-1.5 leading-none">
+                <Label
+                  htmlFor="approve-inactive"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  Aprovar como inativo
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  O produto será aprovado com o preço de custo, mas ficará inativo e não aparecerá no catálogo até ser ativado pelo administrador.
+                </p>
+              </div>
+            </div>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -408,6 +491,44 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
               disabled={isLoading || !isValidUrl(referenceUrl) || !isValidPrice(suggestedPrice)}
             >
               Confirmar Rejeição
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="w-5 h-5" />
+              Excluir Produto Permanentemente?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. O produto será removido permanentemente do sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="p-4 bg-red-50 border border-red-200 rounded-md space-y-2">
+            <p className="text-sm font-medium text-red-900">Produto: {product.name}</p>
+            <p className="text-xs text-red-700">SKU: {product.sku || 'N/A'}</p>
+            <p className="text-xs text-red-700">Estoque: {product.stock_quantity || 0} unidades</p>
+            
+            <div className="mt-3 pt-3 border-t border-red-300">
+              <p className="text-xs font-medium text-red-900">⚠️ Atenção:</p>
+              <ul className="text-xs text-red-800 mt-1 space-y-1 list-disc list-inside">
+                <li>O produto será removido permanentemente</li>
+                <li>O administrador será notificado da exclusão</li>
+                <li>Esta ação não pode ser desfeita</li>
+              </ul>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              disabled={isLoading}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Confirmar Exclusão
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
