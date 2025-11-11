@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useTopProductsReal } from './useTopProductsReal';
 import { useTopProductsDemo } from './useTopProductsDemo';
 import { useEffect } from 'react';
 
@@ -66,6 +67,7 @@ export const useTopProducts = () => {
     retry: false
   });
 
+  const realProductsQuery = useTopProductsReal();
   const demoQuery = useTopProductsDemo();
 
   // Subscribe to real-time updates for external product_ranking table
@@ -91,10 +93,16 @@ export const useTopProducts = () => {
     };
   }, [queryClient]);
 
-  // Return external ranking if available, otherwise use demo data
-  return {
-    data: externalRankingQuery.data || demoQuery.data,
-    isLoading: externalRankingQuery.isLoading || (!externalRankingQuery.data && demoQuery.isLoading),
-    error: externalRankingQuery.error || (!externalRankingQuery.data && demoQuery.error)
-  };
+  // Prioridade: Externo > Real > Demo
+  const data = externalRankingQuery.data || realProductsQuery.data || demoQuery.data;
+  const isLoading = externalRankingQuery.isLoading || 
+                    (!externalRankingQuery.data && realProductsQuery.isLoading) ||
+                    (!externalRankingQuery.data && !realProductsQuery.data && demoQuery.isLoading);
+  const error = externalRankingQuery.error || 
+                (!externalRankingQuery.data && realProductsQuery.error) ||
+                (!externalRankingQuery.data && !realProductsQuery.data && demoQuery.error);
+  
+  const isRealData = !!(externalRankingQuery.data || realProductsQuery.data);
+
+  return { data, isLoading, error, isRealData };
 };

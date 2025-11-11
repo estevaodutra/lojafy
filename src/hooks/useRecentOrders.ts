@@ -1,3 +1,4 @@
+import { useRecentOrdersReal } from './useRecentOrdersReal';
 import { useRecentOrdersDemo } from './useRecentOrdersDemo';
 
 export interface RecentOrder {
@@ -15,6 +16,16 @@ export interface RecentOrder {
 }
 
 export const useRecentOrders = () => {
-  // Always use demo data (fictional data)
-  return useRecentOrdersDemo();
+  const realOrders = useRecentOrdersReal();
+  const demoOrders = useRecentOrdersDemo();
+  
+  // Priorizar dados reais, usar demo como fallback
+  const hasRealData = realOrders.data && realOrders.data.length > 0;
+  
+  return {
+    data: hasRealData ? realOrders.data : demoOrders.data,
+    isLoading: hasRealData ? realOrders.isLoading : demoOrders.isLoading,
+    error: hasRealData ? realOrders.error : demoOrders.error,
+    isRealData: hasRealData
+  };
 };

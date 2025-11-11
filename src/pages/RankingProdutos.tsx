@@ -17,8 +17,8 @@ const RankingProdutos = () => {
   useDocumentTitle("Ranking de Produtos");
   const [activeTab, setActiveTab] = useState("top-products");
   
-  const { data: topProducts, isLoading: loadingProducts } = useTopProducts();
-  const { data: recentOrders, isLoading: loadingOrders } = useRecentOrders();
+  const { data: topProducts, isLoading: loadingProducts, isRealData: isRealProducts } = useTopProducts();
+  const { data: recentOrders, isLoading: loadingOrders, isRealData: isRealOrders } = useRecentOrders();
 
   return (
     <div className="min-h-screen bg-background">
@@ -26,11 +26,17 @@ const RankingProdutos = () => {
       
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8 text-center">
-          <div className="flex items-center justify-center gap-2 mb-4">
+          <div className="flex items-center justify-center gap-2 mb-4 flex-wrap">
             <Trophy className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold text-foreground">Ranking de Produtos</h1>
             <Badge variant="default" className="bg-green-600 text-white animate-pulse">
               🔴 AO VIVO
+            </Badge>
+            <Badge 
+              variant={isRealProducts || isRealOrders ? "default" : "secondary"}
+              className={isRealProducts || isRealOrders ? "bg-blue-600 hover:bg-blue-700" : ""}
+            >
+              {isRealProducts || isRealOrders ? "📊 DADOS REAIS" : "🧪 MODO DEMO"}
             </Badge>
           </div>
           <p className="text-muted-foreground max-w-2xl mx-auto">
