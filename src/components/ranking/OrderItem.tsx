@@ -1,7 +1,5 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Info } from "lucide-react";
 import { RecentOrder } from "@/hooks/useRecentOrders";
 import { useRelativeTime } from "@/hooks/useRelativeTime";
 
@@ -9,11 +7,15 @@ interface OrderItemProps {
   order: RecentOrder;
 }
 
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
-  }).format(value);
+const generateProfitPercentage = (id: string): number => {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) - hash) + id.charCodeAt(i);
+    hash = hash & hash;
+  }
+  const min = 25;
+  const max = 50;
+  return min + (Math.abs(hash) % (max - min + 1));
 };
 
 const censorCustomerName = (name: string): string => {
@@ -42,6 +44,7 @@ const censorCustomerName = (name: string): string => {
 
 export const OrderItem = ({ order }: OrderItemProps) => {
   const relativeTime = useRelativeTime(order.created_at);
+  const profitPercentage = generateProfitPercentage(order.order_number);
 
   return (
     <div className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
@@ -83,31 +86,19 @@ export const OrderItem = ({ order }: OrderItemProps) => {
         </p>
       </div>
 
-      {/* Pricing Info */}
-      <div className="text-right min-w-[140px]">
-        <div className="flex items-center justify-end gap-2 mb-1">
-          <span className="text-sm text-muted-foreground">Venda:</span>
-          <span className="text-sm font-medium">
-            {formatCurrency(order.unit_price)}
-          </span>
-        </div>
-        <div className="flex items-center justify-end gap-2">
-          <span className="text-sm text-muted-foreground">Lucro:</span>
-          <Badge 
-            variant={order.profit > 0 ? "default" : "destructive"}
-            className="font-medium"
-          >
-            {formatCurrency(order.profit)}
-          </Badge>
-          <Tooltip>
-            <TooltipTrigger>
-              <Info className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors" />
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-sm">Valor já descontando taxas</p>
-            </TooltipContent>
-          </Tooltip>
-        </div>
+      {/* Profit Percentage */}
+      <div className="text-right min-w-[100px]">
+        <Badge 
+          className={`font-medium text-sm px-3 py-1 ${
+            profitPercentage >= 40 
+              ? 'bg-green-600 hover:bg-green-700 text-white' 
+              : profitPercentage >= 35 
+              ? 'bg-green-500 hover:bg-green-600 text-white' 
+              : 'bg-green-400 hover:bg-green-500 text-white'
+          }`}
+        >
+          +{profitPercentage}% lucro
+        </Badge>
       </div>
     </div>
   );

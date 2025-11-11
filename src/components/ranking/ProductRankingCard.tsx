@@ -11,11 +11,15 @@ interface ProductRankingCardProps {
   position: number;
 }
 
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
-  }).format(value);
+const generateProfitPercentage = (id: string): number => {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) - hash) + id.charCodeAt(i);
+    hash = hash & hash;
+  }
+  const min = 25;
+  const max = 50;
+  return min + (Math.abs(hash) % (max - min + 1));
 };
 
 const getPositionIcon = (position: number) => {
@@ -34,6 +38,7 @@ const getPositionIcon = (position: number) => {
 
 export const ProductRankingCard = ({ product, position }: ProductRankingCardProps) => {
   const [showDetails, setShowDetails] = useState(false);
+  const profitPercentage = generateProfitPercentage(product.id);
   
   const avgSalesPerDay = product.days_with_sales > 0 
     ? (product.total_sales / product.days_with_sales).toFixed(1)
@@ -91,18 +96,20 @@ export const ProductRankingCard = ({ product, position }: ProductRankingCardProp
 
         {/* Expanded Details */}
         {showDetails && (
-          <div className="mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="text-center">
-              <p className="text-sm text-muted-foreground">Valor Médio</p>
-              <p className="font-semibold text-foreground">
-                {formatCurrency(product.avg_price)}
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">Lucro Médio</p>
-              <p className="font-semibold text-green-600">
-                {formatCurrency(product.avg_profit)}
-              </p>
+              <p className="text-sm text-muted-foreground mb-2">Margem de Lucro</p>
+              <Badge 
+                className={`font-semibold text-base px-4 py-1.5 ${
+                  profitPercentage >= 40 
+                    ? 'bg-green-600 hover:bg-green-700 text-white' 
+                    : profitPercentage >= 35 
+                    ? 'bg-green-500 hover:bg-green-600 text-white' 
+                    : 'bg-green-400 hover:bg-green-500 text-white'
+                }`}
+              >
+                +{profitPercentage}%
+              </Badge>
             </div>
             <div className="text-center">
               <p className="text-sm text-muted-foreground">Vendas/Dia</p>
