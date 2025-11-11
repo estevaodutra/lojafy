@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSupplierPendingProducts, useSupplierApprovalStats } from "@/hooks/useSupplierPendingProducts";
-import { Clock, CheckCircle, XCircle, Package } from "lucide-react";
+import { Clock, CheckCircle, XCircle, Package, Search, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import ProductApprovalCard from "@/components/supplier/ProductApprovalCard";
 import {
   Dialog,
@@ -17,6 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 const ProductApproval = () => {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   
   const { data: products = [], isLoading, refetch } = useSupplierPendingProducts();
   const { data: stats } = useSupplierApprovalStats();
@@ -24,6 +27,22 @@ const ProductApproval = () => {
   const approvedProducts = products.filter(p => p.approval_status === 'approved');
   const rejectedProducts = products.filter(p => p.approval_status === 'rejected');
   const waitingProducts = products.filter(p => p.approval_status === 'pending_approval');
+  
+  // Função de filtro por nome ou SKU (case-insensitive)
+  const filterBySearch = (productList: any[]) => {
+    if (!searchTerm.trim()) return productList;
+    
+    const search = searchTerm.toLowerCase().trim();
+    return productList.filter(product => 
+      product.name?.toLowerCase().includes(search) ||
+      product.sku?.toLowerCase().includes(search)
+    );
+  };
+
+  // Aplicar filtro em cada lista
+  const filteredApprovedProducts = filterBySearch(approvedProducts);
+  const filteredRejectedProducts = filterBySearch(rejectedProducts);
+  const filteredWaitingProducts = filterBySearch(waitingProducts);
   
   const handleViewProduct = (product: any) => {
     setSelectedProduct(product);
@@ -75,34 +94,78 @@ const ProductApproval = () => {
         </Card>
       </div>
 
+      {/* Barra de Pesquisa */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Buscar por nome do produto ou SKU..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+            {searchTerm && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
+                onClick={() => setSearchTerm("")}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Tabs */}
       <Tabs defaultValue="pending" className="space-y-4">
         <TabsList>
           <TabsTrigger value="pending">
             <Clock className="w-4 h-4 mr-2" />
-            Pendentes ({waitingProducts.length})
+            Pendentes ({filteredWaitingProducts.length})
           </TabsTrigger>
           <TabsTrigger value="approved">
             <CheckCircle className="w-4 h-4 mr-2" />
-            Aprovados ({approvedProducts.length})
+            Aprovados ({filteredApprovedProducts.length})
           </TabsTrigger>
           <TabsTrigger value="rejected">
             <XCircle className="w-4 h-4 mr-2" />
-            Rejeitados ({rejectedProducts.length})
+            Rejeitados ({filteredRejectedProducts.length})
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="pending">
-          {waitingProducts.length === 0 ? (
+          {filteredWaitingProducts.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
-                <Package className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Nenhum produto aguardando aprovação</p>
+                {searchTerm ? (
+                  <>
+                    <Search className="h-12 w-12 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">
+                      Nenhum produto encontrado para "{searchTerm}"
+                    </p>
+                    <Button 
+                      variant="link" 
+                      onClick={() => setSearchTerm("")}
+                      className="mt-2"
+                    >
+                      Limpar busca
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Package className="h-12 w-12 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">Nenhum produto aguardando aprovação</p>
+                  </>
+                )}
               </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {waitingProducts.map(product => (
+              {filteredWaitingProducts.map(product => (
                 <ProductApprovalCard
                   key={product.id}
                   product={product}
@@ -115,16 +178,34 @@ const ProductApproval = () => {
         </TabsContent>
 
         <TabsContent value="approved">
-          {approvedProducts.length === 0 ? (
+          {filteredApprovedProducts.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
-                <CheckCircle className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Nenhum produto aprovado ainda</p>
+                {searchTerm ? (
+                  <>
+                    <Search className="h-12 w-12 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">
+                      Nenhum produto encontrado para "{searchTerm}"
+                    </p>
+                    <Button 
+                      variant="link" 
+                      onClick={() => setSearchTerm("")}
+                      className="mt-2"
+                    >
+                      Limpar busca
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-12 w-12 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">Nenhum produto aprovado ainda</p>
+                  </>
+                )}
               </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {approvedProducts.map(product => (
+              {filteredApprovedProducts.map(product => (
                 <ProductApprovalCard
                   key={product.id}
                   product={product}
@@ -137,16 +218,34 @@ const ProductApproval = () => {
         </TabsContent>
 
         <TabsContent value="rejected">
-          {rejectedProducts.length === 0 ? (
+          {filteredRejectedProducts.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
-                <XCircle className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Nenhum produto rejeitado</p>
+                {searchTerm ? (
+                  <>
+                    <Search className="h-12 w-12 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">
+                      Nenhum produto encontrado para "{searchTerm}"
+                    </p>
+                    <Button 
+                      variant="link" 
+                      onClick={() => setSearchTerm("")}
+                      className="mt-2"
+                    >
+                      Limpar busca
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-12 w-12 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">Nenhum produto rejeitado</p>
+                  </>
+                )}
               </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {rejectedProducts.map(product => (
+              {filteredRejectedProducts.map(product => (
                 <ProductApprovalCard
                   key={product.id}
                   product={product}
