@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Trophy, TrendingUp, Clock } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useTopProducts } from "@/hooks/useTopProducts";
@@ -10,6 +11,7 @@ import { useRecentOrders } from "@/hooks/useRecentOrders";
 import { ProductRankingCard } from "@/components/ranking/ProductRankingCard";
 import { OrderItem } from "@/components/ranking/OrderItem";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 
 const RankingProdutos = () => {
   useDocumentTitle("Ranking de Produtos");
@@ -27,6 +29,9 @@ const RankingProdutos = () => {
           <div className="flex items-center justify-center gap-2 mb-4">
             <Trophy className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold text-foreground">Ranking de Produtos</h1>
+            <Badge variant="default" className="bg-green-600 text-white animate-pulse">
+              🔴 AO VIVO
+            </Badge>
           </div>
           <p className="text-muted-foreground max-w-2xl mx-auto">
             Acompanhe os produtos mais vendidos da semana e os últimos pedidos processados em tempo real

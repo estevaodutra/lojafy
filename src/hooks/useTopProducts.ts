@@ -1,6 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTopProductsDemo } from './useTopProductsDemo';
+import { useEffect } from 'react';
 
 export interface TopProduct {
   id: string;
@@ -16,6 +17,8 @@ export interface TopProduct {
 }
 
 export const useTopProducts = () => {
+  const queryClient = useQueryClient();
+
   // First try to get external ranking data, fallback to demo data
   const externalRankingQuery = useQuery({
     queryKey: ['external-ranking'],
@@ -64,6 +67,29 @@ export const useTopProducts = () => {
   });
 
   const demoQuery = useTopProductsDemo();
+
+  // Subscribe to real-time updates for external product_ranking table
+  useEffect(() => {
+    const channel = supabase
+      .channel('product-ranking-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // INSERT, UPDATE or DELETE
+          schema: 'public',
+          table: 'product_ranking'
+        },
+        (payload) => {
+          console.log('🏆 Ranking externo atualizado:', payload);
+          queryClient.invalidateQueries({ queryKey: ['external-ranking'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // Return external ranking if available, otherwise use demo data
   return {

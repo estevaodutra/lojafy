@@ -1,5 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useEffect } from 'react';
 
 export interface TopProduct {
   id: string;
@@ -15,7 +16,9 @@ export interface TopProduct {
 }
 
 export const useTopProductsDemo = () => {
-  return useQuery({
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
     queryKey: ['top-products-demo'],
     queryFn: async (): Promise<TopProduct[]> => {
       // Query products with demo sales from last 7 days
@@ -98,4 +101,43 @@ export const useTopProductsDemo = () => {
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  // Subscribe to real-time updates for ranking changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('top-products-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'demo_order_items'
+        },
+        (payload) => {
+          console.log('📊 Ranking atualizado - novo item vendido:', payload);
+          // Invalidate cache to recalculate ranking
+          queryClient.invalidateQueries({ queryKey: ['top-products-demo'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'demo_orders',
+          filter: 'status=eq.confirmed'
+        },
+        (payload) => {
+          console.log('✅ Pedido confirmado - atualizando ranking:', payload);
+          queryClient.invalidateQueries({ queryKey: ['top-products-demo'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  return query;
 };

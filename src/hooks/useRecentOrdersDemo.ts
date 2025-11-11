@@ -1,5 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useEffect } from 'react';
 
 export interface RecentOrder {
   id: string;
@@ -16,7 +17,9 @@ export interface RecentOrder {
 }
 
 export const useRecentOrdersDemo = () => {
-  return useQuery({
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
     queryKey: ['recent-orders-demo'],
     queryFn: async (): Promise<RecentOrder[]> => {
       // Fetch recent demo orders with their items and products
@@ -97,6 +100,43 @@ export const useRecentOrdersDemo = () => {
         .slice(0, 15);
     },
     staleTime: 1 * 60 * 1000, // 1 minute
-    refetchInterval: 2 * 60 * 1000, // 2 minutes
   });
+
+  // Subscribe to real-time updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('demo-orders-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'demo_orders'
+        },
+        (payload) => {
+          console.log('🔔 Novo pedido inserido:', payload);
+          // Invalidate cache to trigger automatic refetch
+          queryClient.invalidateQueries({ queryKey: ['recent-orders-demo'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'demo_order_items'
+        },
+        (payload) => {
+          console.log('🔔 Novo item de pedido inserido:', payload);
+          queryClient.invalidateQueries({ queryKey: ['recent-orders-demo'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  return query;
 };
