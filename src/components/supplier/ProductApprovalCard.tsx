@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 
 interface ProductApprovalCardProps {
   product: any;
@@ -32,7 +32,7 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
   const [referenceUrl, setReferenceUrl] = useState("");
   const [suggestedPrice, setSuggestedPrice] = useState("");
   const [costPrice, setCostPrice] = useState("");
-  const [approveAsInactive, setApproveAsInactive] = useState(false);
+  const [publishAsActive, setPublishAsActive] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
   const isValidUrl = (url: string): boolean => {
@@ -76,7 +76,7 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
           approved_by: userData.user?.id,
           approved_at: new Date().toISOString(),
           cost_price: costPriceValue,
-          active: !approveAsInactive
+          active: publishAsActive
         })
         .eq('id', product.id);
 
@@ -88,7 +88,7 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
         performed_by: userData.user?.id,
         previous_status: 'pending_approval',
         new_status: 'approved',
-        notes: `Aprovado com preço de custo: R$ ${costPriceValue.toFixed(2)}${approveAsInactive ? ' (aprovado como inativo)' : ''}`
+        notes: `Aprovado com preço de custo: R$ ${costPriceValue.toFixed(2)}${!publishAsActive ? ' (aprovado como inativo)' : ''}`
       });
 
       if (product.created_by) {
@@ -97,15 +97,15 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
         await supabase.from('notifications').insert({
           user_id: product.created_by,
           title: '✅ Produto Aprovado',
-          message: `O produto "${product.name}" foi aprovado com preço de custo R$ ${costPriceValue.toFixed(2)} (margem de ${marginPercent}%)${approveAsInactive ? '. O produto foi aprovado mas permanece inativo no catálogo.' : '.'}`,
+          message: `O produto "${product.name}" foi aprovado com preço de custo R$ ${costPriceValue.toFixed(2)} (margem de ${marginPercent}%)${!publishAsActive ? '. O produto foi aprovado mas permanece inativo no catálogo.' : '.'}`,
           type: 'product_approved',
           action_url: '/super-admin/catalogo',
           metadata: {
-            product_id: product.id,
-            supplier_id: product.supplier_id,
-            cost_price: costPriceValue,
-            margin_percent: parseFloat(marginPercent),
-            approved_as_inactive: approveAsInactive
+          product_id: product.id,
+          supplier_id: product.supplier_id,
+          cost_price: costPriceValue,
+          margin_percent: parseFloat(marginPercent),
+          published_as_active: publishAsActive
           }
         });
       }
@@ -113,7 +113,7 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
       toast.success('Produto aprovado com preço de custo registrado!');
       setIsApproveDialogOpen(false);
       setCostPrice("");
-      setApproveAsInactive(false);
+      setPublishAsActive(true);
       onRefresh();
     } catch (error) {
       console.error('Error approving product:', error);
@@ -402,22 +402,26 @@ const ProductApprovalCard = ({ product, onView, onRefresh }: ProductApprovalCard
               </div>
             )}
             
-            <div className="flex items-start space-x-2 p-3 border rounded-md bg-amber-50 border-amber-200">
-              <Checkbox
-                id="approve-inactive"
-                checked={approveAsInactive}
-                onCheckedChange={(checked) => setApproveAsInactive(checked === true)}
-              />
-              <div className="grid gap-1.5 leading-none">
-                <Label
-                  htmlFor="approve-inactive"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                >
-                  Aprovar como inativo
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  O produto será aprovado com o preço de custo, mas ficará inativo e não aparecerá no catálogo até ser ativado pelo administrador.
-                </p>
+            <div className={`p-3 border rounded-md ${publishAsActive ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+              <div className="flex items-center justify-between">
+                <div className="space-y-1 flex-1">
+                  <Label
+                    htmlFor="publish-active"
+                    className="text-sm font-medium leading-none cursor-pointer"
+                  >
+                    Publicar produto ativo no catálogo
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {publishAsActive 
+                      ? 'O produto será aprovado e publicado imediatamente no catálogo para os clientes.' 
+                      : 'O produto será aprovado com preço de custo, mas ficará inativo até ser ativado pelo administrador.'}
+                  </p>
+                </div>
+                <Switch
+                  id="publish-active"
+                  checked={publishAsActive}
+                  onCheckedChange={setPublishAsActive}
+                />
               </div>
             </div>
           </div>
