@@ -2,6 +2,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AdminProducts from "./Products";
 import AdminCategorias from "./Categorias";
 import Frete from "./Frete";
+import ProductApproval from "./ProductApproval";
+import { CheckSquare } from "lucide-react";
 
 const Catalogo = () => {
   return (
@@ -9,7 +11,7 @@ const Catalogo = () => {
       <div>
         <h1 className="text-3xl font-bold">Catálogo</h1>
         <p className="text-muted-foreground mt-1">
-          Gerencie produtos, categorias e métodos de frete
+          Gerencie produtos, categorias, aprovações e métodos de frete
         </p>
       </div>
 
@@ -17,6 +19,10 @@ const Catalogo = () => {
         <TabsList>
           <TabsTrigger value="products">Produtos</TabsTrigger>
           <TabsTrigger value="categories">Categorias</TabsTrigger>
+          <TabsTrigger value="approval">
+            <CheckSquare className="w-4 h-4 mr-2" />
+            Aprovação
+          </TabsTrigger>
           <TabsTrigger value="shipping">Frete</TabsTrigger>
         </TabsList>
 
@@ -26,6 +32,10 @@ const Catalogo = () => {
 
         <TabsContent value="categories" className="space-y-4">
           <AdminCategorias />
+        </TabsContent>
+
+        <TabsContent value="approval" className="space-y-4">
+          <ProductApproval />
         </TabsContent>
 
         <TabsContent value="shipping" className="space-y-4">
