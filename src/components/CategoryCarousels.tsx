@@ -145,21 +145,46 @@ const CategoryCarousels = () => {
 
             return (
               <div key={category.id} className="space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 min-w-0">
-                  <div className="min-w-0">
-                    <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2 truncate">
-                      {category.name}
-                    </h2>
-                    <p className="text-base sm:text-lg text-muted-foreground">
-                      Descubra os melhores produtos desta categoria
-                    </p>
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2">
+                        {category.name}
+                      </h2>
+                      <p className="text-sm sm:text-base text-muted-foreground hidden sm:block">
+                        Descubra os melhores produtos desta categoria
+                      </p>
+                    </div>
+                    {/* Botão compacto no mobile, ao lado do título */}
+                    <Link to={`/categorias/${category.slug}`} className="flex-shrink-0 sm:hidden">
+                      <Button 
+                        variant="default" 
+                        size="sm"
+                        className="gap-1"
+                      >
+                        Ver todos
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </Link>
                   </div>
-                  <Link to={`/categorias/${category.slug}`} className="flex-shrink-0">
-                    <Button variant="outline" className="gap-2">
-                      Ver todos
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </Link>
+                  {/* Botão grande em desktop */}
+                  <div className="hidden sm:flex justify-end">
+                    <Link to={`/categorias/${category.slug}`}>
+                      <Button 
+                        variant="default" 
+                        size="lg"
+                        className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md"
+                      >
+                        <span className="flex items-center gap-2">
+                          Ver todos os produtos
+                          <span className="bg-white/20 px-2 py-0.5 rounded-full text-sm">
+                            {products.length}+
+                          </span>
+                        </span>
+                        <ChevronRight className="h-5 w-5" />
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
 
                 <div className="overflow-hidden max-w-full">
@@ -170,12 +195,36 @@ const CategoryCarousels = () => {
                     }}
                     className="w-full"
                   >
-                  <CarouselContent className="-ml-2 md:-ml-4">
+                    <CarouselContent className="-ml-2 md:-ml-4">
                       {products.filter(p => p.active === true).map((product) => (
                         <CarouselItem key={product.id} className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3 xl:basis-1/4 min-w-0">
                           <ProductCard product={product} />
                         </CarouselItem>
                       ))}
+                      {/* Card CTA no final do carousel */}
+                      <CarouselItem className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3 xl:basis-1/4 min-w-0">
+                        <Link to={`/categorias/${category.slug}`}>
+                          <div className="h-full min-h-[400px] flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg border-2 border-dashed border-primary/30 hover:border-primary/50 transition-all cursor-pointer group">
+                            <div className="text-center p-6 space-y-4">
+                              <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <ChevronRight className="h-8 w-8 text-primary" />
+                              </div>
+                              <h3 className="text-xl font-bold text-foreground">
+                                Ver mais produtos
+                              </h3>
+                              <p className="text-sm text-muted-foreground">
+                                Explore toda a categoria {category.name}
+                              </p>
+                              <Button 
+                                variant="default" 
+                                className="mt-4"
+                              >
+                                Ver todos
+                              </Button>
+                            </div>
+                          </div>
+                        </Link>
+                      </CarouselItem>
                     </CarouselContent>
                     <CarouselPrevious className="hidden md:flex left-2" />
                     <CarouselNext className="hidden md:flex right-2" />
