@@ -12,6 +12,7 @@ import { ImpersonationBanner } from "@/components/admin/ImpersonationBanner";
 import Index from "./pages/Index";
 import Categorias from "./pages/Categorias";
 import Promocoes from "./pages/Promocoes";
+import EmDestaque from "./pages/EmDestaque";
 import Contato from "./pages/Contato";
 import Produto from "./pages/Produto";
 import Favoritos from "./pages/Favoritos";
@@ -169,6 +170,7 @@ const App = () => {
               <Route path="/categorias" element={<Categorias />} />
               <Route path="/categorias/:slug" element={<Categorias />} />
               <Route path="/promocoes" element={<Promocoes />} />
+              <Route path="/em-destaque" element={<EmDestaque />} />
               <Route path="/contato" element={<Contato />} />
               <Route path="/produto/:id" element={<Produto />} />
               <Route path="/favoritos" element={<Favoritos />} />
