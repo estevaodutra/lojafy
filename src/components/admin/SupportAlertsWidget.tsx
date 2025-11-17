@@ -39,7 +39,7 @@ export const SupportAlertsWidget = () => {
             <CardDescription>Monitoramento de tickets e atendimento</CardDescription>
           </div>
           <Button asChild size="sm" variant="outline">
-            <Link to="/super-admin/chat-support">
+            <Link to="/super-admin/chat-suporte">
               Ver Todos <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
