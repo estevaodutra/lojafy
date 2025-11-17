@@ -71,7 +71,7 @@ const ProductGrid = () => {
               </div>
               {/* Botão para desktop */}
               <div className="hidden sm:flex flex-shrink-0">
-                <Link to="/promocoes">
+                <Link to="/em-destaque">
                   <Button 
                     variant="default" 
                     size="lg"
@@ -85,7 +85,7 @@ const ProductGrid = () => {
             </div>
             {/* Botão para mobile - centralizado */}
             <div className="flex sm:hidden justify-center">
-              <Link to="/promocoes" className="w-full max-w-md">
+              <Link to="/em-destaque" className="w-full max-w-md">
                 <Button 
                   variant="default" 
                   size="lg"
