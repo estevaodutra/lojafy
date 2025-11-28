@@ -28,7 +28,8 @@ export const useResellerBanners = (resellerId?: string, bannerType?: 'carousel' 
       let query = supabase
         .from('reseller_banners')
         .select('*')
-        .eq('reseller_id', resellerId);
+        .eq('reseller_id', resellerId)
+        .eq('active', true);
       
       if (bannerType) {
         query = query.eq('banner_type', bannerType);

@@ -30,7 +30,7 @@ const PublicStoreBannerCarousel = ({ banners }: PublicStoreBannerCarouselProps) 
   if (banners.length === 1) {
     const banner = banners[0];
     return (
-      <section className="relative overflow-hidden py-4">
+      <section className="relative overflow-hidden py-4 bg-background">
         <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
           <BannerImage banner={banner} />
         </div>
@@ -39,7 +39,7 @@ const PublicStoreBannerCarousel = ({ banners }: PublicStoreBannerCarouselProps) 
   }
 
   return (
-    <section className="relative overflow-hidden py-4">
+    <section className="relative overflow-hidden py-4 bg-background">
       <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
         <Carousel 
           className="w-full"
