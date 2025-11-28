@@ -95,21 +95,23 @@ const Hero = () => {
       };
       
       return (
-        <section className="relative overflow-hidden">
-          <div className={`w-full ${getHeightClass(mobileHeight)} md:h-[60vh] lg:h-[70vh]`}>
-            <picture>
-              {banner.mobile_image_url && (
-                <source 
-                  media="(max-width: 768px)" 
-                  srcSet={banner.mobile_image_url} 
+        <section className="relative overflow-hidden py-4">
+          <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
+            <div className={`w-full ${getHeightClass(mobileHeight)} md:h-[45vh] lg:h-[52vh] rounded-lg overflow-hidden`}>
+              <picture>
+                {banner.mobile_image_url && (
+                  <source 
+                    media="(max-width: 768px)" 
+                    srcSet={banner.mobile_image_url} 
+                  />
+                )}
+                <img
+                  src={banner.image_url}
+                  alt="Banner"
+                  className="w-full h-full object-contain md:object-cover"
                 />
-              )}
-              <img
-                src={banner.image_url}
-                alt="Banner"
-                className="w-full h-full object-contain md:object-cover"
-              />
-            </picture>
+              </picture>
+            </div>
           </div>
         </section>
       );
@@ -207,20 +209,24 @@ const Hero = () => {
               
               return (
                 <CarouselItem key={banner.id}>
-                  <div className={`w-full h-[${mobileHeight}vh] md:h-[60vh] lg:h-[70vh]`}>
-                    <picture>
-                      {banner.mobile_image_url && (
-                        <source 
-                          media="(max-width: 768px)" 
-                          srcSet={banner.mobile_image_url} 
-                        />
-                      )}
-                      <img
-                        src={banner.image_url}
-                        alt="Banner"
-                        className="w-full h-full object-cover"
-                      />
-                    </picture>
+                  <div className="py-4">
+                    <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
+                      <div className={`w-full h-[37vh] md:h-[45vh] lg:h-[52vh] rounded-lg overflow-hidden`}>
+                        <picture>
+                          {banner.mobile_image_url && (
+                            <source 
+                              media="(max-width: 768px)" 
+                              srcSet={banner.mobile_image_url} 
+                            />
+                          )}
+                          <img
+                            src={banner.image_url}
+                            alt="Banner"
+                            className="w-full h-full object-cover"
+                          />
+                        </picture>
+                      </div>
+                    </div>
                   </div>
                 </CarouselItem>
               );
