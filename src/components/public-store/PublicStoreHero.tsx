@@ -21,57 +21,61 @@ const PublicStoreHero = ({ store }: PublicStoreHeroProps) => {
     
     if (isImageOnly) {
       return (
-        <section className="relative overflow-hidden">
-          <div className="w-full h-[50vh] md:h-[60vh] lg:h-[70vh]">
-            <img
-              src={store.banner_image_url}
-              alt="Banner da loja"
-              className="w-full h-full object-cover"
-            />
+        <section className="relative overflow-hidden py-4">
+          <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
+            <div className="w-full h-[37vh] md:h-[45vh] lg:h-[52vh] rounded-lg overflow-hidden">
+              <img
+                src={store.banner_image_url}
+                alt="Banner da loja"
+                className="w-full h-full object-cover"
+              />
+            </div>
           </div>
         </section>
       );
     }
 
     return (
-      <section className="relative overflow-hidden">
-        <div className="relative h-[50vh] md:h-[60vh] lg:h-[70vh]">
-          <img
-            src={store.banner_image_url}
-            alt="Banner da loja"
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <div className="container mx-auto px-4 text-center text-white">
-              {store.banner_title && (
-                <h1 className="text-4xl md:text-6xl font-bold mb-4">
-                  {store.banner_title}
-                </h1>
-              )}
-              {store.banner_subtitle && (
-                <p className="text-xl md:text-2xl mb-6">
-                  {store.banner_subtitle}
-                </p>
-              )}
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                {store.whatsapp && (
-                  <Button 
-                    onClick={handleWhatsAppContact}
-                    size="lg"
-                    className="bg-white text-primary hover:bg-gray-100 font-semibold text-lg px-8 py-4"
-                  >
-                    <MessageCircle className="mr-2 h-5 w-5" />
-                    Falar Conosco
-                  </Button>
+      <section className="relative overflow-hidden py-4">
+        <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
+          <div className="relative h-[37vh] md:h-[45vh] lg:h-[52vh] rounded-lg overflow-hidden">
+            <img
+              src={store.banner_image_url}
+              alt="Banner da loja"
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+              <div className="container mx-auto px-4 text-center text-white">
+                {store.banner_title && (
+                  <h1 className="text-4xl md:text-6xl font-bold mb-4">
+                    {store.banner_title}
+                  </h1>
                 )}
-                <Button 
-                  size="lg"
-                  variant="outline"
-                  className="border-white text-white hover:bg-white hover:text-primary font-semibold text-lg px-8 py-4"
-                  asChild
-                >
-                  <Link to="#produtos">Ver Produtos</Link>
-                </Button>
+                {store.banner_subtitle && (
+                  <p className="text-xl md:text-2xl mb-6">
+                    {store.banner_subtitle}
+                  </p>
+                )}
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  {store.whatsapp && (
+                    <Button 
+                      onClick={handleWhatsAppContact}
+                      size="lg"
+                      className="bg-white text-primary hover:bg-gray-100 font-semibold text-lg px-8 py-4"
+                    >
+                      <MessageCircle className="mr-2 h-5 w-5" />
+                      Falar Conosco
+                    </Button>
+                  )}
+                  <Button 
+                    size="lg"
+                    variant="outline"
+                    className="border-white text-white hover:bg-white hover:text-primary font-semibold text-lg px-8 py-4"
+                    asChild
+                  >
+                    <Link to="#produtos">Ver Produtos</Link>
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

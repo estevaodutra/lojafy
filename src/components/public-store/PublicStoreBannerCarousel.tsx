@@ -10,7 +10,7 @@ const PublicStoreBannerCarousel = ({ banners }: PublicStoreBannerCarouselProps) 
   if (banners.length === 0) return null;
 
   const BannerImage = ({ banner }: { banner: ResellerBanner }) => (
-    <div className="w-full h-[50vh] md:h-[60vh] lg:h-[70vh] relative overflow-hidden">
+    <div className="w-full h-[37vh] md:h-[45vh] lg:h-[52vh] relative overflow-hidden rounded-lg">
       <picture>
         {banner.mobile_image_url && (
           <source 
@@ -30,34 +30,38 @@ const PublicStoreBannerCarousel = ({ banners }: PublicStoreBannerCarouselProps) 
   if (banners.length === 1) {
     const banner = banners[0];
     return (
-      <section className="relative overflow-hidden">
-        <BannerImage banner={banner} />
+      <section className="relative overflow-hidden py-4">
+        <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
+          <BannerImage banner={banner} />
+        </div>
       </section>
     );
   }
 
   return (
-    <section className="relative overflow-hidden">
-      <Carousel 
-        className="w-full"
-        plugins={[
-          Autoplay({
-            delay: 5000,
-            stopOnInteraction: true,
-          }),
-        ]}
-      >
-        <CarouselContent>
-          {banners.map((banner) => (
-            <CarouselItem key={banner.id}>
-              <BannerImage banner={banner} />
-            </CarouselItem>
-          ))}
-        </CarouselContent>
-        
-        <CarouselPrevious className="left-4 bg-white/10 border-white/20 text-white hover:bg-white/20" />
-        <CarouselNext className="right-4 bg-white/10 border-white/20 text-white hover:bg-white/20" />
-      </Carousel>
+    <section className="relative overflow-hidden py-4">
+      <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
+        <Carousel 
+          className="w-full"
+          plugins={[
+            Autoplay({
+              delay: 5000,
+              stopOnInteraction: true,
+            }),
+          ]}
+        >
+          <CarouselContent>
+            {banners.map((banner) => (
+              <CarouselItem key={banner.id}>
+                <BannerImage banner={banner} />
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+          
+          <CarouselPrevious className="left-4 bg-white/10 border-white/20 text-white hover:bg-white/20" />
+          <CarouselNext className="right-4 bg-white/10 border-white/20 text-white hover:bg-white/20" />
+        </Carousel>
+      </div>
     </section>
   );
 };
