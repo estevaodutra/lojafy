@@ -12,7 +12,9 @@ import {
   Target,
   FileText,
   Gift,
-  Image
+  Image,
+  ShoppingBag,
+  Settings
 } from 'lucide-react';
 import {
   Sidebar,
@@ -29,61 +31,37 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { PremiumBadge } from '@/components/premium/PremiumBadge';
 
-const resellerMenuItems = [
+const menuGroups = [
   {
-    title: 'Dashboard',
-    url: '/reseller/dashboard',
-    icon: LayoutDashboard,
+    label: 'Principal',
+    items: [
+      { title: 'Dashboard', url: '/reseller/dashboard', icon: LayoutDashboard },
+    ]
   },
   {
-    title: 'Catálogo',
-    url: '/reseller/catalogo',
-    icon: Package,
+    label: 'Produtos',
+    items: [
+      { title: 'Catálogo', url: '/reseller/catalogo', icon: ShoppingBag },
+      { title: 'Meus Produtos', url: '/reseller/produtos', icon: Package },
+    ]
   },
   {
-    title: 'Meus Produtos',
-    url: '/reseller/produtos',
-    icon: Package,
+    label: 'Minha Loja',
+    items: [
+      { title: 'Configurar Loja', url: '/reseller/loja', icon: Settings },
+      { title: 'Páginas', url: '/reseller/paginas', icon: FileText },
+      { title: 'Banners', url: '/reseller/banners', icon: Image },
+      { title: 'Vantagens', url: '/reseller/vantagens', icon: Gift },
+    ]
   },
   {
-    title: 'Minha Loja',
-    url: '/reseller/loja',
-    icon: Store,
-  },
-  {
-    title: 'Vantagens',
-    url: '/reseller/vantagens',
-    icon: Gift,
-  },
-  {
-    title: 'Páginas',
-    url: '/reseller/paginas',
-    icon: FileText,
-  },
-  {
-    title: 'Banners',
-    url: '/reseller/banners',
-    icon: Image,
-  },
-  {
-    title: 'Vendas',
-    url: '/reseller/vendas',
-    icon: ShoppingCart,
-  },
-  {
-    title: 'Financeiro',
-    url: '/reseller/financeiro',
-    icon: DollarSign,
-  },
-  {
-    title: 'Clientes',
-    url: '/reseller/clientes',
-    icon: Users,
-  },
-  {
-    title: 'Metas',
-    url: '/reseller/metas',
-    icon: Target,
+    label: 'Vendas & Finanças',
+    items: [
+      { title: 'Vendas', url: '/reseller/vendas', icon: ShoppingCart },
+      { title: 'Financeiro', url: '/reseller/financeiro', icon: DollarSign },
+      { title: 'Clientes', url: '/reseller/clientes', icon: Users },
+      { title: 'Metas', url: '/reseller/metas', icon: Target },
+    ]
   },
 ];
 
@@ -100,42 +78,44 @@ const ResellerSidebar = () => {
   return (
     <Sidebar className="border-r">
       <SidebarContent>
-        <div className="p-4 flex items-center justify-between">
+        <div className="p-4 flex items-center justify-between border-b">
           <h2 className="text-lg font-semibold">Revendedor</h2>
           {profile?.subscription_plan && (
             <PremiumBadge plan={profile.subscription_plan} />
           )}
         </div>
         
-        <SidebarGroup>
-          <SidebarGroupLabel>Vendas</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {resellerMenuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild
-                    className={currentPath === item.url ? 'bg-sidebar-accent' : ''}
-                  >
-                    <button onClick={() => navigate(item.url)}>
-                      <item.icon className="mr-2 h-4 w-4" />
-                      <span>{item.title}</span>
-                    </button>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {menuGroups.map((group) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton 
+                      asChild
+                      className={currentPath === item.url ? 'bg-sidebar-accent' : ''}
+                    >
+                      <button onClick={() => navigate(item.url)}>
+                        <item.icon className="mr-2 h-4 w-4" />
+                        <span>{item.title}</span>
+                      </button>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
 
-        <SidebarGroup>
+        <SidebarGroup className="mt-auto">
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
+                <SidebarMenuButton asChild className="bg-primary/10 hover:bg-primary/20">
                   <button onClick={() => navigate('/')}>
-                    <Store className="mr-2 h-4 w-4" />
-                    <span>Ver Loja</span>
+                    <Store className="mr-2 h-4 w-4 text-primary" />
+                    <span className="font-medium text-primary">Ver Minha Loja</span>
                   </button>
                 </SidebarMenuButton>
               </SidebarMenuItem>
