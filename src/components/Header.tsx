@@ -12,17 +12,30 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose 
 import { useState } from "react";
 import { useStoreConfig } from '@/hooks/useStoreConfig';
 import { NotificationBell } from "@/components/NotificationBell";
-
 const Header = () => {
-  const { favoritesCount } = useFavorites();
-  const { itemsCount } = useCart();
-  const { user, signOut, profile } = useAuth();
-  const { role, isSuperAdmin, isSupplier, isReseller } = useUserRole();
-  const { config } = useStoreConfig();
+  const {
+    favoritesCount
+  } = useFavorites();
+  const {
+    itemsCount
+  } = useCart();
+  const {
+    user,
+    signOut,
+    profile
+  } = useAuth();
+  const {
+    role,
+    isSuperAdmin,
+    isSupplier,
+    isReseller
+  } = useUserRole();
+  const {
+    config
+  } = useStoreConfig();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchTerm.trim()) {
@@ -31,7 +44,6 @@ const Header = () => {
       setMobileMenuOpen(false);
     }
   };
-
   const getPanelRoute = () => {
     switch (role) {
       case 'super_admin':
@@ -46,7 +58,6 @@ const Header = () => {
         return '/minha-conta';
     }
   };
-
   const getPanelName = () => {
     switch (role) {
       case 'super_admin':
@@ -61,17 +72,12 @@ const Header = () => {
         return 'Minha Conta';
     }
   };
-  
-  return (
-    <header className="w-full border-b bg-background sticky top-0 z-50">
+  return <header className="w-full border-b bg-background sticky top-0 z-50">
       {/* Top Bar */}
-      <div 
-        className="py-2"
-        style={{ 
-          backgroundColor: config?.header_background_color || '#000000', 
-          color: config?.header_message_color || '#ffffff' 
-        }}
-      >
+      <div className="py-2" style={{
+      backgroundColor: config?.header_background_color || '#000000',
+      color: config?.header_message_color || '#ffffff'
+    }}>
         <div className="container mx-auto px-4 text-center text-sm">
           {config?.header_message || '🚚 Frete GRÁTIS para compras acima de R$ 199 | 📦 Entrega em todo o Brasil'}
         </div>
@@ -82,13 +88,9 @@ const Header = () => {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-            {config?.logo_url ? (
-              <img src={config.logo_url} alt={config.store_name} className="h-10 w-auto" />
-            ) : (
-              <div className="w-10 h-10 bg-hero-gradient rounded-lg flex items-center justify-center">
+            {config?.logo_url ? <img src={config.logo_url} alt={config.store_name} className="h-10 w-auto" /> : <div className="w-10 h-10 bg-hero-gradient rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-xl">E</span>
-              </div>
-            )}
+              </div>}
             <span className="hidden md:block text-2xl font-bold text-foreground">
               {config?.store_name || 'Lojafy'}
             </span>
@@ -97,18 +99,8 @@ const Header = () => {
           {/* Search Bar - Desktop only */}
           <div className="hidden md:flex flex-1 max-w-2xl mx-4 md:mx-8">
             <form onSubmit={handleSearch} className="relative w-full">
-              <Input
-                type="text"
-                placeholder="Buscar produtos..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-4 pr-12 py-2 md:py-3 w-full rounded-lg border-border text-sm md:text-base"
-              />
-              <Button 
-                type="submit"
-                size="sm" 
-                className="absolute right-1 top-1 h-6 md:h-8 px-2 md:px-3 bg-primary hover:bg-primary/90"
-              >
+              <Input type="text" placeholder="Buscar produtos..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-4 pr-12 py-2 md:py-3 w-full rounded-lg border-border text-sm md:text-base" />
+              <Button type="submit" size="sm" className="absolute right-1 top-1 h-6 md:h-8 px-2 md:px-3 bg-primary hover:bg-primary/90">
                 <Search className="h-3 w-3 md:h-4 md:w-4" />
               </Button>
             </form>
@@ -118,8 +110,7 @@ const Header = () => {
           <div className="hidden md:flex items-center space-x-2">
 
             {/* User Account */}
-            {user ? (
-              <DropdownMenu>
+            {user ? <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="flex flex-col items-center p-1 sm:p-2 min-w-[44px]">
                     <Avatar className="h-4 w-4 sm:h-5 sm:w-5">
@@ -140,40 +131,33 @@ const Header = () => {
                       Minha Conta
                     </Link>
                   </DropdownMenuItem>
-                  {role !== 'customer' && (
-                    <DropdownMenuItem asChild>
+                  {role !== 'customer' && <DropdownMenuItem asChild>
                       <Link to={getPanelRoute()} className="w-full">
                         <Settings className="mr-2 h-4 w-4" />
                         {getPanelName()}
                       </Link>
-                    </DropdownMenuItem>
-                  )}
+                    </DropdownMenuItem>}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={signOut}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Sair
                   </DropdownMenuItem>
                 </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button variant="ghost" size="sm" className="flex flex-col items-center p-1 sm:p-2 min-w-[44px]" asChild>
+              </DropdownMenu> : <Button variant="ghost" size="sm" className="flex flex-col items-center p-1 sm:p-2 min-w-[44px]" asChild>
                 <Link to="/auth">
                   <User className="h-4 w-4 sm:h-5 sm:w-5" />
                   <span className="text-xs hidden sm:block">Entrar</span>
                 </Link>
-              </Button>
-            )}
+              </Button>}
 
             {/* Favorites */}
             <Button variant="ghost" size="sm" className="flex flex-col items-center p-1 sm:p-2 relative min-w-[44px]" asChild>
               <Link to="/favoritos">
                 <Heart className="h-4 w-4 sm:h-5 sm:w-5" />
                 <span className="text-xs hidden sm:block">Favoritos</span>
-                {favoritesCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
+                {favoritesCount > 0 && <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
                     {favoritesCount}
-                  </span>
-                )}
+                  </span>}
               </Link>
             </Button>
 
@@ -185,11 +169,9 @@ const Header = () => {
               <Link to="/carrinho">
                 <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
                 <span className="text-xs hidden sm:block">Carrinho</span>
-                {itemsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
+                {itemsCount > 0 && <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
                     {itemsCount}
-                  </span>
-                )}
+                  </span>}
               </Link>
             </Button>
           </div>
@@ -211,18 +193,8 @@ const Header = () => {
                   {/* Mobile Search */}
                   <div className="p-4 border-b">
                     <form onSubmit={handleSearch} className="relative">
-                      <Input
-                        type="text"
-                        placeholder="Buscar produtos..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-4 pr-12 py-3 w-full rounded-lg"
-                      />
-                      <Button 
-                        type="submit"
-                        size="sm" 
-                        className="absolute right-1 top-1 h-8 px-3"
-                      >
+                      <Input type="text" placeholder="Buscar produtos..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-4 pr-12 py-3 w-full rounded-lg" />
+                      <Button type="submit" size="sm" className="absolute right-1 top-1 h-8 px-3">
                         <Search className="h-4 w-4" />
                       </Button>
                     </form>
@@ -231,47 +203,23 @@ const Header = () => {
                   {/* Navigation Links */}
                   <nav className="flex-1 p-4">
                     <div className="space-y-4">
-                      <Link 
-                        to="/" 
-                        className="block py-2 text-foreground hover:text-primary transition-colors"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
+                      <Link to="/" className="block py-2 text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
                         Início
                       </Link>
-                      <Link 
-                        to="/categorias" 
-                        className="block py-2 text-foreground hover:text-primary transition-colors"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
+                      <Link to="/categorias" className="block py-2 text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
                         Lançamentos
                       </Link>
-                      <Link 
-                        to="/promocoes" 
-                        className="block py-2 text-foreground hover:text-primary transition-colors"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
+                      <Link to="/promocoes" className="block py-2 text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
                         Promoções
                       </Link>
-                      <Link 
-                        to="/categorias" 
-                        className="block py-2 text-foreground hover:text-primary transition-colors"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
+                      <Link to="/categorias" className="block py-2 text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
                         Categorias
                       </Link>
-                      <Link 
-                        to="/ranking-produtos" 
-                        className="flex items-center gap-2 py-2 text-foreground hover:text-primary transition-colors"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
+                      <Link to="/ranking-produtos" className="flex items-center gap-2 py-2 text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
                         <Trophy className="w-4 h-4" />
                         Ranking
                       </Link>
-                      <Link 
-                        to="/contato" 
-                        className="block py-2 text-foreground hover:text-primary transition-colors"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
+                      <Link to="/contato" className="block py-2 text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
                         Contato
                       </Link>
                     </div>
@@ -280,42 +228,27 @@ const Header = () => {
                   {/* Quick Actions - Favorites & Cart */}
                   <div className="border-t p-4">
                     <div className="flex gap-3 mb-4">
-                      <Link 
-                        to="/favoritos" 
-                        className="flex-1 flex items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors relative"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
+                      <Link to="/favoritos" className="flex-1 flex items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors relative" onClick={() => setMobileMenuOpen(false)}>
                         <Heart className="h-4 w-4 mr-2" />
                         <span className="text-sm">Favoritos</span>
-                        {favoritesCount > 0 && (
-                          <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                        {favoritesCount > 0 && <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
                             {favoritesCount}
-                          </span>
-                        )}
+                          </span>}
                       </Link>
-                      {user && (
-                        <div className="flex items-center justify-center py-3 border rounded-lg">
+                      {user && <div className="flex items-center justify-center py-3 border rounded-lg">
                           <NotificationBell />
-                        </div>
-                      )}
-                      <Link 
-                        to="/carrinho" 
-                        className="flex-1 flex items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors relative"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
+                        </div>}
+                      <Link to="/carrinho" className="flex-1 flex items-center justify-center py-3 border rounded-lg hover:bg-muted transition-colors relative" onClick={() => setMobileMenuOpen(false)}>
                         <ShoppingCart className="h-4 w-4 mr-2" />
                         <span className="text-sm">Carrinho</span>
-                        {itemsCount > 0 && (
-                          <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                        {itemsCount > 0 && <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
                             {itemsCount}
-                          </span>
-                        )}
+                          </span>}
                       </Link>
                     </div>
 
                     {/* User Section */}
-                    {user ? (
-                      <div className="space-y-3">
+                    {user ? <div className="space-y-3">
                         <div className="flex items-center space-x-3 p-2">
                           <Avatar className="h-8 w-8">
                             <AvatarImage src={profile?.avatar_url} />
@@ -328,46 +261,26 @@ const Header = () => {
                           </span>
                         </div>
                         <div className="space-y-2">
-                          <Link 
-                            to="/minha-conta" 
-                            className="block py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors"
-                            onClick={() => setMobileMenuOpen(false)}
-                          >
+                          <Link to="/minha-conta" className="block py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
                             <User className="inline mr-2 h-4 w-4" />
                             Minha Conta
                           </Link>
-                          {role !== 'customer' && (
-                            <Link 
-                              to={getPanelRoute()} 
-                              className="block py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors"
-                              onClick={() => setMobileMenuOpen(false)}
-                            >
+                          {role !== 'customer' && <Link to={getPanelRoute()} className="block py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
                               <Settings className="inline mr-2 h-4 w-4" />
                               {getPanelName()}
-                            </Link>
-                          )}
-                          <button 
-                            onClick={() => {
-                              signOut();
-                              setMobileMenuOpen(false);
-                            }}
-                            className="block w-full text-left py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors"
-                          >
+                            </Link>}
+                          <button onClick={() => {
+                        signOut();
+                        setMobileMenuOpen(false);
+                      }} className="block w-full text-left py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors">
                             <LogOut className="inline mr-2 h-4 w-4" />
                             Sair
                           </button>
                         </div>
-                      </div>
-                    ) : (
-                      <Link 
-                        to="/auth" 
-                        className="flex items-center justify-center py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
+                      </div> : <Link to="/auth" className="flex items-center justify-center py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors" onClick={() => setMobileMenuOpen(false)}>
                         <User className="mr-2 h-4 w-4" />
                         Entrar
-                      </Link>
-                    )}
+                      </Link>}
                   </div>
                 </div>
               </SheetContent>
@@ -385,7 +298,7 @@ const Header = () => {
             <Link to="/categorias">Lançamentos</Link>
           </Button>
           <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
-            <Link to="/promocoes">Promoções</Link>
+            
           </Button>
           <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
             <Link to="/categorias">Categorias</Link>
@@ -401,8 +314,6 @@ const Header = () => {
           </Button>
         </nav>
       </div>
-    </header>
-  );
+    </header>;
 };
-
 export default Header;
