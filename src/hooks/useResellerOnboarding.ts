@@ -16,14 +16,14 @@ const ONBOARDING_STEPS: Omit<OnboardingStep, 'completed'>[] = [
     id: 'store-config',
     title: 'Configure sua Loja',
     description: 'Personalize logo, cores e URL da sua loja',
-    url: '/reseller/store-editor',
+    url: '/reseller/loja',
     order: 1
   },
   {
     id: 'add-products',
     title: 'Adicione Produtos',
     description: 'Importe produtos e configure suas margens',
-    url: '/reseller/products',
+    url: '/reseller/produtos',
     order: 2
   },
   {
@@ -37,21 +37,21 @@ const ONBOARDING_STEPS: Omit<OnboardingStep, 'completed'>[] = [
     id: 'share-link',
     title: 'Compartilhe sua Loja',
     description: 'Copie o link da sua loja pública',
-    url: '/reseller/store-editor#share',
+    url: '/reseller/loja#share',
     order: 4
   },
   {
     id: 'academy',
     title: 'Conheça a Academia',
     description: 'Aprenda estratégias de vendas',
-    url: '/customer/academy',
+    url: '/minha-conta/academy',
     order: 5
   },
   {
     id: 'first-sale',
     title: 'Faça sua Primeira Venda',
     description: 'Acompanhe seus primeiros resultados',
-    url: '/reseller/sales',
+    url: '/reseller/vendas',
     order: 6
   }
 ];
