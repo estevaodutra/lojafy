@@ -12,19 +12,12 @@ import { LogoUpload } from '@/components/admin/LogoUpload';
 import { BannerUpload } from '@/components/admin/BannerUpload';
 import { useResellerStore } from '@/hooks/useResellerStore';
 import { useToast } from '@/hooks/use-toast';
-import { StorePreviewModal } from '@/components/reseller/StorePreviewModal';
 import { QRCodeGenerator } from '@/components/reseller/QRCodeGenerator';
 import { 
   Store, 
   Palette, 
   Settings, 
-  Eye, 
-  ExternalLink,
-  Upload,
   Save,
-  Smartphone,
-  Monitor,
-  Tablet,
   Loader2
 } from 'lucide-react';
 
@@ -80,8 +73,6 @@ const ResellerStoreEditor = () => {
   }, [store]);
 
   const [activeTab, setActiveTab] = useState('visual');
-  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
-  const [showPreview, setShowPreview] = useState(false);
 
   const handleColorChange = (colorType: string, color: string) => {
     setStoreConfig(prev => ({
@@ -159,12 +150,7 @@ const ResellerStoreEditor = () => {
     }
   };
 
-  const getDeviceIcon = (device: string) => {
-    const Icon = device === 'desktop' ? Monitor : Smartphone;
-    return <Icon className="h-4 w-4" />;
-  };
-
-  const storeUrl = storeConfig.storeSlug 
+  const storeUrl = storeConfig.storeSlug
     ? `${window.location.origin}/loja/${storeConfig.storeSlug}` 
     : `${window.location.origin}/loja/minha-loja`;
 
@@ -178,31 +164,19 @@ const ResellerStoreEditor = () => {
             Personalize sua loja online
           </p>
         </div>
-        <div className="flex space-x-2">
-          <div className="flex items-center justify-between">
-            <Button variant="outline" onClick={() => setPreviewDevice(previewDevice === 'desktop' ? 'mobile' : 'desktop')}>
-              {getDeviceIcon(previewDevice)}
-              <span className="ml-2 capitalize">{previewDevice}</span>
-            </Button>
-            <Button onClick={() => setShowPreview(true)}>
-              Preview da Loja
-            </Button>
-          </div>
-          <Button onClick={handleSaveStore} disabled={isLoading}>
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
-            )}
-            Salvar Alterações
-          </Button>
-        </div>
+        <Button onClick={handleSaveStore} disabled={isLoading}>
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4 mr-2" />
+          )}
+          Salvar Alterações
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-6">
-        <div className="flex gap-6">
-          {/* Editor Panel */}
-          <div className="flex-1 space-y-6">
+        {/* Editor Panel */}
+        <div className="space-y-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="visual">
@@ -437,107 +411,7 @@ const ResellerStoreEditor = () => {
               </TabsContent>
             </Tabs>
           </div>
-
-          {/* Preview Panel - Only show in Visual tab */}
-          {activeTab === 'visual' && (
-            <div className="w-1/2 border rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">Preview da Loja</h3>
-              <div className="border rounded-lg overflow-hidden bg-background min-h-[500px]">
-                {/* Header simulado */}
-                <div 
-                  className="h-16 flex items-center justify-between px-6"
-                  style={{ backgroundColor: storeConfig.primaryColor || '#000000' }}
-                >
-                  {storeConfig.logoUrl ? (
-                    <img 
-                      src={storeConfig.logoUrl} 
-                      alt="Logo" 
-                      className="h-8 object-contain"
-                    />
-                  ) : (
-                    <div 
-                      className="h-8 w-24 rounded flex items-center justify-center text-sm font-medium"
-                      style={{ 
-                        backgroundColor: storeConfig.secondaryColor || '#f3f4f6',
-                        color: storeConfig.primaryColor || '#000000'
-                      }}
-                    >
-                      {storeConfig.storeName || 'Logo'}
-                    </div>
-                  )}
-                  <div className="text-white text-sm">
-                    {storeConfig.storeName || 'Minha Loja'}
-                  </div>
-                </div>
-
-                {/* Banner simulado */}
-                <div 
-                  className="h-48 flex items-center justify-center"
-                  style={{
-                    backgroundColor: storeConfig.secondaryColor || '#f3f4f6',
-                    backgroundImage: storeConfig.bannerImageUrl ? `url(${storeConfig.bannerImageUrl})` : 'none',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center'
-                  }}
-                >
-                  <div className="text-center">
-                    <h1 
-                      className="text-2xl font-bold mb-2"
-                      style={{ color: storeConfig.primaryColor || '#000000' }}
-                    >
-                      {storeConfig.bannerTitle || 'Bem-vindos à nossa loja'}
-                    </h1>
-                    <p 
-                      className="text-lg"
-                      style={{ color: storeConfig.primaryColor || '#000000' }}
-                    >
-                      {storeConfig.bannerSubtitle || 'Os melhores produtos com preços especiais'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Produtos de exemplo para preview */}
-                <div className="p-6">
-                  <h2 
-                    className="text-xl font-semibold mb-4"
-                    style={{ color: storeConfig.primaryColor || '#000000' }}
-                  >
-                    Produtos em Destaque
-                  </h2>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {[1, 2, 3, 4, 5, 6].map((i) => (
-                      <div key={i} className="border rounded-lg p-3 bg-background">
-                        <div className="aspect-square bg-muted rounded mb-2 overflow-hidden">
-                          <div className="w-full h-full bg-gradient-to-br from-muted to-muted-foreground/20 flex items-center justify-center">
-                            <span className="text-xs text-muted-foreground">Produto</span>
-                          </div>
-                        </div>
-                        <h3 className="font-medium text-sm mb-1">
-                          Produto Exemplo {i}
-                        </h3>
-                        <p 
-                          className="font-bold text-sm"
-                          style={{ color: storeConfig.accentColor || '#3b82f6' }}
-                        >
-                          R$ {(99.90 + i * 10).toFixed(2)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
-
-      {/* Modals */}
-      <StorePreviewModal
-        isOpen={showPreview}
-        onClose={() => setShowPreview(false)}
-        storeConfig={storeConfig}
-        storeUrl={storeUrl}
-      />
     </div>
   );
 };
