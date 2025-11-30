@@ -2150,6 +2150,27 @@ export type Database = {
           },
         ]
       }
+      reseller_onboarding_progress: {
+        Row: {
+          completed_at: string | null
+          id: string
+          step_id: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          id?: string
+          step_id: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          id?: string
+          step_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       reseller_products: {
         Row: {
           active: boolean | null
