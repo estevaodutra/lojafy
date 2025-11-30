@@ -277,7 +277,7 @@ const PublicStoreHeader = ({ store }: PublicStoreHeaderProps) => {
         </div>
 
         {/* Navigation Menu - Desktop */}
-        <nav className="hidden md:flex items-center justify-center space-x-8 mt-4 pb-2 border-t pt-4">
+        <nav className="hidden md:flex items-center space-x-8 mt-4">
           <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
             <Link to={`/loja/${store.store_slug}`}>Início</Link>
           </Button>
