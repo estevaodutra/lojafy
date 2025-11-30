@@ -8,7 +8,7 @@ const PublicStoreFeaturedBanners = ({ banners }: PublicStoreFeaturedBannersProps
   if (banners.length === 0) return null;
 
   const BannerImage = ({ banner }: { banner: ResellerBanner }) => (
-    <div className="relative overflow-hidden rounded-lg h-[37vh] md:h-[45vh] lg:h-[52vh] bg-muted">
+    <div className="relative overflow-hidden rounded-lg aspect-[2/1] bg-muted">
       <picture>
         {banner.mobile_image_url && (
           <source 
