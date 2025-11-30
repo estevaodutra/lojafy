@@ -14,7 +14,8 @@ import {
   Gift,
   Image,
   ShoppingBag,
-  Settings
+  Settings,
+  Plug
 } from 'lucide-react';
 import {
   Sidebar,
@@ -30,6 +31,7 @@ import {
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { PremiumBadge } from '@/components/premium/PremiumBadge';
+import { Badge } from '@/components/ui/badge';
 
 const menuGroups = [
   {
@@ -61,6 +63,12 @@ const menuGroups = [
       { title: 'Financeiro', url: '/reseller/financeiro', icon: DollarSign },
       { title: 'Clientes', url: '/reseller/clientes', icon: Users },
       { title: 'Metas', url: '/reseller/metas', icon: Target },
+    ]
+  },
+  {
+    label: 'Avançado',
+    items: [
+      { title: 'Integrações', url: '/reseller/integracoes', icon: Plug, badge: 'Em breve' },
     ]
   },
 ];
@@ -96,9 +104,16 @@ const ResellerSidebar = () => {
                       asChild
                       className={currentPath === item.url ? 'bg-sidebar-accent' : ''}
                     >
-                      <button onClick={() => navigate(item.url)}>
-                        <item.icon className="mr-2 h-4 w-4" />
-                        <span>{item.title}</span>
+                      <button onClick={() => navigate(item.url)} className="flex items-center justify-between w-full">
+                        <div className="flex items-center">
+                          <item.icon className="mr-2 h-4 w-4" />
+                          <span>{item.title}</span>
+                        </div>
+                        {item.badge && (
+                          <Badge variant="secondary" className="ml-auto text-xs">
+                            {item.badge}
+                          </Badge>
+                        )}
                       </button>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
