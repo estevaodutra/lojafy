@@ -76,6 +76,7 @@ import ResellerStoreEditor from "./pages/reseller/StoreEditor";
 import ResellerPagesEditor from "./pages/reseller/PagesEditor";
 import ResellerBenefits from "./pages/reseller/Benefits";
 import ResellerBanners from "./pages/reseller/Banners";
+import ResellerIntegrations from "./pages/reseller/Integrations";
 import PublicStore from "./pages/PublicStore";
 import PublicStoreProduct from "./pages/PublicStoreProduct";
 import PublicStoreCategory from "./pages/PublicStoreCategory";
@@ -306,6 +307,7 @@ const App = () => {
                 <Route path="clientes" element={<ResellerClients />} />
                 <Route path="financeiro" element={<ResellerFinanceiro />} />
                 <Route path="metas" element={<ResellerGoals />} />
+                <Route path="integracoes" element={<ResellerIntegrations />} />
                 
               </Route>
               
