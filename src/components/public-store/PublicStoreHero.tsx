@@ -27,7 +27,7 @@ const PublicStoreHero = ({ store }: PublicStoreHeroProps) => {
               <img
                 src={store.banner_image_url}
                 alt="Banner da loja"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain md:object-cover"
               />
             </div>
           </div>
@@ -42,7 +42,7 @@ const PublicStoreHero = ({ store }: PublicStoreHeroProps) => {
             <img
               src={store.banner_image_url}
               alt="Banner da loja"
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain md:object-cover"
             />
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
               <div className="container mx-auto px-4 text-center text-white">

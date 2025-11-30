@@ -21,7 +21,7 @@ const PublicStoreBannerCarousel = ({ banners }: PublicStoreBannerCarouselProps) 
         <img
           src={banner.desktop_image_url}
           alt="Banner"
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain md:object-cover"
         />
       </picture>
     </div>
