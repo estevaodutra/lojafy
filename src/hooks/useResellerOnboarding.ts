@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export interface OnboardingStep {
   id: string;
@@ -56,8 +57,6 @@ const ONBOARDING_STEPS: Omit<OnboardingStep, 'completed'>[] = [
   }
 ];
 
-const STORAGE_KEY = 'reseller-onboarding-progress';
-
 export const useResellerOnboarding = () => {
   const { user } = useAuth();
   const [steps, setSteps] = useState<OnboardingStep[]>([]);
@@ -69,19 +68,61 @@ export const useResellerOnboarding = () => {
 
     const loadProgress = async () => {
       try {
-        // Carregar do localStorage
-        const localData = localStorage.getItem(STORAGE_KEY);
-        let completedSteps: string[] = localData ? JSON.parse(localData) : [];
+        // Carregar progresso do banco de dados
+        const { data: savedProgress } = await supabase
+          .from('reseller_onboarding_progress')
+          .select('step_id')
+          .eq('user_id', user.id);
+
+        let completedSteps: string[] = savedProgress?.map(p => p.step_id) || [];
 
         // Verificações automáticas de progresso
-        const { data: storeConfig } = await supabase
-          .from('reseller_stores')
-          .select('id')
-          .eq('reseller_id', user.id)
-          .maybeSingle();
+        const [storeConfig, products, sales] = await Promise.all([
+          supabase
+            .from('reseller_stores')
+            .select('id')
+            .eq('reseller_id', user.id)
+            .maybeSingle(),
+          supabase
+            .from('reseller_products')
+            .select('id')
+            .eq('reseller_id', user.id)
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('orders')
+            .select('id')
+            .eq('user_id', user.id)
+            .in('status', ['confirmed', 'processing', 'shipped', 'delivered'])
+            .limit(1)
+            .maybeSingle()
+        ]);
 
-        if (storeConfig && !completedSteps.includes('store-config')) {
-          completedSteps.push('store-config');
+        // Auto-completar steps baseado em dados reais
+        const autoCompleteSteps = [];
+        
+        if (storeConfig.data && !completedSteps.includes('store-config')) {
+          autoCompleteSteps.push('store-config');
+        }
+        
+        if (products.data && !completedSteps.includes('add-products')) {
+          autoCompleteSteps.push('add-products');
+        }
+        
+        if (sales.data && !completedSteps.includes('first-sale')) {
+          autoCompleteSteps.push('first-sale');
+        }
+
+        // Salvar auto-completados no banco
+        if (autoCompleteSteps.length > 0) {
+          await Promise.all(
+            autoCompleteSteps.map(stepId =>
+              supabase
+                .from('reseller_onboarding_progress')
+                .upsert({ user_id: user.id, step_id: stepId }, { onConflict: 'user_id,step_id' })
+            )
+          );
+          completedSteps = [...new Set([...completedSteps, ...autoCompleteSteps])];
         }
 
         // Montar steps com progresso
@@ -101,6 +142,7 @@ export const useResellerOnboarding = () => {
         setLoading(false);
       } catch (error) {
         console.error('Error loading onboarding progress:', error);
+        toast.error('Erro ao carregar progresso do onboarding');
         setLoading(false);
       }
     };
@@ -111,18 +153,29 @@ export const useResellerOnboarding = () => {
   const markStepCompleted = async (stepId: string) => {
     if (!user) return;
 
-    const newSteps = steps.map(step =>
-      step.id === stepId ? { ...step, completed: true } : step
-    );
-    setSteps(newSteps);
+    try {
+      // Salvar no banco de dados
+      await supabase
+        .from('reseller_onboarding_progress')
+        .upsert({ user_id: user.id, step_id: stepId }, { onConflict: 'user_id,step_id' });
 
-    const completedSteps = newSteps.filter(s => s.completed).map(s => s.id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(completedSteps));
+      // Atualizar estado local
+      const newSteps = steps.map(step =>
+        step.id === stepId ? { ...step, completed: true } : step
+      );
+      setSteps(newSteps);
 
-    // Fechar se 100% completo
-    const progress = (completedSteps.length / ONBOARDING_STEPS.length) * 100;
-    if (progress === 100) {
-      setIsOpen(false);
+      const completedSteps = newSteps.filter(s => s.completed).map(s => s.id);
+
+      // Fechar se 100% completo
+      const progress = (completedSteps.length / ONBOARDING_STEPS.length) * 100;
+      if (progress === 100) {
+        setIsOpen(false);
+        toast.success('🎉 Parabéns! Você concluiu o onboarding!');
+      }
+    } catch (error) {
+      console.error('Error marking step as completed:', error);
+      toast.error('Erro ao salvar progresso');
     }
   };
 
