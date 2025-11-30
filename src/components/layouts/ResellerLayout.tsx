@@ -15,7 +15,11 @@ import {
   Image,
   ShoppingBag,
   Settings,
-  Plug
+  Plug,
+  Ticket,
+  Truck,
+  Star,
+  TrendingUp
 } from 'lucide-react';
 import {
   Sidebar,
@@ -48,21 +52,26 @@ const menuGroups = [
     ]
   },
   {
+    label: 'Vendas & Finanças',
+    items: [
+      { title: 'Pedidos', url: '/reseller/pedidos', icon: Package },
+      { title: 'Vendas', url: '/reseller/vendas', icon: ShoppingCart },
+      { title: 'Relatórios', url: '/reseller/relatorios', icon: TrendingUp },
+      { title: 'Financeiro', url: '/reseller/financeiro', icon: DollarSign },
+      { title: 'Clientes', url: '/reseller/clientes', icon: Users },
+      { title: 'Metas', url: '/reseller/metas', icon: Target },
+    ]
+  },
+  {
     label: 'Minha Loja',
     items: [
       { title: 'Configurar Loja', url: '/reseller/loja', icon: Settings },
       { title: 'Páginas', url: '/reseller/paginas', icon: FileText },
       { title: 'Banners', url: '/reseller/banners', icon: Image },
       { title: 'Vantagens', url: '/reseller/vantagens', icon: Gift },
-    ]
-  },
-  {
-    label: 'Vendas & Finanças',
-    items: [
-      { title: 'Vendas', url: '/reseller/vendas', icon: ShoppingCart },
-      { title: 'Financeiro', url: '/reseller/financeiro', icon: DollarSign },
-      { title: 'Clientes', url: '/reseller/clientes', icon: Users },
-      { title: 'Metas', url: '/reseller/metas', icon: Target },
+      { title: 'Cupons', url: '/reseller/cupons', icon: Ticket },
+      { title: 'Frete', url: '/reseller/frete', icon: Truck },
+      { title: 'Depoimentos', url: '/reseller/depoimentos', icon: Star },
     ]
   },
   {
