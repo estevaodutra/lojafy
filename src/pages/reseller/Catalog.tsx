@@ -315,7 +315,6 @@ const ResellerCatalog = () => {
                   <SelectItem value="name">Nome A-Z</SelectItem>
                   <SelectItem value="price_asc">Menor preço</SelectItem>
                   <SelectItem value="price_desc">Maior preço</SelectItem>
-                  <SelectItem value="high_rotation">Alto giro primeiro</SelectItem>
                   <SelectItem value="recent">Mais recentes</SelectItem>
                 </SelectContent>
               </Select>
@@ -375,14 +374,20 @@ const ResellerCatalog = () => {
                       alt={product.name}
                       className="w-full h-48 object-cover rounded-lg"
                     />
-                    {product.high_rotation && (
-                      <Badge className="absolute top-2 left-2 bg-orange-500 hover:bg-orange-600">
+                    {product.featured && (
+                      <Badge className="absolute top-2 left-2 bg-purple-500 hover:bg-purple-600">
                         <Star className="h-3 w-3 mr-1" />
+                        Destaque
+                      </Badge>
+                    )}
+                    {product.high_rotation && (
+                      <Badge className="absolute top-2 right-2 bg-orange-500 hover:bg-orange-600">
+                        <TrendingUp className="h-3 w-3 mr-1" />
                         Alto Giro
                       </Badge>
                     )}
                     {product.isInMyStore && (
-                      <Badge className="absolute top-2 right-2 bg-green-500 hover:bg-green-600">
+                      <Badge className="absolute bottom-2 right-2 bg-green-500 hover:bg-green-600">
                         <Check className="h-3 w-3 mr-1" />
                         Na Loja
                       </Badge>

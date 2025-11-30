@@ -18,6 +18,7 @@ export interface CatalogProduct {
   rating?: number;
   stock_quantity: number;
   high_rotation?: boolean;
+  featured?: boolean;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -87,26 +88,41 @@ export const useResellerCatalog = () => {
         query = query.gt('stock_quantity', 0);
       }
 
-      // Apply sorting
+      // Apply sorting with optimized hierarchy:
+      // 1. Featured products first (featured DESC)
+      // 2. High rotation products last (high_rotation ASC)
+      // 3. User-selected sorting
       const sortBy = filtersToApply.sortBy || 'name';
       switch (sortBy) {
         case 'name':
-          query = query.order('name', { ascending: true });
+          query = query
+            .order('featured', { ascending: false, nullsFirst: false })
+            .order('high_rotation', { ascending: true, nullsFirst: true })
+            .order('name', { ascending: true });
           break;
         case 'price_asc':
-          query = query.order('price', { ascending: true });
+          query = query
+            .order('featured', { ascending: false, nullsFirst: false })
+            .order('high_rotation', { ascending: true, nullsFirst: true })
+            .order('price', { ascending: true });
           break;
         case 'price_desc':
-          query = query.order('price', { ascending: false });
-          break;
-        case 'high_rotation':
-          query = query.order('high_rotation', { ascending: false }).order('name', { ascending: true });
+          query = query
+            .order('featured', { ascending: false, nullsFirst: false })
+            .order('high_rotation', { ascending: true, nullsFirst: true })
+            .order('price', { ascending: false });
           break;
         case 'recent':
-          query = query.order('created_at', { ascending: false });
+          query = query
+            .order('featured', { ascending: false, nullsFirst: false })
+            .order('high_rotation', { ascending: true, nullsFirst: true })
+            .order('created_at', { ascending: false });
           break;
         default:
-          query = query.order('name', { ascending: true });
+          query = query
+            .order('featured', { ascending: false, nullsFirst: false })
+            .order('high_rotation', { ascending: true, nullsFirst: true })
+            .order('name', { ascending: true });
       }
 
       const { data, error } = await query;
