@@ -72,6 +72,11 @@ import ResellerGoals from "./pages/reseller/Goals";
 
 import ResellerCatalog from "./pages/reseller/Catalog";
 import ResellerProducts from "./pages/reseller/Products";
+import ResellerOrders from "./pages/reseller/Orders";
+import ResellerCoupons from "./pages/reseller/Coupons";
+import ResellerReports from "./pages/reseller/Reports";
+import ResellerShipping from "./pages/reseller/Shipping";
+import ResellerTestimonials from "./pages/reseller/Testimonials";
 import ResellerStoreEditor from "./pages/reseller/StoreEditor";
 import ResellerPagesEditor from "./pages/reseller/PagesEditor";
 import ResellerBenefits from "./pages/reseller/Benefits";
@@ -299,11 +304,16 @@ const App = () => {
                 <Route path="dashboard" element={<ResellerDashboard />} />
                 <Route path="catalogo" element={<ResellerCatalog />} />
                 <Route path="produtos" element={<ResellerProducts />} />
+                <Route path="pedidos" element={<ResellerOrders />} />
                 <Route path="loja" element={<ResellerStoreEditor />} />
                 <Route path="paginas" element={<ResellerPagesEditor />} />
                 <Route path="vantagens" element={<ResellerBenefits />} />
                 <Route path="banners" element={<ResellerBanners />} />
+                <Route path="cupons" element={<ResellerCoupons />} />
+                <Route path="frete" element={<ResellerShipping />} />
+                <Route path="depoimentos" element={<ResellerTestimonials />} />
                 <Route path="vendas" element={<ResellerSales />} />
+                <Route path="relatorios" element={<ResellerReports />} />
                 <Route path="clientes" element={<ResellerClients />} />
                 <Route path="financeiro" element={<ResellerFinanceiro />} />
                 <Route path="metas" element={<ResellerGoals />} />
