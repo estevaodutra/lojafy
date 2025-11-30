@@ -6,6 +6,15 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from '@/components/ui/pagination';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Search, 
@@ -50,11 +59,16 @@ const ResellerCatalog = () => {
     isLoading,
     error,
     filters,
+    currentPage,
+    totalPages,
+    totalCount,
     applyFilters,
+    goToPage,
     calculateMargin,
     calculatePrice,
     getSuggestedPrice,
-    getProductStats
+    getProductStats,
+    ITEMS_PER_PAGE
   } = useResellerCatalog();
 
   const { addProduct, removeProduct } = useResellerStore();
@@ -323,6 +337,15 @@ const ResellerCatalog = () => {
         </CardContent>
       </Card>
 
+      {/* Results Info */}
+      {!isLoading && products.length > 0 && (
+        <div className="flex justify-between items-center mb-4">
+          <p className="text-sm text-muted-foreground">
+            Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} de {totalCount} produtos
+          </p>
+        </div>
+      )}
+
       {/* Products Grid */}
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -463,6 +486,50 @@ const ResellerCatalog = () => {
               </Card>
             );
           })}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!isLoading && totalPages > 1 && (
+        <div className="flex justify-center mt-8">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => goToPage(currentPage - 1)}
+                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+              
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
+                .map((page, index, arr) => (
+                  <React.Fragment key={page}>
+                    {index > 0 && arr[index - 1] !== page - 1 && (
+                      <PaginationItem>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    )}
+                    <PaginationItem>
+                      <PaginationLink
+                        onClick={() => goToPage(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  </React.Fragment>
+                ))}
+              
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => goToPage(currentPage + 1)}
+                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       )}
 
