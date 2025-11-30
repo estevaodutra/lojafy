@@ -6,12 +6,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useResellerTestimonials } from "@/hooks/useResellerTestimonials";
+import { useResellerStore } from "@/hooks/useResellerStore";
 import { Plus, Star, Edit, Trash2, User } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function ResellerTestimonials() {
   const { testimonials, isLoading, createTestimonial, updateTestimonial, deleteTestimonial } = useResellerTestimonials();
+  const { products: resellerProducts, isLoading: isLoadingProducts } = useResellerStore();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTestimonial, setEditingTestimonial] = useState<any>(null);
 
@@ -155,12 +158,26 @@ export default function ResellerTestimonials() {
 
               <div className="space-y-2">
                 <Label htmlFor="product_purchased">Produto Comprado (opcional)</Label>
-                <Input
-                  id="product_purchased"
+                <Select
                   value={formData.product_purchased}
-                  onChange={(e) => setFormData({ ...formData, product_purchased: e.target.value })}
-                  placeholder="Ex: iPhone 15 Pro Max"
-                />
+                  onValueChange={(value) => setFormData({ ...formData, product_purchased: value === "none" ? "" : value })}
+                  disabled={isLoadingProducts}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um produto (opcional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum produto</SelectItem>
+                    {resellerProducts.map((rp) => (
+                      <SelectItem key={rp.id} value={rp.product?.name || rp.product_name_snapshot || ""}>
+                        {rp.product?.name || rp.product_name_snapshot}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {isLoadingProducts ? "Carregando produtos..." : `${resellerProducts.length} produtos disponíveis`}
+                </p>
               </div>
 
               <div className="space-y-2">
