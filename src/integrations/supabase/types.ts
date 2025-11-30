@@ -1623,6 +1623,7 @@ export type Database = {
           payment_status: string | null
           pix_qr_code: string | null
           pix_qr_code_base64: string | null
+          reseller_id: string | null
           shipping_address: Json | null
           shipping_amount: number | null
           shipping_estimated_days: number | null
@@ -1649,6 +1650,7 @@ export type Database = {
           payment_status?: string | null
           pix_qr_code?: string | null
           pix_qr_code_base64?: string | null
+          reseller_id?: string | null
           shipping_address?: Json | null
           shipping_amount?: number | null
           shipping_estimated_days?: number | null
@@ -1675,6 +1677,7 @@ export type Database = {
           payment_status?: string | null
           pix_qr_code?: string | null
           pix_qr_code_base64?: string | null
+          reseller_id?: string | null
           shipping_address?: Json | null
           shipping_amount?: number | null
           shipping_estimated_days?: number | null
@@ -1688,6 +1691,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_reseller_id_fkey"
+            columns: ["reseller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
           {
             foreignKeyName: "orders_shipping_method_id_fkey"
             columns: ["shipping_method_id"]
@@ -2150,6 +2160,62 @@ export type Database = {
           },
         ]
       }
+      reseller_coupons: {
+        Row: {
+          active: boolean | null
+          code: string
+          created_at: string | null
+          current_uses: number | null
+          discount_type: string
+          discount_value: number
+          expires_at: string | null
+          id: string
+          max_uses: number | null
+          min_order_value: number | null
+          reseller_id: string
+          starts_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          code: string
+          created_at?: string | null
+          current_uses?: number | null
+          discount_type: string
+          discount_value: number
+          expires_at?: string | null
+          id?: string
+          max_uses?: number | null
+          min_order_value?: number | null
+          reseller_id: string
+          starts_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          code?: string
+          created_at?: string | null
+          current_uses?: number | null
+          discount_type?: string
+          discount_value?: number
+          expires_at?: string | null
+          id?: string
+          max_uses?: number | null
+          min_order_value?: number | null
+          reseller_id?: string
+          starts_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reseller_coupons_reseller_id_fkey"
+            columns: ["reseller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       reseller_onboarding_progress: {
         Row: {
           completed_at: string | null
@@ -2220,6 +2286,50 @@ export type Database = {
             foreignKeyName: "reseller_products_reseller_id_fkey"
             columns: ["reseller_id"]
             isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      reseller_shipping_rules: {
+        Row: {
+          additional_days: number | null
+          created_at: string | null
+          enabled_shipping_methods: string[] | null
+          free_shipping_enabled: boolean | null
+          free_shipping_min_value: number | null
+          id: string
+          regional_rates: Json | null
+          reseller_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          additional_days?: number | null
+          created_at?: string | null
+          enabled_shipping_methods?: string[] | null
+          free_shipping_enabled?: boolean | null
+          free_shipping_min_value?: number | null
+          id?: string
+          regional_rates?: Json | null
+          reseller_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          additional_days?: number | null
+          created_at?: string | null
+          enabled_shipping_methods?: string[] | null
+          free_shipping_enabled?: boolean | null
+          free_shipping_min_value?: number | null
+          id?: string
+          regional_rates?: Json | null
+          reseller_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reseller_shipping_rules_reseller_id_fkey"
+            columns: ["reseller_id"]
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -2331,6 +2441,59 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "reseller_stores_reseller_id_fkey"
+            columns: ["reseller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      reseller_testimonials: {
+        Row: {
+          active: boolean | null
+          comment: string
+          created_at: string | null
+          customer_avatar_url: string | null
+          customer_initials: string | null
+          customer_name: string
+          id: string
+          position: number | null
+          product_purchased: string | null
+          rating: number | null
+          reseller_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          comment: string
+          created_at?: string | null
+          customer_avatar_url?: string | null
+          customer_initials?: string | null
+          customer_name: string
+          id?: string
+          position?: number | null
+          product_purchased?: string | null
+          rating?: number | null
+          reseller_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          comment?: string
+          created_at?: string | null
+          customer_avatar_url?: string | null
+          customer_initials?: string | null
+          customer_name?: string
+          id?: string
+          position?: number | null
+          product_purchased?: string | null
+          rating?: number | null
+          reseller_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reseller_testimonials_reseller_id_fkey"
             columns: ["reseller_id"]
             isOneToOne: false
             referencedRelation: "profiles"
