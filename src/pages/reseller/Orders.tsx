@@ -17,7 +17,7 @@ const statusConfig = {
   cancelled: { label: "Cancelado", icon: XCircle, color: "bg-red-100 text-red-800" },
 };
 
-export default function ResellerOrders() {
+function ResellerOrders() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const { data: orders, isLoading } = useResellerOrders(statusFilter, searchTerm);
@@ -180,3 +180,5 @@ export default function ResellerOrders() {
     </div>
   );
 }
+
+export default ResellerOrders;
