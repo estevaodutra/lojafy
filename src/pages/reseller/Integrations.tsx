@@ -1,8 +1,9 @@
-import { ShoppingBag, Store, Package, ShoppingCart, Building2, Globe, Link2, Sparkles } from 'lucide-react';
+import { ShoppingBag, Store, Package, Link2, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
 
 const marketplaces = [
   {
@@ -25,27 +26,6 @@ const marketplaces = [
     description: 'Alcance milhões de clientes na Amazon',
     color: 'text-blue-600',
     bgColor: 'bg-blue-100',
-  },
-  {
-    name: 'Magazine Luiza',
-    icon: ShoppingCart,
-    description: 'Venda no Magalu Marketplace',
-    color: 'text-blue-700',
-    bgColor: 'bg-blue-100',
-  },
-  {
-    name: 'Americanas',
-    icon: Building2,
-    description: 'Integre com Americanas, Submarino e Shoptime',
-    color: 'text-red-600',
-    bgColor: 'bg-red-100',
-  },
-  {
-    name: 'AliExpress',
-    icon: Globe,
-    description: 'Expanda suas vendas internacionalmente',
-    color: 'text-red-700',
-    bgColor: 'bg-red-100',
   },
 ];
 
@@ -95,6 +75,20 @@ const Integrations = () => {
           Em breve você poderá gerenciar tudo em um só lugar.
         </AlertDescription>
       </Alert>
+
+      {/* Progresso do desenvolvimento */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">Progresso do desenvolvimento</span>
+            <span className="text-sm text-muted-foreground">60%</span>
+          </div>
+          <Progress value={60} className="h-2" />
+          <p className="text-xs text-muted-foreground mt-2">
+            Estamos avançando! Em breve você terá acesso às integrações.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Benefícios */}
       <div>
