@@ -8,7 +8,7 @@ const PublicStoreFeaturedBanners = ({ banners }: PublicStoreFeaturedBannersProps
   if (banners.length === 0) return null;
 
   const BannerImage = ({ banner }: { banner: ResellerBanner }) => (
-    <div className="relative overflow-hidden rounded-lg aspect-video bg-muted">
+    <div className="relative overflow-hidden rounded-lg aspect-[2/1] bg-muted">
       <picture>
         {banner.mobile_image_url && (
           <source 
@@ -19,7 +19,7 @@ const PublicStoreFeaturedBanners = ({ banners }: PublicStoreFeaturedBannersProps
         <img
           src={banner.desktop_image_url}
           alt="Banner destaque"
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
           loading="lazy"
         />
       </picture>

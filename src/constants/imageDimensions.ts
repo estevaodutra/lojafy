@@ -10,8 +10,8 @@ export const IMAGE_DIMENSIONS = {
   BANNER: {
     width: 1200,
     height: 600,
-    aspectRatio: 1200 / 600,
-    description: "Banner promocional",
+    aspectRatio: 2,
+    description: "Banner promocional (proporção 2:1)",
     recommendedFormat: "JPG ou PNG"
   },
   PRODUCT: {
