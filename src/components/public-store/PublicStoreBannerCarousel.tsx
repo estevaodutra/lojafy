@@ -10,7 +10,7 @@ const PublicStoreBannerCarousel = ({ banners }: PublicStoreBannerCarouselProps) 
   if (banners.length === 0) return null;
 
   const BannerImage = ({ banner }: { banner: ResellerBanner }) => (
-    <div className="w-full h-[37vh] md:h-[45vh] lg:h-[52vh] relative overflow-hidden rounded-lg">
+    <div className="w-full aspect-[2/1] relative overflow-hidden rounded-lg bg-muted">
       <picture>
         {banner.mobile_image_url && (
           <source 
@@ -21,7 +21,7 @@ const PublicStoreBannerCarousel = ({ banners }: PublicStoreBannerCarouselProps) 
         <img
           src={banner.desktop_image_url}
           alt="Banner"
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
         />
       </picture>
     </div>
