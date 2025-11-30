@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
+const ITEMS_PER_PAGE = 24;
+
 export interface CatalogProduct {
   id: string;
   name: string;
@@ -45,21 +47,28 @@ export const useResellerCatalog = () => {
   const [myStoreProducts, setMyStoreProducts] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [filters, setFilters] = useState<CatalogFilters>({});
   
   const { user } = useAuth();
 
-  const fetchCatalogProducts = async (currentFilters?: CatalogFilters) => {
+  const fetchCatalogProducts = async (currentFilters?: CatalogFilters, page: number = currentPage) => {
     try {
       setIsLoading(true);
+      
+      // Calculate pagination range
+      const from = (page - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
       
       let query = supabase
         .from('products')
         .select(`
           *,
           category:categories(id, name)
-        `)
-        .eq('active', true);
+        `, { count: 'exact' })
+        .eq('active', true)
+        .range(from, to);
 
       // Apply filters
       const filtersToApply = currentFilters || filters;
@@ -125,9 +134,12 @@ export const useResellerCatalog = () => {
             .order('name', { ascending: true });
       }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
 
       if (error) throw error;
+      
+      // Set total count for pagination
+      setTotalCount(count || 0);
 
       // Fetch user's store products to mark which ones are already in store
       if (user?.id) {
@@ -165,8 +177,16 @@ export const useResellerCatalog = () => {
 
   const applyFilters = (newFilters: CatalogFilters) => {
     setFilters(newFilters);
-    fetchCatalogProducts(newFilters);
+    setCurrentPage(1); // Reset to page 1 when filters change
+    fetchCatalogProducts(newFilters, 1);
   };
+
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+    fetchCatalogProducts(filters, page);
+  };
+
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
   const calculateMargin = (cost: number, price: number): number => {
     if (!cost || cost === 0) return 0;
@@ -217,12 +237,17 @@ export const useResellerCatalog = () => {
     isLoading,
     error,
     filters,
+    currentPage,
+    totalPages,
+    totalCount,
     applyFilters,
+    goToPage,
     calculateMargin,
     calculatePrice,
     getSuggestedPrice,
     getProductStats,
     refetch: () => fetchCatalogProducts(),
-    setFilters
+    setFilters,
+    ITEMS_PER_PAGE
   };
 };
