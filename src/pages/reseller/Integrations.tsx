@@ -12,6 +12,7 @@ const marketplaces = [
     description: 'Sincronize produtos, gerencie pedidos e estoque automaticamente',
     color: 'text-orange-600',
     bgColor: 'bg-orange-100',
+    progress: 65,
   },
   {
     name: 'Mercado Livre',
@@ -19,6 +20,7 @@ const marketplaces = [
     description: 'Integre com o maior marketplace da América Latina',
     color: 'text-yellow-600',
     bgColor: 'bg-yellow-100',
+    progress: 58,
   },
   {
     name: 'Amazon',
@@ -26,6 +28,7 @@ const marketplaces = [
     description: 'Alcance milhões de clientes na Amazon',
     color: 'text-blue-600',
     bgColor: 'bg-blue-100',
+    progress: 52,
   },
 ];
 
@@ -76,19 +79,6 @@ const Integrations = () => {
         </AlertDescription>
       </Alert>
 
-      {/* Progresso do desenvolvimento */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">Progresso do desenvolvimento</span>
-            <span className="text-sm text-muted-foreground">60%</span>
-          </div>
-          <Progress value={60} className="h-2" />
-          <p className="text-xs text-muted-foreground mt-2">
-            Estamos avançando! Em breve você terá acesso às integrações.
-          </p>
-        </CardContent>
-      </Card>
 
       {/* Benefícios */}
       <div>
@@ -111,7 +101,7 @@ const Integrations = () => {
         <h2 className="text-xl font-semibold mb-4">Marketplaces Disponíveis em Breve</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {marketplaces.map((marketplace) => (
-            <Card key={marketplace.name} className="opacity-60 hover:opacity-80 transition-opacity cursor-not-allowed">
+            <Card key={marketplace.name} className="opacity-75 hover:opacity-90 transition-opacity">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className={`p-3 rounded-lg ${marketplace.bgColor}`}>
@@ -124,6 +114,15 @@ const Integrations = () => {
                 <CardTitle className="mt-4">{marketplace.name}</CardTitle>
                 <CardDescription>{marketplace.description}</CardDescription>
               </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Progresso</span>
+                    <span className="font-medium">{marketplace.progress}%</span>
+                  </div>
+                  <Progress value={marketplace.progress} className="h-2" />
+                </div>
+              </CardContent>
               <CardFooter>
                 <Button disabled className="w-full">
                   <Link2 className="mr-2 h-4 w-4" />
