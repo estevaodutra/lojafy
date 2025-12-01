@@ -3,6 +3,9 @@ project_id = "bbrmjrjorcgsgeztzbsr"
 [functions.webhook-role-transition]
 verify_jwt = false
 
+[functions.api-usuarios-listar]
+verify_jwt = false
+
 [functions.suggest-answer]
 verify_jwt = false
 

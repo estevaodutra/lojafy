@@ -51,6 +51,61 @@ const userEndpoints = [
         created_at: '2025-01-12T15:00:00Z'
       }
     }
+  },
+  {
+    title: 'Listar Usuários',
+    method: 'GET' as const,
+    url: '/functions/v1/api-usuarios-listar',
+    description: 'Lista todos os usuários da plataforma com filtros por role, busca e paginação.',
+    queryParams: [
+      { name: 'limit', description: 'Quantidade por página (máx: 100, padrão: 50)', example: '20' },
+      { name: 'page', description: 'Número da página (padrão: 1)', example: '1' },
+      { name: 'role', description: 'Filtrar por role (customer, reseller, supplier, admin, super_admin)', example: 'reseller' },
+      { name: 'search', description: 'Buscar por nome ou email', example: 'joao' }
+    ],
+    responseExample: {
+      success: true,
+      data: [
+        {
+          user_id: 'user123',
+          email: 'joao@example.com',
+          full_name: 'João Silva',
+          role: 'reseller',
+          phone: '11999999999',
+          is_active: true,
+          created_at: '2025-01-10T10:00:00Z',
+          last_sign_in_at: '2025-01-12T15:00:00Z'
+        },
+        {
+          user_id: 'user456',
+          email: 'maria@example.com',
+          full_name: 'Maria Santos',
+          role: 'reseller',
+          phone: '11988888888',
+          is_active: true,
+          created_at: '2025-01-11T14:00:00Z',
+          last_sign_in_at: '2025-01-12T10:30:00Z'
+        }
+      ],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 150,
+        totalPages: 8,
+        hasNext: true,
+        hasPrev: false
+      },
+      summary: {
+        total_users: 150,
+        by_role: {
+          customer: 100,
+          reseller: 30,
+          supplier: 15,
+          admin: 3,
+          super_admin: 2
+        }
+      }
+    }
   }
 ];
 
