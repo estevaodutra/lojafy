@@ -819,6 +819,30 @@ const academyUserEndpoints = [
         }
       }
     }
+  },
+  {
+    title: 'Alterar Role do Usuário',
+    method: 'POST' as const,
+    url: '/functions/v1/api-usuarios-alterar-role',
+    description: 'Altera a role (função) de um usuário específico. Se a transição for de customer para reseller, dispara webhook automático para N8N.',
+    requestBody: {
+      user_id: 'uuid-do-usuario',
+      new_role: 'reseller',
+      transitioned_by: 'uuid-do-admin-opcional'
+    },
+    responseExample: {
+      success: true,
+      message: 'Role atualizada com sucesso',
+      data: {
+        user_id: 'uuid-123',
+        email: 'usuario@email.com',
+        previous_role: 'customer',
+        new_role: 'reseller',
+        transitioned_at: '2025-01-12T15:00:00Z',
+        transitioned_by: 'uuid-admin',
+        webhook_triggered: true
+      }
+    }
   }
 ];
 
