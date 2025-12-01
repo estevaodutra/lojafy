@@ -75,12 +75,34 @@ const Usuarios = () => {
     setUpdatingUsers(prev => [...prev, userId]);
     
     try {
+      // Buscar role atual do usuário
+      const currentUser = users?.find(u => u.user_id === userId);
+      const oldRole = currentUser?.role || 'customer';
+
       const { error } = await supabase
         .from('profiles')
         .update({ role: newRole as 'customer' | 'admin' | 'super_admin' | 'supplier' | 'reseller' })
         .eq('user_id', userId);
 
       if (error) throw error;
+
+      // Chamar edge function para registrar transição e enviar webhook (se aplicável)
+      if (oldRole !== newRole) {
+        try {
+          const { data: currentUserData } = await supabase.auth.getUser();
+          await supabase.functions.invoke('webhook-role-transition', {
+            body: {
+              userId,
+              fromRole: oldRole,
+              toRole: newRole,
+              transitionedBy: currentUserData?.user?.id
+            }
+          });
+        } catch (webhookError) {
+          console.error('Error calling webhook function:', webhookError);
+          // Não falhar a operação se o webhook falhar
+        }
+      }
 
       toast({
         title: 'Sucesso',
