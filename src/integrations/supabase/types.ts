@@ -2539,6 +2539,45 @@ export type Database = {
           },
         ]
       }
+      role_transition_logs: {
+        Row: {
+          created_at: string | null
+          from_role: Database["public"]["Enums"]["app_role"]
+          id: string
+          to_role: Database["public"]["Enums"]["app_role"]
+          transitioned_by: string | null
+          user_id: string
+          webhook_sent: boolean | null
+          webhook_sent_at: string | null
+          welcome_popup_seen: boolean | null
+          welcome_popup_seen_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          from_role: Database["public"]["Enums"]["app_role"]
+          id?: string
+          to_role: Database["public"]["Enums"]["app_role"]
+          transitioned_by?: string | null
+          user_id: string
+          webhook_sent?: boolean | null
+          webhook_sent_at?: string | null
+          welcome_popup_seen?: boolean | null
+          welcome_popup_seen_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          from_role?: Database["public"]["Enums"]["app_role"]
+          id?: string
+          to_role?: Database["public"]["Enums"]["app_role"]
+          transitioned_by?: string | null
+          user_id?: string
+          webhook_sent?: boolean | null
+          webhook_sent_at?: string | null
+          welcome_popup_seen?: boolean | null
+          welcome_popup_seen_at?: string | null
+        }
+        Relationships: []
+      }
       shipping_methods: {
         Row: {
           active: boolean
