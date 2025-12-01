@@ -36,6 +36,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { PremiumBadge } from '@/components/premium/PremiumBadge';
 import { Badge } from '@/components/ui/badge';
+import { WelcomeResellerModal } from '@/components/reseller/WelcomeResellerModal';
 
 const menuGroups = [
   {
@@ -162,6 +163,7 @@ const ResellerSidebar = () => {
 export const ResellerLayout: React.FC = () => {
   return (
     <SidebarProvider>
+      <WelcomeResellerModal />
       <div className="min-h-screen flex w-full">
         <ResellerSidebar />
         <main className="flex-1">
