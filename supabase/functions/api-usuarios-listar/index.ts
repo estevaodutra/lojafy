@@ -72,36 +72,56 @@ serve(async (req) => {
 
     console.log('Query params:', { limit, page, roleFilter, searchQuery });
 
-    // Fetch all users using RPC function that joins profiles with auth.users
-    const { data: allUsers, error: usersError } = await supabase.rpc('get_users_with_email');
+    // Fetch all profiles directly (service_role bypasses RLS)
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-    if (usersError) {
-      console.error('Error fetching users via RPC:', usersError);
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
       return new Response(
-        JSON.stringify({ success: false, error: 'Erro ao buscar usuários' }),
+        JSON.stringify({ success: false, error: 'Erro ao buscar perfis' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Fetched ${allUsers?.length || 0} users via RPC`);
+    console.log(`Fetched ${profiles?.length || 0} profiles`);
 
-    // Transform data to expected format
-    let combinedUsers = (allUsers || []).map(user => {
-      const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+    // Fetch all auth users with increased page size
+    const { data: authData, error: authError } = await supabase.auth.admin.listUsers({
+      perPage: 1000
+    });
+
+    if (authError) {
+      console.error('Error fetching auth users:', authError);
+    }
+
+    console.log(`Fetched ${authData?.users?.length || 0} auth users`);
+
+    // Create email map from auth.users
+    const emailMap = new Map(
+      authData?.users?.map(u => [u.id, { email: u.email, last_sign_in_at: u.last_sign_in_at }]) || []
+    );
+
+    // Combine profiles with auth data
+    let combinedUsers = (profiles || []).map(profile => {
+      const authInfo = emailMap.get(profile.user_id);
+      const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
       
       return {
-        user_id: user.user_id,
-        email: user.email || '',
+        user_id: profile.user_id,
+        email: authInfo?.email || '',
         full_name: fullName || 'N/A',
-        role: user.role || 'customer',
-        phone: user.phone || null,
-        is_active: user.is_active ?? true,
-        created_at: user.created_at,
-        last_sign_in_at: user.last_sign_in_at
+        role: profile.role || 'customer',
+        phone: profile.phone || null,
+        is_active: profile.is_active ?? true,
+        created_at: profile.created_at,
+        last_sign_in_at: authInfo?.last_sign_in_at || null
       };
     });
 
-    console.log(`Transformed ${combinedUsers.length} users`);
+    console.log(`Combined ${combinedUsers.length} users`);
 
     // Apply role filter
     if (roleFilter) {
