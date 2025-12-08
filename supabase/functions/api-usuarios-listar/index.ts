@@ -72,56 +72,36 @@ serve(async (req) => {
 
     console.log('Query params:', { limit, page, roleFilter, searchQuery });
 
-    // Fetch all users from auth.users
-    const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+    // Fetch all users using RPC function that joins profiles with auth.users
+    const { data: allUsers, error: usersError } = await supabase.rpc('get_users_with_email');
 
-    if (authError) {
-      console.error('Error fetching auth users:', authError);
+    if (usersError) {
+      console.error('Error fetching users via RPC:', usersError);
       return new Response(
         JSON.stringify({ success: false, error: 'Erro ao buscar usuários' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Fetched ${authUsers.users.length} auth users`);
+    console.log(`Fetched ${allUsers?.length || 0} users via RPC`);
 
-    // Fetch all profiles
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('*');
-
-    if (profilesError) {
-      console.error('Error fetching profiles:', profilesError);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Erro ao buscar perfis' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log(`Fetched ${profiles?.length || 0} profiles`);
-
-    // Combine user data
-    const profilesMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
-    
-    let combinedUsers = authUsers.users.map(user => {
-      const profile = profilesMap.get(user.id);
-      const fullName = profile 
-        ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
-        : '';
+    // Transform data to expected format
+    let combinedUsers = (allUsers || []).map(user => {
+      const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
       
       return {
-        user_id: user.id,
+        user_id: user.user_id,
         email: user.email || '',
         full_name: fullName || 'N/A',
-        role: profile?.role || 'customer',
-        phone: profile?.phone || null,
-        is_active: profile?.is_active ?? true,
+        role: user.role || 'customer',
+        phone: user.phone || null,
+        is_active: user.is_active ?? true,
         created_at: user.created_at,
         last_sign_in_at: user.last_sign_in_at
       };
     });
 
-    console.log(`Combined ${combinedUsers.length} users`);
+    console.log(`Transformed ${combinedUsers.length} users`);
 
     // Apply role filter
     if (roleFilter) {
@@ -156,7 +136,8 @@ serve(async (req) => {
       total,
       totalPages,
       page,
-      paginatedCount: paginatedUsers.length
+      paginatedCount: paginatedUsers.length,
+      roleBreakdown: roleCount
     });
 
     return new Response(
