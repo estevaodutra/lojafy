@@ -1,25 +1,35 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { User, Package, MapPin, Heart, HelpCircle, Settings, Home, LogOut, GraduationCap, BookOpen } from 'lucide-react';
+import { User, Package, Heart, HelpCircle, Settings, Home, LogOut, GraduationCap } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
-const customerMenuItems = [
+const baseMenuItems = [
   { title: 'Resumo', url: '/minha-conta', icon: User },
   { title: 'Meus Pedidos', url: '/minha-conta/pedidos', icon: Package },
   { title: 'Favoritos', url: '/minha-conta/favoritos', icon: Heart },
   { title: 'Meu Perfil', url: '/minha-conta/configuracoes', icon: Settings },
   { title: 'Ajuda', url: '/minha-conta/ajuda', icon: HelpCircle },
-  { title: 'Lojafy Academy', url: '/minha-conta/academy', icon: GraduationCap },
 ];
 
 const CustomerSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, profile } = useAuth();
   const currentPath = location.pathname;
 
   const isActive = (path: string) => currentPath === path;
+
+  const menuItems = useMemo(() => {
+    const items = [...baseMenuItems];
+    
+    // Adicionar Academy apenas para revendedores
+    if (profile?.role === 'reseller') {
+      items.push({ title: 'Lojafy Academy', url: '/minha-conta/academy', icon: GraduationCap });
+    }
+    
+    return items;
+  }, [profile?.role]);
 
   const handleLogout = async () => {
     await signOut();
@@ -33,7 +43,7 @@ const CustomerSidebar = () => {
           <SidebarGroupLabel>Minha Conta</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {customerMenuItems.map((item) => (
+              {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <Link 
