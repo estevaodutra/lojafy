@@ -3268,14 +3268,14 @@ export type Database = {
       }
       has_role:
         | {
-            Args: { user_role: Database["public"]["Enums"]["app_role"] }
-            Returns: boolean
-          }
-        | {
             Args: {
               _role: Database["public"]["Enums"]["app_role"]
               _user_id: string
             }
+            Returns: boolean
+          }
+        | {
+            Args: { user_role: Database["public"]["Enums"]["app_role"] }
             Returns: boolean
           }
       has_supplier_access_to_order: {
