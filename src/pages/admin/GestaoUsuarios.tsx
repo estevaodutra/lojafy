@@ -34,6 +34,7 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import {
   Pagination,
   PaginationContent,
+  PaginationEllipsis,
   PaginationItem,
   PaginationLink,
   PaginationNext,
@@ -446,17 +447,36 @@ const GestaoUsuarios = () => {
                           className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                         />
                       </PaginationItem>
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <PaginationItem key={page}>
-                          <PaginationLink
-                            onClick={() => setCurrentPage(page)}
-                            isActive={currentPage === page}
-                            className="cursor-pointer"
-                          >
-                            {page}
-                          </PaginationLink>
-                        </PaginationItem>
-                      ))}
+                      {(() => {
+                        const maxVisible = 5;
+                        let pages: (number | 'ellipsis-start' | 'ellipsis-end')[] = [];
+                        
+                        if (totalPages <= maxVisible) {
+                          pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+                        } else if (currentPage <= 3) {
+                          pages = [1, 2, 3, 4, 5, 'ellipsis-end'];
+                        } else if (currentPage >= totalPages - 2) {
+                          pages = ['ellipsis-start', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+                        } else {
+                          pages = ['ellipsis-start', currentPage - 1, currentPage, currentPage + 1, 'ellipsis-end'];
+                        }
+                        
+                        return pages.map((page, index) => (
+                          <PaginationItem key={index}>
+                            {page === 'ellipsis-start' || page === 'ellipsis-end' ? (
+                              <PaginationEllipsis />
+                            ) : (
+                              <PaginationLink
+                                onClick={() => setCurrentPage(page)}
+                                isActive={currentPage === page}
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            )}
+                          </PaginationItem>
+                        ));
+                      })()}
                       <PaginationItem>
                         <PaginationNext 
                           onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
