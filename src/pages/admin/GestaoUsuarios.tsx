@@ -41,6 +41,16 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -53,6 +63,8 @@ const GestaoUsuarios = () => {
   const [editingUser, setEditingUser] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [updatingUsers, setUpdatingUsers] = useState<string[]>([]);
+  const [deletingUser, setDeletingUser] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
   const { data: users, isLoading, refetch } = useQuery({
@@ -152,6 +164,41 @@ const GestaoUsuarios = () => {
         description: error.message,
         variant: 'destructive',
       });
+    }
+  };
+
+  const deleteUser = async () => {
+    if (!deletingUser) return;
+    
+    setIsDeleting(true);
+    try {
+      const response = await supabase.functions.invoke('delete-user', {
+        body: { userId: deletingUser.user_id },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Erro ao excluir usuário');
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
+
+      toast({
+        title: 'Usuário excluído',
+        description: `${deletingUser.email} foi excluído com sucesso.`,
+      });
+      
+      setDeletingUser(null);
+      refetch();
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao excluir usuário',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -419,6 +466,15 @@ const GestaoUsuarios = () => {
                               userRole={user.role}
                               userName={`${user.first_name} ${user.last_name}`}
                             />
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setDeletingUser(user)}
+                              title="Excluir usuário"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -502,6 +558,34 @@ const GestaoUsuarios = () => {
         user={editingUser || {}}
         onSuccess={refetch}
       />
+
+      <AlertDialog open={!!deletingUser} onOpenChange={(open) => !open && setDeletingUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Usuário</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você tem certeza que deseja excluir o usuário <strong>{deletingUser?.email}</strong>?
+              <br /><br />
+              Esta ação é <strong>irreversível</strong> e irá remover permanentemente:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Conta do usuário</li>
+                <li>Perfil e dados associados</li>
+                <li>Pedidos e histórico</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deleteUser}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Excluindo...' : 'Excluir Usuário'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
