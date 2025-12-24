@@ -288,24 +288,24 @@ const GestaoUsuarios = () => {
           </Card>
 
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-6 overflow-x-auto">
               {isLoading ? (
                 <div className="text-center py-8">Carregando usuários...</div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Alterar Role</TableHead>
-                      <TableHead>Plano</TableHead>
-                      <TableHead>Expiração</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Atividade</TableHead>
-                      <TableHead>Data Criação</TableHead>
-                      <TableHead>Último Acesso</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
+                      <TableHead className="whitespace-nowrap">Nome</TableHead>
+                      <TableHead className="whitespace-nowrap">Email</TableHead>
+                      <TableHead className="whitespace-nowrap">Role</TableHead>
+                      <TableHead className="whitespace-nowrap">Alterar Role</TableHead>
+                      <TableHead className="whitespace-nowrap">Plano</TableHead>
+                      <TableHead className="whitespace-nowrap">Expiração</TableHead>
+                      <TableHead className="whitespace-nowrap">Status</TableHead>
+                      <TableHead className="whitespace-nowrap">Atividade</TableHead>
+                      <TableHead className="whitespace-nowrap">Criação</TableHead>
+                      <TableHead className="whitespace-nowrap">Último Acesso</TableHead>
+                      <TableHead className="text-right whitespace-nowrap">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -320,13 +320,13 @@ const GestaoUsuarios = () => {
                             {getRoleLabel(user.role)}
                           </Badge>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-nowrap">
                           <Select
                             value={user.role}
                             onValueChange={(newRole) => updateUserRole(user.user_id, newRole)}
                             disabled={updatingUsers.includes(user.user_id)}
                           >
-                            <SelectTrigger className="w-40">
+                            <SelectTrigger className="w-32">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -338,25 +338,7 @@ const GestaoUsuarios = () => {
                             </SelectContent>
                           </Select>
                         </TableCell>
-                        <TableCell>
-                          <Select
-                            value={user.role}
-                            onValueChange={(newRole) => updateUserRole(user.user_id, newRole)}
-                            disabled={updatingUsers.includes(user.user_id)}
-                          >
-                            <SelectTrigger className="w-40">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="customer">Cliente</SelectItem>
-                              <SelectItem value="reseller">Revendedor</SelectItem>
-                              <SelectItem value="supplier">Fornecedor</SelectItem>
-                              <SelectItem value="admin">Admin</SelectItem>
-                              <SelectItem value="super_admin">Super Admin</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-nowrap">
                           {user.role === 'reseller' && user.subscription_plan ? (
                             <PremiumBadge plan={user.subscription_plan as 'free' | 'premium'} />
                           ) : (
