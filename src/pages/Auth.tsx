@@ -268,10 +268,13 @@ const Auth = () => {
                         placeholder="Repita seu email" 
                         value={confirmSignupEmail} 
                         onChange={e => setConfirmSignupEmail(e.target.value)} 
-                        className="pl-10" 
+                        className={`pl-10 ${confirmSignupEmail && signupEmail !== confirmSignupEmail ? 'border-red-500' : ''}`}
                         required 
                       />
                     </div>
+                    {confirmSignupEmail && signupEmail !== confirmSignupEmail && (
+                      <p className="text-sm text-red-500">Os emails não coincidem</p>
+                    )}
                   </div>
                   
                   <div className="space-y-2">
@@ -301,11 +304,14 @@ const Auth = () => {
                         placeholder="••••••••" 
                         value={confirmSignupPassword} 
                         onChange={e => setConfirmSignupPassword(e.target.value)} 
-                        className="pl-10" 
+                        className={`pl-10 ${confirmSignupPassword && signupPassword !== confirmSignupPassword ? 'border-red-500' : ''}`}
                         minLength={6} 
                         required 
                       />
                     </div>
+                    {confirmSignupPassword && signupPassword !== confirmSignupPassword && (
+                      <p className="text-sm text-red-500">As senhas não coincidem</p>
+                    )}
                   </div>
                   
                   <Button type="submit" className="w-full" disabled={isLoading}>
