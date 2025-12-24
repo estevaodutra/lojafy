@@ -34,7 +34,8 @@ const Auth = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
 
-  if (loading) {
+  // Mostrar loading se autenticação está em andamento ou usuário já logado
+  if (loading || user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -54,6 +55,9 @@ const Auth = () => {
         window.location.href = returnUrl;
         return;
       }
+      // Login bem-sucedido sem returnUrl - manter loading ativo
+      // useAuthRedirect fará o redirecionamento quando o profile carregar
+      return;
     }
     
     setIsLoading(false);
