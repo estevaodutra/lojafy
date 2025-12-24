@@ -7,11 +7,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
+import { useToast } from '@/hooks/use-toast';
 import { Loader2, Mail, Lock, User } from 'lucide-react';
 import lojafyLogo from '@/assets/lojafy-logo-new.png';
 
 const Auth = () => {
   const { user, loading, signIn, signUp, resetPassword } = useAuth();
+  const { toast } = useToast();
   
   useAuthRedirect();
   
@@ -26,7 +28,9 @@ const Auth = () => {
 
   // Signup form state
   const [signupEmail, setSignupEmail] = useState('');
+  const [confirmSignupEmail, setConfirmSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
+  const [confirmSignupPassword, setConfirmSignupPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
 
@@ -57,6 +61,19 @@ const Auth = () => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validar se emails coincidem
+    if (signupEmail !== confirmSignupEmail) {
+      toast({ title: 'Os emails não coincidem', variant: 'destructive' });
+      return;
+    }
+    
+    // Validar se senhas coincidem
+    if (signupPassword !== confirmSignupPassword) {
+      toast({ title: 'As senhas não coincidem', variant: 'destructive' });
+      return;
+    }
+    
     setIsLoading(true);
     const result = await signUp(signupEmail, signupPassword, firstName, lastName);
     
@@ -242,6 +259,22 @@ const Auth = () => {
                   </div>
                   
                   <div className="space-y-2">
+                    <Label htmlFor="confirm-signup-email">Confirmar Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        id="confirm-signup-email" 
+                        type="email" 
+                        placeholder="Repita seu email" 
+                        value={confirmSignupEmail} 
+                        onChange={e => setConfirmSignupEmail(e.target.value)} 
+                        className="pl-10" 
+                        required 
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
                     <Label htmlFor="signup-password">Senha</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -251,6 +284,23 @@ const Auth = () => {
                         placeholder="••••••••" 
                         value={signupPassword} 
                         onChange={e => setSignupPassword(e.target.value)} 
+                        className="pl-10" 
+                        minLength={6} 
+                        required 
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-signup-password">Confirmar Senha</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        id="confirm-signup-password" 
+                        type="password" 
+                        placeholder="••••••••" 
+                        value={confirmSignupPassword} 
+                        onChange={e => setConfirmSignupPassword(e.target.value)} 
                         className="pl-10" 
                         minLength={6} 
                         required 
