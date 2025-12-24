@@ -17,8 +17,19 @@ export const useAuthRedirect = () => {
       return;
     }
 
-    // Don't redirect if we already did or no role yet
-    if (!role || hasRedirected.current) return;
+    // Aguardar role carregar com timeout de segurança
+    if (!role) {
+      const timeout = setTimeout(() => {
+        if (isAuthenticated && location.pathname === '/auth') {
+          console.warn('⚠️ Timeout esperando role, redirecionando para home');
+          navigate('/', { replace: true });
+        }
+      }, 3000);
+      return () => clearTimeout(timeout);
+    }
+
+    // Don't redirect if we already did
+    if (hasRedirected.current) return;
 
     // Only redirect from auth page or home page
     const currentPath = location.pathname;
