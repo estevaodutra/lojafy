@@ -119,6 +119,7 @@ import AdminAcademy from "./pages/admin/Academy";
 import CourseModules from "./pages/customer/CourseModules";
 import ModuleLessons from "./pages/customer/ModuleLessons";
 import LessonViewer from "./pages/customer/LessonViewer";
+import Courses from "./pages/customer/Courses";
 import { MandatoryNotificationModal } from "@/components/MandatoryNotificationModal";
 import { useMandatoryNotifications } from "@/hooks/useMandatoryNotifications";
 
@@ -202,6 +203,7 @@ const App = () => {
                 <Route path="curso/:courseId" element={<CourseModules />} />
                 <Route path="curso/:courseId/modulo/:moduleId" element={<ModuleLessons />} />
                 <Route path="aula/:lessonId" element={<LessonViewer />} />
+                <Route path="aulas" element={<Courses />} />
                 <Route path="aulas/:courseId" element={<CourseViewer />} />
                 <Route path="favoritos" element={<CustomerFavorites />} />
                 <Route path="enderecos" element={<CustomerAddresses />} />
