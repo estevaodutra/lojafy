@@ -2,7 +2,7 @@ import Header from "@/components/Header";
 import Hero from "@/components/Hero";
 import ProductGrid from "@/components/ProductGrid";
 import CategoryCarousels from "@/components/CategoryCarousels";
-import CategorySection from "@/components/CategorySection";
+
 import Benefits from "@/components/Benefits";
 import Testimonials from "@/components/Testimonials";
 import Newsletter from "@/components/Newsletter";
@@ -50,7 +50,7 @@ const Index = () => {
         <ProductGrid />
         <FeaturedBanners />
         <CategoryCarousels />
-        <CategorySection />
+        
         <Benefits />
         <Testimonials />
         <Newsletter />
