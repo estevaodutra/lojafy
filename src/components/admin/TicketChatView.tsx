@@ -125,7 +125,7 @@ export const TicketChatView = ({ ticketId }: TicketChatViewProps) => {
   }
 
   return (
-    <Card className="flex flex-col h-[calc(100vh-300px)]">
+    <Card className="flex flex-col h-full">
       {/* Header */}
       <div className="p-4 border-b">
         <div className="flex items-center justify-between">
