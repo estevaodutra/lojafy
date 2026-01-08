@@ -169,7 +169,7 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
         </div>
       </div>
 
-      <ScrollArea className="flex-1 min-h-0">
+      <ScrollArea className="flex-1 min-h-0 overflow-auto">
         {loading ? (
           <div className="flex items-center justify-center p-8">
             <div className="text-center">

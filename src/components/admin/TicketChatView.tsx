@@ -125,7 +125,7 @@ export const TicketChatView = ({ ticketId }: TicketChatViewProps) => {
   }
 
   return (
-    <Card className="flex flex-col h-full">
+    <Card className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b">
         <div className="flex items-center justify-between">
@@ -167,7 +167,7 @@ export const TicketChatView = ({ ticketId }: TicketChatViewProps) => {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4 bg-muted/30">
+      <ScrollArea className="flex-1 min-h-0 p-4 bg-muted/30">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center p-6">
