@@ -264,7 +264,7 @@ const Carrinho = () => {
                     </div>
 
                     <p className="text-xs text-muted-foreground italic">
-                      Caso houver o envio de etiqueta o frete será zerado
+                      *Caso houver o envio de etiqueta o frete será zerado*
                     </p>
 
                     <Separator />
