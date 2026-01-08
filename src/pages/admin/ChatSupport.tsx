@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
+import { SupportMetrics } from '@/components/admin/SupportMetrics';
 import { TicketList } from '@/components/admin/TicketList';
 import { TicketChatView } from '@/components/admin/TicketChatView';
 import { MessageSquare } from 'lucide-react';
@@ -46,18 +47,25 @@ const ChatSupport = () => {
   }, [tickets, loading, searchParams, selectedTicket]);
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold tracking-tight">Chat de Suporte</h1>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Chat de Suporte</h1>
+        <p className="text-muted-foreground">
+          Visualize e gerencie todas as conversas de suporte em tempo real
+        </p>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 h-[calc(100vh-140px)]">
-        <div className="lg:col-span-2 h-full">
+      <SupportMetrics />
+
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 min-h-[600px]">
+        <div className="lg:col-span-2">
           <TicketList 
             onSelectTicket={setSelectedTicket}
             selectedTicketId={selectedTicket?.id}
           />
         </div>
 
-        <div className="lg:col-span-3 h-full">
+        <div className="lg:col-span-3">
           {selectedTicket ? (
             <TicketChatView ticketId={selectedTicket.id} />
           ) : (

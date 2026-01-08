@@ -98,7 +98,7 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
   }, [tickets]);
 
   return (
-    <Card className="h-full flex flex-col overflow-hidden">
+    <Card className="h-full flex flex-col">
       <div className="p-4 space-y-3 border-b">
         <div className="flex items-center justify-between">
           <div>
@@ -169,7 +169,7 @@ export const TicketList = ({ onSelectTicket, selectedTicketId }: TicketListProps
         </div>
       </div>
 
-      <ScrollArea className="flex-1 min-h-0 overflow-auto">
+      <ScrollArea className="flex-1">
         {loading ? (
           <div className="flex items-center justify-center p-8">
             <div className="text-center">
