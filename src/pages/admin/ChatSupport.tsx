@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { SupportMetrics } from '@/components/admin/SupportMetrics';
 import { TicketList } from '@/components/admin/TicketList';
 import { TicketChatView } from '@/components/admin/TicketChatView';
 import { MessageSquare } from 'lucide-react';
@@ -51,8 +50,6 @@ const ChatSupport = () => {
         <h1 className="text-3xl font-bold tracking-tight">Chat de Suporte</h1>
         
       </div>
-
-      <SupportMetrics />
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 min-h-[600px]">
         <div className="lg:col-span-2">
