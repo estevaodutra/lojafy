@@ -68,6 +68,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
         
         // Fetch profile when user logs in (defer to avoid deadlock)
+        // IMPORTANT: Only set loading=false AFTER profile is loaded
         if (session?.user) {
           setTimeout(async () => {
             const { data: profileData } = await supabase
@@ -77,19 +78,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               .single();
             
             setProfile(profileData);
+            setLoading(false);
           }, 0);
         } else {
           setProfile(null);
+          setLoading(false);
         }
-        
-        setLoading(false);
       }
     );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // THEN check for existing session - load profile before setting loading=false
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .single();
+        
+        setProfile(profileData);
+      }
+      
       setLoading(false);
     });
 
