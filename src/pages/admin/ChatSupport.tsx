@@ -45,18 +45,17 @@ const ChatSupport = () => {
       setSelectedTicket(tickets[0]);
     }
   }, [tickets, loading, searchParams, selectedTicket]);
-  return <div className="space-y-6">
-      <div>
+  return <div className="h-full flex flex-col gap-6 min-h-0">
+      <div className="shrink-0">
         <h1 className="text-3xl font-bold tracking-tight">Chat de Suporte</h1>
-        
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 flex-1 min-h-0">
-        <div className="lg:col-span-2 h-full">
+        <div className="lg:col-span-2 min-h-0 h-full">
           <TicketList onSelectTicket={setSelectedTicket} selectedTicketId={selectedTicket?.id} />
         </div>
 
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-3 min-h-0 h-full">
           {selectedTicket ? <TicketChatView ticketId={selectedTicket.id} /> : <Card className="h-full flex items-center justify-center">
               <div className="text-center p-6">
                 <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
