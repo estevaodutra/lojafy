@@ -201,13 +201,13 @@ const SuperAdminSidebar = () => {
 export const SuperAdminLayout: React.FC = () => {
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="h-screen flex w-full overflow-hidden">
         <SuperAdminSidebar />
-        <main className="flex-1">
-          <header className="h-12 flex items-center border-b px-4">
+        <main className="flex-1 flex flex-col overflow-hidden">
+          <header className="h-12 flex items-center border-b px-4 shrink-0">
             <SidebarTrigger />
           </header>
-          <div className="p-6">
+          <div className="p-6 flex-1 overflow-auto">
             <Outlet />
           </div>
         </main>
