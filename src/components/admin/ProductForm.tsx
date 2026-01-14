@@ -325,6 +325,41 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
     enabled: !!selectedCategoryId,
   });
 
+  // Fetch existing variants when editing a product
+  const { data: existingVariants = [] } = useQuery({
+    queryKey: ['product-variants', product?.id],
+    queryFn: async () => {
+      if (!product?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('product_variants')
+        .select('*')
+        .eq('product_id', product.id)
+        .order('price_modifier', { ascending: true });
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!product?.id,
+  });
+
+  // Populate variants state when existing variants are loaded
+  useEffect(() => {
+    if (existingVariants.length > 0 && variants.length === 0) {
+      const mappedVariants: ProductVariant[] = existingVariants.map(v => ({
+        id: v.id,
+        type: v.type as 'color' | 'size' | 'model',
+        name: v.name,
+        value: v.value,
+        priceModifier: v.price_modifier || 0,
+        stockQuantity: v.stock_quantity || 0,
+        imageUrl: v.image_url || '',
+        active: v.active ?? true,
+      }));
+      setVariants(mappedVariants);
+    }
+  }, [existingVariants]);
+
   const onSubmit = async (data: ProductFormData) => {
     setIsSubmitting(true);
     
