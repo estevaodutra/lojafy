@@ -218,7 +218,7 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
                   asChild
                   onClick={() => onClose()}
                 >
-                  <Link to="/customer/academy">
+                  <Link to="/minha-conta/academy">
                     <Bot className="h-4 w-4 mr-2" />
                     Acessar Academia
                   </Link>
@@ -309,7 +309,7 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
                                 components={{
                                   a: ({ node, ...props }) => {
                                     // Se o link é de aula, renderizar como botão
-                                    if (props.href?.startsWith('/customer/academy/lesson/')) {
+                                    if (props.href?.startsWith('/minha-conta/aula/')) {
                                       return (
                                         <Button
                                           asChild

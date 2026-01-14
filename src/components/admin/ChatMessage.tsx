@@ -110,7 +110,7 @@ export const ChatMessage = ({
                   components={{
                     a: ({ node, ...props }) => {
                       // Se o link é de aula, renderizar como botão
-                      if (props.href?.startsWith('/customer/academy/lesson/')) {
+                      if (props.href?.startsWith('/minha-conta/aula/')) {
                         return (
                           <Button
                             asChild
