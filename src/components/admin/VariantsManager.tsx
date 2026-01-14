@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Edit2, Check, X } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,26 +13,80 @@ export interface ProductVariant {
   type: 'color' | 'size' | 'model';
   name: string;
   value: string;
+  costPrice: number;
   priceModifier: number;
   stockQuantity: number;
   imageUrl?: string;
   active: boolean;
 }
 
+interface PlatformSettings {
+  platform_fee_value: number;
+  platform_fee_type: 'percentage' | 'fixed';
+  gateway_fee_percentage: number;
+  additional_costs?: Array<{
+    id: string;
+    name: string;
+    value: number;
+    type: 'percentage' | 'fixed';
+    active: boolean;
+  }>;
+}
+
 interface VariantsManagerProps {
   variants: ProductVariant[];
   onVariantsChange: (variants: ProductVariant[]) => void;
+  platformSettings?: PlatformSettings | null;
 }
+
+// Calculate selling price based on cost and platform fees
+const calculateSellingPrice = (
+  costPrice: number,
+  settings?: PlatformSettings | null
+): number => {
+  if (!settings || !costPrice) return costPrice;
+
+  let price = costPrice;
+
+  // Apply platform fee
+  if (settings.platform_fee_type === 'percentage') {
+    price += (costPrice * settings.platform_fee_value / 100);
+  } else {
+    price += settings.platform_fee_value;
+  }
+
+  // Apply additional costs
+  if (settings.additional_costs && Array.isArray(settings.additional_costs)) {
+    settings.additional_costs.forEach(cost => {
+      if (cost.active) {
+        if (cost.type === 'percentage') {
+          price += (costPrice * cost.value / 100);
+        } else {
+          price += cost.value;
+        }
+      }
+    });
+  }
+
+  // Apply gateway fee (divide to include in final price)
+  if (settings.gateway_fee_percentage > 0) {
+    price = price / (1 - settings.gateway_fee_percentage / 100);
+  }
+
+  return Math.round(price * 100) / 100;
+};
 
 export const VariantsManager: React.FC<VariantsManagerProps> = ({
   variants,
-  onVariantsChange
+  onVariantsChange,
+  platformSettings
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newVariant, setNewVariant] = useState<Partial<ProductVariant>>({
     type: 'color',
     name: '',
     value: '',
+    costPrice: 0,
     priceModifier: 0,
     stockQuantity: 0,
     imageUrl: '',
@@ -49,12 +103,16 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
   const addVariant = () => {
     if (!newVariant.name || !newVariant.value) return;
 
+    const costPrice = newVariant.costPrice || 0;
+    const sellingPrice = calculateSellingPrice(costPrice, platformSettings);
+
     const variant: ProductVariant = {
       id: `variant-${Date.now()}`,
       type: newVariant.type as 'color' | 'size' | 'model',
       name: newVariant.name,
       value: newVariant.value,
-      priceModifier: newVariant.priceModifier || 0,
+      costPrice: costPrice,
+      priceModifier: sellingPrice,
       stockQuantity: newVariant.stockQuantity || 0,
       imageUrl: newVariant.imageUrl || '',
       active: newVariant.active !== false
@@ -67,6 +125,7 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
       type: 'color',
       name: '',
       value: '',
+      costPrice: 0,
       priceModifier: 0,
       stockQuantity: 0,
       imageUrl: '',
@@ -76,9 +135,18 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
   };
 
   const updateVariant = (id: string, updates: Partial<ProductVariant>) => {
-    const updatedVariants = variants.map(variant =>
-      variant.id === id ? { ...variant, ...updates } : variant
-    );
+    const updatedVariants = variants.map(variant => {
+      if (variant.id !== id) return variant;
+      
+      const updated = { ...variant, ...updates };
+      
+      // Recalculate selling price if costPrice changed
+      if ('costPrice' in updates) {
+        updated.priceModifier = calculateSellingPrice(updated.costPrice, platformSettings);
+      }
+      
+      return updated;
+    });
     onVariantsChange(updatedVariants);
   };
 
@@ -86,10 +154,12 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
     onVariantsChange(variants.filter(variant => variant.id !== id));
   };
 
-  const formatPrice = (modifier: number) => {
-    const sign = modifier >= 0 ? '+' : '';
-    return `${sign}R$ ${modifier.toFixed(2)}`;
+  const formatCurrency = (value: number) => {
+    return `R$ ${value.toFixed(2)}`;
   };
+
+  // Calculate selling price preview for new variant form
+  const newVariantSellingPrice = calculateSellingPrice(newVariant.costPrice || 0, platformSettings);
 
   return (
     <div className="space-y-4">
@@ -156,14 +226,20 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>Modificador de Preço (R$)</Label>
+                <Label>Preço de Custo (R$)</Label>
                 <Input
                   type="number"
                   step="0.01"
                   placeholder="0.00"
-                  value={newVariant.priceModifier}
-                  onChange={(e) => setNewVariant({ ...newVariant, priceModifier: parseFloat(e.target.value) || 0 })}
+                  value={newVariant.costPrice || ''}
+                  onChange={(e) => setNewVariant({ ...newVariant, costPrice: parseFloat(e.target.value) || 0 })}
                 />
+                {platformSettings && (newVariant.costPrice || 0) > 0 && (
+                  <div className="flex items-center gap-1 text-xs text-green-600">
+                    <Calculator className="h-3 w-3" />
+                    Preço de venda: {formatCurrency(newVariantSellingPrice)}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -259,13 +335,19 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label>Modificador de Preço (R$)</Label>
+                          <Label>Preço de Custo (R$)</Label>
                           <Input
                             type="number"
                             step="0.01"
-                            value={variant.priceModifier}
-                            onChange={(e) => updateVariant(variant.id, { priceModifier: parseFloat(e.target.value) || 0 })}
+                            value={variant.costPrice || ''}
+                            onChange={(e) => updateVariant(variant.id, { costPrice: parseFloat(e.target.value) || 0 })}
                           />
+                          {platformSettings && variant.costPrice > 0 && (
+                            <div className="flex items-center gap-1 text-xs text-green-600">
+                              <Calculator className="h-3 w-3" />
+                              Preço de venda: {formatCurrency(variant.priceModifier)}
+                            </div>
+                          )}
                         </div>
 
                         <div className="space-y-2">
@@ -309,7 +391,8 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
                           )}
                         </div>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <span>Preço: {formatPrice(variant.priceModifier)}</span>
+                          <span>Custo: {formatCurrency(variant.costPrice || 0)}</span>
+                          <span className="text-green-600 font-medium">Venda: {formatCurrency(variant.priceModifier)}</span>
                           <span>Estoque: {variant.stockQuantity} unidades</span>
                         </div>
                       </div>

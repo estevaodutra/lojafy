@@ -1843,6 +1843,7 @@ export type Database = {
       product_variants: {
         Row: {
           active: boolean | null
+          cost_price: number | null
           created_at: string
           id: string
           image_url: string | null
@@ -1856,6 +1857,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean | null
+          cost_price?: number | null
           created_at?: string
           id?: string
           image_url?: string | null
@@ -1869,6 +1871,7 @@ export type Database = {
         }
         Update: {
           active?: boolean | null
+          cost_price?: number | null
           created_at?: string
           id?: string
           image_url?: string | null
