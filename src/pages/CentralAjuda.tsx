@@ -22,9 +22,23 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
+import { useStoreConfig } from "@/hooks/useStoreConfig";
 
 const CentralAjuda = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const { config, isLoading } = useStoreConfig();
+
+  const formatPhone = (phone: string | null | undefined) => {
+    if (!phone) return null;
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 11) {
+      return `(${cleaned.slice(0,2)}) ${cleaned.slice(2,7)}-${cleaned.slice(7)}`;
+    }
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0,2)}) ${cleaned.slice(2,6)}-${cleaned.slice(6)}`;
+    }
+    return phone;
+  };
 
   const helpCategories = [
     {
@@ -71,6 +85,11 @@ const CentralAjuda = () => {
     }
   ];
 
+  const phoneNumber = config?.company_phone?.replace(/\D/g, '') || '';
+  const formattedPhone = formatPhone(config?.company_phone);
+  const email = config?.company_email || 'contato@suaempresa.com';
+  const businessHours = config?.business_hours || 'Seg-Sex: 8h às 18h';
+
   const contactOptions = [
     {
       icon: MessageCircle,
@@ -79,7 +98,10 @@ const CentralAjuda = () => {
       time: "Online agora",
       action: "Conversar",
       variant: "default" as const,
-      contact: "(11) 99999-9999"
+      contact: formattedPhone || "(11) 99999-9999",
+      href: phoneNumber 
+        ? `https://wa.me/55${phoneNumber}?text=Olá! Preciso de ajuda.`
+        : "#"
     },
     {
       icon: Mail,
@@ -88,16 +110,18 @@ const CentralAjuda = () => {
       time: "Resposta em até 4h",
       action: "Enviar E-mail",
       variant: "outline" as const,
-      contact: "contato@suaempresa.com"
+      contact: email,
+      href: `mailto:${email}`
     },
     {
       icon: Phone,
       title: "Telefone",
       description: "Atendimento personalizado",
-      time: "Seg-Sex: 8h às 18h",
+      time: businessHours,
       action: "Ligar",
       variant: "outline" as const,
-      contact: "(11) 3000-0000"
+      contact: formattedPhone || "(11) 3000-0000",
+      href: phoneNumber ? `tel:+55${phoneNumber}` : "#"
     }
   ];
 
@@ -195,7 +219,9 @@ const CentralAjuda = () => {
                     </div>
                     <p className="text-sm font-medium text-foreground mb-3">{option.contact}</p>
                     <Button variant={option.variant} className="w-full" asChild>
-                      <Link to="/contato">{option.action}</Link>
+                      <a href={option.href} target={option.title === "WhatsApp" ? "_blank" : undefined} rel={option.title === "WhatsApp" ? "noopener noreferrer" : undefined}>
+                        {option.action}
+                      </a>
                     </Button>
                   </CardContent>
                 </Card>
@@ -298,15 +324,13 @@ const CentralAjuda = () => {
                   <div>
                     <h4 className="font-semibold text-foreground mb-2">WhatsApp</h4>
                     <p className="text-muted-foreground">
-                      Segunda a Sábado<br />
-                      8h às 20h
+                      {businessHours}
                     </p>
                   </div>
                   <div>
                     <h4 className="font-semibold text-foreground mb-2">Telefone</h4>
                     <p className="text-muted-foreground">
-                      Segunda a Sexta<br />
-                      8h às 18h
+                      {businessHours}
                     </p>
                   </div>
                   <div>
