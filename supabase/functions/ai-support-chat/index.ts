@@ -524,7 +524,7 @@ serve(async (req) => {
             const lesson = bestMatch.related_lesson as any;
             const courseName = lesson.course_modules.courses.title;
             const lessonTitle = lesson.title;
-            const lessonUrl = `/customer/academy/lesson/${lesson.id}`;
+            const lessonUrl = `/minha-conta/aula/${lesson.id}`;
             finalMessage += `\n\n🎓 **Aula Recomendada:** ${courseName} - ${lessonTitle}\n[Ver Aula Agora](${lessonUrl})`;
           }
         }
@@ -789,15 +789,15 @@ Se a resposta da base de conhecimento contém informações sobre cursos, módul
 
 1. **[CURSO RELACIONADO: ...]** → Use o formato:
    "📚 **Curso Recomendado:** [Nome do Curso]
-   [Ver Curso Completo](/customer/academy/course/[ID])"
+   [Ver Curso Completo](/minha-conta/curso/[ID])"
 
 2. **[MÓDULO RELACIONADO: ...]** → Use o formato:
    "📖 **Módulo Recomendado:** [Nome do Curso] - [Nome do Módulo]
-   [Ver Módulo](/customer/academy/course/[COURSE_ID]/module/[MODULE_ID])"
+   [Ver Módulo](/minha-conta/curso/[COURSE_ID]/modulo/[MODULE_ID])"
 
 3. **[AULA RELACIONADA: ...]** → Use o formato:
    "🎓 **Aula Recomendada:** [Nome do Curso] - [Nome da Aula]
-   [Ver Aula Agora](/customer/academy/lesson/[ID])"
+   [Ver Aula Agora](/minha-conta/aula/[ID])"
 
 Sempre use Markdown para os links: [Texto](URL)
 
