@@ -207,7 +207,7 @@ export const SuperAdminLayout: React.FC = () => {
           <header className="h-12 flex items-center border-b px-4 shrink-0">
             <SidebarTrigger />
           </header>
-          <div className="p-6 flex-1 min-h-0 overflow-hidden flex flex-col">
+          <div className="p-6 flex-1 min-h-0 overflow-auto flex flex-col">
             <Outlet />
           </div>
         </main>
