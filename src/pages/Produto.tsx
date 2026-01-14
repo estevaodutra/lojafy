@@ -63,6 +63,23 @@ const Produto = ({
     enabled: !!id
   });
 
+  // Fetch product variants
+  const { data: variants = [] } = useQuery({
+    queryKey: ['product-variants', id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data, error } = await supabase
+        .from('product_variants')
+        .select('*')
+        .eq('product_id', id)
+        .eq('active', true)
+        .order('price_modifier', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!id
+  });
+
   // Fetch related products
   const {
     data: relatedProducts = []
@@ -129,25 +146,38 @@ const Produto = ({
     return Math.round((Number(product.price) - Number(product.original_price)) / Number(product.price) * 100);
   };
   const productImages = product.images && product.images.length > 0 ? product.images : [product.main_image_url || product.image_url || '/placeholder.svg'];
+  
+  // Get selected variant data
+  const selectedVariantData = variants.find(v => v.id === selectedVariant);
+  
+  // Calculate effective price based on variant selection
+  const getEffectivePrice = () => {
+    if (selectedVariantData) {
+      return Number(selectedVariantData.price_modifier);
+    }
+    return Number(product.price);
+  };
+  
+  const effectivePrice = getEffectivePrice();
+  
   const handleAddToCart = () => {
     // Set store context if this product is from a public store
     if (storeSlug) {
       setStoreSlug(storeSlug);
     }
+    const variantName = selectedVariantData?.name;
     const cartItem = {
       productId: product.id,
-      productName: product.name,
-      productImage: product.main_image_url || product.image_url || '/placeholder.svg',
-      price: Number(product.price),
+      productName: variantName ? `${product.name} - ${variantName}` : product.name,
+      productImage: selectedVariantData?.image_url || product.main_image_url || product.image_url || '/placeholder.svg',
+      price: effectivePrice,
       quantity: quantity,
-      variants: selectedVariant ? {
-        variant: selectedVariant
-      } : undefined
+      variants: variantName ? { variant: variantName } : undefined
     };
     addItem(cartItem);
     toast({
       title: "Produto adicionado ao carrinho!",
-      description: `${quantity}x ${product.name}`
+      description: `${quantity}x ${cartItem.productName}`
     });
   };
   const handleAddToWishlist = () => {
@@ -187,20 +217,19 @@ const Produto = ({
     if (storeSlug) {
       setStoreSlug(storeSlug);
     }
+    const variantName = selectedVariantData?.name;
     const cartItem = {
       productId: product.id,
-      productName: product.name,
-      productImage: product.main_image_url || product.image_url || '/placeholder.svg',
-      price: Number(product.price),
+      productName: variantName ? `${product.name} - ${variantName}` : product.name,
+      productImage: selectedVariantData?.image_url || product.main_image_url || product.image_url || '/placeholder.svg',
+      price: effectivePrice,
       quantity: quantity,
-      variants: selectedVariant ? {
-        variant: selectedVariant
-      } : undefined
+      variants: variantName ? { variant: variantName } : undefined
     };
     addItem(cartItem);
     toast({
       title: "Produto adicionado ao carrinho!",
-      description: `${quantity}x ${product.name}`
+      description: `${quantity}x ${cartItem.productName}`
     });
 
     // Navigate to appropriate cart page
@@ -278,7 +307,25 @@ const Produto = ({
 
             {/* Price */}
             <div className="space-y-2">
-              {product.original_price ? <>
+              {variants.length > 0 ? (
+                // Show variant-based pricing
+                selectedVariantData ? (
+                  <>
+                    <p className="text-4xl font-bold text-primary">
+                      {formatPrice(effectivePrice)}
+                    </p>
+                    <p className="text-muted-foreground">
+                      ou 12x de {formatPrice(effectivePrice / 12)} sem juros
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-lg text-muted-foreground">
+                    Selecione uma opção para ver o preço
+                  </p>
+                )
+              ) : (
+                // Show regular pricing when no variants
+                product.original_price ? <>
                   <p className="text-lg text-muted-foreground line-through">
                     De: {formatPrice(Number(product.price))}
                   </p>
@@ -295,8 +342,31 @@ const Produto = ({
                   <p className="text-muted-foreground">
                     ou 12x de {formatPrice(Number(product.price) / 12)} sem juros
                   </p>
-                </>}
+                </>
+              )}
             </div>
+
+            {/* Product Variants */}
+            {variants.length > 0 && (
+              <div className="space-y-3">
+                <label className="font-medium">Selecione uma opção:</label>
+                <div className="flex flex-wrap gap-2">
+                  {variants.map((variant) => (
+                    <Button
+                      key={variant.id}
+                      variant={selectedVariant === variant.id ? "default" : "outline"}
+                      onClick={() => setSelectedVariant(variant.id)}
+                      className="flex flex-col h-auto py-3 px-4 min-w-[100px]"
+                    >
+                      <span className="font-medium">{variant.name}</span>
+                      <span className="text-sm opacity-80">
+                        {formatPrice(Number(variant.price_modifier))}
+                      </span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Product Information */}
             <div className="bg-accent/50 rounded-lg p-4 space-y-3">
@@ -398,7 +468,13 @@ const Produto = ({
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
-                <Button size="lg" variant="outline" onClick={handleAddToCart} disabled={(product.stock_quantity || 0) <= 0} className="flex-1 h-12">
+                <Button 
+                  size="lg" 
+                  variant="outline" 
+                  onClick={handleAddToCart} 
+                  disabled={(product.stock_quantity || 0) <= 0 || (variants.length > 0 && !selectedVariant)} 
+                  className="flex-1 h-12"
+                >
                   <span className="text-xl">🛒</span>
                   <span className="hidden sm:inline ml-2">Adicionar ao Carrinho</span>
                 </Button>
@@ -412,8 +488,15 @@ const Produto = ({
                 </Button>
               </div>
 
-              <Button size="lg" onClick={handleBuyNow} disabled={(product.stock_quantity || 0) <= 0} className="w-full btn-buy-now h-12 text-slate-50 text-base bg-[3dba54] bg-[#3fc356]">
-                <span className="text-base font-semibold">Comprar Agora</span>
+              <Button 
+                size="lg" 
+                onClick={handleBuyNow} 
+                disabled={(product.stock_quantity || 0) <= 0 || (variants.length > 0 && !selectedVariant)} 
+                className="w-full btn-buy-now h-12 text-slate-50 text-base bg-[3dba54] bg-[#3fc356]"
+              >
+                <span className="text-base font-semibold">
+                  {variants.length > 0 && !selectedVariant ? 'Selecione uma opção' : 'Comprar Agora'}
+                </span>
               </Button>
 
               {product.reference_ad_url && (
