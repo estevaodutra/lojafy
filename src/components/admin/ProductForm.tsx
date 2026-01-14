@@ -351,6 +351,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         type: v.type as 'color' | 'size' | 'model',
         name: v.name,
         value: v.value,
+        costPrice: (v as any).cost_price || v.price_modifier || 0,
         priceModifier: v.price_modifier || 0,
         stockQuantity: v.stock_quantity || 0,
         imageUrl: v.image_url || '',
@@ -472,6 +473,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
           type: variant.type,
           name: variant.name,
           value: variant.value,
+          cost_price: variant.costPrice,
           price_modifier: variant.priceModifier,
           stock_quantity: variant.stockQuantity,
           image_url: variant.imageUrl || null,
@@ -1167,6 +1169,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         <VariantsManager
           variants={variants}
           onVariantsChange={setVariants}
+          platformSettings={settings}
         />
 
         {/* Settings */}

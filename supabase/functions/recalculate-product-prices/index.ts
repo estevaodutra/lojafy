@@ -120,16 +120,67 @@ serve(async (req) => {
 
     console.log(`Prepared ${updates.length} price updates`)
 
-    // Background task to update products in batches
+    // Fetch all variants with cost_price for recalculation
+    const { data: variants, error: variantsError } = await supabaseClient
+      .from('product_variants')
+      .select('id, cost_price, price_modifier')
+      .not('cost_price', 'is', null)
+
+    if (variantsError) {
+      console.error('Error fetching variants:', variantsError)
+    }
+
+    const variantUpdates = (variants || []).map(variant => {
+      if (!variant.cost_price) return null
+
+      let newPrice = variant.cost_price
+
+      // Apply platform fee
+      if (platform_fee_type === 'percentage') {
+        newPrice += (variant.cost_price * platform_fee_value / 100)
+      } else {
+        newPrice += platform_fee_value
+      }
+
+      // Apply additional costs
+      if (Array.isArray(additionalCosts)) {
+        additionalCosts.forEach((cost: any) => {
+          if (cost.active) {
+            if (cost.type === 'percentage') {
+              newPrice += (variant.cost_price * cost.value / 100)
+            } else {
+              newPrice += cost.value
+            }
+          }
+        })
+      }
+
+      // Apply gateway fee on final price
+      const priceBeforeFee = newPrice
+      newPrice = priceBeforeFee / (1 - gateway_fee_percentage / 100)
+
+      // Round to 2 decimal places
+      newPrice = Math.round(newPrice * 100) / 100
+
+      return {
+        id: variant.id,
+        price_modifier: newPrice
+      }
+    }).filter(update => update !== null)
+
+    console.log(`Prepared ${variantUpdates.length} variant price updates`)
+
+    // Background task to update products and variants in batches
     const updateProductsInBackground = async () => {
       try {
         const batchSize = 50
         let updatedCount = 0
 
+        // Update products
         for (let i = 0; i < updates.length; i += batchSize) {
           const batch = updates.slice(i, i + batchSize)
           
-          console.log(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(updates.length / batchSize)}`)
+          console.log(`Processing product batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(updates.length / batchSize)}`)
 
           for (const update of batch) {
             const { error: updateError } = await supabaseClient
@@ -152,7 +203,36 @@ serve(async (req) => {
           await new Promise(resolve => setTimeout(resolve, 100))
         }
 
-        console.log(`Price recalculation completed. Updated ${updatedCount} products.`)
+        // Update variants
+        let variantsUpdatedCount = 0
+        for (let i = 0; i < variantUpdates.length; i += batchSize) {
+          const batch = variantUpdates.slice(i, i + batchSize)
+          
+          console.log(`Processing variant batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(variantUpdates.length / batchSize)}`)
+
+          for (const update of batch) {
+            if (!update) continue
+            
+            const { error: updateError } = await supabaseClient
+              .from('product_variants')
+              .update({ 
+                price_modifier: update.price_modifier
+              })
+              .eq('id', update.id)
+
+            if (updateError) {
+              console.error(`Error updating variant ${update.id}:`, updateError)
+            } else {
+              variantsUpdatedCount++
+              console.log(`Updated variant ${update.id}: price_modifier = ${update.price_modifier}`)
+            }
+          }
+
+          // Small delay between batches
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
+
+        console.log(`Price recalculation completed. Updated ${updatedCount} products and ${variantsUpdatedCount} variants.`)
 
         // Optionally, send a notification to admins about completion
         // You could insert a notification record here if needed
