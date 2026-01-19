@@ -1,4 +1,4 @@
-import { Search, User, Heart, ShoppingCart, Menu, LogOut, Settings, X, Trophy } from "lucide-react";
+import { Search, User, Heart, ShoppingCart, Menu, LogOut, Settings, X, Trophy, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link, useNavigate } from "react-router-dom";
@@ -131,6 +131,14 @@ const Header = () => {
                       Minha Conta
                     </Link>
                   </DropdownMenuItem>
+                  {role === 'reseller' && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/minha-conta/academy" className="w-full">
+                        <GraduationCap className="mr-2 h-4 w-4" />
+                        Lojafy Academy
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   {role !== 'customer' && <DropdownMenuItem asChild>
                       <Link to={getPanelRoute()} className="w-full">
                         <Settings className="mr-2 h-4 w-4" />
@@ -265,6 +273,12 @@ const Header = () => {
                             <User className="inline mr-2 h-4 w-4" />
                             Minha Conta
                           </Link>
+                          {role === 'reseller' && (
+                            <Link to="/minha-conta/academy" className="block py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
+                              <GraduationCap className="inline mr-2 h-4 w-4" />
+                              Lojafy Academy
+                            </Link>
+                          )}
                           {role !== 'customer' && <Link to={getPanelRoute()} className="block py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
                               <Settings className="inline mr-2 h-4 w-4" />
                               {getPanelName()}
