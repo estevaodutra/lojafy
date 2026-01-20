@@ -76,6 +76,11 @@ const GestaoUsuarios = () => {
     },
   });
 
+  // Helper to check if user is banned
+  const isUserBanned = (bannedUntil: string | null) => {
+    return bannedUntil && new Date(bannedUntil) > new Date();
+  };
+
   const filteredUsers = users?.filter(user => {
     const matchesSearch = 
       user.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -84,9 +89,14 @@ const GestaoUsuarios = () => {
     
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     const matchesPlan = planFilter === 'all' || user.subscription_plan === planFilter;
+    
+    const isBanned = isUserBanned(user.banned_until);
+    const isDeleted = !!user.deleted_at;
+    
     const matchesStatus = statusFilter === 'all' || 
-      (statusFilter === 'active' && user.is_active) ||
-      (statusFilter === 'inactive' && !user.is_active);
+      (statusFilter === 'active' && user.is_active && !isBanned && !isDeleted) ||
+      (statusFilter === 'inactive' && (!user.is_active || isBanned || isDeleted)) ||
+      (statusFilter === 'banned' && isBanned);
 
     return matchesSearch && matchesRole && matchesPlan && matchesStatus;
   });
@@ -235,7 +245,23 @@ const GestaoUsuarios = () => {
     return null;
   };
 
-  const getActivityStatus = (createdAt: string, lastSignInAt: string | null, isActive: boolean) => {
+  const getActivityStatus = (
+    createdAt: string, 
+    lastSignInAt: string | null, 
+    isActive: boolean,
+    bannedUntil: string | null,
+    deletedAt: string | null
+  ) => {
+    // Check if user is deleted
+    if (deletedAt) {
+      return { icon: <Trash2 className="h-3 w-3" />, text: "Excluído", variant: "destructive" as const };
+    }
+
+    // Check if user is banned
+    if (bannedUntil && new Date(bannedUntil) > new Date()) {
+      return { icon: <UserX className="h-3 w-3" />, text: "Banido", variant: "destructive" as const };
+    }
+
     if (lastSignInAt) {
       return { icon: <Clock className="h-3 w-3" />, text: "Ativo", variant: "default" as const };
     }
@@ -329,6 +355,7 @@ const GestaoUsuarios = () => {
                     <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="active">Ativos</SelectItem>
                     <SelectItem value="inactive">Inativos</SelectItem>
+                    <SelectItem value="banned">Banidos</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -416,17 +443,30 @@ const GestaoUsuarios = () => {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={user.is_active ? 'success' : 'destructive'}>
-                            {user.is_active ? 'Ativo' : 'Inativo'}
-                          </Badge>
+                          {(() => {
+                            const isBanned = isUserBanned(user.banned_until);
+                            const isDeleted = !!user.deleted_at;
+                            
+                            if (isDeleted) {
+                              return <Badge variant="destructive">Excluído</Badge>;
+                            }
+                            if (isBanned) {
+                              return <Badge variant="destructive">Banido</Badge>;
+                            }
+                            return (
+                              <Badge variant={user.is_active ? 'success' : 'destructive'}>
+                                {user.is_active ? 'Ativo' : 'Inativo'}
+                              </Badge>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>
                           <Badge 
-                            variant={getActivityStatus(user.created_at, user.last_sign_in_at, user.is_active).variant}
+                            variant={getActivityStatus(user.created_at, user.last_sign_in_at, user.is_active, user.banned_until, user.deleted_at).variant}
                             className="flex items-center gap-1 w-fit text-xs"
                           >
-                            {getActivityStatus(user.created_at, user.last_sign_in_at, user.is_active).icon}
-                            {getActivityStatus(user.created_at, user.last_sign_in_at, user.is_active).text}
+                            {getActivityStatus(user.created_at, user.last_sign_in_at, user.is_active, user.banned_until, user.deleted_at).icon}
+                            {getActivityStatus(user.created_at, user.last_sign_in_at, user.is_active, user.banned_until, user.deleted_at).text}
                           </Badge>
                         </TableCell>
                         <TableCell>
