@@ -3248,11 +3248,13 @@ export type Database = {
         Args: never
         Returns: {
           avatar_url: string
+          banned_until: string
           business_address: string
           business_cnpj: string
           business_name: string
           cpf: string
           created_at: string
+          deleted_at: string
           email: string
           first_name: string
           id: string
