@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useCourseContent } from '@/hooks/useCourseContent';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Plus, Edit, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CourseModuleForm } from '@/components/admin/CourseModuleForm';
@@ -101,6 +101,40 @@ export default function CourseContent() {
 
   const handleSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['course-modules', courseId] });
+  };
+
+  const handleMoveLesson = async (
+    lesson: CourseLesson, 
+    direction: 'up' | 'down', 
+    allLessons: CourseLesson[]
+  ) => {
+    const sortedLessons = [...allLessons].sort((a, b) => a.position - b.position);
+    const currentIndex = sortedLessons.findIndex(l => l.id === lesson.id);
+    
+    if (direction === 'up' && currentIndex === 0) return;
+    if (direction === 'down' && currentIndex === sortedLessons.length - 1) return;
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    const targetLesson = sortedLessons[targetIndex];
+
+    try {
+      const { error: error1 } = await supabase
+        .from('course_lessons')
+        .update({ position: targetLesson.position })
+        .eq('id', lesson.id);
+
+      const { error: error2 } = await supabase
+        .from('course_lessons')
+        .update({ position: lesson.position })
+        .eq('id', targetLesson.id);
+
+      if (error1 || error2) throw error1 || error2;
+
+      toast.success('Ordem atualizada');
+      queryClient.invalidateQueries({ queryKey: ['course-modules', courseId] });
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao mover aula');
+    }
   };
 
   if (loading) {
@@ -235,6 +269,28 @@ export default function CourseContent() {
                               )}
                             </div>
                             <div className="flex items-center gap-2">
+                              <div className="flex flex-col">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => handleMoveLesson(lesson, 'up', module.lessons || [])}
+                                  disabled={module.lessons?.sort((a, b) => a.position - b.position)[0]?.id === lesson.id}
+                                  title="Mover para cima"
+                                >
+                                  <ArrowUp className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => handleMoveLesson(lesson, 'down', module.lessons || [])}
+                                  disabled={module.lessons?.sort((a, b) => a.position - b.position)[module.lessons.length - 1]?.id === lesson.id}
+                                  title="Mover para baixo"
+                                >
+                                  <ArrowDown className="h-3 w-3" />
+                                </Button>
+                              </div>
                               <Button
                                 variant="ghost"
                                 size="icon"
