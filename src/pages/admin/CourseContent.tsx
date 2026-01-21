@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useCourseContent } from '@/hooks/useCourseContent';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Plus, Edit, Trash2, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CourseModuleForm } from '@/components/admin/CourseModuleForm';
@@ -27,6 +27,23 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { SortableLessonItem } from '@/components/admin/SortableLessonItem';
 
 export default function CourseContent() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -42,6 +59,15 @@ export default function CourseContent() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'module' | 'lesson'; id: string } | null>(null);
   const [expandedModules, setExpandedModules] = useState<string[]>([]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const toggleModule = (moduleId: string) => {
     setExpandedModules(prev =>
@@ -103,37 +129,31 @@ export default function CourseContent() {
     queryClient.invalidateQueries({ queryKey: ['course-modules', courseId] });
   };
 
-  const handleMoveLesson = async (
-    lesson: CourseLesson, 
-    direction: 'up' | 'down', 
-    allLessons: CourseLesson[]
-  ) => {
-    const sortedLessons = [...allLessons].sort((a, b) => a.position - b.position);
-    const currentIndex = sortedLessons.findIndex(l => l.id === lesson.id);
+  const handleDragEnd = async (event: DragEndEvent, lessons: CourseLesson[]) => {
+    const { active, over } = event;
     
-    if (direction === 'up' && currentIndex === 0) return;
-    if (direction === 'down' && currentIndex === sortedLessons.length - 1) return;
+    if (!over || active.id === over.id) return;
 
-    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-    const targetLesson = sortedLessons[targetIndex];
-
+    const sortedLessons = [...lessons].sort((a, b) => a.position - b.position);
+    const oldIndex = sortedLessons.findIndex(l => l.id === active.id);
+    const newIndex = sortedLessons.findIndex(l => l.id === over.id);
+    
+    const reorderedLessons = arrayMove(sortedLessons, oldIndex, newIndex);
+    
     try {
-      const { error: error1 } = await supabase
-        .from('course_lessons')
-        .update({ position: targetLesson.position })
-        .eq('id', lesson.id);
-
-      const { error: error2 } = await supabase
-        .from('course_lessons')
-        .update({ position: lesson.position })
-        .eq('id', targetLesson.id);
-
-      if (error1 || error2) throw error1 || error2;
-
-      toast.success('Ordem atualizada');
+      const updates = reorderedLessons.map((lesson, index) => 
+        supabase
+          .from('course_lessons')
+          .update({ position: index })
+          .eq('id', lesson.id)
+      );
+      
+      await Promise.all(updates);
+      
+      toast.success('Ordem das aulas atualizada');
       queryClient.invalidateQueries({ queryKey: ['course-modules', courseId] });
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao mover aula');
+      toast.error(error.message || 'Erro ao reordenar aulas');
     }
   };
 
@@ -246,69 +266,30 @@ export default function CourseContent() {
                         </Button>
                       </div>
                     ) : (
-                      <div className="space-y-2">
-                        {module.lessons.map((lesson) => (
-                          <div
-                            key={lesson.id}
-                            className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors"
-                          >
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">{lesson.title}</span>
-                                <Badge variant={lesson.is_published ? 'default' : 'secondary'} className="text-xs">
-                                  {lesson.is_published ? 'Publicado' : 'Rascunho'}
-                                </Badge>
-                              </div>
-                              {lesson.description && (
-                                <p className="text-sm text-muted-foreground mt-1">{lesson.description}</p>
-                              )}
-                              {lesson.duration_minutes && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Duração: {lesson.duration_minutes} minutos
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex flex-col">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={() => handleMoveLesson(lesson, 'up', module.lessons || [])}
-                                  disabled={module.lessons?.sort((a, b) => a.position - b.position)[0]?.id === lesson.id}
-                                  title="Mover para cima"
-                                >
-                                  <ArrowUp className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={() => handleMoveLesson(lesson, 'down', module.lessons || [])}
-                                  disabled={module.lessons?.sort((a, b) => a.position - b.position)[module.lessons.length - 1]?.id === lesson.id}
-                                  title="Mover para baixo"
-                                >
-                                  <ArrowDown className="h-3 w-3" />
-                                </Button>
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEditLesson(lesson)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteClick('lesson', lesson.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        modifiers={[restrictToVerticalAxis]}
+                        onDragEnd={(event) => handleDragEnd(event, module.lessons || [])}
+                      >
+                        <SortableContext
+                          items={(module.lessons || []).sort((a, b) => a.position - b.position).map(l => l.id)}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          <div className="space-y-2">
+                            {(module.lessons || [])
+                              .sort((a, b) => a.position - b.position)
+                              .map((lesson) => (
+                                <SortableLessonItem
+                                  key={lesson.id}
+                                  lesson={lesson}
+                                  onEdit={handleEditLesson}
+                                  onDelete={(id) => handleDeleteClick('lesson', id)}
+                                />
+                              ))}
                           </div>
-                        ))}
-                      </div>
+                        </SortableContext>
+                      </DndContext>
                     )}
                   </CardContent>
                 </CollapsibleContent>
