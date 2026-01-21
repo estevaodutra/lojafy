@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, UserPlus, Edit, Power, UserCircle, AlertTriangle, Clock, UserX, Trash2 } from 'lucide-react';
+import { Search, UserPlus, Edit, Power, UserCircle, AlertTriangle, Clock, UserX, Trash2, ShieldOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, differenceInDays } from 'date-fns';
 
@@ -65,6 +65,8 @@ const GestaoUsuarios = () => {
   const [updatingUsers, setUpdatingUsers] = useState<string[]>([]);
   const [deletingUser, setDeletingUser] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [unbanningUser, setUnbanningUser] = useState<any>(null);
+  const [isUnbanning, setIsUnbanning] = useState(false);
   const { toast } = useToast();
 
   const { data: users, isLoading, refetch } = useQuery({
@@ -209,6 +211,41 @@ const GestaoUsuarios = () => {
       });
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const unbanUser = async () => {
+    if (!unbanningUser) return;
+    
+    setIsUnbanning(true);
+    try {
+      const response = await supabase.functions.invoke('unban-user', {
+        body: { userId: unbanningUser.user_id },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Erro ao desbanir usuário');
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
+
+      toast({
+        title: 'Usuário desbanido',
+        description: `${unbanningUser.email} foi desbanido com sucesso.`,
+      });
+      
+      setUnbanningUser(null);
+      refetch();
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao desbanir usuário',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUnbanning(false);
     }
   };
 
@@ -506,6 +543,17 @@ const GestaoUsuarios = () => {
                               userRole={user.role}
                               userName={`${user.first_name} ${user.last_name}`}
                             />
+                            {isUserBanned(user.banned_until) && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setUnbanningUser(user)}
+                                title="Desbanir usuário"
+                                className="text-green-600 hover:text-green-700 hover:bg-green-100"
+                              >
+                                <ShieldOff className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button
                               size="icon"
                               variant="ghost"
@@ -622,6 +670,29 @@ const GestaoUsuarios = () => {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {isDeleting ? 'Excluindo...' : 'Excluir Usuário'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!unbanningUser} onOpenChange={(open) => !open && setUnbanningUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desbanir Usuário</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover o banimento de <strong>{unbanningUser?.email}</strong>?
+              <br /><br />
+              O usuário poderá acessar a plataforma normalmente após esta ação.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUnbanning}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={unbanUser}
+              disabled={isUnbanning}
+              className="bg-green-600 text-white hover:bg-green-700"
+            >
+              {isUnbanning ? 'Desbanindo...' : 'Desbanir Usuário'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
