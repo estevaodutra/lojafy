@@ -1,26 +1,5 @@
 import React, { useState } from 'react';
-import { 
-  Trophy, 
-  Clock, 
-  Target, 
-  CheckCircle2, 
-  Circle, 
-  ExternalLink, 
-  Rocket, 
-  Users, 
-  MessageCircle, 
-  Facebook, 
-  Instagram, 
-  Store,
-  Zap,
-  AlertTriangle,
-  Sparkles,
-  Timer,
-  ChevronDown,
-  ChevronUp,
-  Copy,
-  Check
-} from 'lucide-react';
+import { Trophy, Clock, Target, CheckCircle2, Circle, ExternalLink, Rocket, Users, MessageCircle, Facebook, Instagram, Store, Zap, AlertTriangle, Sparkles, Timer, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-
 interface Product {
   id: string;
   number: number;
@@ -37,66 +15,121 @@ interface Product {
   completed: boolean;
   userLink: string;
 }
-
-const initialProducts: Product[] = [
-  { id: '1', number: 1, name: 'Tela Ampliadora 3D para Celular', productUrl: '/produto/0a8d1f8f-984a-4c52-8c2f-88250ac393ca', completed: false, userLink: '' },
-  { id: '2', number: 2, name: 'Dermaroller Microagulhamento', productUrl: '/produto/252cd780-fa9f-4825-b14b-9ec6c7e57d7b', completed: false, userLink: '' },
-  { id: '3', number: 3, name: 'Lousa Mágica LCD Infantil', productUrl: '/produto/06684218-913b-4e88-94d7-fc193ba8b28f', completed: false, userLink: '' },
-  { id: '4', number: 4, name: 'Palmilha Elevatória', productUrl: '/produto/645f1845-b184-47de-b4bf-9b277fe1ce39', completed: false, userLink: '' },
-  { id: '5', number: 5, name: 'Palmilha Gel Ortopédica (Calcanhar)', productUrl: '/produto/5211ef86-e034-4cfe-9836-ebbc417dad0d', completed: false, userLink: '' },
-  { id: '6', number: 6, name: 'Joelheira de Compressão', productUrl: '/produto/581bd820-17cc-43df-b924-5d15d4ba768a', completed: false, userLink: '' },
-  { id: '7', number: 7, name: 'Meia / Palmilha Fascite Plantar', productUrl: '/produto/8954f5bf-cbd6-424a-8e7a-80584cbdd77e', completed: false, userLink: '' },
-  { id: '8', number: 8, name: 'Cascata de Chocolate', productUrl: '/produto/e5debf21-08d1-4ab5-9e6b-afb8ba5e04bc', completed: false, userLink: '' },
-  { id: '9', number: 9, name: 'Tábua Mágica de Descongelamento', productUrl: '/produto/02d9ea24-0942-4748-97fc-38bb2ad2560b', completed: false, userLink: '' },
-  { id: '10', number: 10, name: 'Regata Modeladora Efeito Sauna', productUrl: '/produto/7f6a1540-ff88-4260-8a00-3dcb90e6208d', completed: false, userLink: '' },
-  { id: '11', number: 11, name: 'Cinta Modeladora Alta Compressão Feminina', productUrl: '/produto/4bec5a4c-79d3-4ae0-9038-9b9f51c26b62', completed: false, userLink: '' },
-];
-
-const strategies = [
-  {
-    icon: Users,
-    title: 'Amigos e Familiares',
-    description: 'Não venda. Peça opinião sobre seus anúncios.',
-    tip: 'Comentário e clique movimentam o anúncio.',
-    color: 'bg-blue-500',
-  },
-  {
-    icon: MessageCircle,
-    title: 'Grupos de WhatsApp',
-    description: 'Nada de spam. Comece com curiosidade.',
-    tip: 'Curiosidade gera inbox.',
-    color: 'bg-green-500',
-  },
-  {
-    icon: Facebook,
-    title: 'Grupos do Facebook',
-    description: 'Escolha 3 grupos por produto. Texto simples.',
-    tip: 'Link só nos comentários.',
-    color: 'bg-indigo-500',
-  },
-  {
-    icon: Zap,
-    title: 'Status do WhatsApp',
-    description: 'Foto do produto + mensagem simples.',
-    tip: 'Status vende no privado.',
-    color: 'bg-yellow-500',
-  },
-  {
-    icon: Store,
-    title: 'Facebook Marketplace',
-    description: 'Reposte o anúncio com título diferente.',
-    tip: 'Marketplace recompensa atividade.',
-    color: 'bg-purple-500',
-  },
-  {
-    icon: Instagram,
-    title: 'Impulsionar no Instagram',
-    description: 'Opcional. Orçamento baixo, público amplo.',
-    tip: 'Impulsionar é tração inicial.',
-    color: 'bg-pink-500',
-  },
-];
-
+const initialProducts: Product[] = [{
+  id: '1',
+  number: 1,
+  name: 'Tela Ampliadora 3D para Celular',
+  productUrl: '/produto/0a8d1f8f-984a-4c52-8c2f-88250ac393ca',
+  completed: false,
+  userLink: ''
+}, {
+  id: '2',
+  number: 2,
+  name: 'Dermaroller Microagulhamento',
+  productUrl: '/produto/252cd780-fa9f-4825-b14b-9ec6c7e57d7b',
+  completed: false,
+  userLink: ''
+}, {
+  id: '3',
+  number: 3,
+  name: 'Lousa Mágica LCD Infantil',
+  productUrl: '/produto/06684218-913b-4e88-94d7-fc193ba8b28f',
+  completed: false,
+  userLink: ''
+}, {
+  id: '4',
+  number: 4,
+  name: 'Palmilha Elevatória',
+  productUrl: '/produto/645f1845-b184-47de-b4bf-9b277fe1ce39',
+  completed: false,
+  userLink: ''
+}, {
+  id: '5',
+  number: 5,
+  name: 'Palmilha Gel Ortopédica (Calcanhar)',
+  productUrl: '/produto/5211ef86-e034-4cfe-9836-ebbc417dad0d',
+  completed: false,
+  userLink: ''
+}, {
+  id: '6',
+  number: 6,
+  name: 'Joelheira de Compressão',
+  productUrl: '/produto/581bd820-17cc-43df-b924-5d15d4ba768a',
+  completed: false,
+  userLink: ''
+}, {
+  id: '7',
+  number: 7,
+  name: 'Meia / Palmilha Fascite Plantar',
+  productUrl: '/produto/8954f5bf-cbd6-424a-8e7a-80584cbdd77e',
+  completed: false,
+  userLink: ''
+}, {
+  id: '8',
+  number: 8,
+  name: 'Cascata de Chocolate',
+  productUrl: '/produto/e5debf21-08d1-4ab5-9e6b-afb8ba5e04bc',
+  completed: false,
+  userLink: ''
+}, {
+  id: '9',
+  number: 9,
+  name: 'Tábua Mágica de Descongelamento',
+  productUrl: '/produto/02d9ea24-0942-4748-97fc-38bb2ad2560b',
+  completed: false,
+  userLink: ''
+}, {
+  id: '10',
+  number: 10,
+  name: 'Regata Modeladora Efeito Sauna',
+  productUrl: '/produto/7f6a1540-ff88-4260-8a00-3dcb90e6208d',
+  completed: false,
+  userLink: ''
+}, {
+  id: '11',
+  number: 11,
+  name: 'Cinta Modeladora Alta Compressão Feminina',
+  productUrl: '/produto/4bec5a4c-79d3-4ae0-9038-9b9f51c26b62',
+  completed: false,
+  userLink: ''
+}];
+const strategies = [{
+  icon: Users,
+  title: 'Amigos e Familiares',
+  description: 'Não venda. Peça opinião sobre seus anúncios.',
+  tip: 'Comentário e clique movimentam o anúncio.',
+  color: 'bg-blue-500'
+}, {
+  icon: MessageCircle,
+  title: 'Grupos de WhatsApp',
+  description: 'Nada de spam. Comece com curiosidade.',
+  tip: 'Curiosidade gera inbox.',
+  color: 'bg-green-500'
+}, {
+  icon: Facebook,
+  title: 'Grupos do Facebook',
+  description: 'Escolha 3 grupos por produto. Texto simples.',
+  tip: 'Link só nos comentários.',
+  color: 'bg-indigo-500'
+}, {
+  icon: Zap,
+  title: 'Status do WhatsApp',
+  description: 'Foto do produto + mensagem simples.',
+  tip: 'Status vende no privado.',
+  color: 'bg-yellow-500'
+}, {
+  icon: Store,
+  title: 'Facebook Marketplace',
+  description: 'Reposte o anúncio com título diferente.',
+  tip: 'Marketplace recompensa atividade.',
+  color: 'bg-purple-500'
+}, {
+  icon: Instagram,
+  title: 'Impulsionar no Instagram',
+  description: 'Opcional. Orçamento baixo, público amplo.',
+  tip: 'Impulsionar é tração inicial.',
+  color: 'bg-pink-500'
+}];
 const TopProdutosVencedores: React.FC = () => {
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem('missao24h_products');
@@ -104,46 +137,40 @@ const TopProdutosVencedores: React.FC = () => {
   });
   const [checklistOpen, setChecklistOpen] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-
   const completedCount = products.filter(p => p.completed).length;
-  const progressPercentage = (completedCount / products.length) * 100;
-
+  const progressPercentage = completedCount / products.length * 100;
   const handleToggleComplete = (id: string) => {
-    const updated = products.map(p => 
-      p.id === id ? { ...p, completed: !p.completed } : p
-    );
+    const updated = products.map(p => p.id === id ? {
+      ...p,
+      completed: !p.completed
+    } : p);
     setProducts(updated);
     localStorage.setItem('missao24h_products', JSON.stringify(updated));
-    
     const product = updated.find(p => p.id === id);
     if (product?.completed) {
       toast.success(`✅ ${product.name} marcado como publicado!`);
     }
   };
-
   const handleUpdateLink = (id: string, link: string) => {
-    const updated = products.map(p => 
-      p.id === id ? { ...p, userLink: link } : p
-    );
+    const updated = products.map(p => p.id === id ? {
+      ...p,
+      userLink: link
+    } : p);
     setProducts(updated);
     localStorage.setItem('missao24h_products', JSON.stringify(updated));
   };
-
   const handleResetProgress = () => {
     setProducts(initialProducts);
     localStorage.removeItem('missao24h_products');
     toast.info('Progresso resetado!');
   };
-
   const handleCopyLink = (url: string, id: string) => {
     navigator.clipboard.writeText(window.location.origin + url);
     setCopiedId(id);
     toast.success('Link copiado!');
     setTimeout(() => setCopiedId(null), 2000);
   };
-
-  return (
-    <div className="space-y-8 max-w-6xl mx-auto pb-12">
+  return <div className="space-y-8 max-w-6xl mx-auto pb-12">
       {/* Hero Section */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-red-500 p-8 text-white">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
@@ -180,74 +207,11 @@ const TopProdutosVencedores: React.FC = () => {
           </div>
           
           <div className="mt-6 flex flex-wrap gap-3">
-            <Button 
-              size="lg" 
-              className="bg-white text-orange-600 hover:bg-amber-50 font-semibold"
-              onClick={() => document.getElementById('products-list')?.scrollIntoView({ behavior: 'smooth' })}
-            >
-              <Rocket className="w-4 h-4 mr-2" />
-              Começar Agora
-            </Button>
-            <Button 
-              size="lg" 
-              variant="outline" 
-              className="border-white/30 text-white hover:bg-white/10"
-              onClick={handleResetProgress}
-            >
-              <Timer className="w-4 h-4 mr-2" />
-              Resetar Progresso
-            </Button>
+            
+            
           </div>
         </div>
       </div>
-
-      {/* Main Progress Bar - Colorful */}
-      <Card className="border-2 border-transparent bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-red-500/10 overflow-hidden">
-        <CardContent className="pt-6 pb-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-6 h-6 text-amber-500" />
-              <span className="font-bold text-lg">Progresso da Missão</span>
-            </div>
-            <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 text-lg px-4 py-1">
-              {completedCount}/{products.length}
-            </Badge>
-          </div>
-          
-          {/* Colorful Progress Bar */}
-          <div className="relative h-6 rounded-full bg-muted overflow-hidden mb-4">
-            <div 
-              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-amber-400 via-orange-500 to-red-500 transition-all duration-500 ease-out"
-              style={{ width: `${progressPercentage}%` }}
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-sm font-bold text-foreground drop-shadow-sm">
-                {Math.round(progressPercentage)}%
-              </span>
-            </div>
-          </div>
-          
-          {/* Dynamic Message Based on Progress */}
-          <p className={`text-center font-semibold text-lg ${
-            completedCount === 0 
-              ? 'text-red-500' 
-              : completedCount <= 5 
-                ? 'text-amber-600'
-                : completedCount < products.length
-                  ? 'text-orange-500'
-                  : 'text-green-500'
-          }`}>
-            {completedCount === 0 
-              ? '🚨 Quem não anuncia não vende, Faça seu primeiro anúncio!'
-              : completedCount <= 5 
-                ? '🎉 Parabéns você começou! Continue assim!'
-                : completedCount < products.length 
-                  ? `🔥 Você está voando! Faltam apenas ${products.length - completedCount} produtos!`
-                  : '🏆 Missão Completa! Você é um campeão!'
-            }
-          </p>
-        </CardContent>
-      </Card>
 
       {/* Progress & Rules */}
       <div className="grid md:grid-cols-3 gap-6">
@@ -256,19 +220,14 @@ const TopProdutosVencedores: React.FC = () => {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Sparkles className="w-5 h-5 text-primary" />
-              Resumo
+              Progresso da Missão
             </CardTitle>
             <CardDescription>{completedCount}/11 produtos publicados</CardDescription>
           </CardHeader>
           <CardContent>
             <Progress value={progressPercentage} className="h-3 mb-4" />
             <p className="text-sm text-muted-foreground">
-              {completedCount === 0 
-                ? 'Comece agora!' 
-                : completedCount === products.length 
-                  ? '🎉 Missão completa!' 
-                  : `Faltam ${products.length - completedCount} produtos!`
-              }
+              {completedCount === 0 ? 'Comece a publicar seus produtos!' : completedCount === products.length ? '🎉 Parabéns! Missão completa!' : `Faltam ${products.length - completedCount} produtos!`}
             </p>
           </CardContent>
         </Card>
@@ -339,99 +298,48 @@ const TopProdutosVencedores: React.FC = () => {
         </h2>
         
         <div className="grid md:grid-cols-2 gap-4">
-          {products.map((product) => (
-            <Card 
-              key={product.id} 
-              className={`transition-all duration-300 relative overflow-hidden ${
-                product.completed 
-                  ? 'border-green-500 bg-green-50 dark:bg-green-950/20' 
-                  : 'border-red-300 bg-red-50/50 dark:bg-red-950/10 hover:border-red-400'
-              }`}
-            >
-              {/* Yellow Gradient Number Badge on the Side */}
-              <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-b from-amber-400 via-yellow-500 to-orange-500 flex items-center justify-center">
-                <span className="text-white font-bold text-2xl drop-shadow-lg">
-                  {product.number}
-                </span>
-              </div>
-              
-              <CardContent className="pt-4 pl-16">
+          {products.map(product => <Card key={product.id} className={`transition-all duration-300 ${product.completed ? 'border-green-500 bg-green-50 dark:bg-green-950/20' : 'hover:border-primary/50'}`}>
+              <CardContent className="pt-4">
                 <div className="flex items-start gap-3">
-                  <button
-                    onClick={() => handleToggleComplete(product.id)}
-                    className="mt-1 flex-shrink-0"
-                  >
-                    {product.completed ? (
-                      <CheckCircle2 className="w-6 h-6 text-green-500" />
-                    ) : (
-                      <Circle className="w-6 h-6 text-red-400 hover:text-primary transition-colors" />
-                    )}
+                  <button onClick={() => handleToggleComplete(product.id)} className="mt-1 flex-shrink-0">
+                    {product.completed ? <CheckCircle2 className="w-6 h-6 text-green-500" /> : <Circle className="w-6 h-6 text-muted-foreground hover:text-primary transition-colors" />}
                   </button>
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
-                      {!product.completed && (
-                        <Badge variant="outline" className="bg-red-100 text-red-600 border-red-300 text-xs">
-                          PENDENTE
-                        </Badge>
-                      )}
-                      {product.completed && (
-                        <Badge variant="outline" className="bg-green-100 text-green-600 border-green-300 text-xs">
-                          ✓ PUBLICADO
-                        </Badge>
-                      )}
-                      <span className={`font-semibold ${product.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                      <Badge variant="outline" className={`${product.completed ? 'bg-green-500 text-white border-green-500' : 'bg-primary text-primary-foreground'} font-bold text-sm px-2`}>
+                        {product.number}
+                      </Badge>
+                      <span className={`font-medium ${product.completed ? 'line-through text-muted-foreground' : ''}`}>
                         {product.name}
                       </span>
                     </div>
                     
-                    <div className="space-y-3">
-                      <div>
-                        <span className="text-xs text-muted-foreground font-medium flex items-center gap-1 mb-1">
-                          Veja o produto aqui 👉
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground uppercase font-medium">
+                          Produto Base:
                         </span>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 text-xs font-semibold bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100"
-                            onClick={() => window.open(product.productUrl, '_blank')}
-                          >
-                            VER PRODUTO
-                            <ExternalLink className="w-3 h-3 ml-1" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleCopyLink(product.productUrl, product.id)}
-                          >
-                            {copiedId === product.id ? (
-                              <Check className="w-4 h-4 text-green-500" />
-                            ) : (
-                              <Copy className="w-4 h-4" />
-                            )}
-                          </Button>
-                        </div>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-primary" onClick={() => window.open(product.productUrl, '_blank')}>
+                          Abrir Lojafy
+                          <ExternalLink className="w-3 h-3 ml-1" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCopyLink(product.productUrl, product.id)}>
+                          {copiedId === product.id ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                        </Button>
                       </div>
                       
                       <div>
                         <span className="text-xs text-muted-foreground uppercase font-medium block mb-1">
                           Seu Anúncio:
                         </span>
-                        <Input
-                          placeholder="Cole o link do seu anúncio aqui"
-                          value={product.userLink}
-                          onChange={(e) => handleUpdateLink(product.id, e.target.value)}
-                          className={`h-8 text-sm ${!product.completed ? 'border-red-200 focus:border-red-400' : ''}`}
-                        />
+                        <Input placeholder="Cole o link do seu anúncio aqui" value={product.userLink} onChange={e => handleUpdateLink(product.id, e.target.value)} className="h-8 text-sm" />
                       </div>
                     </div>
                   </div>
                 </div>
               </CardContent>
-            </Card>
-          ))}
+            </Card>)}
         </div>
       </div>
 
@@ -446,8 +354,7 @@ const TopProdutosVencedores: React.FC = () => {
         </p>
         
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {strategies.map((strategy, index) => (
-            <Card key={index} className="hover:shadow-md transition-shadow">
+          {strategies.map((strategy, index) => <Card key={index} className="hover:shadow-md transition-shadow">
               <CardContent className="pt-4">
                 <div className="flex items-start gap-3">
                   <div className={`${strategy.color} p-2 rounded-lg text-white flex-shrink-0`}>
@@ -462,8 +369,7 @@ const TopProdutosVencedores: React.FC = () => {
                   </div>
                 </div>
               </CardContent>
-            </Card>
-          ))}
+            </Card>)}
         </div>
       </div>
 
@@ -495,8 +401,6 @@ const TopProdutosVencedores: React.FC = () => {
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 };
-
 export default TopProdutosVencedores;
