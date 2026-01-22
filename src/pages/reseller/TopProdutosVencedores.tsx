@@ -201,6 +201,54 @@ const TopProdutosVencedores: React.FC = () => {
         </div>
       </div>
 
+      {/* Main Progress Bar - Colorful */}
+      <Card className="border-2 border-transparent bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-red-500/10 overflow-hidden">
+        <CardContent className="pt-6 pb-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-6 h-6 text-amber-500" />
+              <span className="font-bold text-lg">Progresso da Missão</span>
+            </div>
+            <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 text-lg px-4 py-1">
+              {completedCount}/{products.length}
+            </Badge>
+          </div>
+          
+          {/* Colorful Progress Bar */}
+          <div className="relative h-6 rounded-full bg-muted overflow-hidden mb-4">
+            <div 
+              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-amber-400 via-orange-500 to-red-500 transition-all duration-500 ease-out"
+              style={{ width: `${progressPercentage}%` }}
+            />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-sm font-bold text-foreground drop-shadow-sm">
+                {Math.round(progressPercentage)}%
+              </span>
+            </div>
+          </div>
+          
+          {/* Dynamic Message Based on Progress */}
+          <p className={`text-center font-semibold text-lg ${
+            completedCount === 0 
+              ? 'text-red-500' 
+              : completedCount <= 5 
+                ? 'text-amber-600'
+                : completedCount < products.length
+                  ? 'text-orange-500'
+                  : 'text-green-500'
+          }`}>
+            {completedCount === 0 
+              ? '🚨 Quem não anuncia não vende, Faça seu primeiro anúncio!'
+              : completedCount <= 5 
+                ? '🎉 Parabéns você começou! Continue assim!'
+                : completedCount < products.length 
+                  ? `🔥 Você está voando! Faltam apenas ${products.length - completedCount} produtos!`
+                  : '🏆 Missão Completa! Você é um campeão!'
+            }
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Progress & Rules */}
       <div className="grid md:grid-cols-3 gap-6">
         {/* Progress Card */}
@@ -208,7 +256,7 @@ const TopProdutosVencedores: React.FC = () => {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Sparkles className="w-5 h-5 text-primary" />
-              Progresso da Missão
+              Resumo
             </CardTitle>
             <CardDescription>{completedCount}/11 produtos publicados</CardDescription>
           </CardHeader>
@@ -216,9 +264,9 @@ const TopProdutosVencedores: React.FC = () => {
             <Progress value={progressPercentage} className="h-3 mb-4" />
             <p className="text-sm text-muted-foreground">
               {completedCount === 0 
-                ? 'Comece a publicar seus produtos!' 
+                ? 'Comece agora!' 
                 : completedCount === products.length 
-                  ? '🎉 Parabéns! Missão completa!' 
+                  ? '🎉 Missão completa!' 
                   : `Faltam ${products.length - completedCount} produtos!`
               }
             </p>
@@ -294,13 +342,20 @@ const TopProdutosVencedores: React.FC = () => {
           {products.map((product) => (
             <Card 
               key={product.id} 
-              className={`transition-all duration-300 ${
+              className={`transition-all duration-300 relative overflow-hidden ${
                 product.completed 
                   ? 'border-green-500 bg-green-50 dark:bg-green-950/20' 
-                  : 'hover:border-primary/50'
+                  : 'border-red-300 bg-red-50/50 dark:bg-red-950/10 hover:border-red-400'
               }`}
             >
-              <CardContent className="pt-4">
+              {/* Yellow Gradient Number Badge on the Side */}
+              <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-b from-amber-400 via-yellow-500 to-orange-500 flex items-center justify-center">
+                <span className="text-white font-bold text-2xl drop-shadow-lg">
+                  {product.number}
+                </span>
+              </div>
+              
+              <CardContent className="pt-4 pl-16">
                 <div className="flex items-start gap-3">
                   <button
                     onClick={() => handleToggleComplete(product.id)}
@@ -309,53 +364,55 @@ const TopProdutosVencedores: React.FC = () => {
                     {product.completed ? (
                       <CheckCircle2 className="w-6 h-6 text-green-500" />
                     ) : (
-                      <Circle className="w-6 h-6 text-muted-foreground hover:text-primary transition-colors" />
+                      <Circle className="w-6 h-6 text-red-400 hover:text-primary transition-colors" />
                     )}
                   </button>
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
-                      <Badge 
-                        variant="outline" 
-                        className={`${
-                          product.completed 
-                            ? 'bg-green-500 text-white border-green-500' 
-                            : 'bg-primary text-primary-foreground'
-                        } font-bold text-sm px-2`}
-                      >
-                        {product.number}
-                      </Badge>
-                      <span className={`font-medium ${product.completed ? 'line-through text-muted-foreground' : ''}`}>
+                      {!product.completed && (
+                        <Badge variant="outline" className="bg-red-100 text-red-600 border-red-300 text-xs">
+                          PENDENTE
+                        </Badge>
+                      )}
+                      {product.completed && (
+                        <Badge variant="outline" className="bg-green-100 text-green-600 border-green-300 text-xs">
+                          ✓ PUBLICADO
+                        </Badge>
+                      )}
+                      <span className={`font-semibold ${product.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
                         {product.name}
                       </span>
                     </div>
                     
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground uppercase font-medium">
-                          Produto Base:
+                    <div className="space-y-3">
+                      <div>
+                        <span className="text-xs text-muted-foreground font-medium flex items-center gap-1 mb-1">
+                          Veja o produto aqui 👉
                         </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs text-primary"
-                          onClick={() => window.open(product.productUrl, '_blank')}
-                        >
-                          Abrir Lojafy
-                          <ExternalLink className="w-3 h-3 ml-1" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => handleCopyLink(product.productUrl, product.id)}
-                        >
-                          {copiedId === product.id ? (
-                            <Check className="w-3 h-3 text-green-500" />
-                          ) : (
-                            <Copy className="w-3 h-3" />
-                          )}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs font-semibold bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100"
+                            onClick={() => window.open(product.productUrl, '_blank')}
+                          >
+                            VER PRODUTO
+                            <ExternalLink className="w-3 h-3 ml-1" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleCopyLink(product.productUrl, product.id)}
+                          >
+                            {copiedId === product.id ? (
+                              <Check className="w-4 h-4 text-green-500" />
+                            ) : (
+                              <Copy className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </div>
                       </div>
                       
                       <div>
@@ -366,7 +423,7 @@ const TopProdutosVencedores: React.FC = () => {
                           placeholder="Cole o link do seu anúncio aqui"
                           value={product.userLink}
                           onChange={(e) => handleUpdateLink(product.id, e.target.value)}
-                          className="h-8 text-sm"
+                          className={`h-8 text-sm ${!product.completed ? 'border-red-200 focus:border-red-400' : ''}`}
                         />
                       </div>
                     </div>
