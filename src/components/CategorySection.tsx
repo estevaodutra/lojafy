@@ -140,7 +140,7 @@ const CategorySection = () => {
               ))}
             </div>
           </div>
-        ) : categories.length === 0 ? (
+        ) : categories.filter(c => (c.real_product_count || 0) > 0).length === 0 ? (
           <div className="text-center py-12">
             <h3 className="text-lg font-semibold mb-2">Nenhuma categoria encontrada</h3>
             <p className="text-muted-foreground">Cadastre categorias para exibi-las aqui.</p>
@@ -148,7 +148,9 @@ const CategorySection = () => {
         ) : (
           <div className="flex justify-center overflow-hidden">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6 max-w-full w-full">
-              {categories.map((category) => {
+              {categories
+                .filter(category => (category.real_product_count || 0) > 0)
+                .map((category) => {
               const IconComponent = iconMap[category.name] || iconMap.default;
               const colorClass = colorMap[category.name] || colorMap.default;
               

@@ -236,7 +236,9 @@ const Categorias = () => {
                         <Skeleton key={i} className="h-8 w-full" />
                       ))
                     ) : (
-                      categories.map((category) => (
+                      categories
+                        .filter(category => (category.real_product_count || 0) > 0)
+                        .map((category) => (
                         <Link
                           key={category.id}
                           to={`/categorias/${category.slug}`}
@@ -244,7 +246,7 @@ const Categorias = () => {
                             selectedCategory?.id === category.id ? 'bg-accent' : ''
                           }`}
                         >
-                          {category.name} ({category.real_product_count || 0})
+                          {category.name} ({category.real_product_count})
                         </Link>
                       ))
                     )}
