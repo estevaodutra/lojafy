@@ -30,8 +30,8 @@ export const OpenTicketButton = ({
   const { profile } = useAuth();
   const navigate = useNavigate();
 
-  // Only customers can open tickets
-  if (profile?.role !== 'customer') {
+  // Apenas usuários autenticados podem abrir tickets
+  if (!profile) {
     return null;
   }
 
