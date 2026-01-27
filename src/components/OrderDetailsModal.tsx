@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { OpenTicketButton } from '@/components/order-tickets/OpenTicketButton';
+import { getAvailableTicketTypes } from '@/types/orderTickets';
 interface OrderItem {
   id: string;
   product_id: string;
@@ -892,31 +893,36 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               </CardContent>
             </Card>
 
-            {/* Suporte ao Pedido - Apenas para Clientes */}
-            {!isAdmin && order && (
-              <Card className="border-primary/20 bg-primary/5">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <MessageSquarePlus className="h-4 w-4 text-primary" />
-                    Precisa de Ajuda com Este Pedido?
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Se você teve algum problema com seu pedido, pode abrir um ticket para solicitar reembolso, troca ou cancelamento.
-                  </p>
-                  <OpenTicketButton
-                    orderId={order.id}
-                    orderStatus={order.status}
-                    paymentStatus={order.payment_status}
-                    existingTicketId={existingTicketId}
-                    variant="default"
-                    size="default"
-                    className="w-full"
-                  />
-                </CardContent>
-              </Card>
-            )}
+            {/* Suporte ao Pedido - Apenas para Clientes com tickets elegíveis */}
+            {(() => {
+              const availableTicketTypes = getAvailableTicketTypes(order.status, order.payment_status);
+              const showTicketCard = !isAdmin && (existingTicketId || availableTicketTypes.length > 0);
+              
+              return showTicketCard ? (
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <MessageSquarePlus className="h-4 w-4 text-primary" />
+                      Precisa de Ajuda com Este Pedido?
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Se você teve algum problema com seu pedido, pode abrir um ticket para solicitar reembolso, troca ou cancelamento.
+                    </p>
+                    <OpenTicketButton
+                      orderId={order.id}
+                      orderStatus={order.status}
+                      paymentStatus={order.payment_status}
+                      existingTicketId={existingTicketId}
+                      variant="default"
+                      size="default"
+                      className="w-full"
+                    />
+                  </CardContent>
+                </Card>
+              ) : null;
+            })()}
 
             {/* Shipping Files */}
             {(shippingFiles.length > 0 || isAdmin) && <Card>
