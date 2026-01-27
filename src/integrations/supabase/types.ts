@@ -1608,6 +1608,163 @@ export type Database = {
           },
         ]
       }
+      order_ticket_attachments: {
+        Row: {
+          created_at: string | null
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          message_id: string | null
+          ticket_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          message_id?: string | null
+          ticket_id: string
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          message_id?: string | null
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_ticket_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "order_ticket_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_ticket_attachments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "order_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_ticket_messages: {
+        Row: {
+          author_id: string
+          author_type: Database["public"]["Enums"]["ticket_author_type"]
+          created_at: string | null
+          id: string
+          is_internal: boolean | null
+          message: string
+          ticket_id: string
+        }
+        Insert: {
+          author_id: string
+          author_type: Database["public"]["Enums"]["ticket_author_type"]
+          created_at?: string | null
+          id?: string
+          is_internal?: boolean | null
+          message: string
+          ticket_id: string
+        }
+        Update: {
+          author_id?: string
+          author_type?: Database["public"]["Enums"]["ticket_author_type"]
+          created_at?: string | null
+          id?: string
+          is_internal?: boolean | null
+          message?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_ticket_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "order_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_tickets: {
+        Row: {
+          created_at: string | null
+          current_responsible: string | null
+          customer_id: string
+          first_responded_at: string | null
+          id: string
+          order_id: string
+          reason: string
+          refund_amount: number | null
+          reseller_id: string | null
+          resolution: string | null
+          resolved_at: string | null
+          sla_first_response: string | null
+          sla_resolution: string | null
+          status: Database["public"]["Enums"]["order_ticket_status"] | null
+          supplier_id: string | null
+          ticket_number: string
+          tipo: Database["public"]["Enums"]["order_ticket_type"]
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_responsible?: string | null
+          customer_id: string
+          first_responded_at?: string | null
+          id?: string
+          order_id: string
+          reason: string
+          refund_amount?: number | null
+          reseller_id?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          sla_first_response?: string | null
+          sla_resolution?: string | null
+          status?: Database["public"]["Enums"]["order_ticket_status"] | null
+          supplier_id?: string | null
+          ticket_number: string
+          tipo: Database["public"]["Enums"]["order_ticket_type"]
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_responsible?: string | null
+          customer_id?: string
+          first_responded_at?: string | null
+          id?: string
+          order_id?: string
+          reason?: string
+          refund_amount?: number | null
+          reseller_id?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          sla_first_response?: string | null
+          sla_resolution?: string | null
+          status?: Database["public"]["Enums"]["order_ticket_status"] | null
+          supplier_id?: string | null
+          ticket_number?: string
+          tipo?: Database["public"]["Enums"]["order_ticket_type"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_tickets_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           billing_address: Json | null
@@ -1703,6 +1860,47 @@ export type Database = {
             columns: ["shipping_method_id"]
             isOneToOne: false
             referencedRelation: "shipping_methods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pending_refunds: {
+        Row: {
+          amount: number
+          created_at: string | null
+          customer_id: string
+          id: string
+          processed_at: string | null
+          processed_by: string | null
+          status: string | null
+          ticket_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          customer_id: string
+          id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          status?: string | null
+          ticket_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          customer_id?: string
+          id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          status?: string | null
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_refunds_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "order_tickets"
             referencedColumns: ["id"]
           },
         ]
@@ -3154,6 +3352,7 @@ export type Database = {
         Args: { brand_name?: string; category_name?: string }
         Returns: string
       }
+      generate_ticket_number: { Args: never; Returns: string }
       generate_unique_store_slug: {
         Args: { store_id_param?: string; store_name_param: string }
         Returns: string
@@ -3288,6 +3487,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin_user: { Args: never; Returns: boolean }
+      is_ticket_participant: {
+        Args: { _ticket_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_users_order: {
         Args: { _order_id: string; _user_id: string }
         Returns: boolean
@@ -3329,7 +3532,20 @@ export type Database = {
         | "general"
         | "academy_lesson"
       message_sender_type: "customer" | "ai" | "admin" | "system"
+      order_ticket_status:
+        | "aberto"
+        | "em_analise"
+        | "aguardando_cliente"
+        | "resolvido"
+        | "cancelado"
+      order_ticket_type: "reembolso" | "troca" | "cancelamento"
       subscription_plan: "free" | "premium"
+      ticket_author_type:
+        | "cliente"
+        | "revendedor"
+        | "fornecedor"
+        | "superadmin"
+        | "sistema"
       ticket_priority: "low" | "normal" | "high" | "urgent"
       ticket_status:
         | "open"
@@ -3474,7 +3690,22 @@ export const Constants = {
         "academy_lesson",
       ],
       message_sender_type: ["customer", "ai", "admin", "system"],
+      order_ticket_status: [
+        "aberto",
+        "em_analise",
+        "aguardando_cliente",
+        "resolvido",
+        "cancelado",
+      ],
+      order_ticket_type: ["reembolso", "troca", "cancelamento"],
       subscription_plan: ["free", "premium"],
+      ticket_author_type: [
+        "cliente",
+        "revendedor",
+        "fornecedor",
+        "superadmin",
+        "sistema",
+      ],
       ticket_priority: ["low", "normal", "high", "urgent"],
       ticket_status: [
         "open",
