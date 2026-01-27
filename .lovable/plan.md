@@ -1,91 +1,98 @@
 
 
-# Corrigir Card de Suporte Vazio
+# Permitir Abertura de Tickets para Todos os Usuários de "Minha Conta"
 
 ## Problema Identificado
 
-O card "Precisa de Ajuda com Este Pedido?" está sendo exibido para todos os clientes, mas o botão "Abrir Ticket" dentro dele só aparece quando existem tipos de ticket disponíveis para o status atual do pedido. Isso resulta em um card vazio como mostrado na imagem.
+O componente `OpenTicketButton` possui uma verificação hardcoded que bloqueia qualquer usuário que não seja exatamente `'customer'`:
+
+```typescript
+// src/components/order-tickets/OpenTicketButton.tsx linha 33-36
+if (profile?.role !== 'customer') {
+  return null;  // ← Bloqueia resellers, suppliers, etc.
+}
+```
+
+Isso faz com que o card "Precisa de Ajuda?" apareça vazio para resellers e outros usuários.
 
 ---
 
 ## Solução
 
-Mover a lógica de verificação de elegibilidade para o nível do card, não apenas do botão. O card inteiro só deve aparecer se:
-1. Não for admin (`!isAdmin`)
-2. Existir o pedido (`order`)
-3. **E** houver tipos de ticket disponíveis para este pedido **OU** já existir um ticket aberto
+Remover a restrição de role no `OpenTicketButton` para que **todos os usuários autenticados** possam abrir tickets, já que todos têm acesso às rotas de `/minha-conta`.
 
 ---
 
-## Alterações em `src/components/OrderDetailsModal.tsx`
+## Alterações Necessárias
 
-### 1. Importar a função de validação
+### Arquivo: `src/components/order-tickets/OpenTicketButton.tsx`
 
-```typescript
-import { getAvailableTicketTypes } from '@/types/orderTickets';
-```
-
-### 2. Adicionar verificação de elegibilidade
-
-Antes de renderizar o card, verificar se há tipos disponíveis:
+**Remover as linhas 33-36:**
 
 ```typescript
-// Calcular se há ticket types disponíveis
-const availableTicketTypes = order 
-  ? getAvailableTicketTypes(order.status, order.payment_status) 
-  : [];
-
-const showTicketCard = !isAdmin && order && (
-  existingTicketId || availableTicketTypes.length > 0
-);
+// REMOVER ESTE BLOCO:
+// Only customers can open tickets
+if (profile?.role !== 'customer') {
+  return null;
+}
 ```
 
-### 3. Condicionar o Card
+**Substituir por verificação de autenticação:**
 
-```tsx
-{/* Suporte ao Pedido - Apenas para Clientes com tickets elegíveis */}
-{showTicketCard && (
-  <Card className="border-primary/20 bg-primary/5">
-    <CardHeader className="pb-3">
-      <CardTitle className="text-sm flex items-center gap-2">
-        <MessageSquarePlus className="h-4 w-4 text-primary" />
-        Precisa de Ajuda com Este Pedido?
-      </CardTitle>
-    </CardHeader>
-    <CardContent>
-      <p className="text-sm text-muted-foreground mb-4">
-        Se você teve algum problema com seu pedido, pode abrir um ticket para solicitar reembolso, troca ou cancelamento.
-      </p>
-      <OpenTicketButton
-        orderId={order.id}
-        orderStatus={order.status}
-        paymentStatus={order.payment_status}
-        existingTicketId={existingTicketId}
-        variant="default"
-        size="default"
-        className="w-full"
-      />
-    </CardContent>
-  </Card>
-)}
+```typescript
+// Apenas usuários autenticados podem abrir tickets
+if (!profile) {
+  return null;
+}
+```
+
+---
+
+## Código Final do Componente (início)
+
+```typescript
+export const OpenTicketButton = ({
+  orderId,
+  orderStatus,
+  paymentStatus,
+  existingTicketId,
+  variant = 'outline',
+  size = 'sm',
+  className,
+}: OpenTicketButtonProps) => {
+  const [modalOpen, setModalOpen] = useState(false);
+  const { profile } = useAuth();
+  const navigate = useNavigate();
+
+  // Apenas usuários autenticados podem abrir tickets
+  if (!profile) {
+    return null;
+  }
+
+  // If there's already an open ticket, show link to it
+  if (existingTicketId) {
+    // ... resto do código
+  }
+  // ...
+};
 ```
 
 ---
 
 ## Resultado Esperado
 
-| Status do Pedido | Payment Status | Comportamento |
-|------------------|----------------|---------------|
-| pending | pending | Card NÃO aparece |
-| confirmed/processing | paid | Card aparece com botão "Abrir Ticket" |
-| shipped/delivered | paid | Card aparece com botão "Abrir Ticket" |
-| Qualquer com ticket aberto | - | Card aparece com botão "Ver Ticket Aberto" |
+| Role do Usuário | Acesso a /minha-conta | Card Visível | Botão Visível |
+|-----------------|----------------------|--------------|---------------|
+| customer | Sim | Sim (se elegível) | Sim |
+| reseller | Sim | Sim (se elegível) | Sim |
+| supplier | Sim | Sim (se elegível) | Sim |
+| admin/super_admin | Sim | Não | - |
 
 ---
 
 ## Resumo das Alterações
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/components/OrderDetailsModal.tsx` | Adicionar import de `getAvailableTicketTypes` e condicionar exibição do card |
+| Arquivo | Linha | Alteração |
+|---------|-------|-----------|
+| `src/components/order-tickets/OpenTicketButton.tsx` | 33-36 | Trocar `profile?.role !== 'customer'` por `!profile` |
 
