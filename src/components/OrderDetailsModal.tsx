@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User, FileText, Download, Upload, TrendingUp } from 'lucide-react';
+import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User, FileText, Download, Upload, TrendingUp, MessageSquarePlus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { OpenTicketButton } from '@/components/order-tickets/OpenTicketButton';
 interface OrderItem {
   id: string;
   product_id: string;
@@ -92,6 +93,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [isRefundUploading, setIsRefundUploading] = useState(false);
   const [currentProductCosts, setCurrentProductCosts] = useState<Record<string, number>>({});
+  const [existingTicketId, setExistingTicketId] = useState<string | null>(null);
   const {
     toast
   } = useToast();
@@ -105,8 +107,26 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       fetchStatusHistory();
       fetchShippingFiles();
       fetchRefundDocuments();
+      fetchExistingTicket();
+    } else {
+      setExistingTicketId(null);
     }
   }, [orderId, isOpen]);
+
+  const fetchExistingTicket = async () => {
+    if (!orderId) return;
+    try {
+      const { data } = await supabase
+        .from('order_tickets')
+        .select('id')
+        .eq('order_id', orderId)
+        .not('status', 'in', '("resolvido","cancelado")')
+        .maybeSingle();
+      setExistingTicketId(data?.id || null);
+    } catch (error) {
+      console.error('Erro ao buscar ticket existente:', error);
+    }
+  };
   const fetchOrderDetails = async () => {
     if (!orderId) return;
     setLoading(true);
@@ -871,6 +891,32 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                 )}
               </CardContent>
             </Card>
+
+            {/* Suporte ao Pedido - Apenas para Clientes */}
+            {!isAdmin && order && (
+              <Card className="border-primary/20 bg-primary/5">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <MessageSquarePlus className="h-4 w-4 text-primary" />
+                    Precisa de Ajuda com Este Pedido?
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Se você teve algum problema com seu pedido, pode abrir um ticket para solicitar reembolso, troca ou cancelamento.
+                  </p>
+                  <OpenTicketButton
+                    orderId={order.id}
+                    orderStatus={order.status}
+                    paymentStatus={order.payment_status}
+                    existingTicketId={existingTicketId}
+                    variant="default"
+                    size="default"
+                    className="w-full"
+                  />
+                </CardContent>
+              </Card>
+            )}
 
             {/* Shipping Files */}
             {(shippingFiles.length > 0 || isAdmin) && <Card>
