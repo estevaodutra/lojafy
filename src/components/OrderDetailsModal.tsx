@@ -644,8 +644,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Breakdown de Precificação */}
-                      {breakdown.costPrice > 0 ? <div className="mt-3 ml-20 p-3 bg-muted/20 rounded-lg border border-border/50">
+                      {/* Breakdown de Precificação - Apenas para Admin */}
+                      {isAdmin && (
+                        breakdown.costPrice > 0 ? <div className="mt-3 ml-20 p-3 bg-muted/20 rounded-lg border border-border/50">
                           <div className="flex items-center justify-between mb-2">
                             <p className="text-xs font-semibold text-muted-foreground">
                               📊 Composição de Preço (por unidade)
@@ -710,7 +711,8 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                           <p className="text-xs text-amber-700 dark:text-amber-400">
                             ⚠️ Preço de custo não disponível para este produto
                           </p>
-                        </div>}
+                        </div>
+                      )}
                     </div>;
               })}
                 </div>
@@ -720,31 +722,32 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             {/* Order Summary with Financial Breakdown */}
             <Card>
               <CardHeader>
-                <CardTitle>Resumo Financeiro do Pedido</CardTitle>
+                <CardTitle>{isAdmin ? 'Resumo Financeiro do Pedido' : 'Resumo do Pedido'}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {(() => {
-              const financials = calculateOrderFinancials(order);
+                {isAdmin ? (
+                  (() => {
+                    const financials = calculateOrderFinancials(order);
 
-              // Calcular totais agregados com decomposição reversa
-              const totalSalePrice = financials.subtotal; // Soma dos preços de venda
+                    // Calcular totais agregados com decomposição reversa
+                    const totalSalePrice = financials.subtotal; // Soma dos preços de venda
 
-              // Taxa de transação sobre o total
-              const transactionPercent = 4.5;
-              const transactionAmount = totalSalePrice * (transactionPercent / 100);
-              const afterTransaction = totalSalePrice - transactionAmount;
+                    // Taxa de transação sobre o total
+                    const transactionPercent = 4.5;
+                    const transactionAmount = totalSalePrice * (transactionPercent / 100);
+                    const afterTransaction = totalSalePrice - transactionAmount;
 
-              // Contingenciamento sobre o que sobrou
-              const contingencyPercent = 1;
-              const contingencyAmount = afterTransaction * (contingencyPercent / 100);
-              const afterContingency = afterTransaction - contingencyAmount;
+                    // Contingenciamento sobre o que sobrou
+                    const contingencyPercent = 1;
+                    const contingencyAmount = afterTransaction * (contingencyPercent / 100);
+                    const afterContingency = afterTransaction - contingencyAmount;
 
-              // Subtrair custo total
-              const afterCost = afterContingency - financials.totalCost;
+                    // Subtrair custo total
+                    const afterCost = afterContingency - financials.totalCost;
 
-              // Lucro real dos produtos
-              const productProfit = afterCost;
-              return <>
+                    // Lucro real dos produtos
+                    const productProfit = afterCost;
+                    return <>
                       {/* Preço de Venda Total */}
                       <div className="flex justify-between font-semibold text-base pb-2 border-b">
                         <span>Preço de Venda:</span>
@@ -856,7 +859,16 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                         </div>
                       </div>
                     </>;
-            })()}
+                  })()
+                ) : (
+                  /* Visualização simplificada para clientes */
+                  <div className="flex justify-between items-center text-lg font-semibold">
+                    <span>Valor:</span>
+                    <span className="text-primary">
+                      {formatPrice(Number(order.total_amount))}
+                    </span>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
