@@ -36,6 +36,8 @@ import CustomerFavorites from "./pages/customer/Favorites";
 import CustomerSettings from "./pages/customer/Settings";
 import CustomerHelp from "./pages/customer/Help";
 import CustomerNotifications from "./pages/customer/Notifications";
+import CustomerTickets from "./pages/customer/Tickets";
+import CustomerTicketDetails from "./pages/customer/TicketDetails";
 import Academy from "./pages/customer/Academy";
 import CourseViewer from "./pages/customer/CourseViewer";
 import CourseCheckout from "./pages/CourseCheckout";
@@ -200,6 +202,8 @@ const App = () => {
               <Route path="/minha-conta" element={<CustomerLayout />}>
                 <Route index element={<CustomerDashboard />} />
                 <Route path="pedidos" element={<CustomerOrders />} />
+                <Route path="tickets" element={<CustomerTickets />} />
+                <Route path="tickets/:ticketId" element={<CustomerTicketDetails />} />
                 <Route path="notificacoes" element={<CustomerNotifications />} />
                 <Route path="academy" element={<Academy />} />
                 <Route path="curso/:courseId" element={<CourseModules />} />
