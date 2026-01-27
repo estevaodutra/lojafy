@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { ImageZoomModal } from "@/components/ImageZoomModal";
-import { ChevronRight, Star, Heart, ShoppingCart, Truck, Shield, RotateCcw, Plus, Minus, Share2, ZoomIn, Package, Info, ExternalLink } from "lucide-react";
+import { ChevronRight, Star, Heart, ShoppingCart, Truck, Shield, RotateCcw, Plus, Minus, Share2, ZoomIn, Package, Info, ExternalLink, Copy, Download } from "lucide-react";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { useCart } from "@/contexts/CartContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -239,6 +239,73 @@ const Produto = ({
       navigate('/carrinho');
     }
   };
+
+  // Copiar título para clipboard
+  const handleCopyTitle = async () => {
+    try {
+      await navigator.clipboard.writeText(product.name);
+      toast({
+        title: "Título copiado!",
+        description: "O nome do produto foi copiado para a área de transferência.",
+      });
+    } catch (err) {
+      toast({
+        title: "Erro ao copiar",
+        description: "Não foi possível copiar o título.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Copiar descrição para clipboard
+  const handleCopyDescription = async () => {
+    if (!product.description) return;
+    try {
+      await navigator.clipboard.writeText(product.description);
+      toast({
+        title: "Descrição copiada!",
+        description: "A descrição do produto foi copiada para a área de transferência.",
+      });
+    } catch (err) {
+      toast({
+        title: "Erro ao copiar",
+        description: "Não foi possível copiar a descrição.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Baixar todas as fotos do produto
+  const handleDownloadPhotos = async () => {
+    toast({
+      title: "Baixando fotos...",
+      description: `Preparando ${productImages.length} imagem(ns) para download.`,
+    });
+
+    for (let i = 0; i < productImages.length; i++) {
+      const imageUrl = productImages[i];
+      try {
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const extension = imageUrl.split('.').pop()?.split('?')[0] || 'jpg';
+        link.download = `${product.name.replace(/[^a-z0-9]/gi, '_')}_${i + 1}.${extension}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error('Erro ao baixar imagem:', err);
+      }
+    }
+
+    toast({
+      title: "Download concluído!",
+      description: `${productImages.length} foto(s) baixada(s) com sucesso.`,
+    });
+  };
   return <div className="min-h-screen bg-background">
       {showHeader && <Header />}
       
@@ -276,17 +343,40 @@ const Produto = ({
                   <img src={image} alt={`${product.name} ${index + 1}`} className="w-full h-full object-cover" />
                 </button>)}
             </div>
+            
+            {productImages.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadPhotos}
+                className="w-full sm:w-auto gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Baixar {productImages.length > 1 ? `${productImages.length} Fotos` : 'Foto'}
+              </Button>
+            )}
           </div>
 
           {/* Product Information */}
           <div className="space-y-6">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold mb-2 line-clamp-2 flex items-start gap-3">
-                <span className="line-clamp-2">{product.name}</span>
-                {product.high_rotation && !storeSlug && <span className="text-orange-500 text-2xl flex-shrink-0" title="Produto de Alta Rotatividade - Pode haver atraso no envio devido à alta demanda">
-                    ⚠️
-                  </span>}
-              </h1>
+              <div className="flex items-start justify-between gap-2">
+                <h1 className="text-2xl md:text-3xl font-bold mb-2 line-clamp-2 flex items-start gap-3">
+                  <span className="line-clamp-2">{product.name}</span>
+                  {product.high_rotation && !storeSlug && <span className="text-orange-500 text-2xl flex-shrink-0" title="Produto de Alta Rotatividade - Pode haver atraso no envio devido à alta demanda">
+                      ⚠️
+                    </span>}
+                </h1>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleCopyTitle}
+                  className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-foreground"
+                  title="Copiar título"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
               {product.brand && <p className="text-muted-foreground">Marca: {product.brand}</p>}
             </div>
 
@@ -418,6 +508,19 @@ const Produto = ({
             {/* Description */}
             {product.description && (
               <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium text-sm text-muted-foreground">Descrição</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopyDescription}
+                    className="h-7 px-2 text-muted-foreground hover:text-foreground gap-1"
+                    title="Copiar descrição"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    <span className="text-xs">Copiar</span>
+                  </Button>
+                </div>
                 <div className="text-muted-foreground leading-relaxed prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1">
                   <ReactMarkdown
                     components={{
