@@ -360,7 +360,7 @@ const Produto = ({
           </div>
 
           {/* Product Information */}
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             <div>
               <div className="flex items-start justify-between gap-2">
                 <h1 className="text-2xl md:text-3xl font-bold mb-2 line-clamp-2 flex items-start gap-3">
@@ -405,7 +405,7 @@ const Produto = ({
                 // Show variant-based pricing
                 selectedVariantData ? (
                   <>
-                    <p className="text-4xl font-bold text-primary">
+                    <p className="text-3xl md:text-4xl font-bold text-primary">
                       {formatPrice(effectivePrice)}
                     </p>
                     <p className="text-muted-foreground">
@@ -423,14 +423,14 @@ const Produto = ({
                   <p className="text-lg text-muted-foreground line-through">
                     De: {formatPrice(Number(product.price))}
                   </p>
-                  <p className="text-4xl font-bold text-primary">
+                  <p className="text-3xl md:text-4xl font-bold text-primary">
                     Por: {formatPrice(Number(product.original_price))}
                   </p>
                   <p className="text-muted-foreground">
                     ou 12x de {formatPrice(Number(product.original_price) / 12)} sem juros
                   </p>
                 </> : <>
-                  <p className="text-4xl font-bold text-primary">
+                  <p className="text-3xl md:text-4xl font-bold text-primary">
                     {formatPrice(Number(product.price))}
                   </p>
                   <p className="text-muted-foreground">
@@ -562,46 +562,53 @@ const Produto = ({
             )}
 
             {/* Quantity and Actions */}
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-                <label className="font-medium">Quantidade:</label>
-                <div className="flex items-center border rounded-lg w-fit">
-                  <Button size="sm" variant="ghost" onClick={() => setQuantity(Math.max(1, quantity - 1))} disabled={quantity <= 1} className="h-10 w-10">
+            <div className="space-y-3 md:space-y-4">
+              <div className="flex items-center gap-3">
+                <label className="font-medium text-sm md:text-base">Quantidade:</label>
+                <div className="flex items-center border rounded-lg">
+                  <Button size="sm" variant="ghost" onClick={() => setQuantity(Math.max(1, quantity - 1))} disabled={quantity <= 1} className="h-9 w-9 md:h-10 md:w-10">
                     <Minus className="h-4 w-4" />
                   </Button>
-                  <span className="px-4 py-2 min-w-[60px] text-center text-lg">{quantity}</span>
-                  <Button size="sm" variant="ghost" onClick={() => setQuantity(quantity + 1)} className="h-10 w-10">
+                  <span className="px-3 py-2 min-w-[50px] md:min-w-[60px] text-center text-base md:text-lg">{quantity}</span>
+                  <Button size="sm" variant="ghost" onClick={() => setQuantity(quantity + 1)} className="h-9 w-9 md:h-10 md:w-10">
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="space-y-2 md:space-y-0 md:flex md:flex-row md:gap-3">
                 <Button 
                   size="lg" 
                   variant="outline" 
                   onClick={handleAddToCart} 
                   disabled={(product.stock_quantity || 0) <= 0 || (variants.length > 0 && !selectedVariant)} 
-                  className="flex-1 h-12"
+                  className="w-full md:flex-1 h-11 md:h-12"
                 >
                   <span className="text-xl">🛒</span>
-                  <span className="hidden sm:inline ml-2">Adicionar ao Carrinho</span>
+                  <span className="hidden md:inline ml-2">Adicionar ao Carrinho</span>
                 </Button>
-                <Button size="lg" variant="outline" onClick={handleAddToWishlist} className={`h-12 w-12 sm:w-auto ${isFavorite(product.id) ? "text-destructive border-destructive" : ""}`}>
-                  <span className="text-xl">{isFavorite(product.id) ? '❤️' : '🤍'}</span>
-                  <span className="hidden sm:inline ml-2">Favoritos</span>
-                </Button>
-                <Button size="lg" variant="outline" className="h-12 w-12 sm:w-auto">
-                  <Share2 className="h-5 w-5" />
-                  <span className="hidden sm:inline ml-2">Compartilhar</span>
-                </Button>
+                <div className="flex gap-2 md:contents">
+                  <Button 
+                    size="lg" 
+                    variant="outline" 
+                    onClick={handleAddToWishlist} 
+                    className={`flex-1 md:flex-none h-10 md:h-12 md:w-auto ${isFavorite(product.id) ? "text-destructive border-destructive" : ""}`}
+                  >
+                    <span className="text-lg md:text-xl">{isFavorite(product.id) ? '❤️' : '🤍'}</span>
+                    <span className="hidden md:inline ml-2">Favoritos</span>
+                  </Button>
+                  <Button size="lg" variant="outline" className="flex-1 md:flex-none h-10 md:h-12 md:w-auto">
+                    <Share2 className="h-4 w-4 md:h-5 md:w-5" />
+                    <span className="hidden md:inline ml-2">Compartilhar</span>
+                  </Button>
+                </div>
               </div>
 
               <Button 
                 size="lg" 
                 onClick={handleBuyNow} 
                 disabled={(product.stock_quantity || 0) <= 0 || (variants.length > 0 && !selectedVariant)} 
-                className="w-full btn-buy-now h-12 text-slate-50 text-base bg-[3dba54] bg-[#3fc356]"
+                className="w-full btn-buy-now h-11 md:h-12 text-slate-50 text-base bg-[3dba54] bg-[#3fc356]"
               >
                 <span className="text-base font-semibold">
                   {variants.length > 0 && !selectedVariant ? 'Selecione uma opção' : 'Comprar Agora'}
@@ -623,18 +630,18 @@ const Produto = ({
             </div>
 
             {/* Benefits */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg bg-zinc-200">
-                <span className="text-2xl">🚚💨</span>
-                <p className="text-sm font-medium">Envio em 24hrs</p>
+            <div className="grid grid-cols-3 gap-2 md:gap-3">
+              <div className="flex flex-col items-center justify-center gap-1 md:gap-2 p-2 md:p-4 rounded-lg bg-zinc-200">
+                <span className="text-xl md:text-2xl">🚚💨</span>
+                <p className="text-xs md:text-sm font-medium text-center">Envio 24h</p>
               </div>
-              <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg bg-zinc-200">
-                <span className="text-2xl">🛡️</span>
-                <p className="text-sm font-medium">Garantia</p>
+              <div className="flex flex-col items-center justify-center gap-1 md:gap-2 p-2 md:p-4 rounded-lg bg-zinc-200">
+                <span className="text-xl md:text-2xl">🛡️</span>
+                <p className="text-xs md:text-sm font-medium text-center">Garantia</p>
               </div>
-              <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg bg-zinc-200">
-                <span className="text-2xl">🔄</span>
-                <p className="text-sm font-medium">Troca Fácil</p>
+              <div className="flex flex-col items-center justify-center gap-1 md:gap-2 p-2 md:p-4 rounded-lg bg-zinc-200">
+                <span className="text-xl md:text-2xl">🔄</span>
+                <p className="text-xs md:text-sm font-medium text-center">Troca Fácil</p>
               </div>
             </div>
           </div>
