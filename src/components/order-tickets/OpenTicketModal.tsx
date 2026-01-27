@@ -21,6 +21,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import { useOrderTickets } from '@/hooks/useOrderTickets';
 import { getAvailableTicketTypes, TICKET_TYPE_LABELS, OrderTicketType } from '@/types/orderTickets';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { TicketAttachmentUpload, TicketAttachment } from './TicketAttachmentUpload';
 
 interface OpenTicketModalProps {
   open: boolean;
@@ -28,13 +29,14 @@ interface OpenTicketModalProps {
   orderId: string;
   orderStatus: string;
   paymentStatus: string;
+  deliveredAt?: string | null;
 }
 
 const MIN_REASON_LENGTH = 20;
 
 const typeDescriptions: Record<OrderTicketType, string> = {
   reembolso: 'Solicite a devolução do valor pago pelo pedido.',
-  troca: 'Solicite a substituição de um produto por outro.',
+  troca: 'Solicite a substituição de um produto por outro. Disponível até 7 dias após a entrega.',
   cancelamento: 'Cancele o pedido antes do envio.',
 };
 
@@ -44,19 +46,23 @@ export const OpenTicketModal = ({
   orderId,
   orderStatus,
   paymentStatus,
+  deliveredAt,
 }: OpenTicketModalProps) => {
   const [tipo, setTipo] = useState<OrderTicketType | ''>('');
   const [reason, setReason] = useState('');
+  const [attachments, setAttachments] = useState<TicketAttachment[]>([]);
   
   const { createTicket, isCreating } = useOrderTickets();
 
   const availableTypes = useMemo(
-    () => getAvailableTicketTypes(orderStatus, paymentStatus),
-    [orderStatus, paymentStatus]
+    () => getAvailableTicketTypes(orderStatus, paymentStatus, deliveredAt),
+    [orderStatus, paymentStatus, deliveredAt]
   );
 
   const isValidReason = reason.trim().length >= MIN_REASON_LENGTH;
-  const canSubmit = tipo && isValidReason && !isCreating;
+  const requiresAttachment = tipo === 'troca';
+  const hasAttachments = attachments.length > 0;
+  const canSubmit = tipo && isValidReason && !isCreating && (!requiresAttachment || hasAttachments);
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -66,12 +72,14 @@ export const OpenTicketModal = ({
         order_id: orderId,
         tipo: tipo as OrderTicketType,
         reason: reason.trim(),
+        attachments: attachments,
       },
       {
         onSuccess: () => {
           onOpenChange(false);
           setTipo('');
           setReason('');
+          setAttachments([]);
         },
       }
     );
@@ -82,12 +90,13 @@ export const OpenTicketModal = ({
       onOpenChange(false);
       setTipo('');
       setReason('');
+      setAttachments([]);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Abrir Ticket de Suporte</DialogTitle>
           <DialogDescription>
@@ -139,6 +148,19 @@ export const OpenTicketModal = ({
                 </span>
               )}
             </div>
+          </div>
+
+          {/* Attachments */}
+          <div className="space-y-2">
+            <Label>
+              Anexos (Fotos ou PDF) {requiresAttachment && '*'}
+            </Label>
+            <TicketAttachmentUpload
+              attachments={attachments}
+              onAttachmentsChange={setAttachments}
+              required={requiresAttachment}
+              disabled={isCreating}
+            />
           </div>
 
           {/* Info Alert */}
