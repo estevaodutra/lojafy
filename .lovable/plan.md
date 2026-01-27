@@ -1,173 +1,50 @@
 
-# Adicionar Botão "Abrir Ticket" nos Detalhes do Pedido
 
-## Objetivo
+# Corrigir Card de Suporte Vazio
 
-Integrar o componente `OpenTicketButton` dentro do modal `OrderDetailsModal.tsx`, permitindo que clientes abram tickets de suporte (reembolso, troca, cancelamento) diretamente da visualização de detalhes do pedido.
+## Problema Identificado
+
+O card "Precisa de Ajuda com Este Pedido?" está sendo exibido para todos os clientes, mas o botão "Abrir Ticket" dentro dele só aparece quando existem tipos de ticket disponíveis para o status atual do pedido. Isso resulta em um card vazio como mostrado na imagem.
 
 ---
 
-## Análise do Contexto
+## Solução
 
-### Componentes Envolvidos
-
-| Componente | Função |
-|------------|--------|
-| `OrderDetailsModal.tsx` | Modal que exibe detalhes do pedido |
-| `OpenTicketButton.tsx` | Botão inteligente que verifica elegibilidade e abre modal de ticket |
-| `OpenTicketModal.tsx` | Modal para criação do ticket |
-
-### Dados Disponíveis no OrderDetailsModal
-
-O componente já possui todas as informações necessárias:
-- `order.id` - ID do pedido
-- `order.status` - Status do pedido (pending, processing, shipped, delivered, etc.)
-- `order.payment_status` - Status de pagamento (paid, pending)
-- `profile?.role` - Papel do usuário (customer, admin, etc.)
+Mover a lógica de verificação de elegibilidade para o nível do card, não apenas do botão. O card inteiro só deve aparecer se:
+1. Não for admin (`!isAdmin`)
+2. Existir o pedido (`order`)
+3. **E** houver tipos de ticket disponíveis para este pedido **OU** já existir um ticket aberto
 
 ---
 
 ## Alterações em `src/components/OrderDetailsModal.tsx`
 
-### 1. Adicionar Import
+### 1. Importar a função de validação
 
 ```typescript
-import { OpenTicketButton } from '@/components/order-tickets/OpenTicketButton';
+import { getAvailableTicketTypes } from '@/types/orderTickets';
 ```
 
-### 2. Adicionar Estado para Ticket Existente
+### 2. Adicionar verificação de elegibilidade
 
-Criar lógica para verificar se já existe um ticket aberto para este pedido:
+Antes de renderizar o card, verificar se há tipos disponíveis:
 
 ```typescript
-const [existingTicketId, setExistingTicketId] = useState<string | null>(null);
+// Calcular se há ticket types disponíveis
+const availableTicketTypes = order 
+  ? getAvailableTicketTypes(order.status, order.payment_status) 
+  : [];
 
-// Adicionar ao useEffect existente
-const fetchExistingTicket = async () => {
-  if (!orderId) return;
-  const { data } = await supabase
-    .from('order_tickets')
-    .select('id')
-    .eq('order_id', orderId)
-    .not('status', 'in', '("resolvido","cancelado")')
-    .maybeSingle();
-  setExistingTicketId(data?.id || null);
-};
+const showTicketCard = !isAdmin && order && (
+  existingTicketId || availableTicketTypes.length > 0
+);
 ```
 
-### 3. Posicionamento do Botão
-
-Adicionar o botão em um local proeminente, após o card de "Resumo do Pedido" (para clientes) ou como parte da seção de ações. Melhores opções:
-
-**Opção A - Após o Card de Valor (para clientes)**
-Após a linha 873, dentro da área do resumo simplificado:
+### 3. Condicionar o Card
 
 ```tsx
-{/* Botão de Abrir Ticket - Apenas para Clientes */}
-{!isAdmin && order && (
-  <div className="flex justify-end pt-4">
-    <OpenTicketButton
-      orderId={order.id}
-      orderStatus={order.status}
-      paymentStatus={order.payment_status}
-      existingTicketId={existingTicketId}
-      variant="outline"
-      size="default"
-    />
-  </div>
-)}
-```
-
-**Opção B - Card dedicado para Suporte**
-Criar um card específico para ações de suporte:
-
-```tsx
-{/* Suporte ao Pedido - Apenas para Clientes */}
-{!isAdmin && order && (
-  <Card>
-    <CardHeader className="pb-3">
-      <CardTitle className="text-sm flex items-center gap-2">
-        <MessageSquarePlus className="h-4 w-4" />
-        Precisa de Ajuda?
-      </CardTitle>
-    </CardHeader>
-    <CardContent>
-      <p className="text-sm text-muted-foreground mb-3">
-        Problemas com seu pedido? Abra um ticket para solicitar reembolso, troca ou cancelamento.
-      </p>
-      <OpenTicketButton
-        orderId={order.id}
-        orderStatus={order.status}
-        paymentStatus={order.payment_status}
-        existingTicketId={existingTicketId}
-        variant="default"
-        size="default"
-        className="w-full"
-      />
-    </CardContent>
-  </Card>
-)}
-```
-
----
-
-## Fluxo Visual
-
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│ Detalhes do Pedido #12345                           [X]        │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│ ┌─────────────────────────────────────────────────────────────┐ │
-│ │ Informações do Cliente                                      │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│ ┌─────────────────────────────────────────────────────────────┐ │
-│ │ Produtos                                                    │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│ ┌─────────────────────────────────────────────────────────────┐ │
-│ │ Resumo do Pedido                                            │ │
-│ │                                                             │ │
-│ │ Valor:                                          R$ 99,90    │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│ ┌─────────────────────────────────────────────────────────────┐ │
-│ │ 💬 Precisa de Ajuda?                                        │ │ ← NOVO
-│ │                                                             │ │
-│ │ Problemas com seu pedido? Abra um ticket para solicitar     │ │
-│ │ reembolso, troca ou cancelamento.                           │ │
-│ │                                                             │ │
-│ │               [  📩 Abrir Ticket  ]                         │ │
-│ │                                                             │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-│ ┌─────────────────────────────────────────────────────────────┐ │
-│ │ Endereço de Entrega                                         │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Implementação Detalhada
-
-### Alterações no Arquivo
-
-| Linha | Alteração |
-|-------|-----------|
-| ~9 | Adicionar import do `OpenTicketButton` e `MessageSquarePlus` |
-| ~87 | Adicionar estado `existingTicketId` |
-| ~108 | Adicionar chamada `fetchExistingTicket()` no useEffect |
-| ~160 | Criar função `fetchExistingTicket` |
-| ~873 | Adicionar Card "Precisa de Ajuda?" após o resumo do pedido |
-
-### Código Completo da Seção
-
-```tsx
-{/* Suporte ao Pedido - Apenas para Clientes */}
-{!isAdmin && order && (
+{/* Suporte ao Pedido - Apenas para Clientes com tickets elegíveis */}
+{showTicketCard && (
   <Card className="border-primary/20 bg-primary/5">
     <CardHeader className="pb-3">
       <CardTitle className="text-sm flex items-center gap-2">
@@ -195,28 +72,20 @@ Criar um card específico para ações de suporte:
 
 ---
 
-## Comportamento do Botão
+## Resultado Esperado
 
-| Cenário | Comportamento |
-|---------|---------------|
-| Cliente com pedido elegível | Mostra "Abrir Ticket" |
-| Cliente com ticket já aberto | Mostra "Ver Ticket Aberto" (navega para detalhes) |
-| Cliente com pedido não elegível | Botão não aparece |
-| Admin/Revendedor visualizando | Card inteiro não aparece |
+| Status do Pedido | Payment Status | Comportamento |
+|------------------|----------------|---------------|
+| pending | pending | Card NÃO aparece |
+| confirmed/processing | paid | Card aparece com botão "Abrir Ticket" |
+| shipped/delivered | paid | Card aparece com botão "Abrir Ticket" |
+| Qualquer com ticket aberto | - | Card aparece com botão "Ver Ticket Aberto" |
 
 ---
 
 ## Resumo das Alterações
 
-| Arquivo | Tipo | Descrição |
-|---------|------|-----------|
-| `src/components/OrderDetailsModal.tsx` | Modificar | Adicionar import, estado, fetch e card do ticket |
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/components/OrderDetailsModal.tsx` | Adicionar import de `getAvailableTicketTypes` e condicionar exibição do card |
 
----
-
-## Benefícios
-
-- Acesso direto à abertura de ticket a partir dos detalhes do pedido
-- Experiência fluida sem navegação adicional
-- Visual destacado para chamar atenção do cliente
-- Lógica inteligente que mostra opções apenas quando relevantes
