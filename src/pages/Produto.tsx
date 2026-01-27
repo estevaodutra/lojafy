@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ImageZoomModal } from "@/components/ImageZoomModal";
 import { ChevronRight, Star, Heart, ShoppingCart, Truck, Shield, RotateCcw, Plus, Minus, Share2, ZoomIn, Package, Info, ExternalLink, Copy, Download } from "lucide-react";
 import { useFavorites } from "@/contexts/FavoritesContext";
+import { useUserRole } from "@/hooks/useUserRole";
 import { useCart } from "@/contexts/CartContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -44,6 +45,7 @@ const Produto = ({
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState("");
+  const { isReseller } = useUserRole();
 
   // Fetch product from Supabase
   const {
@@ -344,7 +346,7 @@ const Produto = ({
                 </button>)}
             </div>
             
-            {productImages.length > 0 && (
+            {productImages.length > 0 && isReseller() && (
               <Button
                 variant="outline"
                 size="sm"
@@ -367,15 +369,17 @@ const Produto = ({
                       ⚠️
                     </span>}
                 </h1>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleCopyTitle}
-                  className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-foreground"
-                  title="Copiar título"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
+                {isReseller() && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleCopyTitle}
+                    className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-foreground"
+                    title="Copiar título"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
               {product.brand && <p className="text-muted-foreground">Marca: {product.brand}</p>}
             </div>
@@ -510,16 +514,18 @@ const Produto = ({
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-medium text-sm text-muted-foreground">Descrição</h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCopyDescription}
-                    className="h-7 px-2 text-muted-foreground hover:text-foreground gap-1"
-                    title="Copiar descrição"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    <span className="text-xs">Copiar</span>
-                  </Button>
+                  {isReseller() && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleCopyDescription}
+                      className="h-7 px-2 text-muted-foreground hover:text-foreground gap-1"
+                      title="Copiar descrição"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      <span className="text-xs">Copiar</span>
+                    </Button>
+                  )}
                 </div>
                 <div className="text-muted-foreground leading-relaxed prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1">
                   <ReactMarkdown
