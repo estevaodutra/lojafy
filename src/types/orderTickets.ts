@@ -99,7 +99,11 @@ export const SLA_CONFIG: Record<OrderTicketType, { firstResponse: number; resolu
 };
 
 // Get available ticket types based on order status
-export const getAvailableTicketTypes = (orderStatus: string, paymentStatus: string): OrderTicketType[] => {
+export const getAvailableTicketTypes = (
+  orderStatus: string, 
+  paymentStatus: string,
+  deliveredAt?: string | null
+): OrderTicketType[] => {
   const types: OrderTicketType[] = [];
   
   // Reembolso: available after payment confirmed
@@ -107,9 +111,15 @@ export const getAvailableTicketTypes = (orderStatus: string, paymentStatus: stri
     types.push('reembolso');
   }
   
-  // Troca: only for shipped or delivered orders
-  if (['shipped', 'delivered'].includes(orderStatus)) {
-    types.push('troca');
+  // Troca: apenas para pedidos entregues, DENTRO de 7 dias após a entrega
+  if (orderStatus === 'delivered' && deliveredAt) {
+    const deliveryDate = new Date(deliveredAt);
+    const now = new Date();
+    const daysSinceDelivery = Math.floor((now.getTime() - deliveryDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysSinceDelivery <= 7) {
+      types.push('troca');
+    }
   }
   
   // Cancelamento: before shipping

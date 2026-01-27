@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MessageSquarePlus, ExternalLink } from 'lucide-react';
 import { OpenTicketModal } from './OpenTicketModal';
-import { useOrderTickets } from '@/hooks/useOrderTickets';
 import { getAvailableTicketTypes } from '@/types/orderTickets';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,6 +10,7 @@ interface OpenTicketButtonProps {
   orderId: string;
   orderStatus: string;
   paymentStatus: string;
+  deliveredAt?: string | null;
   existingTicketId?: string | null;
   variant?: 'default' | 'outline' | 'ghost' | 'link';
   size?: 'default' | 'sm' | 'lg' | 'icon';
@@ -21,6 +21,7 @@ export const OpenTicketButton = ({
   orderId,
   orderStatus,
   paymentStatus,
+  deliveredAt,
   existingTicketId,
   variant = 'outline',
   size = 'sm',
@@ -51,7 +52,7 @@ export const OpenTicketButton = ({
   }
 
   // Check if any ticket types are available
-  const availableTypes = getAvailableTicketTypes(orderStatus, paymentStatus);
+  const availableTypes = getAvailableTicketTypes(orderStatus, paymentStatus, deliveredAt);
   
   if (availableTypes.length === 0) {
     return null;
@@ -75,6 +76,7 @@ export const OpenTicketButton = ({
         orderId={orderId}
         orderStatus={orderStatus}
         paymentStatus={paymentStatus}
+        deliveredAt={deliveredAt}
       />
     </>
   );

@@ -95,6 +95,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const [isRefundUploading, setIsRefundUploading] = useState(false);
   const [currentProductCosts, setCurrentProductCosts] = useState<Record<string, number>>({});
   const [existingTicketId, setExistingTicketId] = useState<string | null>(null);
+  const [deliveredAt, setDeliveredAt] = useState<string | null>(null);
   const {
     toast
   } = useToast();
@@ -109,8 +110,10 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       fetchShippingFiles();
       fetchRefundDocuments();
       fetchExistingTicket();
+      fetchDeliveredAt();
     } else {
       setExistingTicketId(null);
+      setDeliveredAt(null);
     }
   }, [orderId, isOpen]);
 
@@ -126,6 +129,23 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       setExistingTicketId(data?.id || null);
     } catch (error) {
       console.error('Erro ao buscar ticket existente:', error);
+    }
+  };
+
+  const fetchDeliveredAt = async () => {
+    if (!orderId) return;
+    try {
+      const { data } = await supabase
+        .from('order_status_history')
+        .select('created_at')
+        .eq('order_id', orderId)
+        .eq('status', 'delivered')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setDeliveredAt(data?.created_at || null);
+    } catch (error) {
+      console.error('Erro ao buscar data de entrega:', error);
     }
   };
   const fetchOrderDetails = async () => {
@@ -895,7 +915,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
             {/* Suporte ao Pedido - Apenas para Clientes com tickets elegíveis */}
             {(() => {
-              const availableTicketTypes = getAvailableTicketTypes(order.status, order.payment_status);
+              const availableTicketTypes = getAvailableTicketTypes(order.status, order.payment_status, deliveredAt);
               const showTicketCard = !isAdmin && (existingTicketId || availableTicketTypes.length > 0);
               
               return showTicketCard ? (
@@ -914,6 +934,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                       orderId={order.id}
                       orderStatus={order.status}
                       paymentStatus={order.payment_status}
+                      deliveredAt={deliveredAt}
                       existingTicketId={existingTicketId}
                       variant="default"
                       size="default"

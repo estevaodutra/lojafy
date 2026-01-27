@@ -2,8 +2,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
-import type { OrderTicket, OrderTicketStatus, OrderTicketType, TicketFilters, CreateTicketData } from '@/types/orderTickets';
+import type { OrderTicket, OrderTicketStatus, OrderTicketType, TicketFilters } from '@/types/orderTickets';
+import type { TicketAttachment } from '@/components/order-tickets/TicketAttachmentUpload';
 
+interface CreateTicketDataWithAttachments {
+  order_id: string;
+  tipo: OrderTicketType;
+  reason: string;
+  attachments?: TicketAttachment[];
+}
 export const useOrderTickets = (filters?: TicketFilters) => {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
@@ -72,7 +79,7 @@ export const useOrderTickets = (filters?: TicketFilters) => {
 
   // Create new ticket
   const createTicketMutation = useMutation({
-    mutationFn: async (data: CreateTicketData) => {
+    mutationFn: async (data: CreateTicketDataWithAttachments) => {
       if (!user) throw new Error('User not authenticated');
 
       // Calculate SLA deadlines
@@ -136,6 +143,20 @@ export const useOrderTickets = (filters?: TicketFilters) => {
         author_type: 'cliente' as const,
         message: data.reason,
       });
+
+      // Save attachments if provided
+      if (data.attachments && data.attachments.length > 0) {
+        const attachmentRecords = data.attachments.map(att => ({
+          ticket_id: ticket.id,
+          message_id: null,
+          file_url: att.url,
+          file_name: att.name,
+          file_type: att.type,
+          file_size: att.size,
+        }));
+        
+        await supabase.from('order_ticket_attachments').insert(attachmentRecords);
+      }
 
       return ticket;
     },
