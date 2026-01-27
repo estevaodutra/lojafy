@@ -1,36 +1,23 @@
 
 
-# Adicionar Botões de Download e Cópia na Página de Produto
+# Restringir Botões de Download e Cópia para Revendedores
 
 ## Resumo
 
-Implementar três novos botões na página de produto:
-1. **Botão para baixar todas as fotos** - download em ZIP ou individual
-2. **Botão discreto para copiar a descrição** - ao lado do texto da descrição
-3. **Botão discreto para copiar o título** - ao lado do título do produto
+Atualmente, os botões de baixar fotos, copiar título e copiar descrição estão visíveis para todos os usuários. A alteração irá **ocultar esses botões** para usuários que não sejam revendedores (`reseller`).
 
 ---
 
-## Localização dos Novos Elementos
+## Lógica de Restrição
 
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│  📷 IMAGENS                │  INFORMAÇÕES DO PRODUTO               │
-│  ┌────────────────────┐   │                                        │
-│  │                    │   │  Nome do Produto Aqui        [📋]     │ ← Copiar título
-│  │    Imagem Principal│   │  Marca: XYZ                            │
-│  │                    │   │                                        │
-│  │         [🔍]       │   │  ⭐⭐⭐⭐⭐ 4.5 (10 avaliações)         │
-│  └────────────────────┘   │                                        │
-│                            │  R$ 199,90                             │
-│  [📸] [📸] [📸] [📸]      │                                        │
-│                            │  📦 SKU: PROD-001                      │
-│  [📥 Baixar Fotos]         │                                        │ ← Novo botão
-│                            │  Descrição:                   [📋]    │ ← Copiar descrição
-│                            │  Lorem ipsum dolor sit amet...         │
-│                            │                                        │
-└─────────────────────────────────────────────────────────────────────┘
-```
+| Usuário | Botão Baixar Fotos | Botão Copiar Título | Botão Copiar Descrição |
+|---------|-------------------|---------------------|------------------------|
+| Revendedor (`reseller`) | Visível | Visível | Visível |
+| Super Admin | Oculto | Oculto | Oculto |
+| Admin | Oculto | Oculto | Oculto |
+| Fornecedor (`supplier`) | Oculto | Oculto | Oculto |
+| Cliente (`customer`) | Oculto | Oculto | Oculto |
+| Visitante (não logado) | Oculto | Oculto | Oculto |
 
 ---
 
@@ -38,105 +25,38 @@ Implementar três novos botões na página de produto:
 
 ### Arquivo: `src/pages/Produto.tsx`
 
-#### 1. Adicionar Import do Ícone `Copy` e `Download`
+#### 1. Importar o Hook de Role
+
+Adicionar import do hook `useUserRole`:
 
 ```typescript
-// Linha 13 - adicionar Copy e Download aos imports
-import { 
-  ChevronRight, Star, Heart, ShoppingCart, Truck, Shield, 
-  RotateCcw, Plus, Minus, Share2, ZoomIn, Package, Info, 
-  ExternalLink, Copy, Download  // ← Adicionar estes
-} from "lucide-react";
+import { useUserRole } from "@/hooks/useUserRole";
 ```
 
-#### 2. Criar Funções de Cópia e Download
+#### 2. Usar o Hook no Componente
 
-Adicionar após a função `handleBuyNow` (linha ~241):
+Dentro do componente `Produto`, adicionar:
 
 ```typescript
-// Copiar título para clipboard
-const handleCopyTitle = async () => {
-  try {
-    await navigator.clipboard.writeText(product.name);
-    toast({
-      title: "Título copiado!",
-      description: "O nome do produto foi copiado para a área de transferência.",
-    });
-  } catch (err) {
-    toast({
-      title: "Erro ao copiar",
-      description: "Não foi possível copiar o título.",
-      variant: "destructive",
-    });
-  }
-};
-
-// Copiar descrição para clipboard
-const handleCopyDescription = async () => {
-  if (!product.description) return;
-  try {
-    await navigator.clipboard.writeText(product.description);
-    toast({
-      title: "Descrição copiada!",
-      description: "A descrição do produto foi copiada para a área de transferência.",
-    });
-  } catch (err) {
-    toast({
-      title: "Erro ao copiar",
-      description: "Não foi possível copiar a descrição.",
-      variant: "destructive",
-    });
-  }
-};
-
-// Baixar todas as fotos do produto
-const handleDownloadPhotos = async () => {
-  toast({
-    title: "Baixando fotos...",
-    description: `Preparando ${productImages.length} imagem(ns) para download.`,
-  });
-
-  for (let i = 0; i < productImages.length; i++) {
-    const imageUrl = productImages[i];
-    try {
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      const extension = imageUrl.split('.').pop()?.split('?')[0] || 'jpg';
-      link.download = `${product.name.replace(/[^a-z0-9]/gi, '_')}_${i + 1}.${extension}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Erro ao baixar imagem:', err);
-    }
-  }
-
-  toast({
-    title: "Download concluído!",
-    description: `${productImages.length} foto(s) baixada(s) com sucesso.`,
-  });
-};
+const { isReseller } = useUserRole();
 ```
 
-#### 3. Adicionar Botão de Copiar ao Título (Linha ~284)
+#### 3. Condicionar Botão de Copiar Título (Linha ~370-378)
 
 ```typescript
-// ANTES (linha 284-289):
-<h1 className="text-2xl md:text-3xl font-bold mb-2 line-clamp-2 flex items-start gap-3">
-  <span className="line-clamp-2">{product.name}</span>
-  {product.high_rotation && !storeSlug && <span ...>⚠️</span>}
-</h1>
+// ANTES:
+<Button
+  variant="ghost"
+  size="icon"
+  onClick={handleCopyTitle}
+  className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-foreground"
+  title="Copiar título"
+>
+  <Copy className="h-4 w-4" />
+</Button>
 
 // DEPOIS:
-<div className="flex items-start justify-between gap-2">
-  <h1 className="text-2xl md:text-3xl font-bold mb-2 line-clamp-2 flex items-start gap-3">
-    <span className="line-clamp-2">{product.name}</span>
-    {product.high_rotation && !storeSlug && <span ...>⚠️</span>}
-  </h1>
+{isReseller() && (
   <Button
     variant="ghost"
     size="icon"
@@ -146,115 +66,89 @@ const handleDownloadPhotos = async () => {
   >
     <Copy className="h-4 w-4" />
   </Button>
-</div>
+)}
 ```
 
-#### 4. Adicionar Botão de Copiar à Descrição (Linha ~418-452)
+#### 4. Condicionar Botão de Baixar Fotos (Linha ~347-357)
 
 ```typescript
 // ANTES:
-{product.description && (
-  <div>
-    <div className="text-muted-foreground ...">
-      <ReactMarkdown ...>
-        {product.description}
-      </ReactMarkdown>
-    </div>
-  </div>
-)}
-
-// DEPOIS:
-{product.description && (
-  <div>
-    <div className="flex items-center justify-between mb-2">
-      <h3 className="font-medium text-sm text-muted-foreground">Descrição</h3>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={handleCopyDescription}
-        className="h-7 px-2 text-muted-foreground hover:text-foreground gap-1"
-        title="Copiar descrição"
-      >
-        <Copy className="h-3.5 w-3.5" />
-        <span className="text-xs">Copiar</span>
-      </Button>
-    </div>
-    <div className="text-muted-foreground ...">
-      <ReactMarkdown ...>
-        {product.description}
-      </ReactMarkdown>
-    </div>
-  </div>
-)}
-```
-
-#### 5. Adicionar Botão de Download de Fotos (Após thumbnails, linha ~278)
-
-```typescript
-// ANTES (linha 274-278):
-<div className="flex gap-2 overflow-x-auto pb-2">
-  {productImages.map((image, index) => ...)}
-</div>
-
-// DEPOIS:
-<div className="flex gap-2 overflow-x-auto pb-2">
-  {productImages.map((image, index) => ...)}
-</div>
-
 {productImages.length > 0 && (
-  <Button
-    variant="outline"
-    size="sm"
-    onClick={handleDownloadPhotos}
-    className="w-full sm:w-auto gap-2"
-  >
+  <Button ...>
+    <Download className="h-4 w-4" />
+    Baixar {productImages.length > 1 ? `${productImages.length} Fotos` : 'Foto'}
+  </Button>
+)}
+
+// DEPOIS:
+{productImages.length > 0 && isReseller() && (
+  <Button ...>
     <Download className="h-4 w-4" />
     Baixar {productImages.length > 1 ? `${productImages.length} Fotos` : 'Foto'}
   </Button>
 )}
 ```
 
+#### 5. Condicionar Botão de Copiar Descrição (Linha ~513-523)
+
+```typescript
+// ANTES:
+<div className="flex items-center justify-between mb-2">
+  <h3 className="font-medium text-sm text-muted-foreground">Descrição</h3>
+  <Button
+    variant="ghost"
+    size="sm"
+    onClick={handleCopyDescription}
+    ...
+  >
+    <Copy className="h-3.5 w-3.5" />
+    <span className="text-xs">Copiar</span>
+  </Button>
+</div>
+
+// DEPOIS:
+<div className="flex items-center justify-between mb-2">
+  <h3 className="font-medium text-sm text-muted-foreground">Descrição</h3>
+  {isReseller() && (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleCopyDescription}
+      ...
+    >
+      <Copy className="h-3.5 w-3.5" />
+      <span className="text-xs">Copiar</span>
+    </Button>
+  )}
+</div>
+```
+
 ---
 
-## Resultado Visual Esperado
+## Resultado Esperado
 
-| Elemento | Localização | Aparência |
-|----------|-------------|-----------|
-| 📋 Copiar título | Ao lado direito do nome do produto | Ícone pequeno e discreto |
-| 📋 Copiar descrição | No cabeçalho da seção de descrição | Link "Copiar" com ícone pequeno |
-| 📥 Baixar Fotos | Abaixo das miniaturas | Botão outline com texto |
-
----
-
-## Comportamento
-
-| Ação | Resultado | Feedback |
-|------|-----------|----------|
-| Clique em "Copiar título" | Copia nome do produto para clipboard | Toast: "Título copiado!" |
-| Clique em "Copiar descrição" | Copia descrição (markdown puro) para clipboard | Toast: "Descrição copiada!" |
-| Clique em "Baixar Fotos" | Inicia download de todas as imagens | Toast durante e após o download |
+| Cenário | Comportamento |
+|---------|--------------|
+| Revendedor visualizando produto | Vê todos os 3 botões (baixar fotos, copiar título, copiar descrição) |
+| Cliente visualizando produto | Não vê nenhum dos botões de download/cópia |
+| Visitante (não logado) | Não vê nenhum dos botões de download/cópia |
+| Admin/Super Admin | Não vê os botões (funcionalidade específica para revendedores) |
 
 ---
 
 ## Seção Técnica
 
-### Download de Múltiplas Imagens
+### Hook Utilizado
 
-Como navegadores não permitem múltiplos downloads simultâneos facilmente, as imagens serão baixadas sequencialmente. Cada arquivo será nomeado usando o padrão:
+O hook `useUserRole` já existe no projeto (`src/hooks/useUserRole.ts`) e fornece a função `isReseller()` que retorna `true` apenas quando o usuário logado tem role = `'reseller'`.
 
-```
-NomeDoProduto_1.jpg
-NomeDoProduto_2.png
-...
-```
+### Segurança
 
-### Clipboard API
+Esta é uma validação de UI apenas. As funções de cópia e download continuam existindo no código, mas os botões não são renderizados para usuários não-revendedores. Como são operações client-side (copiar para clipboard e baixar imagens públicas), não há risco de segurança adicional.
 
-Usamos `navigator.clipboard.writeText()` que é suportado em todos os navegadores modernos. Em caso de erro (ex: navegador antigo ou falta de permissão), exibimos uma mensagem de erro.
+### Arquivo a Modificar
 
-### Arquivos a Modificar
-
-| Arquivo | Alteração |
+| Arquivo | Alterações |
 |---------|-----------|
-| `src/pages/Produto.tsx` | Adicionar imports, funções e botões |
+| `src/pages/Produto.tsx` | Adicionar import do hook e condicionar renderização dos 3 botões |
 
