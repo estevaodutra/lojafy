@@ -200,6 +200,8 @@ const App = () => {
               {/* Customer Panel Routes */}
               <Route path="/minha-conta" element={<CustomerLayout />}>
                 <Route index element={<CustomerDashboard />} />
+                <Route path="meus-acessos" element={<ResellerMeusAcessos />} />
+                <Route path="meus-acessos/top-produtos" element={<ResellerTopProdutosVencedores />} />
                 <Route path="pedidos" element={<CustomerOrders />} />
                 <Route path="tickets" element={<CustomerTickets />} />
                 <Route path="tickets/:ticketId" element={<CustomerTicketDetails />} />
