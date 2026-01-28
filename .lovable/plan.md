@@ -1,17 +1,35 @@
 
-# Implementação Completa: Sistema de Permissões Role + Features
 
-## Resumo da Implementação
+# Implementação Completa do Sistema de Roles e Features
 
-Este plano detalha todas as fases necessárias para implementar o novo sistema de permissões que separa **Role** (identidade) de **Features** (capacidades), permitindo gestão flexível pelo SuperAdmin.
+## Resumo
+
+Implementar o sistema completo de permissões que separa **Role** (identidade) de **Features** (capacidades), permitindo gestão flexível pelo SuperAdmin.
+
+---
+
+## Estado Atual
+
+| Item | Status |
+|------|--------|
+| Tabelas no banco (features, user_features, feature_transactions) | Não existe |
+| Edge Functions (atribuir-feature, revogar-feature) | Não existe |
+| Hooks (useFeature, useUserFeatures, useFeatures) | Não existe |
+| Componentes (FeatureGate, FeatureCard, UserFeaturesSection) | Não existe |
+| Página Features.tsx | Não existe |
+| Menu "Features" no SuperAdminLayout | Não existe |
+| Rota /super-admin/features no App.tsx | Não existe |
+| Seção Features no UserDetailsModal | Não existe |
 
 ---
 
 ## Fase 1: Migração do Banco de Dados
 
-### 1.1 Novas Tabelas
+Criar as tabelas, funções SQL, RLS e dados iniciais.
 
-**Tabela `features`** - Catálogo de features disponíveis:
+### Tabelas a Criar
+
+**1. `features`** - Catálogo de features
 - `slug` (identificador único)
 - `nome`, `descricao`, `icone`
 - `categoria`, `ordem_exibicao`
@@ -21,26 +39,26 @@ Este plano detalha todas as fases necessárias para implementar o novo sistema d
 - `roles_permitidas` (array)
 - `requer_features` (dependências)
 
-**Tabela `user_features`** - Relacionamento usuário-feature:
+**2. `user_features`** - Features atribuídas aos usuários
 - `user_id`, `feature_id`
 - `status` (ativo, trial, expirado, cancelado, revogado)
 - `tipo_periodo` (mensal, anual, vitalicio, trial, cortesia)
 - `data_inicio`, `data_expiracao`
 - `atribuido_por`, `motivo`
 
-**Tabela `feature_transactions`** - Histórico de ações:
+**3. `feature_transactions`** - Histórico de ações
 - `user_id`, `feature_id`
 - `tipo` (atribuicao, revogacao, renovacao, expiracao)
 - `executado_por`, `motivo`
 - `metadata`
 
-### 1.2 Funções SQL
+### Funções SQL
 
 ```sql
 -- Verificar se usuário tem feature
 user_has_feature(_user_id, _feature_slug) → BOOLEAN
 
--- Listar features do usuário
+-- Listar features ativas do usuário
 get_user_features(_user_id) → TABLE
 
 -- Verificar com bypass para superadmin
@@ -50,12 +68,7 @@ user_has_feature_or_superadmin(_user_id, _feature_slug) → BOOLEAN
 get_feature_user_count(_feature_id) → INTEGER
 ```
 
-### 1.3 RLS Policies
-- Superadmin: gerencia tudo
-- Admins: visualizam features
-- Usuários: veem apenas suas próprias features
-
-### 1.4 Seed Data (12 features iniciais)
+### Seed Data (12 features iniciais)
 
 | Categoria | Features |
 |-----------|----------|
@@ -66,43 +79,43 @@ get_feature_user_count(_feature_id) → INTEGER
 | Suporte | suporte_prioritario |
 | Academy | academy_acesso, academy_certificado |
 
+### Alteração na tabela `profiles`
+
+Adicionar campos de origem:
+- `origem_tipo` (lojafy, loja, importado, convite)
+- `origem_loja_id` (UUID da loja de origem)
+- `origem_metadata` (JSONB com dados adicionais)
+
 ---
 
 ## Fase 2: Edge Functions
 
 ### 2.1 `atribuir-feature`
-Permite ao SuperAdmin atribuir uma feature a um usuário.
-
-**Arquivo:** `supabase/functions/atribuir-feature/index.ts`
 
 ```typescript
 // POST { user_id, feature_slug, tipo_periodo, motivo? }
-// Valida dependências
-// Calcula data_expiracao baseado em tipo_periodo
-// Insere em user_features com upsert
-// Registra em feature_transactions
-// Retorna { success: true, userFeature }
+// 1. Verificar se chamador é super_admin
+// 2. Buscar feature pelo slug
+// 3. Verificar dependências (requer_features)
+// 4. Calcular data_expiracao baseado em tipo_periodo
+// 5. Upsert em user_features
+// 6. Registrar em feature_transactions
 ```
 
 ### 2.2 `revogar-feature`
-Permite ao SuperAdmin revogar uma feature de um usuário.
-
-**Arquivo:** `supabase/functions/revogar-feature/index.ts`
 
 ```typescript
 // POST { user_id, feature_slug, motivo? }
-// Atualiza status para 'revogado'
-// Registra em feature_transactions
-// Retorna { success: true }
+// 1. Verificar se chamador é super_admin
+// 2. Atualizar status para 'revogado'
+// 3. Registrar em feature_transactions
 ```
 
 ---
 
 ## Fase 3: Hooks Frontend
 
-### 3.1 `useFeature` - Verificar feature única
-
-**Arquivo:** `src/hooks/useFeature.ts`
+### 3.1 `useFeature.ts` - Verificar feature única
 
 ```typescript
 export const useFeature = (featureSlug: string) => {
@@ -111,101 +124,70 @@ export const useFeature = (featureSlug: string) => {
   
   const { data, isLoading } = useQuery({
     queryKey: ['user-feature', user?.id, featureSlug],
-    queryFn: async () => {
-      if (isSuperAdmin) return { tem_acesso: true };
-      const { data } = await supabase.rpc('user_has_feature', {...});
-      return { tem_acesso: data };
-    },
-    enabled: !!user?.id
+    queryFn: () => supabase.rpc('user_has_feature', {...}),
+    enabled: !!user?.id && !isSuperAdmin
   });
   
   return {
-    hasFeature: isSuperAdmin || data?.tem_acesso || false,
+    hasFeature: isSuperAdmin || data || false,
     isLoading
   };
 };
 ```
 
-### 3.2 `useUserFeatures` - Listar todas features
-
-**Arquivo:** `src/hooks/useUserFeatures.ts`
+### 3.2 `useUserFeatures.ts` - Listar todas features
 
 ```typescript
-export const useUserFeatures = () => {
-  const { user } = useAuth();
-  
+export const useUserFeatures = (userId?: string) => {
   const { data: features, isLoading } = useQuery({
-    queryKey: ['user-features', user?.id],
-    queryFn: () => supabase.rpc('get_user_features', {...}),
-    enabled: !!user?.id
+    queryKey: ['user-features', userId],
+    queryFn: () => supabase.rpc('get_user_features', {...})
   });
   
-  const hasFeature = (slug: string) => 
-    features?.some(f => f.feature_slug === slug) || false;
-  
-  return { features, hasFeature, isLoading };
+  return { features, hasFeature: (slug) => ..., isLoading };
 };
 ```
 
-### 3.3 `useFeatures` - Gerenciamento (SuperAdmin)
-
-**Arquivo:** `src/hooks/useFeatures.ts`
+### 3.3 `useFeatures.ts` - Gerenciamento (Admin)
 
 ```typescript
-// Query para listar todas features
-// Mutation para criar/editar feature
-// Mutation para toggle ativo
-// Query para métricas
+export const useFeatures = () => {
+  // Query todas features
+  // Mutation criar/editar
+  // Mutation toggle ativo
+  // Query métricas
+};
 ```
 
 ---
 
 ## Fase 4: Componentes de Controle de Acesso
 
-### 4.1 `FeatureGate` - Renderização condicional
+### 4.1 `FeatureGate.tsx`
 
-**Arquivo:** `src/components/auth/FeatureGate.tsx`
+Renderiza conteúdo apenas se usuário tem a feature.
 
 ```typescript
-export const FeatureGate = ({ 
-  feature, 
-  children, 
-  fallback 
-}: Props) => {
-  const { hasFeature, isLoading } = useFeature(feature);
-  
-  if (isLoading) return <Skeleton />;
-  if (!hasFeature) return fallback || null;
-  
-  return <>{children}</>;
-};
+<FeatureGate feature="analytics_avancado">
+  <AdvancedAnalyticsChart />
+</FeatureGate>
 ```
 
-### 4.2 `FeatureRoute` - Proteção de rotas
+### 4.2 `FeatureRoute.tsx`
 
-**Arquivo:** `src/components/auth/FeatureRoute.tsx`
+Protege rotas por feature.
 
 ```typescript
-export const FeatureRoute = ({ 
-  feature, 
-  children 
-}: Props) => {
-  const { hasFeature, isLoading } = useFeature(feature);
-  
-  if (isLoading) return <LoadingSpinner />;
-  if (!hasFeature) return <FeatureRequiredModal feature={feature} />;
-  
-  return <>{children}</>;
-};
+<FeatureRoute feature="loja_propria">
+  <StoreEditor />
+</FeatureRoute>
 ```
 
 ---
 
 ## Fase 5: Interface SuperAdmin - Gerenciamento de Features
 
-### 5.1 Página Principal
-
-**Arquivo:** `src/pages/admin/Features.tsx`
+### 5.1 Página `/super-admin/features`
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
@@ -224,28 +206,19 @@ export const FeatureRoute = ({
 │  │  │Loja Próp│  │Dom.Custo│  │Tema Prem│                 │   │
 │  │  │23 users │  │8 users  │  │5 users  │                 │   │
 │  │  └─────────┘  └─────────┘  └─────────┘                 │   │
-│  │                                                         │   │
-│  │ 📊 ANALYTICS                                            │   │
-│  │  ...                                                    │   │
 │  └─────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 5.2 Componentes
-
-| Arquivo | Descrição |
-|---------|-----------|
-| `FeatureCard.tsx` | Card de cada feature com métricas |
-| `FeatureFormModal.tsx` | Modal para criar/editar feature |
-| `FeatureUsersDrawer.tsx` | Drawer listando usuários com a feature |
+### Componentes:
+- `FeatureCard.tsx` - Card de cada feature
+- `FeatureFormModal.tsx` - Criar/editar feature
 
 ---
 
 ## Fase 6: Seção Features no UserDetailsModal
 
-### 6.1 Novo Componente
-
-**Arquivo:** `src/components/admin/UserFeaturesSection.tsx`
+### 6.1 `UserFeaturesSection.tsx`
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
@@ -260,32 +233,31 @@ export const FeatureRoute = ({
 │                                                                 │
 │  ┌───────────────────────────────────────────────────────────┐ │
 │  │ 📊 Analytics Avançado                                     │ │
-│  │ Mensal • Expira em 12 dias                                │ │
+│  │ Mensal • Expira em 12 dias (10/02/2026)                   │ │
 │  │                                    [Renovar] [Revogar]    │ │
 │  └───────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 6.2 Modal de Atribuição
-
-**Arquivo:** `src/components/admin/AssignFeatureModal.tsx`
+### 6.2 `AssignFeatureModal.tsx`
 
 - Select de features disponíveis
 - Select de período (mensal, anual, vitalício)
 - Campo de motivo (opcional)
-- Validação de dependências
 
 ---
 
 ## Fase 7: Atualização de Arquivos Existentes
 
-### 7.1 SuperAdminLayout.tsx
+### 7.1 `SuperAdminLayout.tsx`
 
-Adicionar item de menu "Features":
+Adicionar menu "Features":
 
 ```typescript
+import { Sparkles } from 'lucide-react';
+
 const superAdminMenuItems = [
-  // ... existentes
+  // ... existentes ...
   {
     title: 'Features',
     url: '/super-admin/features',
@@ -294,61 +266,58 @@ const superAdminMenuItems = [
 ];
 ```
 
-### 7.2 App.tsx
+### 7.2 `App.tsx`
 
 Adicionar rota:
 
 ```typescript
+import Features from "./pages/admin/Features";
+
+// Em /super-admin:
 <Route path="features" element={<Features />} />
 ```
 
-### 7.3 UserDetailsModal.tsx
+### 7.3 `UserDetailsModal.tsx`
 
-Adicionar seção de features:
-
-```typescript
-import { UserFeaturesSection } from './UserFeaturesSection';
-
-// No JSX, após a seção de pedidos:
-<UserFeaturesSection userId={user.user_id} />
-```
+Adicionar seção de features após a seção de pedidos.
 
 ---
 
 ## Arquivos a Criar
 
-| Arquivo | Tipo | Descrição |
-|---------|------|-----------|
-| `src/pages/admin/Features.tsx` | Página | Gerenciamento de features |
-| `src/components/admin/FeatureCard.tsx` | Componente | Card de feature |
-| `src/components/admin/FeatureFormModal.tsx` | Componente | Criar/editar feature |
-| `src/components/admin/FeatureUsersDrawer.tsx` | Componente | Usuários com feature |
-| `src/components/admin/UserFeaturesSection.tsx` | Componente | Features no modal de usuário |
-| `src/components/admin/AssignFeatureModal.tsx` | Componente | Atribuir feature |
-| `src/components/auth/FeatureGate.tsx` | Componente | Renderização condicional |
-| `src/components/auth/FeatureRoute.tsx` | Componente | Proteção de rota |
-| `src/hooks/useFeature.ts` | Hook | Verificar feature única |
-| `src/hooks/useUserFeatures.ts` | Hook | Listar features do usuário |
-| `src/hooks/useFeatures.ts` | Hook | Gerenciamento (admin) |
-| `supabase/functions/atribuir-feature/index.ts` | Edge Function | Atribuir feature |
-| `supabase/functions/revogar-feature/index.ts` | Edge Function | Revogar feature |
+| Arquivo | Descrição |
+|---------|-----------|
+| `src/pages/admin/Features.tsx` | Página de gerenciamento |
+| `src/components/admin/FeatureCard.tsx` | Card de feature |
+| `src/components/admin/FeatureFormModal.tsx` | Modal criar/editar |
+| `src/components/admin/UserFeaturesSection.tsx` | Seção no modal usuário |
+| `src/components/admin/AssignFeatureModal.tsx` | Modal atribuir feature |
+| `src/components/auth/FeatureGate.tsx` | Renderização condicional |
+| `src/components/auth/FeatureRoute.tsx` | Proteção de rota |
+| `src/hooks/useFeature.ts` | Hook verificar feature |
+| `src/hooks/useUserFeatures.ts` | Hook listar features |
+| `src/hooks/useFeatures.ts` | Hook gerenciamento |
+| `supabase/functions/atribuir-feature/index.ts` | Edge function |
+| `supabase/functions/revogar-feature/index.ts` | Edge function |
 
 ## Arquivos a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
 | `src/components/layouts/SuperAdminLayout.tsx` | Adicionar menu "Features" |
-| `src/components/admin/UserDetailsModal.tsx` | Adicionar seção de features |
 | `src/App.tsx` | Adicionar rota `/super-admin/features` |
+| `src/components/admin/UserDetailsModal.tsx` | Adicionar seção features |
+| `supabase/config.toml` | Registrar novas edge functions |
 
 ---
 
 ## Ordem de Execução
 
-1. **Migração SQL** - Criar tabelas, funções, RLS, seed data
+1. **Migração SQL** - Tabelas, funções, RLS, seed
 2. **Edge Functions** - atribuir-feature, revogar-feature
 3. **Hooks** - useFeature, useUserFeatures, useFeatures
-4. **Componentes de Controle** - FeatureGate, FeatureRoute
-5. **Página Features** - UI de gerenciamento
-6. **UserFeaturesSection** - Integração no modal de usuário
-7. **Atualizar arquivos existentes** - Layout, rotas
+4. **Componentes** - FeatureGate, FeatureRoute, FeatureCard
+5. **Página Features.tsx** - UI de gerenciamento
+6. **UserFeaturesSection** - Integração no modal
+7. **Atualizar arquivos** - Layout, rotas
+
