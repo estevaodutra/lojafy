@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CheckoutForm, OrderItem, PixPaymentData } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCPF, validateCPF, cleanCPF } from "@/lib/cpf";
+import { formatPhone } from "@/lib/phone";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
@@ -197,6 +198,13 @@ const Checkout = ({
       setFormData(prev => ({
         ...prev,
         [field]: formattedValue
+      }));
+    } else if (field === 'phone') {
+      // Format phone automatically
+      const formattedPhone = formatPhone(value);
+      setFormData(prev => ({
+        ...prev,
+        [field]: formattedPhone
       }));
     } else if (field === 'zipCode') {
       // Format CEP and trigger search
@@ -597,7 +605,7 @@ const Checkout = ({
                   </div>
                   <div>
                     <Label htmlFor="phone">Telefone</Label>
-                    <Input id="phone" value={formData.phone} onChange={e => handleInputChange("phone", e.target.value)} placeholder="(11) 99999-9999" />
+                    <Input id="phone" value={formData.phone} onChange={e => handleInputChange("phone", e.target.value)} placeholder="+55 (11) 99999-9999" maxLength={19} />
                   </div>
                   <div>
                     <Label htmlFor="cpf">CPF</Label>
