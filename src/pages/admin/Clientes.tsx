@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, UserPlus, History } from 'lucide-react';
+import { Search, History } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { UserFeatureInfo } from '@/components/admin/UnifiedUsersTable';
 
@@ -25,7 +25,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
-import { EditSubscriptionDialog } from '@/components/admin/EditSubscriptionDialog';
 import { UserCleanupPanel } from '@/components/admin/UserCleanupPanel';
 import { UnifiedUsersTable } from '@/components/admin/UnifiedUsersTable';
 import { UserDetailsModal } from '@/components/admin/UserDetailsModal';
@@ -53,6 +52,8 @@ interface UnifiedUser {
   order_count?: number;
   total_spent?: number;
   features?: UserFeatureInfo;
+  origem_tipo?: 'lojafy' | 'loja' | 'importado' | 'convite';
+  origem_loja_nome?: string;
 }
 
 const Clientes = () => {
@@ -62,14 +63,12 @@ const Clientes = () => {
   // States
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
-  const [planFilter, setPlanFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [updatingUsers, setUpdatingUsers] = useState<string[]>([]);
 
   // Modal states
   const [selectedUser, setSelectedUser] = useState<UnifiedUser | null>(null);
-  const [editingUser, setEditingUser] = useState<any>(null);
   const [deletingUser, setDeletingUser] = useState<UnifiedUser | null>(null);
   const [unbanningUser, setUnbanningUser] = useState<UnifiedUser | null>(null);
   const [showCleanupDrawer, setShowCleanupDrawer] = useState(false);
@@ -158,6 +157,9 @@ const Clientes = () => {
       order_count: orderStats?.[user.user_id]?.order_count || 0,
       total_spent: orderStats?.[user.user_id]?.total_spent || 0,
       features: userFeatures?.[user.user_id] || { feature_count: 0, feature_names: [] },
+      // Set default origin as 'lojafy' if not specified
+      origem_tipo: user.origem_tipo || 'lojafy',
+      origem_loja_nome: user.origem_loja_nome || null,
     }));
   }, [usersFromRpc, orderStats, userFeatures]);
 
@@ -175,7 +177,6 @@ const Clientes = () => {
         user.email?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-      const matchesPlan = planFilter === 'all' || user.subscription_plan === planFilter;
 
       const isBanned = isUserBanned(user.banned_until);
       const isDeleted = !!user.deleted_at;
@@ -186,9 +187,9 @@ const Clientes = () => {
         (statusFilter === 'inactive' && (!user.is_active || isBanned || isDeleted)) ||
         (statusFilter === 'banned' && isBanned);
 
-      return matchesSearch && matchesRole && matchesPlan && matchesStatus;
+      return matchesSearch && matchesRole && matchesStatus;
     });
-  }, [users, searchTerm, roleFilter, planFilter, statusFilter]);
+  }, [users, searchTerm, roleFilter, statusFilter]);
 
   // Pagination
   const totalUsers = filteredUsers.length;
@@ -344,7 +345,7 @@ const Clientes = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Gestão de Usuários</h1>
+          <h1 className="text-3xl font-bold">Usuários</h1>
           <p className="text-muted-foreground">
             Gerencie todos os usuários da plataforma
           </p>
@@ -367,7 +368,7 @@ const Clientes = () => {
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
@@ -392,17 +393,6 @@ const Clientes = () => {
                 <SelectItem value="reseller">Revendedores</SelectItem>
                 <SelectItem value="supplier">Fornecedores</SelectItem>
                 <SelectItem value="customer">Clientes</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={planFilter} onValueChange={handleFilterChange(setPlanFilter)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todos os Planos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Planos</SelectItem>
-                <SelectItem value="free">Free</SelectItem>
-                <SelectItem value="premium">Premium</SelectItem>
               </SelectContent>
             </Select>
 
@@ -436,7 +426,6 @@ const Clientes = () => {
             onUpdateRole={updateUserRole}
             onToggleStatus={toggleUserStatus}
             onViewDetails={(user) => setSelectedUser(user)}
-            onEditPlan={(user) => setEditingUser(user)}
             onDeleteUser={(user) => setDeletingUser(user)}
             onUnbanUser={(user) => setUnbanningUser(user)}
           />
@@ -448,14 +437,6 @@ const Clientes = () => {
         user={selectedUser}
         isOpen={!!selectedUser}
         onClose={() => setSelectedUser(null)}
-      />
-
-      {/* Edit Subscription Dialog */}
-      <EditSubscriptionDialog
-        isOpen={!!editingUser}
-        onClose={() => setEditingUser(null)}
-        user={editingUser || {}}
-        onSuccess={refetchUsers}
       />
 
       {/* Cleanup History Drawer */}
@@ -508,7 +489,7 @@ const Clientes = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Desbanir Usuário</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja remover o banimento de{' '}
+              Você tem certeza que deseja desbanir o usuário{' '}
               <strong>{unbanningUser?.email}</strong>?
               <br />
               <br />
@@ -520,7 +501,6 @@ const Clientes = () => {
             <AlertDialogAction
               onClick={unbanUser}
               disabled={isUnbanning}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {isUnbanning ? 'Desbanindo...' : 'Desbanir Usuário'}
             </AlertDialogAction>

@@ -1,15 +1,13 @@
-import { format, differenceInDays } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import {
-  Edit,
   Power,
   Trash2,
   ShieldOff,
-  Clock,
-  UserX,
-  AlertTriangle,
-  Eye,
   Sparkles,
+  MoreHorizontal,
+  Eye,
+  Users,
+  UserCog,
+  Store,
 } from 'lucide-react';
 import {
   Table,
@@ -22,19 +20,21 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { PremiumBadge } from '@/components/premium/PremiumBadge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ImpersonationButton } from '@/components/admin/ImpersonationButton';
 import {
   Pagination,
@@ -70,6 +70,8 @@ interface UnifiedUser {
   order_count?: number;
   total_spent?: number;
   features?: UserFeatureInfo;
+  origem_tipo?: 'lojafy' | 'loja' | 'importado' | 'convite';
+  origem_loja_nome?: string;
 }
 
 interface UnifiedUsersTableProps {
@@ -84,10 +86,17 @@ interface UnifiedUsersTableProps {
   onUpdateRole: (userId: string, newRole: string) => void;
   onToggleStatus: (userId: string, currentStatus: boolean) => void;
   onViewDetails: (user: UnifiedUser) => void;
-  onEditPlan: (user: UnifiedUser) => void;
   onDeleteUser: (user: UnifiedUser) => void;
   onUnbanUser: (user: UnifiedUser) => void;
 }
+
+const ROLES = [
+  { value: 'customer', label: 'Cliente' },
+  { value: 'reseller', label: 'Revendedor' },
+  { value: 'supplier', label: 'Fornecedor' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'super_admin', label: 'Super Admin' },
+];
 
 export const UnifiedUsersTable = ({
   users,
@@ -101,7 +110,6 @@ export const UnifiedUsersTable = ({
   onUpdateRole,
   onToggleStatus,
   onViewDetails,
-  onEditPlan,
   onDeleteUser,
   onUnbanUser,
 }: UnifiedUsersTableProps) => {
@@ -138,94 +146,53 @@ export const UnifiedUsersTable = ({
     return labels[role] || role;
   };
 
-  const getExpirationStatus = (expiresAt?: string) => {
-    if (!expiresAt) return null;
-    const daysUntilExpiration = differenceInDays(new Date(expiresAt), new Date());
-
-    if (daysUntilExpiration < 0) {
-      return { type: 'expired', label: 'Expirado', variant: 'destructive' as const };
-    } else if (daysUntilExpiration <= 7) {
-      return {
-        type: 'warning',
-        label: `Expira em ${daysUntilExpiration}d`,
-        variant: 'secondary' as const,
-      };
+  // Unified status with colors
+  const getUnifiedStatus = (user: UnifiedUser) => {
+    if (user.deleted_at) {
+      return { label: 'Excluído', className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' };
     }
-    return null;
+    if (isUserBanned(user.banned_until)) {
+      return { label: 'Banido', className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' };
+    }
+    if (!user.is_active) {
+      return { label: 'Inativo', className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400' };
+    }
+    if (!user.last_sign_in_at) {
+      return { label: 'Aguardando', className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' };
+    }
+    return { label: 'Ativo', className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' };
   };
 
-  const getActivityStatus = (
-    createdAt: string,
-    lastSignInAt: string | null | undefined,
-    isActive: boolean,
-    bannedUntil: string | null | undefined,
-    deletedAt: string | null | undefined
-  ) => {
-    if (deletedAt) {
-      return {
-        icon: <Trash2 className="h-3 w-3" />,
-        text: 'Excluído',
-        variant: 'destructive' as const,
-      };
-    }
-
-    if (bannedUntil && new Date(bannedUntil) > new Date()) {
-      return {
-        icon: <UserX className="h-3 w-3" />,
-        text: 'Banido',
-        variant: 'destructive' as const,
-      };
-    }
-
-    if (lastSignInAt) {
-      return { icon: <Clock className="h-3 w-3" />, text: 'Ativo', variant: 'default' as const };
-    }
-
-    const created = new Date(createdAt);
-    const daysSinceCreation = Math.floor(
-      (Date.now() - created.getTime()) / (1000 * 60 * 60 * 24)
-    );
-
-    if (daysSinceCreation >= 60) {
-      return {
-        icon: <Trash2 className="h-3 w-3" />,
-        text: 'Será excluído',
-        variant: 'destructive' as const,
-      };
-    }
-    if (daysSinceCreation >= 50) {
-      return {
-        icon: <Trash2 className="h-3 w-3" />,
-        text: `Exclusão em ${60 - daysSinceCreation}d`,
-        variant: 'destructive' as const,
-      };
-    }
-    if (daysSinceCreation >= 30) {
-      if (!isActive) {
+  // Origin badge
+  const getOrigemBadge = (user: UnifiedUser) => {
+    const tipo = user.origem_tipo || 'lojafy';
+    
+    switch (tipo) {
+      case 'loja':
         return {
-          icon: <UserX className="h-3 w-3" />,
-          text: 'Desativado',
-          variant: 'secondary' as const,
+          label: user.origem_loja_nome || 'Loja',
+          className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
+          icon: <Store className="h-3 w-3 mr-1" />,
         };
-      }
-      return {
-        icon: <UserX className="h-3 w-3" />,
-        text: `Desativado há ${daysSinceCreation - 30}d`,
-        variant: 'secondary' as const,
-      };
+      case 'importado':
+        return {
+          label: 'Importado',
+          className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400',
+          icon: null,
+        };
+      case 'convite':
+        return {
+          label: 'Convite',
+          className: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+          icon: null,
+        };
+      default:
+        return {
+          label: 'Lojafy',
+          className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+          icon: null,
+        };
     }
-    if (daysSinceCreation >= 20) {
-      return {
-        icon: <Clock className="h-3 w-3" />,
-        text: `${30 - daysSinceCreation}d p/ desativar`,
-        variant: 'outline' as const,
-      };
-    }
-    return {
-      icon: <Clock className="h-3 w-3" />,
-      text: 'Aguardando acesso',
-      variant: 'outline' as const,
-    };
   };
 
   const formatCurrency = (value: number) => {
@@ -249,28 +216,19 @@ export const UnifiedUsersTable = ({
               <TableHead className="whitespace-nowrap min-w-[180px]">Email</TableHead>
               <TableHead className="whitespace-nowrap min-w-[100px]">Telefone</TableHead>
               <TableHead className="whitespace-nowrap min-w-[100px]">Role</TableHead>
-              <TableHead className="whitespace-nowrap min-w-[120px]">Alterar Role</TableHead>
-              <TableHead className="whitespace-nowrap min-w-[80px]">Plano</TableHead>
               <TableHead className="whitespace-nowrap min-w-[80px]">Features</TableHead>
               <TableHead className="whitespace-nowrap min-w-[70px]">Pedidos</TableHead>
               <TableHead className="whitespace-nowrap min-w-[90px]">Total Gasto</TableHead>
-              <TableHead className="whitespace-nowrap min-w-[80px]">Status</TableHead>
-              <TableHead className="whitespace-nowrap min-w-[120px]">Atividade</TableHead>
-              <TableHead className="whitespace-nowrap min-w-[100px]">Criação</TableHead>
-              <TableHead className="text-right whitespace-nowrap min-w-[150px]">Ações</TableHead>
+              <TableHead className="whitespace-nowrap min-w-[90px]">Status</TableHead>
+              <TableHead className="whitespace-nowrap min-w-[100px]">Origem</TableHead>
+              <TableHead className="text-right whitespace-nowrap min-w-[80px]">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.map((user) => {
-              const activityStatus = getActivityStatus(
-                user.created_at,
-                user.last_sign_in_at,
-                user.is_active,
-                user.banned_until,
-                user.deleted_at
-              );
+              const status = getUnifiedStatus(user);
+              const origem = getOrigemBadge(user);
               const isBanned = isUserBanned(user.banned_until);
-              const isDeleted = !!user.deleted_at;
 
               return (
                 <TableRow key={user.id}>
@@ -287,48 +245,11 @@ export const UnifiedUsersTable = ({
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Select
-                      value={user.role}
-                      onValueChange={(newRole) => onUpdateRole(user.user_id, newRole)}
-                      disabled={updatingUsers.includes(user.user_id)}
-                    >
-                      <SelectTrigger className="w-28 h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="customer">Cliente</SelectItem>
-                        <SelectItem value="reseller">Revendedor</SelectItem>
-                        <SelectItem value="supplier">Fornecedor</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="super_admin">Super Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    {user.role === 'reseller' && user.subscription_plan ? (
-                      <div className="flex flex-col gap-1">
-                        <PremiumBadge plan={user.subscription_plan as 'free' | 'premium'} />
-                        {getExpirationStatus(user.subscription_expires_at) && (
-                          <Badge
-                            variant={getExpirationStatus(user.subscription_expires_at)!.variant}
-                            className="text-xs"
-                          >
-                            {getExpirationStatus(user.subscription_expires_at)!.type ===
-                              'expired' && <AlertTriangle className="h-3 w-3 mr-1" />}
-                            {getExpirationStatus(user.subscription_expires_at)!.label}
-                          </Badge>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
                     {user.features && user.features.feature_count > 0 ? (
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Badge variant="secondary" className="cursor-help flex items-center gap-1">
+                            <Badge variant="secondary" className="cursor-help flex items-center gap-1 w-fit">
                               <Sparkles className="h-3 w-3" />
                               {user.features.feature_count}
                             </Badge>
@@ -356,92 +277,80 @@ export const UnifiedUsersTable = ({
                     {formatCurrency(user.total_spent || 0)}
                   </TableCell>
                   <TableCell>
-                    {isDeleted ? (
-                      <Badge variant="destructive">Excluído</Badge>
-                    ) : isBanned ? (
-                      <Badge variant="destructive">Banido</Badge>
-                    ) : (
-                      <Badge variant={user.is_active ? 'default' : 'secondary'}>
-                        {user.is_active ? 'Ativo' : 'Inativo'}
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={activityStatus.variant}
-                      className="flex items-center gap-1 w-fit text-xs"
-                    >
-                      {activityStatus.icon}
-                      {activityStatus.text}
+                    <Badge className={`${status.className} border-0`}>
+                      {status.label}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-sm">
-                    {format(new Date(user.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                  <TableCell>
+                    <Badge className={`${origem.className} border-0 flex items-center w-fit`}>
+                      {origem.icon}
+                      {origem.label}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => onViewDetails(user)}
-                        title="Ver detalhes"
-                        className="h-8 w-8"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {user.role === 'reseller' && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => onEditPlan(user)}
-                          title="Editar plano"
-                          className="h-8 w-8"
-                        >
-                          <Edit className="h-4 w-4" />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
                         </Button>
-                      )}
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => onToggleStatus(user.user_id, user.is_active)}
-                        title={user.is_active ? 'Desativar' : 'Ativar'}
-                        className="h-8 w-8"
-                      >
-                        <Power className="h-4 w-4" />
-                      </Button>
-                      <ImpersonationButton
-                        userId={user.user_id}
-                        userRole={user.role}
-                        userName={`${user.first_name} ${user.last_name}`}
-                      />
-                      {isBanned && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => onUnbanUser(user)}
-                          title="Desbanir usuário"
-                          className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem onClick={() => onViewDetails(user)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Ver detalhes
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger disabled={updatingUsers.includes(user.user_id)}>
+                            <UserCog className="mr-2 h-4 w-4" />
+                            Alterar role
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent>
+                            {ROLES.map((role) => (
+                              <DropdownMenuItem
+                                key={role.value}
+                                onClick={() => onUpdateRole(user.user_id, role.value)}
+                                className={user.role === role.value ? 'bg-accent' : ''}
+                              >
+                                {role.label}
+                                {user.role === role.value && ' ✓'}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                        <DropdownMenuItem onClick={() => onToggleStatus(user.user_id, user.is_active)}>
+                          <Power className="mr-2 h-4 w-4" />
+                          {user.is_active ? 'Desativar' : 'Ativar'}
+                        </DropdownMenuItem>
+                        <ImpersonationButton
+                          userId={user.user_id}
+                          userRole={user.role}
+                          userName={`${user.first_name} ${user.last_name}`}
+                          asMenuItem
+                        />
+                        {isBanned && (
+                          <DropdownMenuItem onClick={() => onUnbanUser(user)}>
+                            <ShieldOff className="mr-2 h-4 w-4" />
+                            Desbanir
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => onDeleteUser(user)}
+                          className="text-destructive focus:text-destructive"
                         >
-                          <ShieldOff className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => onDeleteUser(user)}
-                        title="Excluir usuário"
-                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               );
             })}
             {!users.length && (
               <TableRow>
-                <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                   Nenhum usuário encontrado
                 </TableCell>
               </TableRow>

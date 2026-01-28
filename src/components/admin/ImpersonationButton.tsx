@@ -9,6 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { UserCheck, AlertTriangle } from 'lucide-react';
 import { useImpersonation } from '@/hooks/useImpersonation';
 import { UserRole } from '@/hooks/useUserRole';
@@ -18,13 +19,15 @@ interface ImpersonationButtonProps {
   userRole: UserRole;
   userName: string;
   disabled?: boolean;
+  asMenuItem?: boolean;
 }
 
 export const ImpersonationButton: React.FC<ImpersonationButtonProps> = ({
   userId,
   userRole,
   userName,
-  disabled = false
+  disabled = false,
+  asMenuItem = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -62,19 +65,37 @@ export const ImpersonationButton: React.FC<ImpersonationButtonProps> = ({
     }
   };
 
+  const TriggerComponent = asMenuItem ? (
+    <DropdownMenuItem
+      disabled={disabled}
+      onSelect={(e) => {
+        e.preventDefault();
+        setIsOpen(true);
+      }}
+    >
+      <UserCheck className="mr-2 h-4 w-4" />
+      Impersonar
+    </DropdownMenuItem>
+  ) : (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={disabled}
+      className="h-8 w-8 p-0"
+      title={`Acessar painel como ${userName}`}
+    >
+      <UserCheck className="h-4 w-4" />
+    </Button>
+  );
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={disabled}
-          className="h-8 w-8 p-0"
-          title={`Acessar painel como ${userName}`}
-        >
-          <UserCheck className="h-4 w-4" />
-        </Button>
-      </DialogTrigger>
+      {!asMenuItem && (
+        <DialogTrigger asChild>
+          {TriggerComponent}
+        </DialogTrigger>
+      )}
+      {asMenuItem && TriggerComponent}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
