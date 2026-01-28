@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, UserPlus, History } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { UserFeatureInfo } from '@/components/admin/UnifiedUsersTable';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -51,6 +52,7 @@ interface UnifiedUser {
   deleted_at?: string;
   order_count?: number;
   total_spent?: number;
+  features?: UserFeatureInfo;
 }
 
 const Clientes = () => {
@@ -114,7 +116,40 @@ const Clientes = () => {
     },
   });
 
-  // Merge users with order stats
+  // Fetch features count for all users
+  const { data: userFeatures } = useQuery({
+    queryKey: ['users-features-count'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('user_features')
+        .select(`
+          user_id,
+          features:feature_id (
+            nome
+          )
+        `)
+        .in('status', ['ativo', 'trial'])
+        .or('data_expiracao.is.null,data_expiracao.gt.now()');
+
+      if (error) throw error;
+
+      // Aggregate features by user
+      const featuresMap: Record<string, UserFeatureInfo> = {};
+      data?.forEach((uf: any) => {
+        if (!featuresMap[uf.user_id]) {
+          featuresMap[uf.user_id] = { feature_count: 0, feature_names: [] };
+        }
+        featuresMap[uf.user_id].feature_count += 1;
+        if (uf.features?.nome) {
+          featuresMap[uf.user_id].feature_names.push(uf.features.nome);
+        }
+      });
+
+      return featuresMap;
+    },
+  });
+
+  // Merge users with order stats and features
   const users: UnifiedUser[] = useMemo(() => {
     if (!usersFromRpc) return [];
 
@@ -122,8 +157,9 @@ const Clientes = () => {
       ...user,
       order_count: orderStats?.[user.user_id]?.order_count || 0,
       total_spent: orderStats?.[user.user_id]?.total_spent || 0,
+      features: userFeatures?.[user.user_id] || { feature_count: 0, feature_names: [] },
     }));
-  }, [usersFromRpc, orderStats]);
+  }, [usersFromRpc, orderStats, userFeatures]);
 
   // Helper to check if user is banned
   const isUserBanned = (bannedUntil: string | null | undefined) => {
