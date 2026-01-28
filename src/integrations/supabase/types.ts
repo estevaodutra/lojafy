@@ -965,6 +965,53 @@ export type Database = {
           },
         ]
       }
+      feature_transactions: {
+        Row: {
+          created_at: string | null
+          executado_por: string | null
+          feature_id: string
+          id: string
+          metadata: Json | null
+          motivo: string | null
+          tipo: Database["public"]["Enums"]["feature_transaction_tipo"]
+          tipo_periodo: Database["public"]["Enums"]["feature_periodo"] | null
+          user_id: string
+          valor: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          executado_por?: string | null
+          feature_id: string
+          id?: string
+          metadata?: Json | null
+          motivo?: string | null
+          tipo: Database["public"]["Enums"]["feature_transaction_tipo"]
+          tipo_periodo?: Database["public"]["Enums"]["feature_periodo"] | null
+          user_id: string
+          valor?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          executado_por?: string | null
+          feature_id?: string
+          id?: string
+          metadata?: Json | null
+          motivo?: string | null
+          tipo?: Database["public"]["Enums"]["feature_transaction_tipo"]
+          tipo_periodo?: Database["public"]["Enums"]["feature_periodo"] | null
+          user_id?: string
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feature_transactions_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "features"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       featured_products: {
         Row: {
           active: boolean
@@ -992,6 +1039,69 @@ export type Database = {
           position?: number
           product_id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      features: {
+        Row: {
+          ativo: boolean | null
+          categoria: string
+          created_at: string | null
+          descricao: string | null
+          icone: string | null
+          id: string
+          metadata: Json | null
+          nome: string
+          ordem_exibicao: number | null
+          preco_anual: number | null
+          preco_mensal: number | null
+          preco_vitalicio: number | null
+          requer_features: string[] | null
+          roles_permitidas: string[] | null
+          slug: string
+          trial_dias: number | null
+          updated_at: string | null
+          visivel_catalogo: boolean | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          categoria?: string
+          created_at?: string | null
+          descricao?: string | null
+          icone?: string | null
+          id?: string
+          metadata?: Json | null
+          nome: string
+          ordem_exibicao?: number | null
+          preco_anual?: number | null
+          preco_mensal?: number | null
+          preco_vitalicio?: number | null
+          requer_features?: string[] | null
+          roles_permitidas?: string[] | null
+          slug: string
+          trial_dias?: number | null
+          updated_at?: string | null
+          visivel_catalogo?: boolean | null
+        }
+        Update: {
+          ativo?: boolean | null
+          categoria?: string
+          created_at?: string | null
+          descricao?: string | null
+          icone?: string | null
+          id?: string
+          metadata?: Json | null
+          nome?: string
+          ordem_exibicao?: number | null
+          preco_anual?: number | null
+          preco_mensal?: number | null
+          preco_vitalicio?: number | null
+          requer_features?: string[] | null
+          roles_permitidas?: string[] | null
+          slug?: string
+          trial_dias?: number | null
+          updated_at?: string | null
+          visivel_catalogo?: boolean | null
         }
         Relationships: []
       }
@@ -2254,6 +2364,9 @@ export type Database = {
           id: string
           is_active: boolean | null
           last_name: string | null
+          origem_loja_id: string | null
+          origem_metadata: Json | null
+          origem_tipo: Database["public"]["Enums"]["origem_tipo"] | null
           phone: string | null
           role: Database["public"]["Enums"]["app_role"]
           subdomain: string | null
@@ -2276,6 +2389,9 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_name?: string | null
+          origem_loja_id?: string | null
+          origem_metadata?: Json | null
+          origem_tipo?: Database["public"]["Enums"]["origem_tipo"] | null
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           subdomain?: string | null
@@ -2298,6 +2414,9 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_name?: string | null
+          origem_loja_id?: string | null
+          origem_metadata?: Json | null
+          origem_tipo?: Database["public"]["Enums"]["origem_tipo"] | null
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           subdomain?: string | null
@@ -3232,6 +3351,65 @@ export type Database = {
         }
         Relationships: []
       }
+      user_features: {
+        Row: {
+          atribuido_por: string | null
+          created_at: string | null
+          data_expiracao: string | null
+          data_inicio: string | null
+          feature_id: string
+          id: string
+          metadata: Json | null
+          motivo: string | null
+          origem: string | null
+          status: Database["public"]["Enums"]["feature_status"] | null
+          tipo_periodo: Database["public"]["Enums"]["feature_periodo"]
+          trial_usado: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          atribuido_por?: string | null
+          created_at?: string | null
+          data_expiracao?: string | null
+          data_inicio?: string | null
+          feature_id: string
+          id?: string
+          metadata?: Json | null
+          motivo?: string | null
+          origem?: string | null
+          status?: Database["public"]["Enums"]["feature_status"] | null
+          tipo_periodo: Database["public"]["Enums"]["feature_periodo"]
+          trial_usado?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          atribuido_por?: string | null
+          created_at?: string | null
+          data_expiracao?: string | null
+          data_inicio?: string | null
+          feature_id?: string
+          id?: string
+          metadata?: Json | null
+          motivo?: string | null
+          origem?: string | null
+          status?: Database["public"]["Enums"]["feature_status"] | null
+          tipo_periodo?: Database["public"]["Enums"]["feature_periodo"]
+          trial_usado?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_features_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "features"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           granted_at: string | null
@@ -3371,6 +3549,7 @@ export type Database = {
           payment_expires_at: string
         }[]
       }
+      get_feature_user_count: { Args: { _feature_id: string }; Returns: number }
       get_inactive_users_for_cleanup: {
         Args: never
         Returns: {
@@ -3437,6 +3616,23 @@ export type Database = {
           id: string
           status: string
           total_amount: number
+        }[]
+      }
+      get_user_active_features: {
+        Args: { _user_id: string }
+        Returns: {
+          atribuido_por: string
+          categoria: string
+          data_expiracao: string
+          data_inicio: string
+          dias_restantes: number
+          feature_icone: string
+          feature_id: string
+          feature_nome: string
+          feature_slug: string
+          motivo: string
+          status: Database["public"]["Enums"]["feature_status"]
+          tipo_periodo: Database["public"]["Enums"]["feature_periodo"]
         }[]
       }
       get_user_role: {
@@ -3521,10 +3717,27 @@ export type Database = {
         }
         Returns: number
       }
+      user_has_feature: {
+        Args: { _feature_slug: string; _user_id: string }
+        Returns: boolean
+      }
+      user_has_feature_or_superadmin: {
+        Args: { _feature_slug: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "customer" | "admin" | "super_admin" | "supplier" | "reseller"
       course_access_level: "all" | "customer" | "supplier" | "reseller"
+      feature_periodo: "mensal" | "anual" | "vitalicio" | "trial" | "cortesia"
+      feature_status: "ativo" | "trial" | "expirado" | "cancelado" | "revogado"
+      feature_transaction_tipo:
+        | "atribuicao"
+        | "revogacao"
+        | "renovacao"
+        | "expiracao"
+        | "trial_inicio"
+        | "trial_fim"
       knowledge_category:
         | "faq"
         | "policy"
@@ -3539,6 +3752,7 @@ export type Database = {
         | "resolvido"
         | "cancelado"
       order_ticket_type: "reembolso" | "troca" | "cancelamento"
+      origem_tipo: "lojafy" | "loja" | "importado" | "convite"
       subscription_plan: "free" | "premium"
       ticket_author_type:
         | "cliente"
@@ -3682,6 +3896,16 @@ export const Constants = {
     Enums: {
       app_role: ["customer", "admin", "super_admin", "supplier", "reseller"],
       course_access_level: ["all", "customer", "supplier", "reseller"],
+      feature_periodo: ["mensal", "anual", "vitalicio", "trial", "cortesia"],
+      feature_status: ["ativo", "trial", "expirado", "cancelado", "revogado"],
+      feature_transaction_tipo: [
+        "atribuicao",
+        "revogacao",
+        "renovacao",
+        "expiracao",
+        "trial_inicio",
+        "trial_fim",
+      ],
       knowledge_category: [
         "faq",
         "policy",
@@ -3698,6 +3922,7 @@ export const Constants = {
         "cancelado",
       ],
       order_ticket_type: ["reembolso", "troca", "cancelamento"],
+      origem_tipo: ["lojafy", "loja", "importado", "convite"],
       subscription_plan: ["free", "premium"],
       ticket_author_type: [
         "cliente",
