@@ -1,6 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Plataforma from "./Plataforma";
-import IntegracaoPage from "./Integracoes";
 import SupportManagement from "./SupportManagement";
 import NotificationsManagement from "./NotificationsManagement";
 import AIKnowledgeBase from "./AIKnowledgeBase";
@@ -11,14 +10,13 @@ const Configuracoes = () => {
       <div>
         <h1 className="text-3xl font-bold">Configurações</h1>
         <p className="text-muted-foreground mt-1">
-          Configure plataforma, integrações e recursos avançados
+          Configure plataforma e recursos avançados
         </p>
       </div>
 
       <Tabs defaultValue="platform" className="space-y-6">
         <TabsList>
           <TabsTrigger value="platform">Plataforma</TabsTrigger>
-          <TabsTrigger value="integrations">Integrações</TabsTrigger>
           <TabsTrigger value="support">Suporte</TabsTrigger>
           <TabsTrigger value="notifications">Notificações</TabsTrigger>
           <TabsTrigger value="ai">Base de Conhecimento</TabsTrigger>
@@ -26,10 +24,6 @@ const Configuracoes = () => {
 
         <TabsContent value="platform" className="space-y-4">
           <Plataforma />
-        </TabsContent>
-
-        <TabsContent value="integrations" className="space-y-4">
-          <IntegracaoPage />
         </TabsContent>
 
         <TabsContent value="support" className="space-y-4">
