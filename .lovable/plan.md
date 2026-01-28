@@ -1,76 +1,114 @@
 
 
-# Plano: Enviar Telefone Sem Máscara e Validar Nono Dígito
+# Correção: Validação em Cadeia - WhatsApp Primeiro
 
-## Resumo
+## Problema
 
-Modificar o envio do telefone para o webhook: remover máscara, enviar apenas números completos (com código do país 55) e validar se celular tem o nono dígito.
+A validação é em cadeia: se o WhatsApp é inválido, o email nem é validado. O webhook retorna:
+```json
+[{
+  "success": true,
+  "exists": false,   // WhatsApp não existe
+  "phone": "5512983195531",
+  "lid": null,
+  "instance_used": "Mauro"
+}]
+```
+
+Quando `exists: false`, deve mostrar "WhatsApp inválido. Por favor, forneça um novo número."
 
 ---
 
-## Alterações
+## Alteração
 
-### `src/pages/Auth.tsx`
+### `src/pages/Auth.tsx` (linhas 118-138)
 
-**1. Importar a função `cleanPhone`:**
+**De:**
 ```typescript
-import { formatPhone, cleanPhone } from '@/lib/phone';
+const validationData = await validationResponse.json();
+
+if (!validationData.email_valid) {
+  toast({ 
+    title: 'Email inválido', 
+    description: validationData.reason || 'Por favor, verifique o email informado e tente novamente.',
+    variant: 'destructive' 
+  });
+  setIsLoading(false);
+  return;
+}
+
+if (!validationData.phone) {
+  toast({ 
+    title: 'Telefone inválido', 
+    description: validationData.reason || 'Por favor, verifique o número de WhatsApp e tente novamente.',
+    variant: 'destructive' 
+  });
+  setIsLoading(false);
+  return;
+}
 ```
 
-**2. Modificar o envio no `handleSignup`:**
-
-Antes:
+**Para:**
 ```typescript
-body: JSON.stringify({
-  email: signupEmail,
-  phone: signupPhone,  // "+55 (11) 99999-9999"
-  first_name: firstName,
-  last_name: lastName,
-}),
-```
+const validationData = await validationResponse.json();
 
-Depois:
-```typescript
-body: JSON.stringify({
-  email: signupEmail,
-  phone: cleanPhone(signupPhone),  // "5511999999999"
-  first_name: firstName,
-  last_name: lastName,
-}),
-```
+// Resposta é um array - pegar o primeiro item
+const validation = Array.isArray(validationData) ? validationData[0] : validationData;
 
-**3. Adicionar validação do nono dígito antes do envio:**
+// Validação em cadeia: primeiro WhatsApp, depois email
+// Se WhatsApp não existe, email nem foi validado
+if (validation.exists === false) {
+  toast({ 
+    title: 'WhatsApp inválido', 
+    description: 'Por favor, forneça um novo número.',
+    variant: 'destructive' 
+  });
+  setIsLoading(false);
+  return;
+}
 
-```typescript
-// Validar nono dígito (celulares brasileiros começam com 9 após o DDD)
-const phoneNumbers = cleanPhone(signupPhone);
-if (phoneNumbers.length === 13) { // 55 + DDD(2) + número(9)
-  const firstDigitAfterDDD = phoneNumbers.charAt(4); // posição após 55XX
-  if (firstDigitAfterDDD !== '9') {
-    toast({ 
-      title: 'Telefone inválido', 
-      description: 'Celulares devem começar com 9 após o DDD.',
-      variant: 'destructive' 
-    });
-    return;
-  }
+// Se WhatsApp válido mas email inválido (caso o webhook retorne)
+if (validation.email_valid === false) {
+  toast({ 
+    title: 'Email inválido', 
+    description: validation.reason || 'Por favor, verifique o email informado e tente novamente.',
+    variant: 'destructive' 
+  });
+  setIsLoading(false);
+  return;
 }
 ```
 
 ---
 
-## Formato do Telefone Enviado
+## Fluxo de Validação
 
-| Usuário digita | Exibido no campo | Enviado ao webhook |
-|----------------|------------------|-------------------|
-| 11999998888 | +55 (11) 99999-8888 | 5511999998888 |
+```
+Usuário clica "Criar conta"
+        ↓
+Validação local do nono dígito
+        ↓
+Webhook recebe email + telefone
+        ↓
+    ┌─────────────────────────────────┐
+    │ WhatsApp existe?                │
+    │   exists: false → Erro WhatsApp │
+    │   exists: true  → Próximo passo │
+    └─────────────────────────────────┘
+        ↓ (se WhatsApp OK)
+    ┌─────────────────────────────────┐
+    │ Email válido?                   │
+    │   email_valid: false → Erro     │
+    │   email_valid: true  → Cadastro │
+    └─────────────────────────────────┘
+```
 
 ---
 
-## Validação do Nono Dígito
+## Mensagens de Erro
 
-- Celulares brasileiros: 13 dígitos (55 + DDD + 9 + 8 dígitos)
-- O terceiro dígito após o DDD deve ser `9`
-- Exemplo válido: `5511999998888` ✓
-- Exemplo inválido: `5511899998888` ✗
+| Situação | Mensagem |
+|----------|----------|
+| WhatsApp não existe | "WhatsApp inválido. Por favor, forneça um novo número." |
+| Email inválido | "Email inválido. Por favor, verifique o email informado e tente novamente." |
 
