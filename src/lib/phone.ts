@@ -3,8 +3,8 @@ export const formatPhone = (value: string): string => {
   // Remove tudo que não é dígito
   let numbers = value.replace(/\D/g, '');
   
-  // Remove 55 do início se já existir (evita duplicação)
-  if (numbers.startsWith('55') && numbers.length > 11) {
+  // SEMPRE remove 55 do início (é o código do país que já adicionamos)
+  if (numbers.startsWith('55')) {
     numbers = numbers.substring(2);
   }
   
