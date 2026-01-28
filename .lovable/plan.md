@@ -1,193 +1,300 @@
 
-# Plano: Reestruturar Listagem de Usuários
 
-## Resumo das Alterações
+# Plano: Tornar Role, Email e Telefone Editáveis no Modal de Detalhes
 
-Simplificar e reorganizar a tabela de usuários conforme solicitado, unificando colunas e centralizando ações em um menu dropdown.
+## Resumo
 
----
-
-## Alterações na Tabela
-
-### Colunas Finais (Nova Estrutura)
-
-| Coluna | Descrição |
-|--------|-----------|
-| Nome | Mantém |
-| Email | Mantém |
-| Telefone | Mantém |
-| Role | Badge colorido (sem dropdown) |
-| Features | Badge com contador |
-| Pedidos | Mantém |
-| Total Gasto | Mantém |
-| Status | Unificado: Ativo/Inativo/Banido/Excluído com cores |
-| Origem | NOVA: Lojafy ou nome da loja de origem |
-| Ações | Menu dropdown único |
-
-### Colunas Removidas
-- ~~Alterar Role~~ (movido para modal)
-- ~~Plano~~ (removido)
-- ~~Atividade~~ (unificado com Status)
-- ~~Criação~~ (removido)
-- ~~Olho~~ (substituído por menu)
+Transformar os campos de Role, Email e Telefone em campos editáveis no modal de detalhes do usuário, permitindo que o admin atualize essas informações diretamente.
 
 ---
 
-## Detalhamento das Mudanças
+## Alterações no Modal
 
-### 1. Coluna "Status" Unificada com Cores
+### Visual Proposto
 
-```
-Status atual + Atividade → Status único colorido:
-
-• Verde (bg-green-100 text-green-800)  → "Ativo"
-• Cinza (bg-gray-100 text-gray-800)    → "Inativo" / "Aguardando"
-• Vermelho (bg-red-100 text-red-800)   → "Banido" / "Excluído"
-• Laranja (bg-orange-100 text-orange-800) → "Expira em Xd"
-```
-
-### 2. Coluna "Origem" (Nova)
-
-Mostra de onde o usuário veio:
-- `origem_tipo = 'lojafy'` ou `null` → Badge "Lojafy" (azul)
-- `origem_tipo = 'loja'` → Badge com nome da loja (verde)
-- `origem_tipo = 'importado'` → Badge "Importado" (cinza)
-- `origem_tipo = 'convite'` → Badge "Convite" (roxo)
-
-### 3. Menu de Ações (Dropdown)
-
-```
-┌────────────────────────┐
-│ ⋮  Ações               │
-├────────────────────────┤
-│ 👁️ Ver detalhes        │
-│ ──────────────────────│
-│ 🔄 Alterar role        │ (submenu com opções)
-│ ⚡ Ativar/Desativar     │
-│ 👤 Impersonar          │
-│ ──────────────────────│
-│ 🔓 Desbanir            │ (só se banido)
-│ 🗑️ Excluir             │ (vermelho)
-└────────────────────────┘
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  👤 Detalhes do Usuário                                         │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │ Informações Pessoais                                    │   │
+│  │                                                         │   │
+│  │ 👤 João Silva                                           │   │
+│  │                                                         │   │
+│  │ Role:     [▼ Revendedor        ]  ← SELECT EDITÁVEL     │   │
+│  │                                                         │   │
+│  │ Email:    [joao@email.com      ]  ← INPUT EDITÁVEL      │   │
+│  │                                                         │   │
+│  │ Telefone: [(11) 99999-9999     ]  ← INPUT EDITÁVEL      │   │
+│  │                                                         │   │
+│  │ 📅 Cliente desde 15/01/2026                             │   │
+│  │ 🕐 Último acesso: 28/01/2026 às 14:30                   │   │
+│  │ 🆔 abc123... [📋]                                       │   │
+│  │                                                         │   │
+│  │                              [💾 Salvar Alterações]     │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│  ...                                                           │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Arquivos a Modificar
+## Arquivo a Modificar
 
-### 1. `src/components/admin/UnifiedUsersTable.tsx`
+### `src/components/admin/UserDetailsModal.tsx`
 
-**Alterações:**
-- Remover imports: `Select`, `SelectContent`, `SelectItem`, `SelectTrigger`, `SelectValue`, `Edit`, `Eye`, `PremiumBadge`
-- Adicionar imports: `DropdownMenu`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuSeparator`, `DropdownMenuSub`, `DropdownMenuSubContent`, `DropdownMenuSubTrigger`, `DropdownMenuTrigger`, `MoreHorizontal`, `Store`
-- Remover colunas: "Alterar Role", "Plano", "Atividade", "Criação"
-- Adicionar coluna: "Origem"
-- Unificar Status + Atividade em uma única coluna colorida
-- Substituir botões de ação por DropdownMenu
-- Adicionar interface para dados de origem
-
-**Interface atualizada:**
+**Novos imports:**
 ```typescript
-interface UnifiedUser {
-  // ... campos existentes ...
-  origem_tipo?: 'lojafy' | 'loja' | 'importado' | 'convite';
-  origem_loja_nome?: string;
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { UserCog, Save, Loader2 } from 'lucide-react';
+```
+
+**Novos states:**
+```typescript
+const [editedEmail, setEditedEmail] = useState(user?.email || '');
+const [editedPhone, setEditedPhone] = useState(user?.phone || '');
+const [editedRole, setEditedRole] = useState(user?.role || 'customer');
+const [isSaving, setIsSaving] = useState(false);
+const [hasChanges, setHasChanges] = useState(false);
+```
+
+**Nova prop na interface:**
+```typescript
+interface UserDetailsModalProps {
+  user: {...} | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onUserUpdated?: () => void; // Para refresh da lista após salvar
 }
 ```
 
-### 2. `src/pages/admin/Clientes.tsx`
-
-**Alterações:**
-- Buscar dados de origem dos usuários (join com lojas se necessário)
-- Passar dados de origem para a tabela
-- Remover filtro de "Plano"
-
----
-
-## Implementação do Menu de Ações
-
-```tsx
-<DropdownMenu>
-  <DropdownMenuTrigger asChild>
-    <Button variant="ghost" size="icon" className="h-8 w-8">
-      <MoreHorizontal className="h-4 w-4" />
-    </Button>
-  </DropdownMenuTrigger>
-  <DropdownMenuContent align="end">
-    <DropdownMenuItem onClick={() => onViewDetails(user)}>
-      <Eye className="mr-2 h-4 w-4" />
-      Ver detalhes
-    </DropdownMenuItem>
-    <DropdownMenuSeparator />
-    <DropdownMenuSub>
-      <DropdownMenuSubTrigger>
-        <Users className="mr-2 h-4 w-4" />
-        Alterar role
-      </DropdownMenuSubTrigger>
-      <DropdownMenuSubContent>
-        {roles.map(role => (
-          <DropdownMenuItem 
-            key={role.value}
-            onClick={() => onUpdateRole(user.user_id, role.value)}
-          >
-            {role.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuSubContent>
-    </DropdownMenuSub>
-    <DropdownMenuItem onClick={() => onToggleStatus(...)}>
-      <Power className="mr-2 h-4 w-4" />
-      {user.is_active ? 'Desativar' : 'Ativar'}
-    </DropdownMenuItem>
-    <ImpersonationMenuItem {...} />
-    {isBanned && (
-      <DropdownMenuItem onClick={() => onUnbanUser(user)}>
-        <ShieldOff className="mr-2 h-4 w-4" />
-        Desbanir
-      </DropdownMenuItem>
-    )}
-    <DropdownMenuSeparator />
-    <DropdownMenuItem 
-      onClick={() => onDeleteUser(user)}
-      className="text-destructive"
-    >
-      <Trash2 className="mr-2 h-4 w-4" />
-      Excluir
-    </DropdownMenuItem>
-  </DropdownMenuContent>
-</DropdownMenu>
+**Constante de roles:**
+```typescript
+const ROLES = [
+  { value: 'customer', label: 'Cliente' },
+  { value: 'reseller', label: 'Revendedor' },
+  { value: 'supplier', label: 'Fornecedor' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'super_admin', label: 'Super Admin' },
+];
 ```
 
----
+**Função de salvar:**
+```typescript
+const handleSaveChanges = async () => {
+  if (!user) return;
+  setIsSaving(true);
+  try {
+    // Atualizar email/phone no profiles
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ 
+        email: editedEmail,
+        phone: editedPhone 
+      })
+      .eq('user_id', user.user_id);
 
-## Cores do Status Unificado
+    if (profileError) throw profileError;
 
-```tsx
-const getUnifiedStatus = (user) => {
-  if (user.deleted_at) {
-    return { label: 'Excluído', className: 'bg-red-100 text-red-800' };
+    // Atualizar role se mudou
+    if (editedRole !== user.role) {
+      const { error: roleError } = await supabase
+        .from('profiles')
+        .update({ role: editedRole })
+        .eq('user_id', user.user_id);
+
+      if (roleError) throw roleError;
+    }
+
+    toast({
+      title: 'Sucesso!',
+      description: 'Informações atualizadas com sucesso',
+    });
+
+    onUserUpdated?.();
+    setHasChanges(false);
+  } catch (error) {
+    toast({
+      title: 'Erro',
+      description: 'Falha ao atualizar informações',
+      variant: 'destructive',
+    });
+  } finally {
+    setIsSaving(false);
   }
-  if (isUserBanned(user.banned_until)) {
-    return { label: 'Banido', className: 'bg-red-100 text-red-800' };
-  }
-  if (!user.is_active) {
-    return { label: 'Inativo', className: 'bg-gray-100 text-gray-800' };
-  }
-  if (!user.last_sign_in_at) {
-    return { label: 'Aguardando', className: 'bg-yellow-100 text-yellow-800' };
-  }
-  return { label: 'Ativo', className: 'bg-green-100 text-green-800' };
 };
 ```
+
+**Atualizar useEffect para sincronizar states:**
+```typescript
+useEffect(() => {
+  if (user && isOpen) {
+    setEditedEmail(user.email);
+    setEditedPhone(user.phone || '');
+    setEditedRole(user.role);
+    setHasChanges(false);
+    fetchUserDetails();
+  }
+}, [user, isOpen]);
+```
+
+**Detectar mudanças:**
+```typescript
+useEffect(() => {
+  if (user) {
+    const changed = 
+      editedEmail !== user.email || 
+      editedPhone !== (user.phone || '') || 
+      editedRole !== user.role;
+    setHasChanges(changed);
+  }
+}, [editedEmail, editedPhone, editedRole, user]);
+```
+
+---
+
+## Nova Estrutura do Card "Informações Pessoais"
+
+```tsx
+<Card>
+  <CardHeader className="pb-3">
+    <CardTitle className="text-base">Informações Pessoais</CardTitle>
+  </CardHeader>
+  <CardContent className="space-y-4">
+    {/* Nome (não editável) */}
+    <div className="flex items-center gap-2">
+      <Users className="w-4 h-4 text-muted-foreground" />
+      <span className="font-medium">
+        {user.first_name} {user.last_name}
+      </span>
+    </div>
+
+    {/* Role (editável) */}
+    <div className="grid grid-cols-[100px_1fr] items-center gap-2">
+      <Label className="flex items-center gap-2">
+        <UserCog className="w-4 h-4 text-muted-foreground" />
+        Role
+      </Label>
+      <Select value={editedRole} onValueChange={setEditedRole}>
+        <SelectTrigger className="w-[200px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {ROLES.map(role => (
+            <SelectItem key={role.value} value={role.value}>
+              {role.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+
+    {/* Email (editável) */}
+    <div className="grid grid-cols-[100px_1fr] items-center gap-2">
+      <Label className="flex items-center gap-2">
+        <Mail className="w-4 h-4 text-muted-foreground" />
+        Email
+      </Label>
+      <Input 
+        value={editedEmail}
+        onChange={(e) => setEditedEmail(e.target.value)}
+        type="email"
+        className="max-w-[300px]"
+      />
+    </div>
+
+    {/* Telefone (editável) */}
+    <div className="grid grid-cols-[100px_1fr] items-center gap-2">
+      <Label className="flex items-center gap-2">
+        <Phone className="w-4 h-4 text-muted-foreground" />
+        Telefone
+      </Label>
+      <Input 
+        value={editedPhone}
+        onChange={(e) => setEditedPhone(e.target.value)}
+        type="tel"
+        placeholder="(00) 00000-0000"
+        className="max-w-[200px]"
+      />
+    </div>
+
+    {/* Informações não editáveis */}
+    <div className="flex items-center gap-2 pt-2 border-t">
+      <Calendar className="w-4 h-4 text-muted-foreground" />
+      <span className="text-sm text-muted-foreground">
+        Cliente desde {format(...)}
+      </span>
+    </div>
+
+    {user.last_sign_in_at && (
+      <div className="flex items-center gap-2">
+        <Clock className="w-4 h-4 text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">
+          Último acesso: {format(...)}
+        </span>
+      </div>
+    )}
+
+    {/* ID */}
+    <div className="flex items-center gap-2">
+      <IdCard className="w-4 h-4 text-muted-foreground" />
+      <span className="text-sm font-mono text-muted-foreground truncate max-w-[200px]">
+        {user.user_id}
+      </span>
+      <Button variant="ghost" size="sm" ...>
+        <Copy className="w-3 h-3" />
+      </Button>
+    </div>
+
+    {/* Botão Salvar */}
+    {hasChanges && (
+      <div className="flex justify-end pt-2 border-t">
+        <Button 
+          onClick={handleSaveChanges} 
+          disabled={isSaving}
+          size="sm"
+        >
+          {isSaving ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <Save className="w-4 h-4 mr-2" />
+          )}
+          Salvar Alterações
+        </Button>
+      </div>
+    )}
+  </CardContent>
+</Card>
+```
+
+---
+
+## Alterações Adicionais
+
+### `src/pages/admin/Clientes.tsx`
+
+Passar callback `onUserUpdated` para o modal para recarregar a lista após salvar:
+
+```tsx
+<UserDetailsModal
+  user={selectedUser}
+  isOpen={isModalOpen}
+  onClose={() => setIsModalOpen(false)}
+  onUserUpdated={() => refetchUsers()}
+/>
+```
+
+### `src/components/admin/UnifiedUsersTable.tsx`
+
+Remover o submenu "Alterar role" do dropdown de ações (já que agora está no modal).
 
 ---
 
 ## Ordem de Execução
 
-1. Modificar `UnifiedUsersTable.tsx` com nova estrutura de colunas
-2. Implementar menu dropdown de ações
-3. Adicionar coluna de origem
-4. Modificar `Clientes.tsx` para buscar dados de origem
-5. Remover filtro de plano
-6. Ajustar colspan para "Nenhum usuário encontrado"
+1. Modificar `UserDetailsModal.tsx` com campos editáveis e lógica de salvamento
+2. Atualizar `Clientes.tsx` para passar callback de atualização
+3. Remover submenu de role do `UnifiedUsersTable.tsx`
 
