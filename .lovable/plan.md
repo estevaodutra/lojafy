@@ -1,307 +1,298 @@
 
 
-# Criar Página Exclusiva "</> API Documentação" no Painel Super Admin
+# Unificação da Gestão de Clientes e Usuários
 
 ## Resumo
 
-Criar uma nova página dedicada para documentação de API (`/super-admin/api-docs`) com:
-1. Navegação lateral estilo sidebar como no exemplo (Introdução, Autenticação, categorias de endpoints)
-2. Separação por abas/seções para cada tipo de integração
-3. Paginação personalizada para evitar scroll longo
-4. Remover a aba "Integrações" da página de Configurações
+Atualmente existem duas abas separadas na página `/super-admin/clientes`:
+1. **Clientes** (AdminCustomers) - Mostra profiles com estatísticas de pedidos
+2. **Gestão de Usuários** (GestaoUsuarios) - Mostra usuários com roles, planos, status e lógica de limpeza
+
+A proposta é **unificar tudo em uma única tabela** com a lógica de limpeza integrada, removendo a separação por abas mas mantendo todas as funcionalidades.
 
 ---
 
 ## Layout Proposto
 
 ```text
-┌───────────────────────────────────────────────────────────────────────────────────┐
-│  SUPER ADMIN SIDEBAR          │            CONTEÚDO DA PÁGINA                    │
-│  ─────────────────────────    │  ─────────────────────────────────────────────── │
-│  Administração                 │                                                  │
-│  ├── Dashboard                 │   </> API Documentação                           │
-│  ├── Catálogo                  │   ────────────────────                           │
-│  ├── Pedidos                   │                                                  │
-│  ├── Clientes                  │   ┌────────────────────┬──────────────────────┐ │
-│  ├── Design                    │   │ NAVEGAÇÃO LATERAL  │ CONTEÚDO             │ │
-│  ├── Configurações             │   │ ────────────────── │ ────────────────────  │ │
-│  ├── Financeiro                │   │ ◎ Introdução       │                      │ │
-│  └── </> API Docs  ← NOVO      │   │ 🔑 Autenticação    │ [Conteúdo Selecionado]│ │
-│                                 │   │ 🔧 Chaves de API   │                      │ │
-│  Suporte                        │   │                    │                      │ │
-│  └── Chat de Suporte            │   │ ENDPOINTS          │                      │ │
-│                                 │   │ ▼ Catálogo         │                      │ │
-│  Academy                        │   │   POST /cadastrar  │                      │ │
-│  └── Lojafy Academy             │   │   GET  /listar     │                      │ │
-│                                 │   │ ▼ Pedidos          │ [Paginação]          │ │
-│                                 │   │   GET  /recentes   │  < 1 2 3 4 5 >       │ │
-│                                 │   │ ▼ Academy          │                      │ │
-│                                 │   └────────────────────┴──────────────────────┘ │
-└───────────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│ Gestão de Usuários                                                                  │
+│ Gerencie todos os usuários da plataforma                          [+ Criar Usuário] │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                     │
+│ ┌────────────────────┐  ┌────────────────────┐  ┌────────────────────┐             │
+│ │ 🟡 Serão Desativados│  │ 🔴 Serão Excluídos │  │ ⬜ Já Desativados  │             │
+│ │ 30+ dias sem acesso │  │ 60+ dias sem acesso│  │ Aguardando exclusão│             │
+│ │        5           │  │         2          │  │         3          │             │
+│ └────────────────────┘  └────────────────────┘  └────────────────────┘             │
+│                                                                                     │
+│ ┌───────────────────────────────────────────────────────────────────────────────┐  │
+│ │ [🔍 Buscar...]     [Role ▼]     [Plano ▼]     [Status ▼]     [Limpeza 🗑️]    │  │
+│ └───────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                     │
+│ ┌───────────────────────────────────────────────────────────────────────────────┐  │
+│ │ Nome     │ Email   │ Telefone│ Role  │ Plano │ Pedidos│ Total  │ Status │ Ações │  │
+│ ├──────────┼─────────┼─────────┼───────┼───────┼────────┼────────┼────────┼───────┤  │
+│ │ João...  │ j@...   │ (11)... │ Client│  -    │  5     │ R$500  │ Ativo  │ 🔍 ⚡ │  │
+│ │ Maria... │ m@...   │ (11)... │ Resell│Premium│  12    │ R$2.5k │ Ativo  │ 🔍 ⚡ │  │
+│ │ Pedro... │ p@...   │ (11)... │ Client│  -    │  0     │ R$0    │ 20d p/ │ 🔍 ⚡ │  │
+│ └───────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                     │
+│ Página 1 de 5                                          [< Anterior] [Próxima >]    │
+└─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Arquivos a Criar
+## Alterações Propostas
 
-### 1. `src/pages/admin/ApiDocumentation.tsx` (Nova Página Principal)
+### 1. Página Única Unificada
 
-Página com layout de duas colunas:
-- **Coluna esquerda**: Navegação lateral com seções colapsáveis
-- **Coluna direita**: Conteúdo da seção selecionada com paginação
+**Arquivo:** `src/pages/admin/Clientes.tsx`
 
-Seções da navegação:
-- **Introdução** - Visão geral da API
-- **Autenticação** - Como autenticar
-- **Chaves de API** - Gerenciamento (ApiKeyManager existente)
-- **Catálogo** (colapsável)
-  - POST /api-produtos-cadastrar
-  - GET /api-produtos-listar
-  - GET /api-produtos-aguardando-aprovacao
-  - GET /api-categorias-listar
-  - POST /api-categorias-cadastrar
-  - GET /api-subcategorias-listar
-  - POST /api-subcategorias-cadastrar
-- **Pedidos** (colapsável)
-  - GET /api-top-produtos
-  - GET /api-pedidos-recentes
-  - GET /api-pedidos-listar
-- **Ranking/Demo** (colapsável)
-  - POST /api-demo-pedidos-cadastrar
-  - POST /api-demo-usuarios-cadastrar
-  - POST /api-ranking-produto-cadastrar
-- **Academy** (colapsável)
-  - Usuários
-  - Cursos
-  - Matrículas
-  - Progresso
+Transformar de tabs para página única com:
+- Cards de status de limpeza no topo (UserCleanupPanel)
+- Filtros unificados (busca, role, plano, status)
+- Botão de acesso rápido ao histórico de limpeza
+- Tabela unificada com todas as informações
 
-### 2. `src/components/admin/ApiDocsSidebar.tsx` (Navegação Lateral)
+### 2. Tabela Unificada com Colunas
 
-Componente de sidebar com:
-- Itens de menu fixos (Introdução, Autenticação, Chaves de API)
-- Seções colapsáveis para cada categoria de endpoint
-- Badges de método (GET, POST, PUT, DELETE) coloridos
-- Estado ativo para item selecionado
+| Coluna | Origem | Descrição |
+|--------|--------|-----------|
+| Nome | profiles | Nome completo |
+| Email | auth.users | Email de cadastro |
+| Telefone | profiles | Telefone do perfil |
+| Role | user_roles | Badge com tipo de usuário |
+| Plano | profiles | Premium/Free (só para resellers) |
+| Pedidos | orders (count) | Quantidade de pedidos |
+| Total Gasto | orders (sum) | Soma dos pedidos |
+| Último Acesso | auth.users | Data do último login |
+| Atividade | calculated | Status de limpeza automática |
+| Status | profiles + auth | Ativo/Inativo/Banido/Excluído |
+| Ações | - | Ver detalhes, Alterar role, etc |
 
-### 3. `src/components/admin/ApiDocsContent.tsx` (Área de Conteúdo)
+### 3. Botão de Histórico de Limpeza
 
-Componente que renderiza o conteúdo baseado na seção selecionada:
-- Seção Introdução
-- Seção Autenticação
-- Seção Chaves de API (usa ApiKeyManager)
-- Lista de endpoints com paginação (5 por página)
-
-### 4. `src/components/admin/ApiDocsPagination.tsx` (Paginação Customizada)
-
-Paginação estilizada com:
-- Botões anterior/próximo
-- Números de página limitados (máximo 5 visíveis)
-- Elipse para páginas intermediárias
-- Contagem de itens (ex: "Mostrando 1-5 de 15")
+Adicionar um botão que abre um modal/drawer com:
+- Regras de limpeza automática
+- Logs de limpeza recentes
+- Botão para executar limpeza manual
 
 ---
 
-## Arquivos a Modificar
+## Estrutura de Dados Unificada
 
-### 1. `src/components/layouts/SuperAdminLayout.tsx`
+A query RPC `get_users_with_email` já retorna:
+- Dados do perfil (nome, telefone, etc)
+- Email do auth.users
+- Role do user_roles
+- Status de ban e deleted
 
-Adicionar novo item no menu:
-
-```typescript
-const superAdminMenuItems = [
-  // ... items existentes
-  {
-    title: 'Financeiro',
-    url: '/super-admin/financeiro',
-    icon: DollarSign,
-  },
-  {
-    title: '</> API Docs',  // ← NOVO
-    url: '/super-admin/api-docs',
-    icon: Code,
-  },
-];
-```
-
-### 2. `src/App.tsx`
-
-Adicionar rota:
-
-```typescript
-<Route path="api-docs" element={<ApiDocumentation />} />
-```
-
-### 3. `src/pages/admin/Configuracoes.tsx`
-
-Remover a aba "Integrações":
-
-```typescript
-// ANTES
-<TabsTrigger value="integrations">Integrações</TabsTrigger>
-<TabsContent value="integrations">
-  <IntegracaoPage />
-</TabsContent>
-
-// DEPOIS - Remover completamente
-```
+Adicionar dados de pedidos na mesma query ou via join client-side:
+- order_count
+- total_spent
+- last_order_date
 
 ---
 
-## Estrutura de Dados para Endpoints
+## Componentes Afetados
 
-```typescript
-interface EndpointCategory {
-  id: string;
-  title: string;
-  icon: string;
-  endpoints: EndpointData[];
-}
-
-const apiCategories: EndpointCategory[] = [
-  {
-    id: 'catalog',
-    title: 'Catálogo',
-    icon: 'Package',
-    endpoints: [...] // endpoints existentes de Integracoes.tsx
-  },
-  {
-    id: 'orders',
-    title: 'Pedidos',
-    icon: 'ShoppingCart',
-    endpoints: [...]
-  },
-  {
-    id: 'ranking',
-    title: 'Ranking & Demo',
-    icon: 'BarChart3',
-    endpoints: [...]
-  },
-  {
-    id: 'academy',
-    title: 'Academy',
-    icon: 'GraduationCap',
-    subcategories: [
-      { id: 'users', title: 'Usuários', endpoints: [...] },
-      { id: 'courses', title: 'Cursos', endpoints: [...] },
-      { id: 'enrollments', title: 'Matrículas', endpoints: [...] },
-      { id: 'progress', title: 'Progresso', endpoints: [...] }
-    ]
-  }
-];
-```
+| Arquivo | Ação | Descrição |
+|---------|------|-----------|
+| `src/pages/admin/Clientes.tsx` | Refatorar | Remover tabs, unificar em página única |
+| `src/pages/admin/GestaoUsuarios.tsx` | Manter | Exportar lógica de tabela como componente |
+| `src/pages/admin/Customers.tsx` | Remover | Funcionalidade absorvida pela página unificada |
+| `src/components/admin/UserCleanupPanel.tsx` | Manter | Continua exibindo cards de limpeza |
+| `src/components/admin/CleanupHistoryTab.tsx` | Modificar | Transformar em modal/drawer |
+| `src/components/admin/UnifiedUsersTable.tsx` | Criar | Nova tabela unificada |
 
 ---
 
-## Design da Navegação Lateral
-
-| Item | Ícone | Comportamento |
-|------|-------|---------------|
-| Introdução | FileText | Página estática |
-| Autenticação | Key | Página estática |
-| Chaves de API | Settings | ApiKeyManager |
-| Catálogo | Package | Colapsável, lista endpoints |
-| Pedidos | ShoppingCart | Colapsável, lista endpoints |
-| Ranking & Demo | BarChart3 | Colapsável, lista endpoints |
-| Academy | GraduationCap | Colapsável, com sub-categorias |
-
----
-
-## Paginação Personalizada
-
-Para evitar scroll longo, a lista de endpoints será paginada:
-
-- **5 endpoints por página** (configurável)
-- Navegação: `[<] [1] [2] [3] [...] [8] [>]`
-- Mostra "Exibindo 1-5 de 23 endpoints"
-- Transição suave entre páginas
+## Fluxo de Dados
 
 ```text
-┌─────────────────────────────────────────────────────┐
-│  Endpoints de Catálogo (7 endpoints)                │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│  [EndpointCard 1]                                   │
-│  [EndpointCard 2]                                   │
-│  [EndpointCard 3]                                   │
-│  [EndpointCard 4]                                   │
-│  [EndpointCard 5]                                   │
-│                                                     │
-│  ← Anterior   [1] [2]   Próximo →                   │
-│                                                     │
-│  Exibindo 1-5 de 7 endpoints                        │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        Clientes.tsx                             │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ UserCleanupPanel - Cards de status de limpeza            │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                              │                                  │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ Filtros + Botão Histórico Limpeza                        │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                              │                                  │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ UnifiedUsersTable                                        │  │
+│  │ - Dados de get_users_with_email                          │  │
+│  │ - Dados de pedidos por usuário                           │  │
+│  │ - Modal de detalhes do cliente                           │  │
+│  │ - Ações de gestão (role, status, etc)                    │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                              │                                  │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ CleanupHistoryDrawer (quando aberto)                     │  │
+│  └──────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Funcionalidades Mantidas
+
+### Da aba "Clientes" (AdminCustomers):
+- Visualização de detalhes do cliente em modal
+- Estatísticas de pedidos (quantidade, total gasto)
+- Histórico de endereços e pedidos
+- Badge de status baseado em última compra
+
+### Da aba "Gestão de Usuários" (GestaoUsuarios):
+- Filtros por role, plano e status
+- Cards de limpeza automática (UserCleanupPanel)
+- Alterar role do usuário
+- Ativar/desativar usuário
+- Excluir usuário
+- Desbanir usuário
+- Editar plano de revendedor
+- Impersonar usuário
+- Paginação com lógica de elipse
+- Histórico de limpeza
+
+---
+
+## Modal de Detalhes do Cliente
+
+Ao clicar no ícone de visualização, abre modal com:
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│ 👤 Detalhes do Usuário                                    [X]  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ Informações Pessoais                                        │ │
+│ │ Nome: João Silva                                            │ │
+│ │ Email: joao@email.com                                       │ │
+│ │ Telefone: (11) 99999-9999                                   │ │
+│ │ CPF: ***.***.***-**                                         │ │
+│ │ Cliente desde: 15/01/2024                                   │ │
+│ │ Último acesso: 25/01/2026 14:30                             │ │
+│ │ ID: [copy icon] abc-123-def                                 │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ 📍 Endereços (2)                                            │ │
+│ │ ├── Casa (Padrão)                                           │ │
+│ │ │   Rua ABC, 123 - Bairro - Cidade/SP - CEP 00000-000       │ │
+│ │ └── Trabalho                                                │ │
+│ │     Av XYZ, 456 - Centro - Cidade/SP - CEP 11111-111        │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ 🛒 Histórico de Pedidos (5)                                 │ │
+│ │ ├── #ORD-001 - 25/01/2026 - R$ 150,00 - Entregue            │ │
+│ │ ├── #ORD-002 - 20/01/2026 - R$ 89,90 - Em trânsito          │ │
+│ │ └── ... e mais 3 pedido(s)                                  │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ ⚙️ Ações Administrativas                                    │ │
+│ │ [Alterar Role ▼]  [Editar Plano]  [Impersonar]              │ │
+│ │ [Ativar/Desativar]  [Banir/Desbanir]  [🗑️ Excluir]          │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Drawer de Histórico de Limpeza
+
+Botão "🗑️ Limpeza" abre drawer lateral com:
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│ Limpeza Automática de Usuários                            [X]  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ ⏰ Regras de Limpeza                                        │ │
+│ │ • 30 dias: Usuários sem acesso são desativados              │ │
+│ │ • 60 dias: Usuários desativados são excluídos               │ │
+│ │ • Proteção: Admins nunca são afetados                       │ │
+│ │ • Automático: Executa às 3h da manhã                        │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│ [🔴 Executar Limpeza Agora]                                     │
+│                                                                 │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ 📋 Logs de Limpeza                                          │ │
+│ │ ├── [Excluído] joao@email.com - 65 dias - 26/01/2026        │ │
+│ │ ├── [Desativado] maria@email.com - 32 dias - 26/01/2026     │ │
+│ │ └── [Desativado] pedro@email.com - 31 dias - 25/01/2026     │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Seção Técnica
 
-### Estado do Componente Principal
+### Query Unificada
+
+Criar uma nova RPC ou modificar `get_users_with_email` para incluir dados de pedidos:
+
+```sql
+-- Adicionar à query existente
+LEFT JOIN LATERAL (
+  SELECT 
+    COUNT(*) as order_count,
+    COALESCE(SUM(total_amount), 0) as total_spent,
+    MAX(created_at) as last_order_date
+  FROM orders 
+  WHERE orders.user_id = profiles.user_id
+) order_stats ON true
+```
+
+### Estados do Componente Principal
 
 ```typescript
-const [selectedSection, setSelectedSection] = useState<string>('intro');
-const [selectedEndpoint, setSelectedEndpoint] = useState<string | null>(null);
+// Estados
+const [searchTerm, setSearchTerm] = useState('');
+const [roleFilter, setRoleFilter] = useState('all');
+const [planFilter, setPlanFilter] = useState('all');
+const [statusFilter, setStatusFilter] = useState('all');
 const [currentPage, setCurrentPage] = useState(1);
-const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['catalog']));
-
-const ITEMS_PER_PAGE = 5;
+const [selectedUser, setSelectedUser] = useState<User | null>(null);
+const [showCleanupDrawer, setShowCleanupDrawer] = useState(false);
 ```
 
-### Lógica de Paginação
+### Arquivos a Criar
 
-```typescript
-const paginatedEndpoints = useMemo(() => {
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  return currentEndpoints.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-}, [currentEndpoints, currentPage]);
+1. `src/components/admin/UnifiedUsersTable.tsx` - Tabela principal
+2. `src/components/admin/UserDetailsModal.tsx` - Modal de detalhes
+3. `src/components/admin/CleanupHistoryDrawer.tsx` - Drawer de limpeza
 
-const totalPages = Math.ceil(currentEndpoints.length / ITEMS_PER_PAGE);
-```
+### Arquivos a Modificar
 
-### Navegação por Categoria
+1. `src/pages/admin/Clientes.tsx` - Refatorar para página única
+2. `src/components/admin/CleanupHistoryTab.tsx` - Adaptar para drawer
 
-```typescript
-const handleCategoryClick = (categoryId: string) => {
-  setExpandedCategories(prev => {
-    const next = new Set(prev);
-    if (next.has(categoryId)) {
-      next.delete(categoryId);
-    } else {
-      next.add(categoryId);
-    }
-    return next;
-  });
-};
+### Arquivos a Remover
 
-const handleEndpointClick = (categoryId: string, endpointIndex: number) => {
-  setSelectedSection(categoryId);
-  setSelectedEndpoint(`${categoryId}-${endpointIndex}`);
-  setCurrentPage(Math.floor(endpointIndex / ITEMS_PER_PAGE) + 1);
-};
-```
+1. `src/pages/admin/Customers.tsx` - Funcionalidade absorvida
+2. `src/pages/admin/GestaoUsuarios.tsx` - Funcionalidade absorvida
 
 ---
 
-## Arquivos Afetados
+## Resultado Esperado
 
-| Arquivo | Ação | Descrição |
-|---------|------|-----------|
-| `src/pages/admin/ApiDocumentation.tsx` | Criar | Página principal da documentação |
-| `src/components/admin/ApiDocsSidebar.tsx` | Criar | Navegação lateral |
-| `src/components/admin/ApiDocsContent.tsx` | Criar | Área de conteúdo |
-| `src/components/admin/ApiDocsPagination.tsx` | Criar | Paginação customizada |
-| `src/components/layouts/SuperAdminLayout.tsx` | Modificar | Adicionar item ao menu |
-| `src/App.tsx` | Modificar | Adicionar rota |
-| `src/pages/admin/Configuracoes.tsx` | Modificar | Remover aba Integrações |
-
----
-
-## Componentes Reutilizados
-
-Os seguintes componentes existentes serão reutilizados:
-- `EndpointCard` - Exibição de cada endpoint
-- `ApiKeyManager` - Gerenciamento de chaves
-- `CodeBlock` - Exibição de código
-- `ApiTester` - Testes de requisição
+| Antes | Depois |
+|-------|--------|
+| 2 abas separadas | Página única unificada |
+| Dados duplicados | Dados consolidados |
+| 2 tabelas diferentes | 1 tabela completa |
+| Navegação confusa | Fluxo simplificado |
+| Modal de cliente básico | Modal completo com ações |
+| Tab de limpeza | Drawer de limpeza |
 
