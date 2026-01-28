@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Mail, Lock, User, Phone } from 'lucide-react';
-import { formatPhone } from '@/lib/phone';
+import { formatPhone, cleanPhone } from '@/lib/phone';
 import lojafyLogo from '@/assets/lojafy-logo-new.png';
 
 const Auth = () => {
@@ -82,6 +82,21 @@ const Auth = () => {
     
   setIsLoading(true);
 
+    // Validar nono dígito (celulares brasileiros começam com 9 após o DDD)
+    const phoneNumbers = cleanPhone(signupPhone);
+    if (phoneNumbers.length === 13) { // 55 + DDD(2) + número(9)
+      const firstDigitAfterDDD = phoneNumbers.charAt(4); // posição após 55XX
+      if (firstDigitAfterDDD !== '9') {
+        toast({ 
+          title: 'Telefone inválido', 
+          description: 'Celulares devem começar com 9 após o DDD.',
+          variant: 'destructive' 
+        });
+        setIsLoading(false);
+        return;
+      }
+    }
+
     // Validação externa via webhook
     try {
       const validationResponse = await fetch(
@@ -93,7 +108,7 @@ const Auth = () => {
           },
           body: JSON.stringify({
             email: signupEmail,
-            phone: signupPhone,
+            phone: phoneNumbers,
             first_name: firstName,
             last_name: lastName,
           }),
