@@ -9,6 +9,7 @@ import {
   UserX,
   AlertTriangle,
   Eye,
+  Sparkles,
 } from 'lucide-react';
 import {
   Table,
@@ -27,6 +28,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { PremiumBadge } from '@/components/premium/PremiumBadge';
 import { ImpersonationButton } from '@/components/admin/ImpersonationButton';
 import {
@@ -39,6 +46,11 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination';
 import { UserRole } from '@/hooks/useUserRole';
+
+export interface UserFeatureInfo {
+  feature_count: number;
+  feature_names: string[];
+}
 
 interface UnifiedUser {
   id: string;
@@ -57,6 +69,7 @@ interface UnifiedUser {
   deleted_at?: string;
   order_count?: number;
   total_spent?: number;
+  features?: UserFeatureInfo;
 }
 
 interface UnifiedUsersTableProps {
@@ -238,6 +251,7 @@ export const UnifiedUsersTable = ({
               <TableHead className="whitespace-nowrap min-w-[100px]">Role</TableHead>
               <TableHead className="whitespace-nowrap min-w-[120px]">Alterar Role</TableHead>
               <TableHead className="whitespace-nowrap min-w-[80px]">Plano</TableHead>
+              <TableHead className="whitespace-nowrap min-w-[80px]">Features</TableHead>
               <TableHead className="whitespace-nowrap min-w-[70px]">Pedidos</TableHead>
               <TableHead className="whitespace-nowrap min-w-[90px]">Total Gasto</TableHead>
               <TableHead className="whitespace-nowrap min-w-[80px]">Status</TableHead>
@@ -305,6 +319,32 @@ export const UnifiedUsersTable = ({
                           </Badge>
                         )}
                       </div>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {user.features && user.features.feature_count > 0 ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="secondary" className="cursor-help flex items-center gap-1">
+                              <Sparkles className="h-3 w-3" />
+                              {user.features.feature_count}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="text-sm">
+                              <p className="font-medium mb-1">Features ativas:</p>
+                              <ul className="list-disc list-inside">
+                                {user.features.feature_names.map((name, i) => (
+                                  <li key={i}>{name}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
@@ -401,7 +441,7 @@ export const UnifiedUsersTable = ({
             })}
             {!users.length && (
               <TableRow>
-                <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
                   Nenhum usuário encontrado
                 </TableCell>
               </TableRow>
