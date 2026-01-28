@@ -125,3 +125,9 @@ verify_jwt = false
 
 [functions.unban-user]
 verify_jwt = false
+
+[functions.atribuir-feature]
+verify_jwt = false
+
+[functions.revogar-feature]
+verify_jwt = false

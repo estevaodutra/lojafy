@@ -21,7 +21,8 @@ import {
   MessageSquare,
   DollarSign,
   GraduationCap,
-  Code
+  Code,
+  Sparkles
 } from 'lucide-react';
 import {
   Sidebar,
@@ -72,6 +73,11 @@ const superAdminMenuItems = [
     title: 'Financeiro',
     url: '/super-admin/financeiro',
     icon: DollarSign,
+  },
+  {
+    title: 'Features',
+    url: '/super-admin/features',
+    icon: Sparkles,
   },
   {
     title: '</> API Docs',

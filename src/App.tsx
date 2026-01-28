@@ -119,6 +119,7 @@ import SupportManagement from "./pages/admin/SupportManagement";
 import ChatSupport from "./pages/admin/ChatSupport";
 import AdminAcademy from "./pages/admin/Academy";
 import ApiDocumentation from "./pages/admin/ApiDocumentation";
+import Features from "./pages/admin/Features";
 import CourseModules from "./pages/customer/CourseModules";
 import ModuleLessons from "./pages/customer/ModuleLessons";
 import LessonViewer from "./pages/customer/LessonViewer";
@@ -261,6 +262,7 @@ const App = () => {
                 <Route path="financeiro" element={<AdminFinanceiro />} />
                 <Route path="chat-suporte" element={<ChatSupport />} />
                 <Route path="academy" element={<AdminAcademy />} />
+                <Route path="features" element={<Features />} />
                 
                 {/* Rotas antigas mantidas para compatibilidade */}
                 <Route path="usuarios" element={<Clientes />} />
