@@ -111,7 +111,7 @@ import PublicStoreProviderRoute from "./components/public-store/PublicStoreProvi
 import AIKnowledgeBase from "./pages/admin/AIKnowledgeBase";
 import ChatWidget from "@/components/support/ChatWidget";
 import Catalogo from "./pages/admin/Catalogo";
-import Clientes from "./pages/admin/Clientes";
+import Clientes from "./pages/admin/Clientes"; // Unified user management
 import Design from "./pages/admin/Design";
 import Configuracoes from "./pages/admin/Configuracoes";
 
