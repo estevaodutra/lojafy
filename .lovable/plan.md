@@ -1,43 +1,10 @@
 
 
-# Plano: Adicionar Campo WhatsApp no Cadastro
+# Implementação: Validação via Webhook antes do Cadastro
 
 ## Resumo
 
-Adicionar campo de WhatsApp com máscara brasileira no formulário de cadastro (aba "Cadastrar") da página de autenticação.
-
----
-
-## Visual Proposto
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│  Acessar sua conta                                          │
-│  Entre ou crie uma conta para continuar                     │
-├─────────────────────────────────────────────────────────────┤
-│  [ Entrar ]  [ Cadastrar ]                                  │
-├─────────────────────────────────────────────────────────────┤
-│  Nome              Sobrenome                                │
-│  [👤 João     ]    [Silva        ]                          │
-│                                                             │
-│  WhatsApp                              ← NOVO CAMPO         │
-│  [📱 +55 (11) 99999-9999]                                   │
-│                                                             │
-│  Email                                                      │
-│  [✉ seu@email.com]                                          │
-│                                                             │
-│  Confirmar Email                                            │
-│  [✉ Repita seu email]                                       │
-│                                                             │
-│  Senha                                                      │
-│  [🔒 ••••••••]                                              │
-│                                                             │
-│  Confirmar Senha                                            │
-│  [🔒 ••••••••]                                              │
-│                                                             │
-│  [        Criar conta        ]                              │
-└─────────────────────────────────────────────────────────────┘
-```
+Adicionar chamada POST ao webhook de validação antes de criar a conta. Se dados inválidos, mostra mensagem pedindo para corrigir. O usuário pode corrigir e tentar novamente.
 
 ---
 
@@ -45,105 +12,79 @@ Adicionar campo de WhatsApp com máscara brasileira no formulário de cadastro (
 
 ### `src/pages/Auth.tsx`
 
-**Novos imports:**
+**Modificar função `handleSignup` (linhas 83-93)**
+
+Adicionar validação externa entre `setIsLoading(true)` e a chamada `signUp()`:
+
 ```typescript
-import { Phone } from 'lucide-react';
-import { formatPhone } from '@/lib/phone';
-```
+setIsLoading(true);
 
-**Novo state:**
-```typescript
-const [signupPhone, setSignupPhone] = useState('');
-```
-
-**Modificar função signUp no AuthContext:**
-- A função `signUp` precisa aceitar o parâmetro `phone`
-- Salvar o telefone no user_metadata ou no profile após criação
-
-**Novo campo no formulário (após Nome/Sobrenome):**
-```tsx
-<div className="space-y-2">
-  <Label htmlFor="signup-phone">WhatsApp</Label>
-  <div className="relative">
-    <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-    <Input 
-      id="signup-phone" 
-      type="tel" 
-      placeholder="+55 (11) 99999-9999" 
-      value={signupPhone} 
-      onChange={e => setSignupPhone(formatPhone(e.target.value))} 
-      className="pl-10" 
-      maxLength={19}
-    />
-  </div>
-</div>
-```
-
----
-
-## Alterações no AuthContext
-
-### `src/contexts/AuthContext.tsx`
-
-**Modificar função signUp:**
-```typescript
-const signUp = async (
-  email: string, 
-  password: string, 
-  firstName: string, 
-  lastName: string,
-  phone?: string  // Novo parâmetro opcional
-) => {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: `${window.location.origin}/`,
-      data: {
+// Validação externa via webhook
+try {
+  const validationResponse = await fetch(
+    'https://n8n-n8n.nuwfic.easypanel.host/webhook/lojafy_data_validation',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: signupEmail,
+        phone: signupPhone,
         first_name: firstName,
         last_name: lastName,
-        phone: phone || ''  // Salvar no user_metadata
-      }
+      }),
     }
-  });
-  // ... resto da lógica
-};
-```
-
-**Atualizar trigger de criação de profile para incluir phone:**
-- O phone será salvo no user_metadata e posteriormente sincronizado com a tabela profiles
-
----
-
-## Chamada Atualizada no Auth.tsx
-
-```typescript
-const handleSignup = async (e: React.FormEvent) => {
-  e.preventDefault();
-  
-  // ... validações existentes ...
-  
-  setIsLoading(true);
-  const result = await signUp(
-    signupEmail, 
-    signupPassword, 
-    firstName, 
-    lastName,
-    signupPhone  // Passar o telefone
   );
   
-  // ... resto da lógica ...
-};
+  const validationData = await validationResponse.json();
+  
+  if (!validationData.email_valid) {
+    toast({ 
+      title: 'Email inválido', 
+      description: validationData.reason || 'Por favor, verifique o email informado e tente novamente.',
+      variant: 'destructive' 
+    });
+    setIsLoading(false);
+    return;
+  }
+  
+  if (!validationData.phone) {
+    toast({ 
+      title: 'Telefone inválido', 
+      description: validationData.reason || 'Por favor, verifique o número de WhatsApp e tente novamente.',
+      variant: 'destructive' 
+    });
+    setIsLoading(false);
+    return;
+  }
+  
+} catch (error) {
+  console.error('Erro na validação:', error);
+  toast({ 
+    title: 'Erro na validação', 
+    description: 'Não foi possível validar seus dados. Tente novamente.',
+    variant: 'destructive' 
+  });
+  setIsLoading(false);
+  return;
+}
+
+// Se validação passou, prosseguir com o cadastro
+const result = await signUp(signupEmail, signupPassword, firstName, lastName, signupPhone);
+// ... resto do código existente
 ```
 
 ---
 
-## Ordem de Execução
+## Comportamento
 
-1. Modificar `AuthContext.tsx` para aceitar parâmetro `phone` na função `signUp`
-2. Modificar `Auth.tsx`:
-   - Adicionar imports (`Phone`, `formatPhone`)
-   - Adicionar state `signupPhone`
-   - Adicionar campo WhatsApp no formulário
-   - Atualizar chamada `handleSignup` para passar o telefone
+| Cenário | Ação |
+|---------|------|
+| Email inválido | Toast com mensagem + formulário continua editável |
+| Telefone inválido | Toast com mensagem + formulário continua editável |
+| Erro de rede | Toast genérico + formulário continua editável |
+| Dados válidos | Prossegue com cadastro normal |
+
+O usuário pode corrigir os dados e clicar novamente em "Criar conta".
 
