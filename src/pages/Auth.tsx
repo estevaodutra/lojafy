@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mail, Lock, User } from 'lucide-react';
+import { Loader2, Mail, Lock, User, Phone } from 'lucide-react';
+import { formatPhone } from '@/lib/phone';
 import lojafyLogo from '@/assets/lojafy-logo-new.png';
 
 const Auth = () => {
@@ -33,6 +34,7 @@ const Auth = () => {
   const [confirmSignupPassword, setConfirmSignupPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [signupPhone, setSignupPhone] = useState('');
 
   // Mostrar loading se autenticação está em andamento ou usuário já logado
   if (loading || user) {
@@ -79,7 +81,7 @@ const Auth = () => {
     }
     
     setIsLoading(true);
-    const result = await signUp(signupEmail, signupPassword, firstName, lastName);
+    const result = await signUp(signupEmail, signupPassword, firstName, lastName, signupPhone);
     
     if (result.error?.friendlyMessage?.includes('já está cadastrado')) {
       setLoginEmail(signupEmail);
@@ -242,6 +244,22 @@ const Auth = () => {
                         value={lastName} 
                         onChange={e => setLastName(e.target.value)} 
                         required 
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-phone">WhatsApp</Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        id="signup-phone" 
+                        type="tel" 
+                        placeholder="+55 (11) 99999-9999" 
+                        value={signupPhone} 
+                        onChange={e => setSignupPhone(formatPhone(e.target.value))} 
+                        className="pl-10" 
+                        maxLength={19}
                       />
                     </div>
                   </div>
