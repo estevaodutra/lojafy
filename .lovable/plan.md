@@ -1,300 +1,167 @@
 
 
-# Plano: Tornar Role, Email e Telefone Editáveis no Modal de Detalhes
+# Plano: Aplicar Máscara de Telefone Brasileiro
 
 ## Resumo
 
-Transformar os campos de Role, Email e Telefone em campos editáveis no modal de detalhes do usuário, permitindo que o admin atualize essas informações diretamente.
+Criar função utilitária para formatação de telefone no padrão brasileiro (+55) e aplicar em todos os campos de telefone do sistema.
 
 ---
 
-## Alterações no Modal
+## Nova Função Utilitária
 
-### Visual Proposto
+### Criar `src/lib/phone.ts`
 
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│  👤 Detalhes do Usuário                                         │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │ Informações Pessoais                                    │   │
-│  │                                                         │   │
-│  │ 👤 João Silva                                           │   │
-│  │                                                         │   │
-│  │ Role:     [▼ Revendedor        ]  ← SELECT EDITÁVEL     │   │
-│  │                                                         │   │
-│  │ Email:    [joao@email.com      ]  ← INPUT EDITÁVEL      │   │
-│  │                                                         │   │
-│  │ Telefone: [(11) 99999-9999     ]  ← INPUT EDITÁVEL      │   │
-│  │                                                         │   │
-│  │ 📅 Cliente desde 15/01/2026                             │   │
-│  │ 🕐 Último acesso: 28/01/2026 às 14:30                   │   │
-│  │ 🆔 abc123... [📋]                                       │   │
-│  │                                                         │   │
-│  │                              [💾 Salvar Alterações]     │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│  ...                                                           │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Arquivo a Modificar
-
-### `src/components/admin/UserDetailsModal.tsx`
-
-**Novos imports:**
 ```typescript
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserCog, Save, Loader2 } from 'lucide-react';
-```
-
-**Novos states:**
-```typescript
-const [editedEmail, setEditedEmail] = useState(user?.email || '');
-const [editedPhone, setEditedPhone] = useState(user?.phone || '');
-const [editedRole, setEditedRole] = useState(user?.role || 'customer');
-const [isSaving, setIsSaving] = useState(false);
-const [hasChanges, setHasChanges] = useState(false);
-```
-
-**Nova prop na interface:**
-```typescript
-interface UserDetailsModalProps {
-  user: {...} | null;
-  isOpen: boolean;
-  onClose: () => void;
-  onUserUpdated?: () => void; // Para refresh da lista após salvar
-}
-```
-
-**Constante de roles:**
-```typescript
-const ROLES = [
-  { value: 'customer', label: 'Cliente' },
-  { value: 'reseller', label: 'Revendedor' },
-  { value: 'supplier', label: 'Fornecedor' },
-  { value: 'admin', label: 'Admin' },
-  { value: 'super_admin', label: 'Super Admin' },
-];
-```
-
-**Função de salvar:**
-```typescript
-const handleSaveChanges = async () => {
-  if (!user) return;
-  setIsSaving(true);
-  try {
-    // Atualizar email/phone no profiles
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .update({ 
-        email: editedEmail,
-        phone: editedPhone 
-      })
-      .eq('user_id', user.user_id);
-
-    if (profileError) throw profileError;
-
-    // Atualizar role se mudou
-    if (editedRole !== user.role) {
-      const { error: roleError } = await supabase
-        .from('profiles')
-        .update({ role: editedRole })
-        .eq('user_id', user.user_id);
-
-      if (roleError) throw roleError;
-    }
-
-    toast({
-      title: 'Sucesso!',
-      description: 'Informações atualizadas com sucesso',
-    });
-
-    onUserUpdated?.();
-    setHasChanges(false);
-  } catch (error) {
-    toast({
-      title: 'Erro',
-      description: 'Falha ao atualizar informações',
-      variant: 'destructive',
-    });
-  } finally {
-    setIsSaving(false);
+// Formata telefone para: +55 (XX) 98123-4567
+export const formatPhone = (value: string): string => {
+  // Remove tudo que não é dígito
+  let numbers = value.replace(/\D/g, '');
+  
+  // Remove 55 do início se já existir (evita duplicação)
+  if (numbers.startsWith('55') && numbers.length > 11) {
+    numbers = numbers.substring(2);
   }
+  
+  // Limita a 11 dígitos (DDD + 9 dígitos)
+  numbers = numbers.substring(0, 11);
+  
+  if (numbers.length === 0) return '';
+  
+  // Aplica a máscara progressivamente
+  let formatted = '+55 ';
+  
+  if (numbers.length <= 2) {
+    formatted += `(${numbers}`;
+  } else if (numbers.length <= 7) {
+    formatted += `(${numbers.substring(0, 2)}) ${numbers.substring(2)}`;
+  } else {
+    formatted += `(${numbers.substring(0, 2)}) ${numbers.substring(2, 7)}-${numbers.substring(7)}`;
+  }
+  
+  return formatted;
+};
+
+// Remove formatação para salvar apenas números
+export const cleanPhone = (phone: string): string => {
+  return phone.replace(/\D/g, '');
+};
+
+// Valida se tem 10 ou 11 dígitos (fixo ou celular)
+export const validatePhone = (phone: string): boolean => {
+  const numbers = cleanPhone(phone);
+  return numbers.length >= 10 && numbers.length <= 11;
 };
 ```
 
-**Atualizar useEffect para sincronizar states:**
-```typescript
-useEffect(() => {
-  if (user && isOpen) {
-    setEditedEmail(user.email);
-    setEditedPhone(user.phone || '');
-    setEditedRole(user.role);
-    setHasChanges(false);
-    fetchUserDetails();
-  }
-}, [user, isOpen]);
-```
+---
 
-**Detectar mudanças:**
-```typescript
-useEffect(() => {
-  if (user) {
-    const changed = 
-      editedEmail !== user.email || 
-      editedPhone !== (user.phone || '') || 
-      editedRole !== user.role;
-    setHasChanges(changed);
-  }
-}, [editedEmail, editedPhone, editedRole, user]);
-```
+## Arquivos a Modificar
+
+| Arquivo | Campo | Linha Aproximada |
+|---------|-------|------------------|
+| `src/pages/customer/Settings.tsx` | Telefone do perfil | ~334 |
+| `src/components/admin/UserDetailsModal.tsx` | Telefone no modal admin | ~301 |
+| `src/pages/Checkout.tsx` | Telefone do checkout | ~600 |
+| `src/pages/reseller/StoreEditor.tsx` | Telefone da loja | ~320 |
 
 ---
 
-## Nova Estrutura do Card "Informações Pessoais"
+## Detalhamento das Alterações
 
-```tsx
-<Card>
-  <CardHeader className="pb-3">
-    <CardTitle className="text-base">Informações Pessoais</CardTitle>
-  </CardHeader>
-  <CardContent className="space-y-4">
-    {/* Nome (não editável) */}
-    <div className="flex items-center gap-2">
-      <Users className="w-4 h-4 text-muted-foreground" />
-      <span className="font-medium">
-        {user.first_name} {user.last_name}
-      </span>
-    </div>
+### 1. `src/pages/customer/Settings.tsx`
 
-    {/* Role (editável) */}
-    <div className="grid grid-cols-[100px_1fr] items-center gap-2">
-      <Label className="flex items-center gap-2">
-        <UserCog className="w-4 h-4 text-muted-foreground" />
-        Role
-      </Label>
-      <Select value={editedRole} onValueChange={setEditedRole}>
-        <SelectTrigger className="w-[200px]">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {ROLES.map(role => (
-            <SelectItem key={role.value} value={role.value}>
-              {role.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-
-    {/* Email (editável) */}
-    <div className="grid grid-cols-[100px_1fr] items-center gap-2">
-      <Label className="flex items-center gap-2">
-        <Mail className="w-4 h-4 text-muted-foreground" />
-        Email
-      </Label>
-      <Input 
-        value={editedEmail}
-        onChange={(e) => setEditedEmail(e.target.value)}
-        type="email"
-        className="max-w-[300px]"
-      />
-    </div>
-
-    {/* Telefone (editável) */}
-    <div className="grid grid-cols-[100px_1fr] items-center gap-2">
-      <Label className="flex items-center gap-2">
-        <Phone className="w-4 h-4 text-muted-foreground" />
-        Telefone
-      </Label>
-      <Input 
-        value={editedPhone}
-        onChange={(e) => setEditedPhone(e.target.value)}
-        type="tel"
-        placeholder="(00) 00000-0000"
-        className="max-w-[200px]"
-      />
-    </div>
-
-    {/* Informações não editáveis */}
-    <div className="flex items-center gap-2 pt-2 border-t">
-      <Calendar className="w-4 h-4 text-muted-foreground" />
-      <span className="text-sm text-muted-foreground">
-        Cliente desde {format(...)}
-      </span>
-    </div>
-
-    {user.last_sign_in_at && (
-      <div className="flex items-center gap-2">
-        <Clock className="w-4 h-4 text-muted-foreground" />
-        <span className="text-sm text-muted-foreground">
-          Último acesso: {format(...)}
-        </span>
-      </div>
-    )}
-
-    {/* ID */}
-    <div className="flex items-center gap-2">
-      <IdCard className="w-4 h-4 text-muted-foreground" />
-      <span className="text-sm font-mono text-muted-foreground truncate max-w-[200px]">
-        {user.user_id}
-      </span>
-      <Button variant="ghost" size="sm" ...>
-        <Copy className="w-3 h-3" />
-      </Button>
-    </div>
-
-    {/* Botão Salvar */}
-    {hasChanges && (
-      <div className="flex justify-end pt-2 border-t">
-        <Button 
-          onClick={handleSaveChanges} 
-          disabled={isSaving}
-          size="sm"
-        >
-          {isSaving ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <Save className="w-4 h-4 mr-2" />
-          )}
-          Salvar Alterações
-        </Button>
-      </div>
-    )}
-  </CardContent>
-</Card>
+**Adicionar import:**
+```typescript
+import { formatPhone } from '@/lib/phone';
 ```
 
----
-
-## Alterações Adicionais
-
-### `src/pages/admin/Clientes.tsx`
-
-Passar callback `onUserUpdated` para o modal para recarregar a lista após salvar:
-
-```tsx
-<UserDetailsModal
-  user={selectedUser}
-  isOpen={isModalOpen}
-  onClose={() => setIsModalOpen(false)}
-  onUserUpdated={() => refetchUsers()}
+**Modificar input (linha ~334):**
+```typescript
+<Input
+  id="phone"
+  value={profile.phone}
+  onChange={(e) => setProfile({...profile, phone: formatPhone(e.target.value)})}
+  placeholder="+55 (11) 99999-9999"
+  maxLength={19}
 />
 ```
 
-### `src/components/admin/UnifiedUsersTable.tsx`
+### 2. `src/components/admin/UserDetailsModal.tsx`
 
-Remover o submenu "Alterar role" do dropdown de ações (já que agora está no modal).
+**Adicionar import:**
+```typescript
+import { formatPhone } from '@/lib/phone';
+```
+
+**Modificar input (linha ~301):**
+```typescript
+<Input
+  value={editedPhone}
+  onChange={(e) => setEditedPhone(formatPhone(e.target.value))}
+  type="tel"
+  placeholder="+55 (00) 00000-0000"
+  maxLength={19}
+  className="max-w-[200px]"
+/>
+```
+
+### 3. `src/pages/Checkout.tsx`
+
+**Adicionar import:**
+```typescript
+import { formatPhone } from '@/lib/phone';
+```
+
+**Modificar handleInputChange ou input direto (linha ~600):**
+```typescript
+<Input 
+  id="phone" 
+  value={formData.phone} 
+  onChange={e => handleInputChange("phone", formatPhone(e.target.value))} 
+  placeholder="+55 (11) 99999-9999"
+  maxLength={19}
+/>
+```
+
+### 4. `src/pages/reseller/StoreEditor.tsx`
+
+**Adicionar import:**
+```typescript
+import { formatPhone } from '@/lib/phone';
+```
+
+**Modificar input (linha ~320):**
+```typescript
+<Input
+  id="phone"
+  value={storeConfig.contactPhone}
+  onChange={(e) => handleColorChange('contactPhone', formatPhone(e.target.value))}
+  placeholder="+55 (00) 00000-0000"
+  maxLength={19}
+/>
+```
+
+---
+
+## Comportamento da Máscara
+
+| Digitado | Exibido |
+|----------|---------|
+| 1 | +55 (1 |
+| 11 | +55 (11) |
+| 119 | +55 (11) 9 |
+| 11991 | +55 (11) 991 |
+| 1199123 | +55 (11) 99123 |
+| 11991234567 | +55 (11) 99123-4567 |
 
 ---
 
 ## Ordem de Execução
 
-1. Modificar `UserDetailsModal.tsx` com campos editáveis e lógica de salvamento
-2. Atualizar `Clientes.tsx` para passar callback de atualização
-3. Remover submenu de role do `UnifiedUsersTable.tsx`
+1. Criar arquivo `src/lib/phone.ts` com funções utilitárias
+2. Modificar `Settings.tsx` (perfil do cliente)
+3. Modificar `UserDetailsModal.tsx` (edição admin)
+4. Modificar `Checkout.tsx` (formulário de checkout)
+5. Modificar `StoreEditor.tsx` (configuração da loja)
 
