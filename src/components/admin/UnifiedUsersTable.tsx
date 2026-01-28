@@ -5,8 +5,6 @@ import {
   Sparkles,
   MoreHorizontal,
   Eye,
-  Users,
-  UserCog,
   Store,
 } from 'lucide-react';
 import {
@@ -30,9 +28,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ImpersonationButton } from '@/components/admin/ImpersonationButton';
@@ -83,20 +78,11 @@ interface UnifiedUsersTableProps {
   itemsPerPage: number;
   updatingUsers: string[];
   onPageChange: (page: number) => void;
-  onUpdateRole: (userId: string, newRole: string) => void;
   onToggleStatus: (userId: string, currentStatus: boolean) => void;
   onViewDetails: (user: UnifiedUser) => void;
   onDeleteUser: (user: UnifiedUser) => void;
   onUnbanUser: (user: UnifiedUser) => void;
 }
-
-const ROLES = [
-  { value: 'customer', label: 'Cliente' },
-  { value: 'reseller', label: 'Revendedor' },
-  { value: 'supplier', label: 'Fornecedor' },
-  { value: 'admin', label: 'Admin' },
-  { value: 'super_admin', label: 'Super Admin' },
-];
 
 export const UnifiedUsersTable = ({
   users,
@@ -107,7 +93,6 @@ export const UnifiedUsersTable = ({
   itemsPerPage,
   updatingUsers,
   onPageChange,
-  onUpdateRole,
   onToggleStatus,
   onViewDetails,
   onDeleteUser,
@@ -300,24 +285,6 @@ export const UnifiedUsersTable = ({
                           Ver detalhes
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuSub>
-                          <DropdownMenuSubTrigger disabled={updatingUsers.includes(user.user_id)}>
-                            <UserCog className="mr-2 h-4 w-4" />
-                            Alterar role
-                          </DropdownMenuSubTrigger>
-                          <DropdownMenuSubContent>
-                            {ROLES.map((role) => (
-                              <DropdownMenuItem
-                                key={role.value}
-                                onClick={() => onUpdateRole(user.user_id, role.value)}
-                                className={user.role === role.value ? 'bg-accent' : ''}
-                              >
-                                {role.label}
-                                {user.role === role.value && ' ✓'}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuSubContent>
-                        </DropdownMenuSub>
                         <DropdownMenuItem onClick={() => onToggleStatus(user.user_id, user.is_active)}>
                           <Power className="mr-2 h-4 w-4" />
                           {user.is_active ? 'Desativar' : 'Ativar'}

@@ -11,6 +11,9 @@ import {
   MapPin,
   ShoppingBag,
   Clock,
+  UserCog,
+  Save,
+  Loader2,
 } from 'lucide-react';
 import {
   Dialog,
@@ -21,9 +24,26 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { UserFeaturesSection } from './UserFeaturesSection';
+
+const ROLES = [
+  { value: 'customer', label: 'Cliente' },
+  { value: 'reseller', label: 'Revendedor' },
+  { value: 'supplier', label: 'Fornecedor' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'super_admin', label: 'Super Admin' },
+];
 
 interface UserDetailsModalProps {
   user: {
@@ -38,6 +58,7 @@ interface UserDetailsModalProps {
   } | null;
   isOpen: boolean;
   onClose: () => void;
+  onUserUpdated?: () => void;
 }
 
 interface Address {
@@ -62,17 +83,90 @@ interface Order {
   order_items?: any[];
 }
 
-export const UserDetailsModal = ({ user, isOpen, onClose }: UserDetailsModalProps) => {
+export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserDetailsModalProps) => {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  // Editable fields state
+  const [editedEmail, setEditedEmail] = useState('');
+  const [editedPhone, setEditedPhone] = useState('');
+  const [editedRole, setEditedRole] = useState('customer');
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Sync state when user changes
   useEffect(() => {
     if (user && isOpen) {
+      setEditedEmail(user.email);
+      setEditedPhone(user.phone || '');
+      setEditedRole(user.role);
+      setHasChanges(false);
       fetchUserDetails();
     }
   }, [user, isOpen]);
+
+  // Detect changes
+  useEffect(() => {
+    if (user) {
+      const changed =
+        editedEmail !== user.email ||
+        editedPhone !== (user.phone || '') ||
+        editedRole !== user.role;
+      setHasChanges(changed);
+    }
+  }, [editedEmail, editedPhone, editedRole, user]);
+
+  // Save changes
+  const handleSaveChanges = async () => {
+    if (!user) return;
+    setIsSaving(true);
+    try {
+      // Update email/phone in profiles
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          email: editedEmail,
+          phone: editedPhone,
+        })
+        .eq('user_id', user.user_id);
+
+      if (profileError) throw profileError;
+
+      // Update role if changed
+      if (editedRole !== user.role) {
+        // Delete existing roles
+        await supabase.from('user_roles').delete().eq('user_id', user.user_id);
+
+        // Insert new role
+        const { data: currentUser } = await supabase.auth.getUser();
+        const { error: roleError } = await supabase.from('user_roles').insert({
+          user_id: user.user_id,
+          role: editedRole as any,
+          granted_by: currentUser.user?.id,
+        } as any);
+
+        if (roleError) throw roleError;
+      }
+
+      toast({
+        title: 'Sucesso!',
+        description: 'Informações atualizadas com sucesso',
+      });
+
+      onUserUpdated?.();
+      setHasChanges(false);
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message || 'Falha ao atualizar informações',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const fetchUserDetails = async () => {
     if (!user) return;
@@ -132,17 +226,6 @@ export const UserDetailsModal = ({ user, isOpen, onClose }: UserDetailsModalProp
     return statusMap[status] || { label: status, variant: 'outline' };
   };
 
-  const getRoleLabel = (role: string) => {
-    const labels: Record<string, string> = {
-      super_admin: 'Super Admin',
-      admin: 'Administrador',
-      reseller: 'Revendedor',
-      supplier: 'Fornecedor',
-      customer: 'Cliente',
-    };
-    return labels[role] || role;
-  };
-
   if (!user) return null;
 
   return (
@@ -164,34 +247,68 @@ export const UserDetailsModal = ({ user, isOpen, onClose }: UserDetailsModalProp
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Informações Pessoais</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-muted-foreground" />
-                    <span className="font-medium">
-                      {user.first_name} {user.last_name}
-                    </span>
-                  </div>
-                  <div>
-                    <Badge variant="outline">{getRoleLabel(user.role)}</Badge>
-                  </div>
-                </div>
-
+              <CardContent className="space-y-4">
+                {/* Nome (não editável) */}
                 <div className="flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-muted-foreground" />
-                  <span>{user.email}</span>
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  <span className="font-medium">
+                    {user.first_name} {user.last_name}
+                  </span>
                 </div>
 
-                {user.phone && (
-                  <div className="flex items-center gap-2">
+                {/* Role (editável) */}
+                <div className="grid grid-cols-[100px_1fr] items-center gap-2">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <UserCog className="w-4 h-4 text-muted-foreground" />
+                    Role
+                  </Label>
+                  <Select value={editedRole} onValueChange={setEditedRole}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ROLES.map((role) => (
+                        <SelectItem key={role.value} value={role.value}>
+                          {role.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Email (editável) */}
+                <div className="grid grid-cols-[100px_1fr] items-center gap-2">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <Mail className="w-4 h-4 text-muted-foreground" />
+                    Email
+                  </Label>
+                  <Input
+                    value={editedEmail}
+                    onChange={(e) => setEditedEmail(e.target.value)}
+                    type="email"
+                    className="max-w-[300px]"
+                  />
+                </div>
+
+                {/* Telefone (editável) */}
+                <div className="grid grid-cols-[100px_1fr] items-center gap-2">
+                  <Label className="flex items-center gap-2 text-sm">
                     <Phone className="w-4 h-4 text-muted-foreground" />
-                    <span>{user.phone}</span>
-                  </div>
-                )}
+                    Telefone
+                  </Label>
+                  <Input
+                    value={editedPhone}
+                    onChange={(e) => setEditedPhone(e.target.value)}
+                    type="tel"
+                    placeholder="(00) 00000-0000"
+                    className="max-w-[200px]"
+                  />
+                </div>
 
-                <div className="flex items-center gap-2">
+                {/* Informações não editáveis */}
+                <div className="flex items-center gap-2 pt-2 border-t">
                   <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <span>
+                  <span className="text-sm text-muted-foreground">
                     Cliente desde {format(new Date(user.created_at), "dd/MM/yyyy", { locale: ptBR })}
                   </span>
                 </div>
@@ -199,12 +316,13 @@ export const UserDetailsModal = ({ user, isOpen, onClose }: UserDetailsModalProp
                 {user.last_sign_in_at && (
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-muted-foreground" />
-                    <span>
+                    <span className="text-sm text-muted-foreground">
                       Último acesso: {format(new Date(user.last_sign_in_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                     </span>
                   </div>
                 )}
 
+                {/* ID */}
                 <div className="flex items-center gap-2">
                   <IdCard className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm font-mono text-muted-foreground truncate max-w-[200px]">
@@ -219,6 +337,24 @@ export const UserDetailsModal = ({ user, isOpen, onClose }: UserDetailsModalProp
                     <Copy className="w-3 h-3" />
                   </Button>
                 </div>
+
+                {/* Botão Salvar */}
+                {hasChanges && (
+                  <div className="flex justify-end pt-2 border-t">
+                    <Button
+                      onClick={handleSaveChanges}
+                      disabled={isSaving}
+                      size="sm"
+                    >
+                      {isSaving ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}
+                      Salvar Alterações
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

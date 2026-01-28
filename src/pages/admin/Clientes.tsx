@@ -423,7 +423,6 @@ const Clientes = () => {
             itemsPerPage={ITEMS_PER_PAGE}
             updatingUsers={updatingUsers}
             onPageChange={setCurrentPage}
-            onUpdateRole={updateUserRole}
             onToggleStatus={toggleUserStatus}
             onViewDetails={(user) => setSelectedUser(user)}
             onDeleteUser={(user) => setDeletingUser(user)}
@@ -437,6 +436,7 @@ const Clientes = () => {
         user={selectedUser}
         isOpen={!!selectedUser}
         onClose={() => setSelectedUser(null)}
+        onUserUpdated={() => refetchUsers()}
       />
 
       {/* Cleanup History Drawer */}
