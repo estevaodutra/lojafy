@@ -117,20 +117,26 @@ const Auth = () => {
       
       const validationData = await validationResponse.json();
       
-      if (!validationData.email_valid) {
+      // Resposta é um array - pegar o primeiro item
+      const validation = Array.isArray(validationData) ? validationData[0] : validationData;
+      
+      // Validação em cadeia: primeiro WhatsApp, depois email
+      // Se WhatsApp não existe, email nem foi validado
+      if (validation.exists === false) {
         toast({ 
-          title: 'Email inválido', 
-          description: validationData.reason || 'Por favor, verifique o email informado e tente novamente.',
+          title: 'WhatsApp inválido', 
+          description: 'Por favor, forneça um novo número.',
           variant: 'destructive' 
         });
         setIsLoading(false);
         return;
       }
       
-      if (!validationData.phone) {
+      // Se WhatsApp válido mas email inválido (caso o webhook retorne)
+      if (validation.email_valid === false) {
         toast({ 
-          title: 'Telefone inválido', 
-          description: validationData.reason || 'Por favor, verifique o número de WhatsApp e tente novamente.',
+          title: 'Email inválido', 
+          description: validation.reason || 'Por favor, verifique o email informado e tente novamente.',
           variant: 'destructive' 
         });
         setIsLoading(false);
