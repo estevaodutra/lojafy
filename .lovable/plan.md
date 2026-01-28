@@ -1,63 +1,149 @@
 
 
-# Plano: Corrigir Máscara de Telefone (Backspace)
+# Plano: Adicionar Campo WhatsApp no Cadastro
 
-## Problema
+## Resumo
 
-Quando o usuário apaga com backspace, o "55" do prefixo `+55` está sendo capturado como parte dos números do telefone, causando duplicação:
-- Valor atual: `+55 (11) 9` 
-- Após backspace: `+55 (55) 1...` (errado!)
+Adicionar campo de WhatsApp com máscara brasileira no formulário de cadastro (aba "Cadastrar") da página de autenticação.
 
-## Causa
+---
 
-A função `formatPhone` remove todos os dígitos do valor (incluindo o "55" do prefixo) e só descarta o "55" se houver mais de 11 dígitos. Quando o campo tem poucos dígitos, o "55" é mantido e reaplicado.
+## Visual Proposto
 
-## Solução
-
-Modificar a lógica para **sempre** remover o prefixo "55" do início, independente do tamanho:
-
-### Arquivo: `src/lib/phone.ts`
-
-```typescript
-export const formatPhone = (value: string): string => {
-  // Remove tudo que não é dígito
-  let numbers = value.replace(/\D/g, '');
-  
-  // SEMPRE remove 55 do início (é o código do país que já adicionamos)
-  if (numbers.startsWith('55')) {
-    numbers = numbers.substring(2);
-  }
-  
-  // Limita a 11 dígitos (DDD + 9 dígitos)
-  numbers = numbers.substring(0, 11);
-  
-  // Se não tiver números, retorna string vazia
-  if (numbers.length === 0) return '';
-  
-  // Aplica a máscara progressivamente
-  let formatted = '+55 ';
-  
-  if (numbers.length <= 2) {
-    formatted += `(${numbers}`;
-  } else if (numbers.length <= 7) {
-    formatted += `(${numbers.substring(0, 2)}) ${numbers.substring(2)}`;
-  } else {
-    formatted += `(${numbers.substring(0, 2)}) ${numbers.substring(2, 7)}-${numbers.substring(7)}`;
-  }
-  
-  return formatted;
-};
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  Acessar sua conta                                          │
+│  Entre ou crie uma conta para continuar                     │
+├─────────────────────────────────────────────────────────────┤
+│  [ Entrar ]  [ Cadastrar ]                                  │
+├─────────────────────────────────────────────────────────────┤
+│  Nome              Sobrenome                                │
+│  [👤 João     ]    [Silva        ]                          │
+│                                                             │
+│  WhatsApp                              ← NOVO CAMPO         │
+│  [📱 +55 (11) 99999-9999]                                   │
+│                                                             │
+│  Email                                                      │
+│  [✉ seu@email.com]                                          │
+│                                                             │
+│  Confirmar Email                                            │
+│  [✉ Repita seu email]                                       │
+│                                                             │
+│  Senha                                                      │
+│  [🔒 ••••••••]                                              │
+│                                                             │
+│  Confirmar Senha                                            │
+│  [🔒 ••••••••]                                              │
+│                                                             │
+│  [        Criar conta        ]                              │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Comportamento Corrigido
-
-| Ação | Antes (bug) | Depois (correto) |
-|------|-------------|------------------|
-| Digitar "11" | `+55 (11` | `+55 (11` |
-| Backspace em `+55 (11` | `+55 (55) 1` | `+55 (1` |
-| Apagar tudo | `+55 (55` | `` (vazio) |
+---
 
 ## Arquivo a Modificar
 
-- `src/lib/phone.ts` - linha 7: remover condição `&& numbers.length > 11`
+### `src/pages/Auth.tsx`
+
+**Novos imports:**
+```typescript
+import { Phone } from 'lucide-react';
+import { formatPhone } from '@/lib/phone';
+```
+
+**Novo state:**
+```typescript
+const [signupPhone, setSignupPhone] = useState('');
+```
+
+**Modificar função signUp no AuthContext:**
+- A função `signUp` precisa aceitar o parâmetro `phone`
+- Salvar o telefone no user_metadata ou no profile após criação
+
+**Novo campo no formulário (após Nome/Sobrenome):**
+```tsx
+<div className="space-y-2">
+  <Label htmlFor="signup-phone">WhatsApp</Label>
+  <div className="relative">
+    <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+    <Input 
+      id="signup-phone" 
+      type="tel" 
+      placeholder="+55 (11) 99999-9999" 
+      value={signupPhone} 
+      onChange={e => setSignupPhone(formatPhone(e.target.value))} 
+      className="pl-10" 
+      maxLength={19}
+    />
+  </div>
+</div>
+```
+
+---
+
+## Alterações no AuthContext
+
+### `src/contexts/AuthContext.tsx`
+
+**Modificar função signUp:**
+```typescript
+const signUp = async (
+  email: string, 
+  password: string, 
+  firstName: string, 
+  lastName: string,
+  phone?: string  // Novo parâmetro opcional
+) => {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: `${window.location.origin}/`,
+      data: {
+        first_name: firstName,
+        last_name: lastName,
+        phone: phone || ''  // Salvar no user_metadata
+      }
+    }
+  });
+  // ... resto da lógica
+};
+```
+
+**Atualizar trigger de criação de profile para incluir phone:**
+- O phone será salvo no user_metadata e posteriormente sincronizado com a tabela profiles
+
+---
+
+## Chamada Atualizada no Auth.tsx
+
+```typescript
+const handleSignup = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  // ... validações existentes ...
+  
+  setIsLoading(true);
+  const result = await signUp(
+    signupEmail, 
+    signupPassword, 
+    firstName, 
+    lastName,
+    signupPhone  // Passar o telefone
+  );
+  
+  // ... resto da lógica ...
+};
+```
+
+---
+
+## Ordem de Execução
+
+1. Modificar `AuthContext.tsx` para aceitar parâmetro `phone` na função `signUp`
+2. Modificar `Auth.tsx`:
+   - Adicionar imports (`Phone`, `formatPhone`)
+   - Adicionar state `signupPhone`
+   - Adicionar campo WhatsApp no formulário
+   - Atualizar chamada `handleSignup` para passar o telefone
 
