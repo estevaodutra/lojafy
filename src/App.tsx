@@ -51,7 +51,6 @@ import AdminFinanceiro from "./pages/admin/Financeiro";
 import AdminProducts from "./pages/admin/Products";
 import AdminBanners from "./pages/admin/Banners";
 import AdminOrders from "./pages/admin/Orders";
-import AdminCustomers from "./pages/admin/Customers";
 import IntegracaoPage from "./pages/admin/Integracoes";
 import HomepageManagement from "./pages/admin/Homepage";
 import AdminCategorias from "./pages/admin/Categorias";
@@ -103,7 +102,6 @@ import PublicStoreTerms from "./pages/PublicStoreTerms";
 import PublicStoreTrackOrder from "./pages/PublicStoreTrackOrder";
 import PublicStoreHelpCenter from "./pages/PublicStoreHelpCenter";
 import SuperAdminDashboard from "./pages/admin/Dashboard";
-import GestaoUsuarios from "./pages/admin/GestaoUsuarios";
 import Plataforma from "./pages/admin/Plataforma";
 import AdminCourses from "./pages/admin/Courses";
 import CourseContent from "./pages/admin/CourseContent";
@@ -231,7 +229,7 @@ const App = () => {
                 <Route path="produtos" element={<AdminProducts />} />
                 <Route path="categorias" element={<AdminCategorias />} />
                 <Route path="pedidos" element={<AdminOrders />} />
-                <Route path="clientes" element={<AdminCustomers />} />
+                <Route path="clientes" element={<Clientes />} />
                 <Route path="integracoes" element={<IntegracaoPage />} />
                 <Route path="homepage" element={<HomepageManagement />} />
                 <Route path="configuracao-visual" element={<ConfiguracaoVisual />} />
@@ -263,7 +261,7 @@ const App = () => {
                 <Route path="academy" element={<AdminAcademy />} />
                 
                 {/* Rotas antigas mantidas para compatibilidade */}
-                <Route path="usuarios" element={<GestaoUsuarios />} />
+                <Route path="usuarios" element={<Clientes />} />
                 <Route path="notificacoes" element={<NotificationsManagement />} />
                 <Route path="plataforma" element={<Plataforma />} />
                 <Route path="produtos" element={<AdminProducts />} />
