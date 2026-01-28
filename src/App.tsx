@@ -120,6 +120,7 @@ import Configuracoes from "./pages/admin/Configuracoes";
 import SupportManagement from "./pages/admin/SupportManagement";
 import ChatSupport from "./pages/admin/ChatSupport";
 import AdminAcademy from "./pages/admin/Academy";
+import ApiDocumentation from "./pages/admin/ApiDocumentation";
 import CourseModules from "./pages/customer/CourseModules";
 import ModuleLessons from "./pages/customer/ModuleLessons";
 import LessonViewer from "./pages/customer/LessonViewer";
@@ -279,6 +280,7 @@ const App = () => {
                 <Route path="integracoes" element={<IntegracaoPage />} />
                 <Route path="base-conhecimento" element={<AIKnowledgeBase />} />
                 <Route path="suporte" element={<SupportManagement />} />
+                <Route path="api-docs" element={<ApiDocumentation />} />
               </Route>
 
               {/* Supplier Panel Routes */}

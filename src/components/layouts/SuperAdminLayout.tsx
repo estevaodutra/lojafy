@@ -20,7 +20,8 @@ import {
   FileText,
   MessageSquare,
   DollarSign,
-  GraduationCap
+  GraduationCap,
+  Code
 } from 'lucide-react';
 import {
   Sidebar,
@@ -71,6 +72,11 @@ const superAdminMenuItems = [
     title: 'Financeiro',
     url: '/super-admin/financeiro',
     icon: DollarSign,
+  },
+  {
+    title: '</> API Docs',
+    url: '/super-admin/api-docs',
+    icon: Code,
   },
 ];
 
