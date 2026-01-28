@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { formatPhone } from '@/lib/phone';
 import { UserFeaturesSection } from './UserFeaturesSection';
 
 const ROLES = [
@@ -298,9 +299,10 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
                   </Label>
                   <Input
                     value={editedPhone}
-                    onChange={(e) => setEditedPhone(e.target.value)}
+                    onChange={(e) => setEditedPhone(formatPhone(e.target.value))}
                     type="tel"
-                    placeholder="(00) 00000-0000"
+                    placeholder="+55 (00) 00000-0000"
+                    maxLength={19}
                     className="max-w-[200px]"
                   />
                 </div>

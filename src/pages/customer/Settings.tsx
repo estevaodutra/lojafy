@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatCep, validateCep, fetchAddressByCep } from '@/lib/cep';
 import { formatCPF, validateCPF } from '@/lib/cpf';
+import { formatPhone } from '@/lib/phone';
 import { User, Mail, Phone, Shield, LogOut, MapPin, Plus, Edit, Trash2, Loader2 } from 'lucide-react';
 
 interface Profile {
@@ -331,8 +332,9 @@ const Settings = () => {
               <Input
                 id="phone"
                 value={profile.phone}
-                onChange={(e) => setProfile({...profile, phone: e.target.value})}
-                placeholder="(11) 99999-9999"
+                onChange={(e) => setProfile({...profile, phone: formatPhone(e.target.value)})}
+                placeholder="+55 (11) 99999-9999"
+                maxLength={19}
               />
             </div>
             <div className="space-y-2">

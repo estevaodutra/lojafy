@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { ColorPicker } from '@/components/admin/ColorPicker';
+import { formatPhone } from '@/lib/phone';
 import { LogoUpload } from '@/components/admin/LogoUpload';
 import { BannerUpload } from '@/components/admin/BannerUpload';
 import { useResellerStore } from '@/hooks/useResellerStore';
@@ -317,7 +318,9 @@ const ResellerStoreEditor = () => {
                         <Input
                           id="phone"
                           value={storeConfig.contactPhone}
-                          onChange={(e) => handleColorChange('contactPhone', e.target.value)}
+                          onChange={(e) => handleColorChange('contactPhone', formatPhone(e.target.value))}
+                          placeholder="+55 (00) 00000-0000"
+                          maxLength={19}
                         />
                       </div>
                       <div>
