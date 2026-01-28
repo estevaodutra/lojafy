@@ -131,21 +131,19 @@ const Header = () => {
                       Minha Conta
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/minha-conta/meus-acessos" className="w-full">
+                      <Rocket className="mr-2 h-4 w-4" />
+                      Meus Acessos
+                    </Link>
+                  </DropdownMenuItem>
                   {role === 'reseller' && (
-                    <>
-                      <DropdownMenuItem asChild>
-                        <Link to="/reseller/meus-acessos/top-produtos" className="w-full">
-                          <Rocket className="mr-2 h-4 w-4" />
-                          Meus Acessos
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link to="/minha-conta/academy" className="w-full">
-                          <GraduationCap className="mr-2 h-4 w-4" />
-                          Lojafy Academy
-                        </Link>
-                      </DropdownMenuItem>
-                    </>
+                    <DropdownMenuItem asChild>
+                      <Link to="/minha-conta/academy" className="w-full">
+                        <GraduationCap className="mr-2 h-4 w-4" />
+                        Lojafy Academy
+                      </Link>
+                    </DropdownMenuItem>
                   )}
                   {role !== 'customer' && <DropdownMenuItem asChild>
                       <Link to={getPanelRoute()} className="w-full">
@@ -281,17 +279,15 @@ const Header = () => {
                             <User className="inline mr-2 h-4 w-4" />
                             Minha Conta
                           </Link>
+                          <Link to="/minha-conta/meus-acessos" className="block py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
+                            <Rocket className="inline mr-2 h-4 w-4" />
+                            Meus Acessos
+                          </Link>
                           {role === 'reseller' && (
-                            <>
-                              <Link to="/reseller/meus-acessos/top-produtos" className="block py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
-                                <Rocket className="inline mr-2 h-4 w-4" />
-                                Meus Acessos
-                              </Link>
-                              <Link to="/minha-conta/academy" className="block py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
-                                <GraduationCap className="inline mr-2 h-4 w-4" />
-                                Lojafy Academy
-                              </Link>
-                            </>
+                            <Link to="/minha-conta/academy" className="block py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
+                              <GraduationCap className="inline mr-2 h-4 w-4" />
+                              Lojafy Academy
+                            </Link>
                           )}
                           {role !== 'customer' && <Link to={getPanelRoute()} className="block py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
                               <Settings className="inline mr-2 h-4 w-4" />

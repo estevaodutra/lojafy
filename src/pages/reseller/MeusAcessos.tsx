@@ -27,7 +27,7 @@ const MeusAcessos: React.FC = () => {
       badge: 'Novo',
       badgeColor: 'bg-amber-500',
       gradient: 'from-amber-500 via-orange-500 to-red-500',
-      route: '/reseller/meus-acessos/top-produtos',
+      route: '/minha-conta/meus-acessos/top-produtos',
       stats: [
         { label: 'Produtos', value: '11' },
         { label: 'Tempo', value: '24h' },
