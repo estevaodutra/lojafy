@@ -1,67 +1,193 @@
 
-# Plano: Verificação e Melhoria da Exibição de Features
+# Plano: Reestruturar Listagem de Usuários
 
-## Situação Atual
+## Resumo das Alterações
 
-O sistema de Features foi implementado corretamente no banco de dados, mas a interface pode não estar aparecendo por:
-1. Cache do navegador (tente Ctrl+Shift+R para forçar atualização)
-2. Deploy ainda não completou
+Simplificar e reorganizar a tabela de usuários conforme solicitado, unificando colunas e centralizando ações em um menu dropdown.
 
-## Verificações Necessárias
+---
 
-### 1. Menu "Features" no sidebar
-O menu deveria aparecer entre "Financeiro" e "</> API Docs". Se não aparecer:
-- Limpar cache do navegador
-- Verificar se o build completou
+## Alterações na Tabela
 
-### 2. Seção Features no Modal de Usuário
-Para ver as features de um usuário:
-1. Na lista de usuários, clique no ícone de olho (👁️) na coluna "Ações"
-2. O modal de detalhes abrirá com uma seção "Features do Usuário" no final
-3. Lá você pode atribuir ou revogar features
+### Colunas Finais (Nova Estrutura)
 
-## Melhorias Propostas
+| Coluna | Descrição |
+|--------|-----------|
+| Nome | Mantém |
+| Email | Mantém |
+| Telefone | Mantém |
+| Role | Badge colorido (sem dropdown) |
+| Features | Badge com contador |
+| Pedidos | Mantém |
+| Total Gasto | Mantém |
+| Status | Unificado: Ativo/Inativo/Banido/Excluído com cores |
+| Origem | NOVA: Lojafy ou nome da loja de origem |
+| Ações | Menu dropdown único |
 
-### Adicionar indicador de features na tabela de usuários
+### Colunas Removidas
+- ~~Alterar Role~~ (movido para modal)
+- ~~Plano~~ (removido)
+- ~~Atividade~~ (unificado com Status)
+- ~~Criação~~ (removido)
+- ~~Olho~~ (substituído por menu)
 
-Para facilitar a visualização, posso adicionar uma coluna "Features" na tabela de usuários mostrando um contador ou badges das features ativas.
+---
 
-#### Alterações necessárias:
+## Detalhamento das Mudanças
 
-**1. Modificar `UnifiedUsersTable.tsx`**
-- Adicionar nova coluna "Features" após "Plano"
-- Mostrar badge com contador de features ativas
-- Tooltip com nomes das features ao passar o mouse
+### 1. Coluna "Status" Unificada com Cores
 
-**2. Modificar `Clientes.tsx`**
-- Buscar contagem de features por usuário (query adicional)
-- Passar dados para a tabela
+```
+Status atual + Atividade → Status único colorido:
 
-**3. Criar hook `useUsersFeatureCount.ts`** (opcional)
-- Buscar contagem de features de todos usuários de forma eficiente
-
-### Exemplo visual da nova coluna:
-
-```text
-| Email | Role | Plano | Features | Pedidos |
-|-------|------|-------|----------|---------|
-| user@mail.com | Revendedor | Premium | 🏪 3 | 5 |
-| outro@mail.com | Cliente | - | - | 0 |
+• Verde (bg-green-100 text-green-800)  → "Ativo"
+• Cinza (bg-gray-100 text-gray-800)    → "Inativo" / "Aguardando"
+• Vermelho (bg-red-100 text-red-800)   → "Banido" / "Excluído"
+• Laranja (bg-orange-100 text-orange-800) → "Expira em Xd"
 ```
 
-## Ordem de Execução
+### 2. Coluna "Origem" (Nova)
 
-1. Atualizar UnifiedUsersTable para aceitar dados de features
-2. Atualizar Clientes.tsx para buscar e passar dados de features
-3. Criar query SQL ou RPC para buscar contagem de features em lote
+Mostra de onde o usuário veio:
+- `origem_tipo = 'lojafy'` ou `null` → Badge "Lojafy" (azul)
+- `origem_tipo = 'loja'` → Badge com nome da loja (verde)
+- `origem_tipo = 'importado'` → Badge "Importado" (cinza)
+- `origem_tipo = 'convite'` → Badge "Convite" (roxo)
+
+### 3. Menu de Ações (Dropdown)
+
+```
+┌────────────────────────┐
+│ ⋮  Ações               │
+├────────────────────────┤
+│ 👁️ Ver detalhes        │
+│ ──────────────────────│
+│ 🔄 Alterar role        │ (submenu com opções)
+│ ⚡ Ativar/Desativar     │
+│ 👤 Impersonar          │
+│ ──────────────────────│
+│ 🔓 Desbanir            │ (só se banido)
+│ 🗑️ Excluir             │ (vermelho)
+└────────────────────────┘
+```
+
+---
 
 ## Arquivos a Modificar
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/components/admin/UnifiedUsersTable.tsx` | Adicionar coluna Features |
-| `src/pages/admin/Clientes.tsx` | Buscar dados de features dos usuários |
+### 1. `src/components/admin/UnifiedUsersTable.tsx`
 
-## Solução Rápida Alternativa
+**Alterações:**
+- Remover imports: `Select`, `SelectContent`, `SelectItem`, `SelectTrigger`, `SelectValue`, `Edit`, `Eye`, `PremiumBadge`
+- Adicionar imports: `DropdownMenu`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuSeparator`, `DropdownMenuSub`, `DropdownMenuSubContent`, `DropdownMenuSubTrigger`, `DropdownMenuTrigger`, `MoreHorizontal`, `Store`
+- Remover colunas: "Alterar Role", "Plano", "Atividade", "Criação"
+- Adicionar coluna: "Origem"
+- Unificar Status + Atividade em uma única coluna colorida
+- Substituir botões de ação por DropdownMenu
+- Adicionar interface para dados de origem
 
-Se preferir não adicionar a coluna, basta clicar no ícone de olho (👁️) na linha de qualquer usuário para ver e gerenciar suas features no modal de detalhes.
+**Interface atualizada:**
+```typescript
+interface UnifiedUser {
+  // ... campos existentes ...
+  origem_tipo?: 'lojafy' | 'loja' | 'importado' | 'convite';
+  origem_loja_nome?: string;
+}
+```
+
+### 2. `src/pages/admin/Clientes.tsx`
+
+**Alterações:**
+- Buscar dados de origem dos usuários (join com lojas se necessário)
+- Passar dados de origem para a tabela
+- Remover filtro de "Plano"
+
+---
+
+## Implementação do Menu de Ações
+
+```tsx
+<DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <Button variant="ghost" size="icon" className="h-8 w-8">
+      <MoreHorizontal className="h-4 w-4" />
+    </Button>
+  </DropdownMenuTrigger>
+  <DropdownMenuContent align="end">
+    <DropdownMenuItem onClick={() => onViewDetails(user)}>
+      <Eye className="mr-2 h-4 w-4" />
+      Ver detalhes
+    </DropdownMenuItem>
+    <DropdownMenuSeparator />
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger>
+        <Users className="mr-2 h-4 w-4" />
+        Alterar role
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent>
+        {roles.map(role => (
+          <DropdownMenuItem 
+            key={role.value}
+            onClick={() => onUpdateRole(user.user_id, role.value)}
+          >
+            {role.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+    <DropdownMenuItem onClick={() => onToggleStatus(...)}>
+      <Power className="mr-2 h-4 w-4" />
+      {user.is_active ? 'Desativar' : 'Ativar'}
+    </DropdownMenuItem>
+    <ImpersonationMenuItem {...} />
+    {isBanned && (
+      <DropdownMenuItem onClick={() => onUnbanUser(user)}>
+        <ShieldOff className="mr-2 h-4 w-4" />
+        Desbanir
+      </DropdownMenuItem>
+    )}
+    <DropdownMenuSeparator />
+    <DropdownMenuItem 
+      onClick={() => onDeleteUser(user)}
+      className="text-destructive"
+    >
+      <Trash2 className="mr-2 h-4 w-4" />
+      Excluir
+    </DropdownMenuItem>
+  </DropdownMenuContent>
+</DropdownMenu>
+```
+
+---
+
+## Cores do Status Unificado
+
+```tsx
+const getUnifiedStatus = (user) => {
+  if (user.deleted_at) {
+    return { label: 'Excluído', className: 'bg-red-100 text-red-800' };
+  }
+  if (isUserBanned(user.banned_until)) {
+    return { label: 'Banido', className: 'bg-red-100 text-red-800' };
+  }
+  if (!user.is_active) {
+    return { label: 'Inativo', className: 'bg-gray-100 text-gray-800' };
+  }
+  if (!user.last_sign_in_at) {
+    return { label: 'Aguardando', className: 'bg-yellow-100 text-yellow-800' };
+  }
+  return { label: 'Ativo', className: 'bg-green-100 text-green-800' };
+};
+```
+
+---
+
+## Ordem de Execução
+
+1. Modificar `UnifiedUsersTable.tsx` com nova estrutura de colunas
+2. Implementar menu dropdown de ações
+3. Adicionar coluna de origem
+4. Modificar `Clientes.tsx` para buscar dados de origem
+5. Remover filtro de plano
+6. Ajustar colspan para "Nenhum usuário encontrado"
+
