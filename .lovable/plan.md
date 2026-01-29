@@ -1,127 +1,145 @@
 
 
-# Plano: Criar Categoria "Usuários" Separada na Documentação API
+# Plano: Expiração por Quantidade de Dias no Cadastro
 
-## Contexto
+## Lógica Proposta
 
-Atualmente, os endpoints de usuários estão dentro da categoria **Academy** como subcategoria. A mudança é extrair esses endpoints para uma **categoria principal** independente.
+Aceitar **quantidade de dias** como parâmetro alternativo à data fixa. O sistema calcula automaticamente a data de expiração.
 
 ---
 
-## Estrutura Atual
+## Parâmetros Aceitos (mutuamente exclusivos)
 
-```text
-├── Catálogo
-├── Pedidos  
-├── Ranking & Demo
-├── Features
-└── Academy
-    ├── Usuários      <-- Aninhado dentro de Academy
-    ├── Cursos
-    ├── Matrículas
-    └── Progresso
+| Parâmetro | Tipo | Exemplo | Descrição |
+|-----------|------|---------|-----------|
+| `subscription_days` | number | `30` | Quantidade de dias a partir de hoje |
+| `subscription_expires_at` | string | `2026-02-28T...` | Data fixa ISO (opcional) |
+
+**Prioridade:** Se ambos forem enviados, `subscription_days` tem precedência.
+
+---
+
+## Exemplos de Uso
+
+### Por dias (recomendado)
+```json
+{
+  "email": "usuario@email.com",
+  "password": "senha123",
+  "full_name": "João Silva",
+  "role": "reseller",
+  "subscription_plan": "premium",
+  "subscription_days": 30
+}
+```
+**Resultado:** `subscription_expires_at = now() + 30 dias`
+
+### Por data fixa
+```json
+{
+  "email": "usuario@email.com",
+  "password": "senha123",
+  "subscription_expires_at": "2026-12-31T23:59:59Z"
+}
 ```
 
 ---
 
-## Nova Estrutura
+## Alterações
 
-```text
-├── Catálogo
-├── Pedidos
-├── Ranking & Demo
-├── Usuários          <-- Nova categoria principal
-├── Features
-└── Academy
-    ├── Cursos
-    ├── Matrículas
-    └── Progresso
-```
-
----
-
-## Alterações no Arquivo
-
-### Arquivo: `src/data/apiEndpointsData.ts`
-
-### 1. Renomear o array de endpoints
-
-| De | Para |
-|----|------|
-| `academyUserEndpoints` | `usersEndpoints` |
-
-### 2. Adicionar nova categoria no export
+### 1. Edge Function `api-usuarios-cadastrar/index.ts`
 
 ```typescript
-export const apiEndpointsData: EndpointCategory[] = [
-  {
-    id: 'catalog',
-    title: 'Catálogo',
-    endpoints: catalogEndpoints
-  },
-  {
-    id: 'orders',
-    title: 'Pedidos',
-    endpoints: ordersEndpoints
-  },
-  {
-    id: 'ranking',
-    title: 'Ranking & Demo',
-    endpoints: rankingEndpoints
-  },
-  // NOVA CATEGORIA
-  {
-    id: 'users',
-    title: 'Usuários',
-    endpoints: usersEndpoints
-  },
-  {
-    id: 'features',
-    title: 'Features',
-    endpoints: featuresEndpoints
-  },
-  {
-    id: 'academy',
-    title: 'Academy',
-    subcategories: [
-      // REMOVIDO: { id: 'academy-users', title: 'Usuários', endpoints: ... }
-      { id: 'academy-courses', title: 'Cursos', endpoints: academyCourseEndpoints },
-      { id: 'academy-enrollments', title: 'Matrículas', endpoints: academyEnrollmentEndpoints },
-      { id: 'academy-progress', title: 'Progresso', endpoints: academyProgressEndpoints }
-    ]
+const { 
+  email, 
+  full_name, 
+  password, 
+  role = 'customer',
+  subscription_plan,
+  subscription_days,        // NOVO: quantidade de dias
+  subscription_expires_at,  // data fixa alternativa
+  phone
+} = body;
+
+// Calcular data de expiração
+let calculatedExpiresAt: string | null = null;
+
+if (subscription_days && subscription_days > 0) {
+  // Calcular a partir de quantidade de dias
+  const expirationDate = new Date();
+  expirationDate.setDate(expirationDate.getDate() + subscription_days);
+  calculatedExpiresAt = expirationDate.toISOString();
+} else if (subscription_expires_at) {
+  // Usar data fixa informada
+  calculatedExpiresAt = subscription_expires_at;
+}
+
+// Atualizar perfil
+await supabase.from('profiles').update({
+  first_name: firstName,
+  last_name: lastName,
+  role: role,
+  phone: phone || null,
+  subscription_plan: subscription_plan || 'free',
+  subscription_expires_at: calculatedExpiresAt
+}).eq('user_id', authData.user.id);
+```
+
+### 2. Documentação `src/data/apiEndpointsData.ts`
+
+**Request Body:**
+```typescript
+requestBody: {
+  email: 'novo@email.com',
+  full_name: 'Maria Santos',
+  password: 'senhaSegura123!',
+  role: 'reseller',
+  phone: '11999999999',
+  subscription_plan: 'premium',
+  subscription_days: 30,
+  _nota: 'Use subscription_days OU subscription_expires_at'
+}
+```
+
+**Response:**
+```typescript
+responseExample: {
+  success: true,
+  message: 'Usuário criado com sucesso',
+  data: {
+    user_id: 'uuid',
+    email: 'novo@email.com',
+    full_name: 'Maria Santos',
+    role: 'reseller',
+    subscription_plan: 'premium',
+    subscription_expires_at: '2026-02-28T00:00:00Z',
+    subscription_days_granted: 30,
+    created_at: '2026-01-29T00:00:00Z'
   }
-];
+}
 ```
 
 ---
 
-## Endpoints da Categoria "Usuários"
+## Resumo de Arquivos
 
-| Endpoint | Método | Descrição |
-|----------|--------|-----------|
-| Verificar Usuário | GET | Verifica se usuário existe |
-| Cadastrar Usuário | POST | Cria novo usuário |
-| Listar Usuários | GET | Lista todos com filtros |
-| Alterar Role | POST | Altera função do usuário |
+| Arquivo | Alteração |
+|---------|-----------|
+| `supabase/functions/api-usuarios-cadastrar/index.ts` | Adicionar lógica de cálculo por dias |
+| `src/data/apiEndpointsData.ts` | Atualizar documentação do endpoint |
 
 ---
 
-## Ordem Final das Categorias
+## Tabela de Parâmetros Final
 
-1. **Catálogo** - Produtos, Categorias, Subcategorias
-2. **Pedidos** - Top produtos, Pedidos recentes, Lista de pedidos
-3. **Ranking & Demo** - Dados demo e ranking
-4. **Usuários** - Gestão de usuários (nova posição)
-5. **Features** - Gestão de funcionalidades
-6. **Academy** - Cursos, Matrículas, Progresso (sem subcategoria Usuários)
-
----
-
-## Resumo de Modificações
-
-| Local | Ação |
-|-------|------|
-| Linha ~248 | Renomear `academyUserEndpoints` para `usersEndpoints` |
-| Linha ~559 | Adicionar categoria `users` antes de `features` |
-| Linha ~584 | Remover `academy-users` das subcategorias de Academy |
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `email` | string | Sim | Email do usuário |
+| `password` | string | Sim | Senha do usuário |
+| `full_name` | string | Não | Nome completo |
+| `role` | string | Não | Role (default: customer) |
+| `phone` | string | Não | Telefone |
+| `subscription_plan` | string | Não | Plano: free ou premium (default: free) |
+| `subscription_days` | number | Não | Dias de acesso a partir de hoje |
+| `subscription_expires_at` | string | Não | Data fixa de expiração ISO |
 
