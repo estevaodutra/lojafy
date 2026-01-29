@@ -16,6 +16,7 @@ import { FeatureFormModal } from '@/components/admin/FeatureFormModal';
 
 const categoryLabels: Record<string, string> = {
   loja: '🏪 Loja',
+  recursos: '🏆 Recursos',
   acessos: '🎯 Acessos',
   geral: '⚙️ Geral',
 };
