@@ -502,6 +502,10 @@ const featuresEndpoints: EndpointData[] = [
       summary: {
         total: 2,
         por_categoria: { loja: 1, recursos: 1 }
+      },
+      expiracao_info: {
+        nota: 'A expiração das features é controlada por profiles.subscription_expires_at',
+        excecoes: ['vitalicio', 'cortesia']
       }
     },
     errorExamples: [
@@ -513,7 +517,7 @@ const featuresEndpoints: EndpointData[] = [
     title: 'Atribuir Feature',
     method: 'POST',
     url: '/functions/v1/api-features-atribuir',
-    description: 'Atribui uma feature a um usuário específico com validação de dependências.',
+    description: 'Atribui uma feature a um usuário. A expiração é controlada pela data do perfil do usuário (subscription_expires_at). Períodos vitalício e cortesia nunca expiram.',
     headers: [
       { name: 'X-API-Key', description: 'Chave de API', example: 'sk_...', required: true }
     ],
@@ -521,7 +525,8 @@ const featuresEndpoints: EndpointData[] = [
       user_id: 'uuid-do-usuario',
       feature_slug: 'loja_propria',
       tipo_periodo: 'mensal',
-      motivo: 'Parceria comercial'
+      motivo: 'Parceria comercial',
+      _nota: 'tipo_periodo define classificação, não data de expiração individual'
     },
     responseExample: {
       success: true,
@@ -532,7 +537,14 @@ const featuresEndpoints: EndpointData[] = [
         status: 'ativo',
         tipo_periodo: 'mensal',
         data_inicio: '2026-01-29T00:00:00Z',
-        data_expiracao: '2026-02-28T00:00:00Z'
+        usa_expiracao_perfil: true,
+        expiracao_perfil: '2026-02-28T00:00:00Z',
+        dias_restantes: 30
+      },
+      expiracao_info: {
+        fonte: 'profiles.subscription_expires_at',
+        nota: 'Features expiram junto com a assinatura do perfil',
+        excecoes: 'tipo_periodo vitalicio ou cortesia nunca expiram'
       }
     },
     errorExamples: [
