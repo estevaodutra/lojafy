@@ -264,16 +264,39 @@ const usersEndpoints: EndpointData[] = [
     title: 'Cadastrar Usuário',
     method: 'POST',
     url: '/functions/v1/api-usuarios-cadastrar',
-    description: 'Cria um novo usuário na plataforma.',
+    description: 'Cria um novo usuário na plataforma. A data de expiração (subscription_expires_at) controla o acesso a features e cursos. Use subscription_days para definir dias de acesso a partir de hoje, ou subscription_expires_at para data fixa.',
+    headers: [
+      { name: 'X-API-Key', description: 'Chave de API', example: 'sk_...', required: true }
+    ],
     requestBody: {
       email: 'novo@email.com',
       full_name: 'Maria Santos',
-      password: 'senhaSegura123!'
+      password: 'senhaSegura123!',
+      role: 'reseller',
+      phone: '11999999999',
+      subscription_plan: 'premium',
+      subscription_days: 30,
+      _nota: 'Use subscription_days OU subscription_expires_at (days tem prioridade)'
     },
     responseExample: {
       success: true,
-      message: 'Usuário criado com sucesso'
-    }
+      message: 'Usuário criado com sucesso',
+      data: {
+        user_id: 'uuid',
+        email: 'novo@email.com',
+        full_name: 'Maria Santos',
+        role: 'reseller',
+        subscription_plan: 'premium',
+        subscription_expires_at: '2026-02-28T00:00:00Z',
+        subscription_days_granted: 30,
+        created_at: '2026-01-29T00:00:00Z'
+      }
+    },
+    errorExamples: [
+      { code: 400, title: 'Campos obrigatórios', description: 'Email ou senha não informados', example: { success: false, error: 'email e password são obrigatórios' } },
+      { code: 400, title: 'Email duplicado', description: 'Email já está em uso', example: { success: false, error: 'Email já está em uso' } },
+      { code: 401, title: 'API Key inválida', description: 'Chave não fornecida ou inativa', example: { success: false, error: 'API key inválida' } }
+    ]
   },
   {
     title: 'Listar Usuários',
