@@ -131,3 +131,9 @@ verify_jwt = false
 
 [functions.revogar-feature]
 verify_jwt = false
+
+[functions.api-features-listar]
+verify_jwt = false
+
+[functions.api-features-atribuir]
+verify_jwt = false
