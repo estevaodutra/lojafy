@@ -244,8 +244,8 @@ const rankingEndpoints: EndpointData[] = [
   }
 ];
 
-// Academy Endpoints - Subcategories
-const academyUserEndpoints: EndpointData[] = [
+// Users Endpoints (standalone category)
+const usersEndpoints: EndpointData[] = [
   {
     title: 'Verificar Usuário',
     method: 'GET',
@@ -573,6 +573,11 @@ export const apiEndpointsData: EndpointCategory[] = [
     endpoints: rankingEndpoints
   },
   {
+    id: 'users',
+    title: 'Usuários',
+    endpoints: usersEndpoints
+  },
+  {
     id: 'features',
     title: 'Features',
     endpoints: featuresEndpoints
@@ -581,7 +586,6 @@ export const apiEndpointsData: EndpointCategory[] = [
     id: 'academy',
     title: 'Academy',
     subcategories: [
-      { id: 'academy-users', title: 'Usuários', endpoints: academyUserEndpoints },
       { id: 'academy-courses', title: 'Cursos', endpoints: academyCourseEndpoints },
       { id: 'academy-enrollments', title: 'Matrículas', endpoints: academyEnrollmentEndpoints },
       { id: 'academy-progress', title: 'Progresso', endpoints: academyProgressEndpoints }
