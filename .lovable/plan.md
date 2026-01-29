@@ -1,122 +1,104 @@
 
-# Plano: Adicionar Feature "Top 10 Produtos Vencedores"
+# Plano: Corrigir Atribuição de Features com Dependências
 
-## Resumo
+## Problema Identificado
 
-Criar uma nova feature `top_10_produtos` no sistema de funcionalidades da plataforma que controla a visibilidade da seção "Top 10 Produtos Vencedores" na página "Meus Acessos".
+Ao tentar atribuir "Certificados" (`academy_certificado`) a um usuário, ocorre erro porque esta feature requer `academy_acesso` (Acesso Academy) que o usuário não possui.
 
----
-
-## Problema Atual
-
-1. A página "Meus Acessos" (`/minha-conta/meus-acessos`) exibe o card "Top 10 Produtos Vencedores" para **todos os usuários**
-2. Deveria ser exibido apenas para usuários que possuem a feature `top_10_produtos` ativa
-3. O erro "Edge Function returned a non-2xx status code" ocorre porque a feature não existe no catálogo
-
----
-
-## Alterações Necessárias
-
-### 1. Criar a Feature no Banco de Dados
-
-Executar SQL via migration para inserir a feature:
-
-```sql
-INSERT INTO features (
-  slug, 
-  nome, 
-  descricao, 
-  icone, 
-  categoria, 
-  ordem_exibicao,
-  preco_mensal,
-  preco_anual,
-  preco_vitalicio,
-  trial_dias,
-  ativo,
-  visivel_catalogo,
-  roles_permitidas
-) VALUES (
-  'top_10_produtos',
-  'Top 10 Produtos Vencedores',
-  'Acesso à missão gamificada de 24h com 11 produtos selecionados para publicação',
-  'Trophy',
-  'acessos',
-  1,
-  0,
-  0,
-  0,
-  0,
-  true,
-  false,
-  ARRAY['reseller', 'customer']
-);
+A edge function valida corretamente e retorna:
+```json
+{"error": "Feature requer \"academy_acesso\" que o usuário não possui"}
 ```
 
-### 2. Modificar `src/pages/reseller/MeusAcessos.tsx`
+Mas o modal não exibe essa mensagem corretamente e permite selecionar features com dependências não satisfeitas.
 
-Envolver o card "Top 10 Produtos" com `FeatureGate`:
+---
+
+## Dependências das Features
+
+| Feature | Requer |
+|---------|--------|
+| Certificados | academy_acesso |
+| Analytics Avançado | analytics_basico |
+| Domínio Personalizado | loja_propria |
+| Tema Premium | loja_propria |
+| Recuperação de Carrinho | loja_propria |
+
+---
+
+## Alterações
+
+### 1. `src/components/admin/AssignFeatureModal.tsx`
+
+**Melhorar filtragem de features disponíveis:**
+
+Filtrar features cujas dependências o usuário já possui:
 
 ```typescript
-import { FeatureGate } from '@/components/auth/FeatureGate';
-import { useUserFeatures } from '@/hooks/useUserFeatures';
-
-// Dentro do componente:
-const { features } = useUserFeatures();
-
-// No array accessItems - filtrar baseado na feature
-const accessItems = [
-  // Condicionalmente incluir o item se tiver a feature
-];
-
-// Ou usar FeatureGate direto no render:
-<FeatureGate feature="top_10_produtos">
-  <Card>...</Card>
-</FeatureGate>
+// Linha 51-54: Modificar filtro
+const availableFeatures = features.filter((f) => {
+  // Já tem a feature
+  if (existingFeatures.includes(f.slug)) return false;
+  // Inativa
+  if (!f.ativo) return false;
+  // Verificar dependências
+  if (f.requer_features && f.requer_features.length > 0) {
+    const hasAllDeps = f.requer_features.every(dep => 
+      existingFeatures.includes(dep)
+    );
+    if (!hasAllDeps) return false;
+  }
+  return true;
+});
 ```
 
-### 3. Modificar `src/pages/reseller/TopProdutosVencedores.tsx`
-
-Adicionar proteção na página direta:
+**Melhorar tratamento de erro da edge function:**
 
 ```typescript
-import { FeatureGate } from '@/components/auth/FeatureGate';
-import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
-import { useFeature } from '@/hooks/useFeature';
+// Linhas 67-77: Modificar handleSubmit
+const { data, error } = await supabase.functions.invoke('atribuir-feature', {
+  body: { ... },
+});
 
-const TopProdutosVencedores = () => {
-  const navigate = useNavigate();
-  const { hasFeature, isLoading } = useFeature('top_10_produtos');
-  
-  useEffect(() => {
-    if (!isLoading && !hasFeature) {
-      navigate('/minha-conta/meus-acessos');
-    }
-  }, [hasFeature, isLoading, navigate]);
-  
-  if (isLoading) return <LoadingSkeleton />;
-  if (!hasFeature) return null;
-  
-  return (/* conteúdo atual */);
-};
+// Checar erro no data (edge function retorna JSON com error)
+if (error) {
+  throw new Error(error.message);
+}
+
+if (data?.error) {
+  throw new Error(data.error);
+}
+```
+
+**Adicionar indicação visual de dependências:**
+
+Mostrar quais features estão disponíveis e quais requerem outras features:
+
+```typescript
+// Na listagem de features, agrupar por disponibilidade
+{availableFeatures.map((feature) => (
+  <SelectItem key={feature.slug} value={feature.slug}>
+    {feature.nome}
+  </SelectItem>
+))}
+
+// Mostrar features bloqueadas (opcional)
+{blockedFeatures.length > 0 && (
+  <div className="text-xs text-muted-foreground mt-2">
+    Features bloqueadas por dependências: {blockedFeatures.map(f => f.nome).join(', ')}
+  </div>
+)}
 ```
 
 ---
 
-## Fluxo de Funcionamento
+## Resultado Esperado
 
-```text
-SuperAdmin atribui feature "top_10_produtos" ao usuário
-                         ↓
-Usuário acessa /minha-conta/meus-acessos
-                         ↓
-    ┌────────────────────────────────────────┐
-    │ Tem feature "top_10_produtos"?         │
-    │   ✓ Sim → Exibe card "Top 10"          │
-    │   ✗ Não → Esconde card                 │
-    └────────────────────────────────────────┘
-```
+| Cenário | Comportamento Atual | Comportamento Esperado |
+|---------|---------------------|------------------------|
+| Usuário sem academy_acesso | Mostra "Certificados" na lista | Esconde "Certificados" da lista |
+| Clica em Atribuir | Erro genérico | Não permite selecionar features bloqueadas |
+| Erro de dependência | "Edge Function returned..." | Mensagem clara sobre qual feature falta |
 
 ---
 
@@ -124,17 +106,22 @@ Usuário acessa /minha-conta/meus-acessos
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `supabase/migrations/[timestamp]_add_top_10_produtos_feature.sql` | Criar feature no banco |
-| `src/pages/reseller/MeusAcessos.tsx` | Filtrar items baseado em features |
-| `src/pages/reseller/TopProdutosVencedores.tsx` | Proteger acesso direto à página |
+| `src/components/admin/AssignFeatureModal.tsx` | Filtrar dependências + melhorar tratamento de erro |
 
 ---
 
-## Comportamento Esperado
+## Fluxo Corrigido
 
-| Cenário | Resultado |
-|---------|-----------|
-| Usuário SEM feature | Não vê o card na página Meus Acessos |
-| Usuário COM feature | Vê o card e pode acessar a página |
-| Acesso direto à URL sem feature | Redirecionado para /meus-acessos |
-| SuperAdmin | Sempre vê (bypass automático) |
+```text
+SuperAdmin abre modal "Atribuir Feature"
+              ↓
+Filtra features: ativas + não possui + dependências satisfeitas
+              ↓
+    ┌──────────────────────────────────┐
+    │ Usuário tem academy_acesso?      │
+    │   ✓ Sim → Mostra "Certificados"  │
+    │   ✗ Não → Esconde "Certificados" │
+    └──────────────────────────────────┘
+              ↓
+Só exibe features que podem ser atribuídas
+```
