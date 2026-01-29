@@ -1,4 +1,5 @@
 
+
 # Plano: Adicionar Feature "Top 10 Produtos Vencedores"
 
 ## Objetivo
@@ -84,3 +85,4 @@ Após a migration:
 | Nova migration SQL | Inserir feature no banco de dados |
 
 Nenhum código frontend precisa ser alterado - a lógica de exibição condicional já foi implementada anteriormente.
+
