@@ -1,104 +1,79 @@
 
-# Plano: Corrigir Atribuição de Features com Dependências
+# Plano: Adicionar Feature "Top 10 Produtos Vencedores"
 
-## Problema Identificado
+## Objetivo
 
-Ao tentar atribuir "Certificados" (`academy_certificado`) a um usuário, ocorre erro porque esta feature requer `academy_acesso` (Acesso Academy) que o usuário não possui.
-
-A edge function valida corretamente e retorna:
-```json
-{"error": "Feature requer \"academy_acesso\" que o usuário não possui"}
-```
-
-Mas o modal não exibe essa mensagem corretamente e permite selecionar features com dependências não satisfeitas.
+Registrar a feature `top_10_produtos` na tabela `features` do banco de dados para permitir que o SuperAdmin atribua esta funcionalidade a usuários.
 
 ---
 
-## Dependências das Features
+## Dados da Feature
 
-| Feature | Requer |
-|---------|--------|
-| Certificados | academy_acesso |
-| Analytics Avançado | analytics_basico |
-| Domínio Personalizado | loja_propria |
-| Tema Premium | loja_propria |
-| Recuperação de Carrinho | loja_propria |
+| Campo | Valor |
+|-------|-------|
+| slug | `top_10_produtos` |
+| nome | Top 10 Produtos Vencedores |
+| descricao | Desafio gamificado para publicar 11 produtos vencedores em marketplaces e começar a vender! |
+| icone | `Trophy` |
+| categoria | `acessos` |
+| ordem_exibicao | 1 |
+| preco_mensal | 0.00 (gratuito) |
+| preco_anual | 0.00 |
+| preco_vitalicio | 0.00 |
+| trial_dias | 0 |
+| ativo | true |
+| visivel_catalogo | false (atribuído manualmente) |
+| roles_permitidas | `['reseller', 'customer']` |
+| requer_features | `[]` (sem dependências) |
 
 ---
 
-## Alterações
+## Migration SQL
 
-### 1. `src/components/admin/AssignFeatureModal.tsx`
-
-**Melhorar filtragem de features disponíveis:**
-
-Filtrar features cujas dependências o usuário já possui:
-
-```typescript
-// Linha 51-54: Modificar filtro
-const availableFeatures = features.filter((f) => {
-  // Já tem a feature
-  if (existingFeatures.includes(f.slug)) return false;
-  // Inativa
-  if (!f.ativo) return false;
-  // Verificar dependências
-  if (f.requer_features && f.requer_features.length > 0) {
-    const hasAllDeps = f.requer_features.every(dep => 
-      existingFeatures.includes(dep)
-    );
-    if (!hasAllDeps) return false;
-  }
-  return true;
-});
-```
-
-**Melhorar tratamento de erro da edge function:**
-
-```typescript
-// Linhas 67-77: Modificar handleSubmit
-const { data, error } = await supabase.functions.invoke('atribuir-feature', {
-  body: { ... },
-});
-
-// Checar erro no data (edge function retorna JSON com error)
-if (error) {
-  throw new Error(error.message);
-}
-
-if (data?.error) {
-  throw new Error(data.error);
-}
-```
-
-**Adicionar indicação visual de dependências:**
-
-Mostrar quais features estão disponíveis e quais requerem outras features:
-
-```typescript
-// Na listagem de features, agrupar por disponibilidade
-{availableFeatures.map((feature) => (
-  <SelectItem key={feature.slug} value={feature.slug}>
-    {feature.nome}
-  </SelectItem>
-))}
-
-// Mostrar features bloqueadas (opcional)
-{blockedFeatures.length > 0 && (
-  <div className="text-xs text-muted-foreground mt-2">
-    Features bloqueadas por dependências: {blockedFeatures.map(f => f.nome).join(', ')}
-  </div>
-)}
+```sql
+INSERT INTO features (
+  slug,
+  nome,
+  descricao,
+  icone,
+  categoria,
+  ordem_exibicao,
+  preco_mensal,
+  preco_anual,
+  preco_vitalicio,
+  trial_dias,
+  ativo,
+  visivel_catalogo,
+  roles_permitidas,
+  requer_features
+) VALUES (
+  'top_10_produtos',
+  'Top 10 Produtos Vencedores',
+  'Desafio gamificado para publicar 11 produtos vencedores em marketplaces e começar a vender!',
+  'Trophy',
+  'acessos',
+  1,
+  0.00,
+  0.00,
+  0.00,
+  0,
+  true,
+  false,
+  ARRAY['reseller', 'customer'],
+  ARRAY[]::text[]
+);
 ```
 
 ---
 
 ## Resultado Esperado
 
-| Cenário | Comportamento Atual | Comportamento Esperado |
-|---------|---------------------|------------------------|
-| Usuário sem academy_acesso | Mostra "Certificados" na lista | Esconde "Certificados" da lista |
-| Clica em Atribuir | Erro genérico | Não permite selecionar features bloqueadas |
-| Erro de dependência | "Edge Function returned..." | Mensagem clara sobre qual feature falta |
+Após a migration:
+
+1. A feature aparecerá no painel SuperAdmin em `/super-admin/features`
+2. SuperAdmin poderá atribuir a feature a usuários via modal "Atribuir Feature"
+3. Usuários com a feature ativa verão o card "Top 10 Produtos Vencedores" na página "Meus Acessos"
+4. A rota `/minha-conta/top-produtos-vencedores` será acessível apenas para quem tem a feature
 
 ---
 
@@ -106,22 +81,6 @@ Mostrar quais features estão disponíveis e quais requerem outras features:
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/components/admin/AssignFeatureModal.tsx` | Filtrar dependências + melhorar tratamento de erro |
+| Nova migration SQL | Inserir feature no banco de dados |
 
----
-
-## Fluxo Corrigido
-
-```text
-SuperAdmin abre modal "Atribuir Feature"
-              ↓
-Filtra features: ativas + não possui + dependências satisfeitas
-              ↓
-    ┌──────────────────────────────────┐
-    │ Usuário tem academy_acesso?      │
-    │   ✓ Sim → Mostra "Certificados"  │
-    │   ✗ Não → Esconde "Certificados" │
-    └──────────────────────────────────┘
-              ↓
-Só exibe features que podem ser atribuídas
-```
+Nenhum código frontend precisa ser alterado - a lógica de exibição condicional já foi implementada anteriormente.
