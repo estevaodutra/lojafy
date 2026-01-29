@@ -6,6 +6,7 @@ import { useFavorites } from "@/contexts/FavoritesContext";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useFeature } from "@/hooks/useFeature";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
@@ -33,6 +34,7 @@ const Header = () => {
   const {
     config
   } = useStoreConfig();
+  const { hasFeature: hasTop10Feature } = useFeature('top_10_produtos');
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -136,6 +138,14 @@ const Header = () => {
                       <Link to="/minha-conta/academy" className="w-full">
                         <GraduationCap className="mr-2 h-4 w-4" />
                         Lojafy Academy
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  {hasTop10Feature && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/minha-conta/meus-acessos" className="w-full">
+                        <Rocket className="mr-2 h-4 w-4" />
+                        Meus Acessos
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -277,6 +287,12 @@ const Header = () => {
                             <Link to="/minha-conta/academy" className="block py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
                               <GraduationCap className="inline mr-2 h-4 w-4" />
                               Lojafy Academy
+                            </Link>
+                          )}
+                          {hasTop10Feature && (
+                            <Link to="/minha-conta/meus-acessos" className="block py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
+                              <Rocket className="inline mr-2 h-4 w-4" />
+                              Meus Acessos
                             </Link>
                           )}
                           {role !== 'customer' && <Link to={getPanelRoute()} className="block py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>

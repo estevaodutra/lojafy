@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -19,8 +19,10 @@ import {
   Ticket,
   Truck,
   Star,
-  TrendingUp
+  TrendingUp,
+  Trophy
 } from 'lucide-react';
+import { useFeature } from '@/hooks/useFeature';
 import {
   Sidebar,
   SidebarContent,
@@ -87,7 +89,24 @@ const ResellerSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, profile } = useAuth();
+  const { hasFeature: hasTop10Feature } = useFeature('top_10_produtos');
   const currentPath = location.pathname;
+
+  const filteredMenuGroups = useMemo(() => {
+    const groups = [...menuGroups];
+    
+    if (hasTop10Feature) {
+      const advancedIndex = groups.findIndex(g => g.label === 'Avançado');
+      groups.splice(advancedIndex, 0, {
+        label: 'Meus Acessos',
+        items: [
+          { title: 'Top 10 Produtos Vencedores', url: '/reseller/meus-acessos/top-produtos', icon: Trophy, badge: 'Novo' },
+        ]
+      });
+    }
+    
+    return groups;
+  }, [hasTop10Feature]);
 
   const handleLogout = async () => {
     await signOut();
@@ -103,7 +122,7 @@ const ResellerSidebar = () => {
           )}
         </div>
         
-        {menuGroups.map((group) => (
+        {filteredMenuGroups.map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
             <SidebarGroupContent>
