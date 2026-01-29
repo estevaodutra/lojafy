@@ -127,6 +127,8 @@ import LessonViewer from "./pages/customer/LessonViewer";
 import Courses from "./pages/customer/Courses";
 import { MandatoryNotificationModal } from "@/components/MandatoryNotificationModal";
 import { useMandatoryNotifications } from "@/hooks/useMandatoryNotifications";
+import { WhatsAppRequiredModal } from "@/components/WhatsAppRequiredModal";
+import { useWhatsAppRequired } from "@/hooks/useWhatsAppRequired";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -153,13 +155,24 @@ const AppContent = () => {
 
 const AppWithNotifications = () => {
   const { pendingNotification, loading } = useMandatoryNotifications();
+  const { requiresWhatsApp, userId } = useWhatsAppRequired();
 
   return (
     <>
       <AppContent />
       <ImpersonationBanner />
       <ChatWidget />
-      {!loading && pendingNotification && (
+      
+      {/* WhatsApp tem prioridade máxima */}
+      {requiresWhatsApp && userId && (
+        <WhatsAppRequiredModal 
+          userId={userId} 
+          onComplete={() => window.location.reload()} 
+        />
+      )}
+      
+      {/* Só mostra outras notificações se WhatsApp OK */}
+      {!requiresWhatsApp && !loading && pendingNotification && (
         <MandatoryNotificationModal notification={pendingNotification} />
       )}
     </>
