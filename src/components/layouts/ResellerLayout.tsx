@@ -19,9 +19,7 @@ import {
   Ticket,
   Truck,
   Star,
-  TrendingUp,
-  Trophy,
-  Rocket
+  TrendingUp
 } from 'lucide-react';
 import {
   Sidebar,
@@ -45,12 +43,6 @@ const menuGroups = [
     label: 'Principal',
     items: [
       { title: 'Dashboard', url: '/reseller/dashboard', icon: LayoutDashboard },
-    ]
-  },
-  {
-    label: 'Meus Acessos',
-    items: [
-      { title: 'Top 10 Produtos Vencedores', url: '/reseller/meus-acessos/top-produtos', icon: Trophy, badge: 'Novo' },
     ]
   },
   {

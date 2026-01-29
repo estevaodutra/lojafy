@@ -1,12 +1,11 @@
 import React, { useMemo } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { User, Package, Heart, HelpCircle, Settings, Home, LogOut, GraduationCap, Ticket, Rocket } from 'lucide-react';
+import { User, Package, Heart, HelpCircle, Settings, Home, LogOut, GraduationCap, Ticket } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const baseMenuItems = [
   { title: 'Resumo', url: '/minha-conta', icon: User },
-  { title: 'Meus Acessos', url: '/minha-conta/meus-acessos', icon: Rocket },
   { title: 'Meus Pedidos', url: '/minha-conta/pedidos', icon: Package },
   { title: 'Meus Tickets', url: '/minha-conta/tickets', icon: Ticket },
   { title: 'Favoritos', url: '/minha-conta/favoritos', icon: Heart },
