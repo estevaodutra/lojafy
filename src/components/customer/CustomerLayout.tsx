@@ -19,6 +19,7 @@ const CustomerSidebar = () => {
   const navigate = useNavigate();
   const { signOut, profile } = useAuth();
   const { hasFeature: hasTop10Feature } = useFeature('top_10_produtos');
+  const { hasFeature: hasAcademyFeature } = useFeature('lojafy_academy');
   const currentPath = location.pathname;
 
   const isActive = (path: string) => currentPath === path;
@@ -26,8 +27,8 @@ const CustomerSidebar = () => {
   const menuItems = useMemo(() => {
     const items = [...baseMenuItems];
     
-    // Adicionar Academy apenas para revendedores
-    if (profile?.role === 'reseller') {
+    // Adicionar Academy apenas para quem tem a feature
+    if (hasAcademyFeature) {
       items.push({ title: 'Lojafy Academy', url: '/minha-conta/academy', icon: GraduationCap });
     }
     
@@ -37,7 +38,7 @@ const CustomerSidebar = () => {
     }
     
     return items;
-  }, [profile?.role, hasTop10Feature]);
+  }, [hasAcademyFeature, hasTop10Feature]);
 
   const handleLogout = async () => {
     await signOut();

@@ -35,6 +35,7 @@ const Header = () => {
     config
   } = useStoreConfig();
   const { hasFeature: hasTop10Feature } = useFeature('top_10_produtos');
+  const { hasFeature: hasAcademyFeature } = useFeature('lojafy_academy');
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -133,7 +134,7 @@ const Header = () => {
                       Minha Conta
                     </Link>
                   </DropdownMenuItem>
-                  {role === 'reseller' && (
+                  {hasAcademyFeature && (
                     <DropdownMenuItem asChild>
                       <Link to="/minha-conta/academy" className="w-full">
                         <GraduationCap className="mr-2 h-4 w-4" />
@@ -283,7 +284,7 @@ const Header = () => {
                             <User className="inline mr-2 h-4 w-4" />
                             Minha Conta
                           </Link>
-                          {role === 'reseller' && (
+                          {hasAcademyFeature && (
                             <Link to="/minha-conta/academy" className="block py-2 pl-2 text-sm text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
                               <GraduationCap className="inline mr-2 h-4 w-4" />
                               Lojafy Academy
