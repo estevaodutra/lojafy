@@ -1,89 +1,240 @@
 
-# Plano: Remover Dados Fictícios do Dashboard do Revendedor
+# Plano: Notificação Obrigatória de WhatsApp
 
-## Problema Identificado
+## Contexto
 
-O Dashboard do Revendedor (`src/pages/reseller/Dashboard.tsx`) exibe dados **hardcoded** em duas seções:
-
-| Seção | Problema |
-|-------|----------|
-| **Metas do Mês** | Valores fixos: "89/120 (74%)", "R$ 2.450/R$ 3.000 (82%)", "5/10 (50%)" |
-| **Vendas Recentes** | Lista gerada com `[1, 2, 3, 4, 5].map()` com valores fictícios |
+- **419 de 541 usuários** (77%) estão sem número de telefone cadastrado
+- É necessário criar um modal bloqueante que force o usuário a cadastrar seu WhatsApp para usar a plataforma
+- Esta notificação é **permanente** enquanto o usuário não tiver telefone cadastrado
 
 ---
 
-## Solução
+## Arquitetura da Solução
 
-### Opção A: Remover Completamente as Seções (Recomendado)
-Como não existe uma tabela de metas no banco de dados e não há pedidos reais de revendedores, a melhor abordagem é **remover as seções fictícias** e manter apenas os dados reais vindos do hook `useResellerSales`.
+Diferente das notificações obrigatórias existentes (tabela `mandatory_notifications`), esta será uma verificação **client-side** baseada no perfil do usuário:
 
-### Opção B: Substituir por Dados Reais
-Criar um hook para buscar os últimos 5 pedidos reais do revendedor e calcular metas com base em dados do banco.
-
----
-
-## Alterações (Opção A - Recomendada)
-
-### 1. Dashboard.tsx — Remover Seções Fictícias
-
-**Linhas 160-237** — Remover todo o grid com "Metas do Mês" e "Vendas Recentes":
-
-```typescript
-// REMOVER este bloco inteiro:
-<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-  {/* Goals Section - Now First */}
-  <Card>... Metas do Mês ...</Card>
-  
-  {/* Recent Sales Section - Now Second */}  
-  <Card>... Vendas Recentes ...</Card>
-</div>
+```text
+Usuário logado
+      │
+      ▼
+┌─────────────────────┐
+│ profile.phone vazio?│
+│  (null ou '')       │
+└─────────┬───────────┘
+          │ SIM
+          ▼
+┌─────────────────────────────┐
+│ Exibe WhatsAppRequiredModal │
+│ - Modal bloqueante          │
+│ - Campo com máscara BR      │
+│ - Validação de celular      │
+│ - Salva no profile + refetch│
+└─────────────────────────────┘
+          │ Após salvar
+          ▼
+    Usuário libera acesso
 ```
 
-**Imports não utilizados** — Remover `Target` e `UserPlus` dos imports do lucide-react
-
 ---
 
-## Alternativa (Opção B - Dados Reais)
+## Alterações Técnicas
 
-Se preferir manter as seções com dados reais:
+### 1. Novo Componente: `WhatsAppRequiredModal.tsx`
 
-### 1. Criar Hook `useResellerRecentOrders`
+Criar um modal que:
+- Aparece quando `profile.phone` está vazio ou nulo
+- **Não pode ser fechado** (sem botão de fechar, ESC e click-outside desabilitados)
+- Campo de telefone com máscara brasileira `+55 (XX) 99999-9999`
+- Validação: mínimo 10 dígitos (fixo) ou 11 dígitos (celular)
+- Ao salvar: atualiza `profiles.phone` no Supabase
+- Após sucesso: atualiza o contexto de autenticação
 
 ```typescript
-// src/hooks/useResellerRecentOrders.ts
-export const useResellerRecentOrders = () => {
-  // Buscar últimos 5 pedidos do revendedor
-  // Incluir nome do cliente e valor da comissão
+// src/components/WhatsAppRequiredModal.tsx
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { MessageCircle, Phone } from 'lucide-react';
+import { formatPhone, cleanPhone, validatePhone } from '@/lib/phone';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+interface Props {
+  userId: string;
+  onComplete: () => void;
+}
+
+export const WhatsAppRequiredModal = ({ userId, onComplete }: Props) => {
+  const [phone, setPhone] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!validatePhone(phone)) {
+      toast.error('Número inválido. Informe um telefone com DDD.');
+      return;
+    }
+
+    setSaving(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ phone: cleanPhone(phone) })
+      .eq('user_id', userId);
+
+    if (error) {
+      toast.error('Erro ao salvar o número.');
+      setSaving(false);
+      return;
+    }
+
+    toast.success('WhatsApp cadastrado com sucesso!');
+    onComplete();
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={() => {}}>
+      <DialogContent 
+        className="max-w-md"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <MessageCircle className="h-6 w-6 text-green-500" />
+            Cadastre seu WhatsApp
+          </DialogTitle>
+          <DialogDescription>
+            Para continuar usando a plataforma, é necessário cadastrar seu número de WhatsApp.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 mt-4">
+          <div className="space-y-2">
+            <Label htmlFor="whatsapp">Número do WhatsApp</Label>
+            <div className="relative">
+              <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="whatsapp"
+                value={phone}
+                onChange={(e) => setPhone(formatPhone(e.target.value))}
+                placeholder="+55 (11) 99999-9999"
+                className="pl-10"
+                maxLength={19}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Informe seu número com DDD para receber notificações importantes.
+            </p>
+          </div>
+
+          <Button 
+            onClick={handleSave} 
+            disabled={saving || !validatePhone(phone)}
+            className="w-full"
+          >
+            {saving ? 'Salvando...' : 'Salvar e Continuar'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 };
 ```
 
-### 2. Atualizar "Vendas Recentes" no Dashboard
+### 2. Novo Hook: `useWhatsAppRequired.ts`
 
-- Usar dados reais do hook
-- Mostrar estado vazio se não houver pedidos: "Nenhuma venda ainda. Compartilhe sua loja!"
+Hook para verificar se o usuário precisa cadastrar WhatsApp:
 
-### 3. Para "Metas do Mês"
+```typescript
+// src/hooks/useWhatsAppRequired.ts
+import { useAuth } from '@/contexts/AuthContext';
+import { cleanPhone } from '@/lib/phone';
 
-- **Problema:** Não existe tabela de metas no banco de dados
-- **Solução:** Remover completamente OU criar sistema de metas (tabela + CRUD)
+export const useWhatsAppRequired = () => {
+  const { user, profile, loading } = useAuth();
+
+  // Usuário não logado ou carregando = não mostra modal
+  if (loading || !user || !profile) {
+    return { requiresWhatsApp: false, userId: null };
+  }
+
+  // Verificar se tem telefone válido cadastrado
+  const phone = profile.phone ? cleanPhone(profile.phone) : '';
+  const requiresWhatsApp = phone.length < 10;
+
+  return { 
+    requiresWhatsApp, 
+    userId: user.id 
+  };
+};
+```
+
+### 3. Atualizar `App.tsx`
+
+Integrar o novo modal no fluxo de renderização, exibindo **antes** das outras notificações obrigatórias:
+
+```typescript
+// No AppWithNotifications:
+import { WhatsAppRequiredModal } from '@/components/WhatsAppRequiredModal';
+import { useWhatsAppRequired } from '@/hooks/useWhatsAppRequired';
+
+const AppWithNotifications = () => {
+  const { pendingNotification, loading } = useMandatoryNotifications();
+  const { requiresWhatsApp, userId } = useWhatsAppRequired();
+  const { refetch: refetchProfile } = useAuth(); // Novo método
+
+  // Prioridade: WhatsApp > Notificações obrigatórias
+  return (
+    <>
+      <AppContent />
+      <ImpersonationBanner />
+      <ChatWidget />
+      
+      {/* WhatsApp tem prioridade máxima */}
+      {requiresWhatsApp && userId && (
+        <WhatsAppRequiredModal 
+          userId={userId} 
+          onComplete={() => window.location.reload()} 
+        />
+      )}
+      
+      {/* Só mostra outras notificações se WhatsApp OK */}
+      {!requiresWhatsApp && !loading && pendingNotification && (
+        <MandatoryNotificationModal notification={pendingNotification} />
+      )}
+    </>
+  );
+};
+```
 
 ---
 
-## Arquivos Modificados
+## Arquivos a Criar/Modificar
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/pages/reseller/Dashboard.tsx` | Remover seções com dados fictícios |
+| Arquivo | Ação |
+|---------|------|
+| `src/components/WhatsAppRequiredModal.tsx` | **Criar** - Modal bloqueante com campo de telefone |
+| `src/hooks/useWhatsAppRequired.ts` | **Criar** - Hook para verificar necessidade de WhatsApp |
+| `src/App.tsx` | **Modificar** - Integrar o modal no AppWithNotifications |
 
 ---
 
-## Decisão Necessária
+## Comportamento Esperado
 
-Qual abordagem você prefere?
+| Situação | Resultado |
+|----------|-----------|
+| Usuário sem telefone | Modal bloqueante aparece, não pode fechar |
+| Usuário preenche e salva | Modal fecha, plataforma liberada |
+| Usuário com telefone | Modal não aparece |
+| Usuário desloga e loga de novo sem telefone | Modal aparece novamente |
 
-| Opção | Resultado |
-|-------|-----------|
-| **A - Remover** | Dashboard limpo, apenas com dados reais do "Resumo do Mês" |
-| **B - Dados Reais** | Manter seções, mas com dados do banco (requer criar hook) |
+---
 
-A **Opção A** é mais rápida e evita exibir seções vazias/incompletas. A **Opção B** requer mais trabalho mas mantém o layout original.
+## Detalhes de UX
+
+- **Ícone**: WhatsApp verde para identificar visualmente
+- **Máscara**: `+55 (XX) 99999-9999` aplicada automaticamente
+- **Validação**: Mínimo 10 dígitos (fixo/celular brasileiro)
+- **Feedback**: Toast de sucesso/erro ao salvar
+- **Bloqueio**: Impossível fechar sem preencher (sem X, ESC desabilitado)
