@@ -1,141 +1,153 @@
 
-# Plano: Corrigir Erro "email column not found in profiles"
 
-## Problema
+# Plano: Transformar Lojafy Academy em Feature Controlada
 
-O modal de detalhes do usuário (`UserDetailsModal.tsx`) está tentando atualizar o campo `email` diretamente na tabela `profiles`, mas essa coluna não existe nessa tabela. O email está armazenado apenas na tabela `auth.users`.
+## Contexto Atual
 
-**Código problemático (linhas 132-138):**
+Atualmente a **Lojafy Academy** está acessível automaticamente para **todos os revendedores** (`role === 'reseller'`). A proposta é transformá-la em uma **feature controlada**, onde o acesso depende de ter a funcionalidade `lojafy_academy` atribuída ao usuário.
+
+---
+
+## Como Funciona o Sistema de Features
+
+O sistema já possui duas features cadastradas:
+- `loja_propria` - Loja Completa (categoria: loja)
+- `top_10_produtos` - Top 10 Produtos (categoria: recursos)
+
+Para verificar se um usuário tem uma feature, usa-se:
 ```typescript
-const { error: profileError } = await supabase
-  .from('profiles')
-  .update({
-    email: editedEmail,  // ❌ Coluna não existe em profiles
-    phone: editedPhone,
-  })
-  .eq('user_id', user.user_id);
+const { hasFeature } = useFeature('slug_da_feature');
 ```
 
 ---
 
-## Solução
+## Alterações Necessárias
 
-Remover a tentativa de atualizar o email na tabela `profiles`. O email é gerenciado pelo Supabase Auth e não deve ser editado diretamente via cliente. Para alterar email de usuários, seria necessário usar `supabase.auth.admin.updateUserById()` em uma Edge Function.
+### 1. Criar Feature no Banco de Dados
 
-Por ora, vamos:
-1. Remover o campo `email` do update de profiles
-2. Desabilitar a edição de email na interface (tornar somente leitura)
+Inserir nova feature na tabela `features`:
 
----
-
-## Alterações
-
-### Arquivo: `src/components/admin/UserDetailsModal.tsx`
-
-### 1. Remover `email` do update (linhas 132-138)
-
-**De:**
-```typescript
-const { error: profileError } = await supabase
-  .from('profiles')
-  .update({
-    email: editedEmail,
-    phone: editedPhone,
-  })
-  .eq('user_id', user.user_id);
-```
-
-**Para:**
-```typescript
-const { error: profileError } = await supabase
-  .from('profiles')
-  .update({
-    phone: editedPhone,
-  })
-  .eq('user_id', user.user_id);
-```
-
-### 2. Remover estado e detecção de mudança de email
-
-**Linhas 98 e 107:** Remover `editedEmail` e `setEditedEmail`
-
-**Linhas 118-119:** Remover comparação de email da detecção de mudanças
-
-### 3. Tornar campo de email somente leitura (linhas 284-296)
-
-**De:**
-```tsx
-<Input
-  value={editedEmail}
-  onChange={(e) => setEditedEmail(e.target.value)}
-  type="email"
-  className="max-w-[300px]"
-/>
-```
-
-**Para:**
-```tsx
-<span className="text-sm">{user.email}</span>
-```
+| Campo | Valor |
+|-------|-------|
+| `slug` | `lojafy_academy` |
+| `nome` | `Lojafy Academy` |
+| `descricao` | `Acesso aos cursos e treinamentos da plataforma` |
+| `icone` | `GraduationCap` |
+| `categoria` | `recursos` |
+| `ordem_exibicao` | `2` |
+| `preco_mensal` | `0.00` (ou valor definido) |
+| `trial_dias` | `0` |
+| `ativo` | `true` |
+| `roles_permitidas` | `['reseller', 'customer']` |
+| `requer_features` | `[]` |
 
 ---
 
-## Código Final do handleSaveChanges
+### 2. Atualizar Header.tsx
+
+**Alterar condição de exibição do menu Academy:**
 
 ```typescript
-const handleSaveChanges = async () => {
-  if (!user) return;
-  setIsSaving(true);
-  try {
-    // Update phone in profiles (email is managed by auth)
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .update({
-        phone: editedPhone,
-      })
-      .eq('user_id', user.user_id);
+// De (linhas 136-143 e 286-291):
+{role === 'reseller' && (
+  <Link to="/minha-conta/academy">...Lojafy Academy</Link>
+)}
 
-    if (profileError) throw profileError;
+// Para:
+{hasAcademyFeature && (
+  <Link to="/minha-conta/academy">...Lojafy Academy</Link>
+)}
+```
 
-    // Update role if changed
-    if (editedRole !== user.role) {
-      // ... resto do código igual
-    }
-
-    toast({ title: 'Sucesso!', description: 'Informações atualizadas com sucesso' });
-    onUserUpdated?.();
-    setHasChanges(false);
-  } catch (error: any) {
-    toast({
-      title: 'Erro',
-      description: error.message || 'Falha ao atualizar informações',
-      variant: 'destructive',
-    });
-  } finally {
-    setIsSaving(false);
-  }
-};
+**Adicionar hook:**
+```typescript
+const { hasFeature: hasAcademyFeature } = useFeature('lojafy_academy');
 ```
 
 ---
 
-## Resumo de Alterações
+### 3. Atualizar CustomerLayout.tsx
 
-| Linha | Alteração |
-|-------|-----------|
-| 98 | Remover `const [editedEmail, setEditedEmail] = useState('');` |
-| 107 | Remover `setEditedEmail(user.email);` |
-| 118-119 | Remover comparação de email na detecção de mudanças |
-| 134-135 | Remover `email: editedEmail,` do update |
-| 290-293 | Substituir Input por texto estático para email |
+**Alterar condição de exibição no menu lateral:**
+
+```typescript
+// De (linhas 29-32):
+if (profile?.role === 'reseller') {
+  items.push({ title: 'Lojafy Academy', url: '/minha-conta/academy', icon: GraduationCap });
+}
+
+// Para:
+if (hasAcademyFeature) {
+  items.push({ title: 'Lojafy Academy', url: '/minha-conta/academy', icon: GraduationCap });
+}
+```
+
+**Adicionar hook:**
+```typescript
+const { hasFeature: hasAcademyFeature } = useFeature('lojafy_academy');
+```
 
 ---
 
-## Por que não editar email?
+### 4. Proteger Rotas da Academy no App.tsx
 
-O email é gerenciado pelo **Supabase Auth** e alterá-lo requer:
-1. Edge Function com `supabase.auth.admin.updateUserById()`
-2. Verificação de email duplicado
-3. Envio de email de confirmação
+**Envolver rotas relacionadas com FeatureRoute:**
 
-Essa funcionalidade pode ser implementada futuramente se necessário.
+```typescript
+// De (linhas 232-237):
+<Route path="academy" element={<Academy />} />
+<Route path="curso/:courseId" element={<CourseModules />} />
+<Route path="curso/:courseId/modulo/:moduleId" element={<ModuleLessons />} />
+<Route path="aula/:lessonId" element={<LessonViewer />} />
+
+// Para:
+<Route path="academy" element={
+  <FeatureRoute feature="lojafy_academy">
+    <Academy />
+  </FeatureRoute>
+} />
+<Route path="curso/:courseId" element={
+  <FeatureRoute feature="lojafy_academy">
+    <CourseModules />
+  </FeatureRoute>
+} />
+<Route path="curso/:courseId/modulo/:moduleId" element={
+  <FeatureRoute feature="lojafy_academy">
+    <ModuleLessons />
+  </FeatureRoute>
+} />
+<Route path="aula/:lessonId" element={
+  <FeatureRoute feature="lojafy_academy">
+    <LessonViewer />
+  </FeatureRoute>
+} />
+```
+
+---
+
+## Resumo de Arquivos
+
+| Arquivo | Alteração |
+|---------|-----------|
+| **Banco de dados** | Inserir feature `lojafy_academy` |
+| `src/components/Header.tsx` | Substituir `role === 'reseller'` por `hasAcademyFeature` |
+| `src/components/customer/CustomerLayout.tsx` | Substituir `profile?.role === 'reseller'` por `hasAcademyFeature` |
+| `src/App.tsx` | Proteger 4 rotas da Academy com `FeatureRoute` |
+
+---
+
+## Comportamento Após Implementação
+
+1. **Usuário SEM feature:** Não vê links da Academy, acesso via URL é bloqueado
+2. **Usuário COM feature:** Vê normalmente todos os links e tem acesso completo
+3. **Super Admin:** Acesso liberado automaticamente (bypass no `useFeature`)
+
+---
+
+## Atribuição de Features
+
+Para dar acesso à Academy para um usuário, o Super Admin pode:
+1. Ir em **Features** > selecionar usuário > atribuir `lojafy_academy`
+2. Usar a API `api-features-atribuir` com o slug `lojafy_academy`
+3. Ao criar usuário via `api-usuarios-cadastrar` + `api-matriculas-cadastrar` com `all_courses: true`, também atribuir a feature
+
