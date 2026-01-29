@@ -17,6 +17,7 @@ import {
   Users,
   Edit,
   Power,
+  Trophy,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +44,7 @@ const iconMap: Record<string, React.ElementType> = {
   GraduationCap,
   Award,
   Sparkles,
+  Trophy,
 };
 
 interface FeatureCardProps {
