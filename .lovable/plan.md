@@ -1,217 +1,267 @@
 
 
-# Plano: Categoria "Features" na API
+# Plano: Vincular Features à Data de Expiração do Usuário
 
-## Visão Geral
+## Contexto da Mudança
 
-Adicionar uma nova categoria **"Features"** na documentação da API com dois endpoints:
-1. **Listar Features** - Retorna todas as features disponíveis no catálogo
-2. **Atribuir Feature** - Atribui uma feature a um usuário específico
+Atualmente, cada feature atribuída a um usuário tem sua **própria data de expiração** (`user_features.data_expiracao`). A mudança é para usar a **data de expiração do perfil do usuário** (`profiles.subscription_expires_at`) como única fonte de verdade.
 
 ---
 
-## Arquitetura dos Endpoints
+## Nova Lógica de Expiração
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│                     Features API                            │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  GET /api-features-listar                                   │
-│  ├─ Auth: X-API-Key                                         │
-│  ├─ Query: active, categoria                                │
-│  └─ Response: Lista de features com contadores              │
-│                                                             │
-│  POST /api-features-atribuir                                │
-│  ├─ Auth: X-API-Key                                         │
-│  ├─ Body: user_id, feature_slug, tipo_periodo, motivo       │
-│  └─ Response: Confirmação + data de expiração               │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                     ANTES (Atual)                               │
+├─────────────────────────────────────────────────────────────────┤
+│  user_features.data_expiracao = 2026-02-28 (individual)         │
+│  Feature expira quando: data_expiracao < NOW()                  │
+└─────────────────────────────────────────────────────────────────┘
+
+                           ▼
+
+┌─────────────────────────────────────────────────────────────────┐
+│                      DEPOIS (Novo)                              │
+├─────────────────────────────────────────────────────────────────┤
+│  profiles.subscription_expires_at = 2026-02-28 (global)         │
+│  Feature expira quando: subscription_expires_at < NOW()         │
+│  Exceção: tipo_periodo = 'vitalicio' ou 'cortesia' → nunca      │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 1. Edge Function: `api-features-listar`
+## Alterações no Banco de Dados
 
-### Especificação
+### 1. Alterar RPC `user_has_feature`
 
-| Campo | Valor |
-|-------|-------|
-| Método | GET |
-| Autenticação | X-API-Key |
-| Permissão | `features.read` |
+**Lógica Atual:**
+```sql
+WHERE uf.user_id = _user_id
+  AND f.slug = _feature_slug
+  AND uf.status IN ('ativo', 'trial')
+  AND (uf.data_expiracao IS NULL OR uf.data_expiracao > NOW())
+```
 
-### Query Parameters
+**Nova Lógica:**
+```sql
+WHERE uf.user_id = _user_id
+  AND f.slug = _feature_slug
+  AND uf.status IN ('ativo', 'trial')
+  AND (
+    uf.tipo_periodo IN ('vitalicio', 'cortesia')  -- Nunca expira
+    OR p.subscription_expires_at IS NULL           -- Sem data = ativo
+    OR p.subscription_expires_at > NOW()           -- Data futura = ativo
+  )
+```
 
-| Parâmetro | Descrição | Exemplo |
-|-----------|-----------|---------|
-| `active` | Filtrar por status ativo | `true` |
-| `categoria` | Filtrar por categoria | `loja` |
+### 2. Alterar RPC `get_user_active_features`
 
-### Response
+**Lógica Atual:**
+```sql
+WHERE uf.user_id = _user_id
+  AND uf.status IN ('ativo', 'trial')
+  AND (uf.data_expiracao IS NULL OR uf.data_expiracao > NOW())
+```
 
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "uuid",
-      "slug": "loja_propria",
-      "nome": "Loja Completa",
-      "descricao": "Permite criar e gerenciar uma loja personalizada",
-      "icone": "Store",
-      "categoria": "loja",
-      "ativo": true,
-      "preco_mensal": 49.90,
-      "preco_anual": 479.00,
-      "preco_vitalicio": 1499.00,
-      "trial_dias": 7,
-      "usuarios_ativos": 15
-    }
-  ],
-  "summary": {
-    "total": 2,
-    "por_categoria": { "loja": 1, "recursos": 1 }
-  }
-}
+**Nova Lógica:**
+```sql
+FROM public.user_features uf
+JOIN public.features f ON f.id = uf.feature_id
+JOIN public.profiles p ON p.user_id = uf.user_id
+WHERE uf.user_id = _user_id
+  AND uf.status IN ('ativo', 'trial')
+  AND (
+    uf.tipo_periodo IN ('vitalicio', 'cortesia')
+    OR p.subscription_expires_at IS NULL
+    OR p.subscription_expires_at > NOW()
+  )
+```
+
+E atualizar o cálculo de `dias_restantes`:
+```sql
+CASE 
+  WHEN uf.tipo_periodo IN ('vitalicio', 'cortesia') THEN NULL
+  WHEN p.subscription_expires_at IS NULL THEN NULL
+  ELSE GREATEST(0, EXTRACT(DAY FROM p.subscription_expires_at - NOW())::INTEGER)
+END as dias_restantes,
+p.subscription_expires_at as data_expiracao_perfil
 ```
 
 ---
 
-## 2. Edge Function: `api-features-atribuir`
+## Alterações nas Edge Functions
 
-### Especificação
+### 3. `atribuir-feature/index.ts`
 
-| Campo | Valor |
-|-------|-------|
-| Método | POST |
-| Autenticação | X-API-Key |
-| Permissão | `features.write` |
-
-### Request Body
-
-```json
-{
-  "user_id": "uuid-do-usuario",
-  "feature_slug": "loja_propria",
-  "tipo_periodo": "mensal",
-  "motivo": "Parceria comercial"
-}
-```
-
-### Tipos de Período
-
-| Tipo | Duração | Descrição |
-|------|---------|-----------|
-| `trial` | feature.trial_dias | Período de teste gratuito |
-| `mensal` | 30 dias | Assinatura mensal |
-| `anual` | 365 dias | Assinatura anual |
-| `vitalicio` | Sem expiração | Acesso permanente |
-| `cortesia` | Sem expiração | Cortesia administrativa |
-
-### Response
-
-```json
-{
-  "success": true,
-  "message": "Feature atribuída com sucesso",
-  "data": {
-    "user_id": "uuid",
-    "feature_slug": "loja_propria",
-    "status": "ativo",
-    "tipo_periodo": "mensal",
-    "data_inicio": "2026-01-29T00:00:00Z",
-    "data_expiracao": "2026-02-28T00:00:00Z"
-  }
-}
-```
-
-### Validações
-
-- Verifica se a feature existe e está ativa
-- Verifica se o usuário existe
-- Valida dependências (`requer_features`)
-- Registra transação para auditoria
-
----
-
-## 3. Documentação da API
-
-### Nova Categoria
-
-Adicionar ao `apiEndpointsData.ts`:
+Remover cálculo de `data_expiracao` individual e simplificar:
 
 ```typescript
-const featuresEndpoints: EndpointData[] = [
-  {
-    title: 'Listar Features',
-    method: 'GET',
-    url: '/functions/v1/api-features-listar',
-    description: 'Retorna a lista de features disponíveis no catálogo.',
-    queryParams: [
-      { name: 'active', description: 'Filtrar por status ativo', example: 'true' },
-      { name: 'categoria', description: 'Filtrar por categoria', example: 'loja' }
-    ],
-    responseExample: {
-      success: true,
-      data: [{ slug: 'loja_propria', nome: 'Loja Completa' }],
-      summary: { total: 2 }
-    }
-  },
-  {
-    title: 'Atribuir Feature',
-    method: 'POST',
-    url: '/functions/v1/api-features-atribuir',
-    description: 'Atribui uma feature a um usuário específico.',
-    requestBody: {
-      user_id: 'uuid-usuario',
-      feature_slug: 'loja_propria',
-      tipo_periodo: 'mensal',
-      motivo: 'Parceria comercial'
-    },
-    responseExample: {
-      success: true,
-      message: 'Feature atribuída com sucesso',
-      data: { status: 'ativo', data_expiracao: '2026-02-28' }
-    }
-  }
+// REMOVER toda a lógica de cálculo:
+// let data_expiracao: string | null = null;
+// switch (tipo_periodo) { ... }
+
+// SIMPLIFICAR upsert:
+const { data: userFeature, error: upsertError } = await supabase
+  .from('user_features')
+  .upsert({
+    user_id,
+    feature_id: feature.id,
+    status: tipo_periodo === 'trial' ? 'trial' : 'ativo',
+    tipo_periodo,
+    data_inicio: new Date().toISOString(),
+    data_expiracao: null,  // Não usado mais
+    trial_usado: tipo_periodo === 'trial',
+    origem: 'admin',
+    atribuido_por: caller.id,
+    motivo,
+  }, {
+    onConflict: 'user_id,feature_id',
+  })
+```
+
+### 4. `api-features-atribuir/index.ts`
+
+Mesma simplificação - remover cálculo de datas individuais.
+
+---
+
+## Alterações no Frontend
+
+### 5. `src/components/admin/AssignFeatureModal.tsx`
+
+Simplificar opções de período (já que não afetam expiração individual):
+
+```typescript
+const periodOptions = [
+  { value: 'mensal', label: 'Mensal (usa data do perfil)' },
+  { value: 'anual', label: 'Anual (usa data do perfil)' },
+  { value: 'vitalicio', label: 'Vitalício (não expira)' },
+  { value: 'cortesia', label: 'Cortesia (não expira)' },
 ];
 ```
 
----
+Adicionar nota explicativa na interface:
+```typescript
+<p className="text-xs text-muted-foreground">
+  A expiração será controlada pela data de expiração do perfil do usuário.
+  Períodos vitalício/cortesia nunca expiram.
+</p>
+```
 
-## Arquivos a Criar/Modificar
+### 6. `src/hooks/useUserFeatures.ts`
 
-| Arquivo | Ação |
-|---------|------|
-| `supabase/functions/api-features-listar/index.ts` | **Criar** |
-| `supabase/functions/api-features-atribuir/index.ts` | **Criar** |
-| `src/data/apiEndpointsData.ts` | **Modificar** - Adicionar categoria Features |
-| `supabase/config.toml` | **Modificar** - Registrar novas funções |
+Atualizar interface para refletir novo campo:
 
----
-
-## Permissões na API Key
-
-As novas edge functions verificarão permissões no objeto `permissions` da API key:
-
-```json
-{
-  "features": {
-    "read": true,
-    "write": true
-  }
+```typescript
+export interface UserFeature {
+  // ... campos existentes ...
+  data_expiracao_perfil: string | null;  // Novo campo
 }
+```
+
+### 7. Atualizar Documentação API
+
+Em `src/data/apiEndpointsData.ts`, adicionar nota sobre a nova lógica de expiração.
+
+---
+
+## Migration SQL
+
+```sql
+-- Alterar função user_has_feature
+CREATE OR REPLACE FUNCTION public.user_has_feature(_user_id uuid, _feature_slug text)
+RETURNS boolean
+LANGUAGE sql
+STABLE SECURITY DEFINER
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.user_features uf
+    JOIN public.features f ON f.id = uf.feature_id
+    JOIN public.profiles p ON p.user_id = uf.user_id
+    WHERE uf.user_id = _user_id
+      AND f.slug = _feature_slug
+      AND uf.status IN ('ativo', 'trial')
+      AND (
+        uf.tipo_periodo IN ('vitalicio', 'cortesia')
+        OR p.subscription_expires_at IS NULL
+        OR p.subscription_expires_at > NOW()
+      )
+  );
+$$;
+
+-- Alterar função get_user_active_features
+CREATE OR REPLACE FUNCTION public.get_user_active_features(_user_id uuid)
+RETURNS TABLE (
+  feature_id uuid,
+  feature_slug varchar,
+  feature_nome varchar,
+  feature_icone varchar,
+  categoria varchar,
+  status feature_status,
+  tipo_periodo feature_period,
+  data_inicio timestamptz,
+  data_expiracao timestamptz,
+  dias_restantes integer,
+  atribuido_por uuid,
+  motivo text
+)
+LANGUAGE sql
+STABLE SECURITY DEFINER
+AS $$
+  SELECT 
+    f.id as feature_id,
+    f.slug as feature_slug,
+    f.nome as feature_nome,
+    f.icone as feature_icone,
+    f.categoria,
+    uf.status,
+    uf.tipo_periodo,
+    uf.data_inicio,
+    p.subscription_expires_at as data_expiracao,
+    CASE 
+      WHEN uf.tipo_periodo IN ('vitalicio', 'cortesia') THEN NULL
+      WHEN p.subscription_expires_at IS NULL THEN NULL
+      ELSE GREATEST(0, EXTRACT(DAY FROM p.subscription_expires_at - NOW())::INTEGER)
+    END as dias_restantes,
+    uf.atribuido_por,
+    uf.motivo
+  FROM public.user_features uf
+  JOIN public.features f ON f.id = uf.feature_id
+  JOIN public.profiles p ON p.user_id = uf.user_id
+  WHERE uf.user_id = _user_id
+    AND uf.status IN ('ativo', 'trial')
+    AND (
+      uf.tipo_periodo IN ('vitalicio', 'cortesia')
+      OR p.subscription_expires_at IS NULL
+      OR p.subscription_expires_at > NOW()
+    )
+  ORDER BY f.categoria, f.ordem_exibicao;
+$$;
 ```
 
 ---
 
-## Ordem das Categorias na Documentação
+## Resumo de Arquivos
 
-1. Catálogo
-2. Pedidos
-3. Ranking & Demo
-4. **Features** (nova)
-5. Academy
+| Arquivo | Ação |
+|---------|------|
+| **Migration SQL** | Alterar RPCs `user_has_feature` e `get_user_active_features` |
+| `supabase/functions/atribuir-feature/index.ts` | Remover cálculo de `data_expiracao` |
+| `supabase/functions/api-features-atribuir/index.ts` | Remover cálculo de `data_expiracao` |
+| `src/components/admin/AssignFeatureModal.tsx` | Atualizar labels e adicionar nota |
+| `src/data/apiEndpointsData.ts` | Atualizar documentação |
+
+---
+
+## Comportamento Final
+
+| Tipo Período | Fonte de Expiração | Comportamento |
+|--------------|-------------------|---------------|
+| mensal | `profiles.subscription_expires_at` | Expira junto com o perfil |
+| anual | `profiles.subscription_expires_at` | Expira junto com o perfil |
+| trial | `profiles.subscription_expires_at` | Expira junto com o perfil |
+| vitalicio | Nunca | Feature permanente |
+| cortesia | Nunca | Feature permanente |
 
