@@ -1,145 +1,135 @@
 
+# Plano: Exibir Data de Expiração nos Detalhes do Usuário
 
-# Plano: Expiração por Quantidade de Dias no Cadastro
+## Contexto
 
-## Lógica Proposta
-
-Aceitar **quantidade de dias** como parâmetro alternativo à data fixa. O sistema calcula automaticamente a data de expiração.
-
----
-
-## Parâmetros Aceitos (mutuamente exclusivos)
-
-| Parâmetro | Tipo | Exemplo | Descrição |
-|-----------|------|---------|-----------|
-| `subscription_days` | number | `30` | Quantidade de dias a partir de hoje |
-| `subscription_expires_at` | string | `2026-02-28T...` | Data fixa ISO (opcional) |
-
-**Prioridade:** Se ambos forem enviados, `subscription_days` tem precedência.
-
----
-
-## Exemplos de Uso
-
-### Por dias (recomendado)
-```json
-{
-  "email": "usuario@email.com",
-  "password": "senha123",
-  "full_name": "João Silva",
-  "role": "reseller",
-  "subscription_plan": "premium",
-  "subscription_days": 30
-}
-```
-**Resultado:** `subscription_expires_at = now() + 30 dias`
-
-### Por data fixa
-```json
-{
-  "email": "usuario@email.com",
-  "password": "senha123",
-  "subscription_expires_at": "2026-12-31T23:59:59Z"
-}
-```
+O modal de detalhes do usuário (`UserDetailsModal`) não exibe os campos `subscription_plan` e `subscription_expires_at`, embora esses dados já sejam retornados pela RPC `get_users_with_email` e passados para o modal.
 
 ---
 
 ## Alterações
 
-### 1. Edge Function `api-usuarios-cadastrar/index.ts`
+### Arquivo: `src/components/admin/UserDetailsModal.tsx`
+
+### 1. Atualizar a interface `UserDetailsModalProps`
+
+Adicionar os campos de assinatura:
 
 ```typescript
-const { 
-  email, 
-  full_name, 
-  password, 
-  role = 'customer',
-  subscription_plan,
-  subscription_days,        // NOVO: quantidade de dias
-  subscription_expires_at,  // data fixa alternativa
-  phone
-} = body;
-
-// Calcular data de expiração
-let calculatedExpiresAt: string | null = null;
-
-if (subscription_days && subscription_days > 0) {
-  // Calcular a partir de quantidade de dias
-  const expirationDate = new Date();
-  expirationDate.setDate(expirationDate.getDate() + subscription_days);
-  calculatedExpiresAt = expirationDate.toISOString();
-} else if (subscription_expires_at) {
-  // Usar data fixa informada
-  calculatedExpiresAt = subscription_expires_at;
-}
-
-// Atualizar perfil
-await supabase.from('profiles').update({
-  first_name: firstName,
-  last_name: lastName,
-  role: role,
-  phone: phone || null,
-  subscription_plan: subscription_plan || 'free',
-  subscription_expires_at: calculatedExpiresAt
-}).eq('user_id', authData.user.id);
-```
-
-### 2. Documentação `src/data/apiEndpointsData.ts`
-
-**Request Body:**
-```typescript
-requestBody: {
-  email: 'novo@email.com',
-  full_name: 'Maria Santos',
-  password: 'senhaSegura123!',
-  role: 'reseller',
-  phone: '11999999999',
-  subscription_plan: 'premium',
-  subscription_days: 30,
-  _nota: 'Use subscription_days OU subscription_expires_at'
+interface UserDetailsModalProps {
+  user: {
+    user_id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone?: string;
+    created_at: string;
+    last_sign_in_at?: string;
+    role: string;
+    subscription_plan?: string;        // NOVO
+    subscription_expires_at?: string;  // NOVO
+  } | null;
+  // ...
 }
 ```
 
-**Response:**
+### 2. Importar ícone adicional
+
+Adicionar `CreditCard` ou `CalendarClock` para representar assinatura:
+
 ```typescript
-responseExample: {
-  success: true,
-  message: 'Usuário criado com sucesso',
-  data: {
-    user_id: 'uuid',
-    email: 'novo@email.com',
-    full_name: 'Maria Santos',
-    role: 'reseller',
-    subscription_plan: 'premium',
-    subscription_expires_at: '2026-02-28T00:00:00Z',
-    subscription_days_granted: 30,
-    created_at: '2026-01-29T00:00:00Z'
-  }
-}
+import { CalendarClock } from 'lucide-react';
+```
+
+### 3. Adicionar exibição no render
+
+Após a exibição do telefone, adicionar seção de assinatura:
+
+```tsx
+{/* Assinatura */}
+<div className="grid grid-cols-[100px_1fr] items-center gap-2">
+  <Label className="flex items-center gap-2 text-sm">
+    <CalendarClock className="w-4 h-4 text-muted-foreground" />
+    Plano
+  </Label>
+  <div className="flex items-center gap-2">
+    <Badge variant={user.subscription_plan === 'premium' ? 'default' : 'secondary'}>
+      {user.subscription_plan === 'premium' ? 'Premium' : 'Free'}
+    </Badge>
+  </div>
+</div>
+
+{/* Data de Expiração */}
+{user.subscription_expires_at && (
+  <div className="grid grid-cols-[100px_1fr] items-center gap-2">
+    <Label className="flex items-center gap-2 text-sm">
+      <Clock className="w-4 h-4 text-muted-foreground" />
+      Expira em
+    </Label>
+    <div className="flex items-center gap-2">
+      <span className={cn(
+        "text-sm",
+        new Date(user.subscription_expires_at) < new Date() 
+          ? "text-destructive" 
+          : "text-foreground"
+      )}>
+        {format(new Date(user.subscription_expires_at), "dd/MM/yyyy", { locale: ptBR })}
+      </span>
+      {new Date(user.subscription_expires_at) < new Date() && (
+        <Badge variant="destructive" className="text-xs">Expirado</Badge>
+      )}
+    </div>
+  </div>
+)}
+
+{!user.subscription_expires_at && user.subscription_plan === 'premium' && (
+  <div className="grid grid-cols-[100px_1fr] items-center gap-2">
+    <Label className="flex items-center gap-2 text-sm">
+      <Clock className="w-4 h-4 text-muted-foreground" />
+      Expira em
+    </Label>
+    <Badge variant="outline" className="text-xs w-fit">Vitalício</Badge>
+  </div>
+)}
+```
+
+### 4. Importar utilitário `cn`
+
+```typescript
+import { cn } from '@/lib/utils';
 ```
 
 ---
 
-## Resumo de Arquivos
+## Visualização Final
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `supabase/functions/api-usuarios-cadastrar/index.ts` | Adicionar lógica de cálculo por dias |
-| `src/data/apiEndpointsData.ts` | Atualizar documentação do endpoint |
+```
+┌─────────────────────────────────────────────────┐
+│ Detalhes do Usuário                             │
+├─────────────────────────────────────────────────┤
+│ Informações Pessoais                            │
+│                                                 │
+│ 👤 Henrique de Jesus                            │
+│                                                 │
+│ Role      [Revendedor ▼]                        │
+│ Email     [centraldeerros2@gmail.com]           │
+│ Telefone  [5512982402981           ]            │
+│ Plano     🏷️ Premium                            │
+│ Expira em 28/02/2026                            │  ← NOVO
+│                                                 │
+│ ─────────────────────────────────────────────── │
+│ 📅 Cliente desde 29/01/2026                     │
+│ 🆔 0995398d-805f-47ed-8ac5-... [📋]             │
+└─────────────────────────────────────────────────┘
+```
 
 ---
 
-## Tabela de Parâmetros Final
+## Resumo de Alterações
 
-| Campo | Tipo | Obrigatório | Descrição |
-|-------|------|-------------|-----------|
-| `email` | string | Sim | Email do usuário |
-| `password` | string | Sim | Senha do usuário |
-| `full_name` | string | Não | Nome completo |
-| `role` | string | Não | Role (default: customer) |
-| `phone` | string | Não | Telefone |
-| `subscription_plan` | string | Não | Plano: free ou premium (default: free) |
-| `subscription_days` | number | Não | Dias de acesso a partir de hoje |
-| `subscription_expires_at` | string | Não | Data fixa de expiração ISO |
-
+| Linha | Alteração |
+|-------|-----------|
+| ~5-17 | Adicionar import `CalendarClock` |
+| ~50-59 | Adicionar campos na interface `user` |
+| ~295-330 | Adicionar exibição de Plano e Data de Expiração |
+| ~1 | Adicionar import `cn` de utils |
