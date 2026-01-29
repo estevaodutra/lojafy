@@ -41,7 +41,16 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { email, full_name, password, role = 'customer' } = body;
+    const { 
+      email, 
+      full_name, 
+      password, 
+      role = 'customer',
+      subscription_plan,
+      subscription_days,
+      subscription_expires_at,
+      phone
+    } = body;
 
     // Validações
     if (!email || !password) {
@@ -80,6 +89,25 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Calcular data de expiração
+    let calculatedExpiresAt: string | null = null;
+    let daysGranted: number | null = null;
+
+    if (subscription_days && subscription_days > 0) {
+      // Calcular a partir de quantidade de dias
+      const expirationDate = new Date();
+      expirationDate.setDate(expirationDate.getDate() + subscription_days);
+      calculatedExpiresAt = expirationDate.toISOString();
+      daysGranted = subscription_days;
+    } else if (subscription_expires_at) {
+      // Usar data fixa informada
+      calculatedExpiresAt = subscription_expires_at;
+      // Calcular dias restantes para referência
+      const now = new Date();
+      const expiresDate = new Date(subscription_expires_at);
+      daysGranted = Math.ceil((expiresDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    }
+
     // Atualizar perfil
     const names = (full_name || '').split(' ');
     const firstName = names[0] || '';
@@ -90,7 +118,10 @@ Deno.serve(async (req) => {
       .update({
         first_name: firstName,
         last_name: lastName,
-        role: role
+        role: role,
+        phone: phone || null,
+        subscription_plan: subscription_plan || 'free',
+        subscription_expires_at: calculatedExpiresAt
       })
       .eq('user_id', authData.user.id);
 
@@ -98,7 +129,7 @@ Deno.serve(async (req) => {
       console.error('Erro ao atualizar perfil:', profileError);
     }
 
-    console.log('Usuário criado com sucesso:', authData.user.id);
+    console.log('Usuário criado com sucesso:', authData.user.id, 'Expiração:', calculatedExpiresAt);
 
     return new Response(
       JSON.stringify({
@@ -109,6 +140,9 @@ Deno.serve(async (req) => {
           email: authData.user.email,
           full_name: full_name,
           role: role,
+          subscription_plan: subscription_plan || 'free',
+          subscription_expires_at: calculatedExpiresAt,
+          subscription_days_granted: daysGranted,
           created_at: authData.user.created_at
         }
       }),
