@@ -229,10 +229,26 @@ const App = () => {
                 <Route path="tickets" element={<CustomerTickets />} />
                 <Route path="tickets/:ticketId" element={<CustomerTicketDetails />} />
                 <Route path="notificacoes" element={<CustomerNotifications />} />
-                <Route path="academy" element={<Academy />} />
-                <Route path="curso/:courseId" element={<CourseModules />} />
-                <Route path="curso/:courseId/modulo/:moduleId" element={<ModuleLessons />} />
-                <Route path="aula/:lessonId" element={<LessonViewer />} />
+                <Route path="academy" element={
+                  <FeatureRoute feature="lojafy_academy">
+                    <Academy />
+                  </FeatureRoute>
+                } />
+                <Route path="curso/:courseId" element={
+                  <FeatureRoute feature="lojafy_academy">
+                    <CourseModules />
+                  </FeatureRoute>
+                } />
+                <Route path="curso/:courseId/modulo/:moduleId" element={
+                  <FeatureRoute feature="lojafy_academy">
+                    <ModuleLessons />
+                  </FeatureRoute>
+                } />
+                <Route path="aula/:lessonId" element={
+                  <FeatureRoute feature="lojafy_academy">
+                    <LessonViewer />
+                  </FeatureRoute>
+                } />
                 <Route path="aulas" element={<Courses />} />
                 <Route path="aulas/:courseId" element={<CourseViewer />} />
                 <Route path="favoritos" element={<CustomerFavorites />} />
