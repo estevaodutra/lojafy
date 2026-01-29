@@ -14,7 +14,9 @@ import {
   UserCog,
   Save,
   Loader2,
+  CalendarClock,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -56,6 +58,8 @@ interface UserDetailsModalProps {
     created_at: string;
     last_sign_in_at?: string;
     role: string;
+    subscription_plan?: string;
+    subscription_expires_at?: string;
   } | null;
   isOpen: boolean;
   onClose: () => void;
@@ -306,6 +310,52 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
                     className="max-w-[200px]"
                   />
                 </div>
+
+                {/* Plano */}
+                <div className="grid grid-cols-[100px_1fr] items-center gap-2">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <CalendarClock className="w-4 h-4 text-muted-foreground" />
+                    Plano
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={user.subscription_plan === 'premium' ? 'default' : 'secondary'}>
+                      {user.subscription_plan === 'premium' ? 'Premium' : 'Free'}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Data de Expiração */}
+                {user.subscription_expires_at && (
+                  <div className="grid grid-cols-[100px_1fr] items-center gap-2">
+                    <Label className="flex items-center gap-2 text-sm">
+                      <Clock className="w-4 h-4 text-muted-foreground" />
+                      Expira em
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "text-sm",
+                        new Date(user.subscription_expires_at) < new Date() 
+                          ? "text-destructive" 
+                          : "text-foreground"
+                      )}>
+                        {format(new Date(user.subscription_expires_at), "dd/MM/yyyy", { locale: ptBR })}
+                      </span>
+                      {new Date(user.subscription_expires_at) < new Date() && (
+                        <Badge variant="destructive" className="text-xs">Expirado</Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {!user.subscription_expires_at && user.subscription_plan === 'premium' && (
+                  <div className="grid grid-cols-[100px_1fr] items-center gap-2">
+                    <Label className="flex items-center gap-2 text-sm">
+                      <Clock className="w-4 h-4 text-muted-foreground" />
+                      Expira em
+                    </Label>
+                    <Badge variant="outline" className="text-xs w-fit">Vitalício</Badge>
+                  </div>
+                )}
 
                 {/* Informações não editáveis */}
                 <div className="flex items-center gap-2 pt-2 border-t">
