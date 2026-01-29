@@ -41,12 +41,20 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { user_id, course_id, expires_at } = body;
+    const { user_id, course_id, expires_at, all_courses } = body;
 
     // Validações
-    if (!user_id || !course_id) {
+    if (!user_id) {
       return new Response(
-        JSON.stringify({ success: false, error: 'user_id e course_id são obrigatórios' }),
+        JSON.stringify({ success: false, error: 'user_id é obrigatório' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Se não for all_courses, course_id é obrigatório
+    if (!all_courses && !course_id) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'course_id é obrigatório (ou use all_courses: true)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -65,6 +73,91 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Se all_courses === true, matricular em todos os cursos publicados
+    if (all_courses === true) {
+      // Buscar todos os cursos publicados
+      const { data: courses, error: coursesError } = await supabase
+        .from('courses')
+        .select('id, title')
+        .eq('is_published', true);
+
+      if (coursesError) {
+        console.error('Erro ao buscar cursos:', coursesError);
+        return new Response(
+          JSON.stringify({ success: false, error: 'Erro ao buscar cursos' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!courses || courses.length === 0) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Nenhum curso publicado encontrado' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Verificar matrículas existentes
+      const { data: existingEnrollments } = await supabase
+        .from('course_enrollments')
+        .select('course_id')
+        .eq('user_id', user_id);
+
+      const existingCourseIds = new Set((existingEnrollments || []).map(e => e.course_id));
+
+      // Filtrar cursos que ainda não tem matrícula
+      const coursesToEnroll = courses.filter(c => !existingCourseIds.has(c.id));
+
+      if (coursesToEnroll.length === 0) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Usuário já está matriculado em todos os cursos publicados' 
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Criar matrículas em lote
+      const enrollments = coursesToEnroll.map(course => ({
+        user_id,
+        course_id: course.id,
+        expires_at: expires_at || null,
+        progress_percentage: 0
+      }));
+
+      const { data: insertedData, error: enrollError } = await supabase
+        .from('course_enrollments')
+        .insert(enrollments)
+        .select();
+
+      if (enrollError) {
+        console.error('Erro ao criar matrículas:', enrollError);
+        return new Response(
+          JSON.stringify({ success: false, error: enrollError.message }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log(`Usuário ${user_id} matriculado em ${coursesToEnroll.length} cursos`);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: `Matrícula realizada em ${coursesToEnroll.length} cursos`,
+          data: {
+            total_enrolled: coursesToEnroll.length,
+            enrolled_courses: coursesToEnroll.map(c => ({
+              course_id: c.id,
+              title: c.title
+            })),
+            skipped_existing: existingCourseIds.size
+          }
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Fluxo normal: matrícula em curso específico
     // Verificar se o curso existe
     const { data: courseData, error: courseError } = await supabase
       .from('courses')
