@@ -55,26 +55,18 @@ interface FeatureFormModalProps {
 
 const categorias = [
   { value: 'loja', label: 'Loja' },
-  { value: 'analytics', label: 'Analytics' },
-  { value: 'integracoes', label: 'Integrações' },
-  { value: 'automacao', label: 'Automação' },
-  { value: 'suporte', label: 'Suporte' },
-  { value: 'academy', label: 'Academy' },
+  { value: 'recursos', label: 'Recursos' },
+  { value: 'acessos', label: 'Acessos' },
   { value: 'geral', label: 'Geral' },
 ];
 
 const icones = [
   { value: 'Store', label: 'Loja' },
+  { value: 'Trophy', label: 'Troféu' },
   { value: 'Globe', label: 'Globo' },
-  { value: 'Palette', label: 'Paleta' },
   { value: 'BarChart2', label: 'Gráfico' },
   { value: 'TrendingUp', label: 'Tendência' },
-  { value: 'MessageCircle', label: 'Mensagem' },
-  { value: 'Mail', label: 'E-mail' },
-  { value: 'Code', label: 'Código' },
   { value: 'ShoppingCart', label: 'Carrinho' },
-  { value: 'HeadphonesIcon', label: 'Suporte' },
-  { value: 'GraduationCap', label: 'Graduação' },
   { value: 'Award', label: 'Prêmio' },
   { value: 'Sparkles', label: 'Estrelas' },
 ];
