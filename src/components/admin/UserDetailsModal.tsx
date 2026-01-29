@@ -95,7 +95,6 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
   const { toast } = useToast();
 
   // Editable fields state
-  const [editedEmail, setEditedEmail] = useState('');
   const [editedPhone, setEditedPhone] = useState('');
   const [editedRole, setEditedRole] = useState('customer');
   const [isSaving, setIsSaving] = useState(false);
@@ -104,7 +103,6 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
   // Sync state when user changes
   useEffect(() => {
     if (user && isOpen) {
-      setEditedEmail(user.email);
       setEditedPhone(user.phone || '');
       setEditedRole(user.role);
       setHasChanges(false);
@@ -116,23 +114,21 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
   useEffect(() => {
     if (user) {
       const changed =
-        editedEmail !== user.email ||
         editedPhone !== (user.phone || '') ||
         editedRole !== user.role;
       setHasChanges(changed);
     }
-  }, [editedEmail, editedPhone, editedRole, user]);
+  }, [editedPhone, editedRole, user]);
 
   // Save changes
   const handleSaveChanges = async () => {
     if (!user) return;
     setIsSaving(true);
     try {
-      // Update email/phone in profiles
+      // Update phone in profiles (email is managed by auth)
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
-          email: editedEmail,
           phone: editedPhone,
         })
         .eq('user_id', user.user_id);
@@ -281,18 +277,13 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
                   </Select>
                 </div>
 
-                {/* Email (editável) */}
+                {/* Email (somente leitura - gerenciado pelo Auth) */}
                 <div className="grid grid-cols-[100px_1fr] items-center gap-2">
                   <Label className="flex items-center gap-2 text-sm">
                     <Mail className="w-4 h-4 text-muted-foreground" />
                     Email
                   </Label>
-                  <Input
-                    value={editedEmail}
-                    onChange={(e) => setEditedEmail(e.target.value)}
-                    type="email"
-                    className="max-w-[300px]"
-                  />
+                  <span className="text-sm">{user.email}</span>
                 </div>
 
                 {/* Telefone (editável) */}
