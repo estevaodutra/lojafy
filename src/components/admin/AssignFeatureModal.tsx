@@ -48,10 +48,29 @@ export const AssignFeatureModal: React.FC<AssignFeatureModalProps> = ({
   const [motivo, setMotivo] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Filter out features the user already has
-  const availableFeatures = features.filter(
-    (f) => f.ativo && !existingFeatures.includes(f.slug)
-  );
+  // Filter features: active, not already owned, and dependencies satisfied
+  const availableFeatures = features.filter((f) => {
+    if (!f.ativo) return false;
+    if (existingFeatures.includes(f.slug)) return false;
+    
+    // Check dependencies
+    if (f.requer_features && f.requer_features.length > 0) {
+      const hasAllDeps = f.requer_features.every(dep => 
+        existingFeatures.includes(dep)
+      );
+      if (!hasAllDeps) return false;
+    }
+    return true;
+  });
+
+  // Features blocked by missing dependencies
+  const blockedFeatures = features.filter((f) => {
+    if (!f.ativo) return false;
+    if (existingFeatures.includes(f.slug)) return false;
+    if (!f.requer_features || f.requer_features.length === 0) return false;
+    
+    return !f.requer_features.every(dep => existingFeatures.includes(dep));
+  });
 
   const handleSubmit = async () => {
     if (!selectedFeature) {
@@ -65,7 +84,7 @@ export const AssignFeatureModal: React.FC<AssignFeatureModalProps> = ({
 
     setLoading(true);
     try {
-      const { error } = await supabase.functions.invoke('atribuir-feature', {
+      const { data, error } = await supabase.functions.invoke('atribuir-feature', {
         body: {
           user_id: userId,
           feature_slug: selectedFeature,
@@ -73,6 +92,11 @@ export const AssignFeatureModal: React.FC<AssignFeatureModalProps> = ({
           motivo: motivo || undefined,
         },
       });
+
+      // Check for edge function error in response body
+      if (data?.error) {
+        throw new Error(data.error);
+      }
 
       if (error) throw error;
 
@@ -155,6 +179,13 @@ export const AssignFeatureModal: React.FC<AssignFeatureModalProps> = ({
               rows={2}
             />
           </div>
+
+          {blockedFeatures.length > 0 && (
+            <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-md">
+              <span className="font-medium">Features bloqueadas por dependências:</span>{' '}
+              {blockedFeatures.map(f => f.nome).join(', ')}
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-2">
