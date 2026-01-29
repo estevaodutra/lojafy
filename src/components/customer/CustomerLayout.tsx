@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { User, Package, Heart, HelpCircle, Settings, Home, LogOut, GraduationCap, Ticket } from 'lucide-react';
+import { User, Package, Heart, HelpCircle, Settings, Home, LogOut, GraduationCap, Ticket, Rocket } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFeature } from '@/hooks/useFeature';
 
 const baseMenuItems = [
   { title: 'Resumo', url: '/minha-conta', icon: User },
@@ -17,6 +18,7 @@ const CustomerSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, profile } = useAuth();
+  const { hasFeature: hasTop10Feature } = useFeature('top_10_produtos');
   const currentPath = location.pathname;
 
   const isActive = (path: string) => currentPath === path;
@@ -29,8 +31,13 @@ const CustomerSidebar = () => {
       items.push({ title: 'Lojafy Academy', url: '/minha-conta/academy', icon: GraduationCap });
     }
     
+    // Adicionar Meus Acessos apenas para quem tem a feature
+    if (hasTop10Feature) {
+      items.push({ title: 'Meus Acessos', url: '/minha-conta/meus-acessos', icon: Rocket });
+    }
+    
     return items;
-  }, [profile?.role]);
+  }, [profile?.role, hasTop10Feature]);
 
   const handleLogout = async () => {
     await signOut();
