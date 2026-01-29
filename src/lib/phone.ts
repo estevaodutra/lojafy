@@ -34,6 +34,13 @@ export const cleanPhone = (phone: string): string => {
 
 // Valida se tem 10 ou 11 dígitos (fixo ou celular)
 export const validatePhone = (phone: string): boolean => {
-  const numbers = cleanPhone(phone);
+  let numbers = cleanPhone(phone);
+  
+  // Remove código do país 55 se presente para validação
+  if (numbers.startsWith('55') && numbers.length >= 12) {
+    numbers = numbers.substring(2);
+  }
+  
+  // Valida se tem 10 (fixo) ou 11 (celular) dígitos
   return numbers.length >= 10 && numbers.length <= 11;
 };
