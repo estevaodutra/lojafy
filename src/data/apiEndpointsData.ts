@@ -468,6 +468,81 @@ const academyProgressEndpoints: EndpointData[] = [
   }
 ];
 
+// Features Endpoints
+const featuresEndpoints: EndpointData[] = [
+  {
+    title: 'Listar Features',
+    method: 'GET',
+    url: '/functions/v1/api-features-listar',
+    description: 'Retorna a lista de features disponíveis no catálogo com contagem de usuários ativos.',
+    headers: [
+      { name: 'X-API-Key', description: 'Chave de API', example: 'sk_...', required: true }
+    ],
+    queryParams: [
+      { name: 'active', description: 'Filtrar por status ativo', example: 'true' },
+      { name: 'categoria', description: 'Filtrar por categoria (loja, recursos, acessos, geral)', example: 'loja' }
+    ],
+    responseExample: {
+      success: true,
+      data: [
+        {
+          id: 'uuid',
+          slug: 'loja_propria',
+          nome: 'Loja Completa',
+          descricao: 'Permite criar e gerenciar uma loja personalizada',
+          icone: 'Store',
+          categoria: 'loja',
+          ativo: true,
+          preco_mensal: 49.90,
+          preco_anual: 479.00,
+          trial_dias: 7,
+          usuarios_ativos: 15
+        }
+      ],
+      summary: {
+        total: 2,
+        por_categoria: { loja: 1, recursos: 1 }
+      }
+    },
+    errorExamples: [
+      { code: 401, title: 'API Key inválida', description: 'Chave não fornecida ou inativa', example: { success: false, error: 'API Key inválida ou inativa' } },
+      { code: 403, title: 'Sem permissão', description: 'API Key sem permissão features.read', example: { success: false, error: 'Permissão features.read não concedida' } }
+    ]
+  },
+  {
+    title: 'Atribuir Feature',
+    method: 'POST',
+    url: '/functions/v1/api-features-atribuir',
+    description: 'Atribui uma feature a um usuário específico com validação de dependências.',
+    headers: [
+      { name: 'X-API-Key', description: 'Chave de API', example: 'sk_...', required: true }
+    ],
+    requestBody: {
+      user_id: 'uuid-do-usuario',
+      feature_slug: 'loja_propria',
+      tipo_periodo: 'mensal',
+      motivo: 'Parceria comercial'
+    },
+    responseExample: {
+      success: true,
+      message: 'Feature atribuída com sucesso',
+      data: {
+        user_id: 'uuid',
+        feature_slug: 'loja_propria',
+        status: 'ativo',
+        tipo_periodo: 'mensal',
+        data_inicio: '2026-01-29T00:00:00Z',
+        data_expiracao: '2026-02-28T00:00:00Z'
+      }
+    },
+    errorExamples: [
+      { code: 400, title: 'Parâmetros inválidos', description: 'Campos obrigatórios ausentes', example: { success: false, error: 'Parâmetros obrigatórios: user_id, feature_slug, tipo_periodo' } },
+      { code: 400, title: 'Dependência ausente', description: 'Usuário não possui feature requerida', example: { success: false, error: 'Feature requer "academy_acesso" que o usuário não possui' } },
+      { code: 404, title: 'Feature não encontrada', description: 'Slug não existe no catálogo', example: { success: false, error: 'Feature não encontrada' } }
+    ]
+  }
+];
+
 // Export organized data structure
 export const apiEndpointsData: EndpointCategory[] = [
   {
@@ -484,6 +559,11 @@ export const apiEndpointsData: EndpointCategory[] = [
     id: 'ranking',
     title: 'Ranking & Demo',
     endpoints: rankingEndpoints
+  },
+  {
+    id: 'features',
+    title: 'Features',
+    endpoints: featuresEndpoints
   },
   {
     id: 'academy',
