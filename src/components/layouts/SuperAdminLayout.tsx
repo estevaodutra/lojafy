@@ -80,7 +80,7 @@ const superAdminMenuItems = [
     icon: Sparkles,
   },
   {
-    title: '</> API Docs',
+    title: 'API Docs',
     url: '/super-admin/api-docs',
     icon: Code,
   },
