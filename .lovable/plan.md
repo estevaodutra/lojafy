@@ -1,106 +1,71 @@
 
-# Plano: Mostrar "Meus Acessos" Apenas para Usuários com Feature
+# Plano: Remover Dados Fictícios do Dashboard do Revendedor
 
 ## Problema Identificado
-No plano anterior, removemos completamente os links "Meus Acessos" de todos os menus. Isso fez com que mesmo usuários com a feature `top_10_produtos` atribuída não conseguissem ver o menu.
 
-**O que deveria ter sido feito:** Condicionar a exibição do menu baseado na feature, não remover completamente.
+O Dashboard do Revendedor (`src/pages/reseller/Dashboard.tsx`) exibe dados **hardcoded** em duas seções:
+
+| Seção | Problema |
+|-------|----------|
+| **Metas do Mês** | Valores fixos: "89/120 (74%)", "R$ 2.450/R$ 3.000 (82%)", "5/10 (50%)" |
+| **Vendas Recentes** | Lista gerada com `[1, 2, 3, 4, 5].map()` com valores fictícios |
 
 ---
 
 ## Solução
 
-Vamos adicionar o item "Meus Acessos" de volta aos menus, mas condicionado à feature `top_10_produtos`:
+### Opção A: Remover Completamente as Seções (Recomendado)
+Como não existe uma tabela de metas no banco de dados e não há pedidos reais de revendedores, a melhor abordagem é **remover as seções fictícias** e manter apenas os dados reais vindos do hook `useResellerSales`.
 
-### 1. Header.tsx — Dropdown Desktop e Menu Mobile
+### Opção B: Substituir por Dados Reais
+Criar um hook para buscar os últimos 5 pedidos reais do revendedor e calcular metas com base em dados do banco.
 
-Adicionar verificação de feature e mostrar o link apenas para quem tem acesso:
+---
 
-```typescript
-// Importar useFeature
-import { useFeature } from '@/hooks/useFeature';
+## Alterações (Opção A - Recomendada)
 
-// Dentro do componente
-const { hasFeature: hasTop10Feature } = useFeature('top_10_produtos');
+### 1. Dashboard.tsx — Remover Seções Fictícias
 
-// No dropdown desktop (após "Lojafy Academy")
-{hasTop10Feature && (
-  <DropdownMenuItem asChild>
-    <Link to="/minha-conta/meus-acessos" className="w-full">
-      <Rocket className="mr-2 h-4 w-4" />
-      Meus Acessos
-    </Link>
-  </DropdownMenuItem>
-)}
-
-// No menu mobile (após "Lojafy Academy")
-{hasTop10Feature && (
-  <Link to="/minha-conta/meus-acessos" className="block py-2 pl-2 text-sm ...">
-    <Rocket className="inline mr-2 h-4 w-4" />
-    Meus Acessos
-  </Link>
-)}
-```
-
-### 2. CustomerLayout.tsx — Menu Lateral
-
-Usar `useFeature` para condicionar o item no menu:
+**Linhas 160-237** — Remover todo o grid com "Metas do Mês" e "Vendas Recentes":
 
 ```typescript
-// Importar useFeature e Rocket
-import { useFeature } from '@/hooks/useFeature';
-import { Rocket } from 'lucide-react';
-
-// Dentro de CustomerSidebar
-const { hasFeature: hasTop10Feature } = useFeature('top_10_produtos');
-
-// No useMemo de menuItems
-const menuItems = useMemo(() => {
-  const items = [...baseMenuItems];
+// REMOVER este bloco inteiro:
+<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  {/* Goals Section - Now First */}
+  <Card>... Metas do Mês ...</Card>
   
-  if (profile?.role === 'reseller') {
-    items.push({ title: 'Lojafy Academy', ... });
-  }
-  
-  // Adicionar Meus Acessos se tem a feature
-  if (hasTop10Feature) {
-    items.push({ title: 'Meus Acessos', url: '/minha-conta/meus-acessos', icon: Rocket });
-  }
-  
-  return items;
-}, [profile?.role, hasTop10Feature]);
+  {/* Recent Sales Section - Now Second */}  
+  <Card>... Vendas Recentes ...</Card>
+</div>
 ```
 
-### 3. ResellerLayout.tsx — Sidebar do Revendedor
+**Imports não utilizados** — Remover `Target` e `UserPlus` dos imports do lucide-react
 
-Adicionar grupo "Meus Acessos" condicionado pela feature:
+---
+
+## Alternativa (Opção B - Dados Reais)
+
+Se preferir manter as seções com dados reais:
+
+### 1. Criar Hook `useResellerRecentOrders`
 
 ```typescript
-// Importar Trophy e useFeature
-import { Trophy } from 'lucide-react';
-import { useFeature } from '@/hooks/useFeature';
-
-// Dentro de ResellerSidebar
-const { hasFeature: hasTop10Feature } = useFeature('top_10_produtos');
-
-// Filtrar menuGroups dinamicamente
-const filteredMenuGroups = useMemo(() => {
-  const groups = [...menuGroups];
-  
-  if (hasTop10Feature) {
-    // Adicionar grupo "Meus Acessos" antes de "Avançado"
-    const advancedIndex = groups.findIndex(g => g.label === 'Avançado');
-    groups.splice(advancedIndex, 0, {
-      label: 'Meus Acessos',
-      items: [
-        { title: 'Top 10 Produtos Vencedores', url: '/reseller/meus-acessos/top-produtos', icon: Trophy, badge: 'Novo' },
-      ]
-    });
-  }
-  
-  return groups;
-}, [hasTop10Feature]);
+// src/hooks/useResellerRecentOrders.ts
+export const useResellerRecentOrders = () => {
+  // Buscar últimos 5 pedidos do revendedor
+  // Incluir nome do cliente e valor da comissão
+};
 ```
+
+### 2. Atualizar "Vendas Recentes" no Dashboard
+
+- Usar dados reais do hook
+- Mostrar estado vazio se não houver pedidos: "Nenhuma venda ainda. Compartilhe sua loja!"
+
+### 3. Para "Metas do Mês"
+
+- **Problema:** Não existe tabela de metas no banco de dados
+- **Solução:** Remover completamente OU criar sistema de metas (tabela + CRUD)
 
 ---
 
@@ -108,16 +73,17 @@ const filteredMenuGroups = useMemo(() => {
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/components/Header.tsx` | Adicionar `useFeature` e mostrar "Meus Acessos" condicionalmente |
-| `src/components/customer/CustomerLayout.tsx` | Adicionar item "Meus Acessos" quando `hasTop10Feature` é true |
-| `src/components/layouts/ResellerLayout.tsx` | Adicionar grupo "Meus Acessos" dinamicamente baseado na feature |
+| `src/pages/reseller/Dashboard.tsx` | Remover seções com dados fictícios |
 
 ---
 
-## Resultado Final
+## Decisão Necessária
 
-| Situação | Menu "Meus Acessos" |
-|----------|---------------------|
-| Usuário sem feature | ❌ Não aparece em nenhum menu |
-| Usuário com `top_10_produtos` | ✅ Aparece no Header, CustomerLayout e ResellerLayout |
-| Acesso direto via URL sem feature | 🔒 Bloqueado pelo FeatureRoute (já implementado) |
+Qual abordagem você prefere?
+
+| Opção | Resultado |
+|-------|-----------|
+| **A - Remover** | Dashboard limpo, apenas com dados reais do "Resumo do Mês" |
+| **B - Dados Reais** | Manter seções, mas com dados do banco (requer criar hook) |
+
+A **Opção A** é mais rápida e evita exibir seções vazias/incompletas. A **Opção B** requer mais trabalho mas mantém o layout original.
