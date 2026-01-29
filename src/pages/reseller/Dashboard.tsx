@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ShoppingCart, DollarSign, Users, TrendingUp, Crown, Target, UserPlus, ExternalLink } from 'lucide-react';
+import { ShoppingCart, DollarSign, Users, TrendingUp, Crown, ExternalLink } from 'lucide-react';
 import { SetupChecklist } from '@/components/reseller/SetupChecklist';
 import { useResellerSales } from '@/hooks/useResellerSales';
 import { useSetupProgress } from '@/hooks/useSetupProgress';
@@ -9,7 +9,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useSubscriptionCheck } from '@/hooks/useSubscriptionCheck';
 import { OnboardingWizard } from '@/components/reseller/OnboardingWizard';
-import { Progress } from '@/components/ui/progress';
+
 import { useAuth } from '@/contexts/AuthContext';
 
 const ResellerDashboard = () => {
@@ -157,84 +157,6 @@ const ResellerDashboard = () => {
         </div>
       </div>
 
-      {/* Inverted Order: Goals First, Then Recent Sales */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Goals Section - Now First */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              Metas do Mês
-            </CardTitle>
-            <CardDescription>Progresso das suas metas</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <ShoppingCart className="h-4 w-4 text-blue-500" />
-                    <span className="text-sm font-medium">Vendas</span>
-                  </div>
-                  <span className="text-sm font-medium">89/120 <span className="text-muted-foreground">(74%)</span></span>
-                </div>
-                <Progress value={74} className="h-2" />
-              </div>
-              
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-green-500" />
-                    <span className="text-sm font-medium">Comissões</span>
-                  </div>
-                  <span className="text-sm font-medium">R$ 2.450/R$ 3.000 <span className="text-muted-foreground">(82%)</span></span>
-                </div>
-                <Progress value={82} className="h-2" />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <UserPlus className="h-4 w-4 text-purple-500" />
-                    <span className="text-sm font-medium">Novos Clientes</span>
-                  </div>
-                  <span className="text-sm font-medium">5/10 <span className="text-muted-foreground">(50%)</span></span>
-                </div>
-                <Progress value={50} className="h-2" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recent Sales Section - Now Second */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5 text-primary" />
-              Vendas Recentes
-            </CardTitle>
-            <CardDescription>Últimas 5 vendas realizadas</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[1, 2, 3, 4, 5].map((item) => (
-                <div key={item} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                  <div>
-                    <p className="text-sm font-medium">Pedido #{1000 + item}</p>
-                    <p className="text-xs text-muted-foreground">Cliente {item}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium">R$ {(150 + item * 50).toFixed(2)}</p>
-                    <p className="text-xs text-green-600 font-medium">
-                      Comissão: R$ {((150 + item * 50) * 0.1).toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 };
