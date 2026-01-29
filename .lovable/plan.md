@@ -1,74 +1,105 @@
 
-# Plano: Controlar "Meus Acessos" por Feature
+# Plano: Mostrar "Meus Acessos" Apenas para Usuários com Feature
 
-## Objetivo
-Remover o item "Meus Acessos" dos menus de todos os usuários e controlar o acesso às páginas relacionadas via sistema de features. Apenas usuários com a feature `top_10_produtos` atribuída terão acesso.
+## Problema Identificado
+No plano anterior, removemos completamente os links "Meus Acessos" de todos os menus. Isso fez com que mesmo usuários com a feature `top_10_produtos` atribuída não conseguissem ver o menu.
+
+**O que deveria ter sido feito:** Condicionar a exibição do menu baseado na feature, não remover completamente.
 
 ---
 
-## Alterações
+## Solução
 
-### 1. Header.tsx — Remover Link do Dropdown e Menu Mobile
+Vamos adicionar o item "Meus Acessos" de volta aos menus, mas condicionado à feature `top_10_produtos`:
 
-**Localização:** `src/components/Header.tsx`
+### 1. Header.tsx — Dropdown Desktop e Menu Mobile
 
-Remover os seguintes blocos:
-- Linhas ~134-139: Link "Meus Acessos" no dropdown desktop
-- Linhas ~282-285: Link "Meus Acessos" no menu mobile
+Adicionar verificação de feature e mostrar o link apenas para quem tem acesso:
 
-### 2. CustomerLayout.tsx — Remover do Menu Lateral
-
-**Localização:** `src/components/customer/CustomerLayout.tsx`
-
-Remover a linha:
 ```typescript
-{ title: 'Meus Acessos', url: '/minha-conta/meus-acessos', icon: Rocket },
+// Importar useFeature
+import { useFeature } from '@/hooks/useFeature';
+
+// Dentro do componente
+const { hasFeature: hasTop10Feature } = useFeature('top_10_produtos');
+
+// No dropdown desktop (após "Lojafy Academy")
+{hasTop10Feature && (
+  <DropdownMenuItem asChild>
+    <Link to="/minha-conta/meus-acessos" className="w-full">
+      <Rocket className="mr-2 h-4 w-4" />
+      Meus Acessos
+    </Link>
+  </DropdownMenuItem>
+)}
+
+// No menu mobile (após "Lojafy Academy")
+{hasTop10Feature && (
+  <Link to="/minha-conta/meus-acessos" className="block py-2 pl-2 text-sm ...">
+    <Rocket className="inline mr-2 h-4 w-4" />
+    Meus Acessos
+  </Link>
+)}
 ```
 
-### 3. ResellerLayout.tsx — Remover Grupo do Menu
+### 2. CustomerLayout.tsx — Menu Lateral
 
-**Localização:** `src/components/layouts/ResellerLayout.tsx`
+Usar `useFeature` para condicionar o item no menu:
 
-Remover o grupo inteiro "Meus Acessos":
 ```typescript
-{
-  label: 'Meus Acessos',
-  items: [
-    { title: 'Top 10 Produtos Vencedores', url: '/reseller/meus-acessos/top-produtos', icon: Trophy, badge: 'Novo' },
-  ]
-},
+// Importar useFeature e Rocket
+import { useFeature } from '@/hooks/useFeature';
+import { Rocket } from 'lucide-react';
+
+// Dentro de CustomerSidebar
+const { hasFeature: hasTop10Feature } = useFeature('top_10_produtos');
+
+// No useMemo de menuItems
+const menuItems = useMemo(() => {
+  const items = [...baseMenuItems];
+  
+  if (profile?.role === 'reseller') {
+    items.push({ title: 'Lojafy Academy', ... });
+  }
+  
+  // Adicionar Meus Acessos se tem a feature
+  if (hasTop10Feature) {
+    items.push({ title: 'Meus Acessos', url: '/minha-conta/meus-acessos', icon: Rocket });
+  }
+  
+  return items;
+}, [profile?.role, hasTop10Feature]);
 ```
 
-### 4. App.tsx — Proteger Rotas com FeatureRoute
+### 3. ResellerLayout.tsx — Sidebar do Revendedor
 
-**Localização:** `src/App.tsx`
-
-Envolver as rotas de "Meus Acessos" com `FeatureRoute`:
+Adicionar grupo "Meus Acessos" condicionado pela feature:
 
 ```typescript
-// Customer routes
-<Route path="meus-acessos" element={
-  <FeatureRoute feature="top_10_produtos">
-    <ResellerMeusAcessos />
-  </FeatureRoute>
-} />
-<Route path="meus-acessos/top-produtos" element={
-  <FeatureRoute feature="top_10_produtos">
-    <ResellerTopProdutosVencedores />
-  </FeatureRoute>
-} />
+// Importar Trophy e useFeature
+import { Trophy } from 'lucide-react';
+import { useFeature } from '@/hooks/useFeature';
 
-// Reseller routes (mesmo padrão)
-<Route path="meus-acessos" element={
-  <FeatureRoute feature="top_10_produtos">
-    <ResellerMeusAcessos />
-  </FeatureRoute>
-} />
-<Route path="meus-acessos/top-produtos" element={
-  <FeatureRoute feature="top_10_produtos">
-    <ResellerTopProdutosVencedores />
-  </FeatureRoute>
-} />
+// Dentro de ResellerSidebar
+const { hasFeature: hasTop10Feature } = useFeature('top_10_produtos');
+
+// Filtrar menuGroups dinamicamente
+const filteredMenuGroups = useMemo(() => {
+  const groups = [...menuGroups];
+  
+  if (hasTop10Feature) {
+    // Adicionar grupo "Meus Acessos" antes de "Avançado"
+    const advancedIndex = groups.findIndex(g => g.label === 'Avançado');
+    groups.splice(advancedIndex, 0, {
+      label: 'Meus Acessos',
+      items: [
+        { title: 'Top 10 Produtos Vencedores', url: '/reseller/meus-acessos/top-produtos', icon: Trophy, badge: 'Novo' },
+      ]
+    });
+  }
+  
+  return groups;
+}, [hasTop10Feature]);
 ```
 
 ---
@@ -77,22 +108,16 @@ Envolver as rotas de "Meus Acessos" com `FeatureRoute`:
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/components/Header.tsx` | Remover links "Meus Acessos" do dropdown e menu mobile |
-| `src/components/customer/CustomerLayout.tsx` | Remover item do menu lateral |
-| `src/components/layouts/ResellerLayout.tsx` | Remover grupo "Meus Acessos" do sidebar |
-| `src/App.tsx` | Envolver rotas com `FeatureRoute` para controle de acesso |
+| `src/components/Header.tsx` | Adicionar `useFeature` e mostrar "Meus Acessos" condicionalmente |
+| `src/components/customer/CustomerLayout.tsx` | Adicionar item "Meus Acessos" quando `hasTop10Feature` é true |
+| `src/components/layouts/ResellerLayout.tsx` | Adicionar grupo "Meus Acessos" dinamicamente baseado na feature |
 
 ---
 
 ## Resultado Final
 
-- **Sem feature:** Usuário não vê "Meus Acessos" em nenhum menu e recebe tela de bloqueio se tentar acessar diretamente a URL
-- **Com feature `top_10_produtos`:** Usuário pode acessar `/minha-conta/meus-acessos` diretamente (via link externo ou notificação)
-
----
-
-## Fluxo de Liberação
-
-1. Super Admin atribui a feature `top_10_produtos` ao usuário
-2. Usuário recebe acesso às rotas protegidas
-3. Usuário pode acessar via link direto (email, notificação, etc.)
+| Situação | Menu "Meus Acessos" |
+|----------|---------------------|
+| Usuário sem feature | ❌ Não aparece em nenhum menu |
+| Usuário com `top_10_produtos` | ✅ Aparece no Header, CustomerLayout e ResellerLayout |
+| Acesso direto via URL sem feature | 🔒 Bloqueado pelo FeatureRoute (já implementado) |
