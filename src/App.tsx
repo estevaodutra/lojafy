@@ -42,6 +42,7 @@ import Academy from "./pages/customer/Academy";
 import CourseViewer from "./pages/customer/CourseViewer";
 import CourseCheckout from "./pages/CourseCheckout";
 import { RoleBasedRoute } from "./components/auth/RoleBasedRoute";
+import { FeatureRoute } from "./components/auth/FeatureRoute";
 import AdminLayout from "./components/admin/AdminLayout";
 import { SupplierLayout } from "./components/layouts/SupplierLayout";
 import { ResellerLayout } from "./components/layouts/ResellerLayout";
@@ -201,8 +202,16 @@ const App = () => {
               {/* Customer Panel Routes */}
               <Route path="/minha-conta" element={<CustomerLayout />}>
                 <Route index element={<CustomerDashboard />} />
-                <Route path="meus-acessos" element={<ResellerMeusAcessos />} />
-                <Route path="meus-acessos/top-produtos" element={<ResellerTopProdutosVencedores />} />
+                <Route path="meus-acessos" element={
+                  <FeatureRoute feature="top_10_produtos">
+                    <ResellerMeusAcessos />
+                  </FeatureRoute>
+                } />
+                <Route path="meus-acessos/top-produtos" element={
+                  <FeatureRoute feature="top_10_produtos">
+                    <ResellerTopProdutosVencedores />
+                  </FeatureRoute>
+                } />
                 <Route path="pedidos" element={<CustomerOrders />} />
                 <Route path="tickets" element={<CustomerTickets />} />
                 <Route path="tickets/:ticketId" element={<CustomerTicketDetails />} />
@@ -330,8 +339,16 @@ const App = () => {
                 <Route path="financeiro" element={<ResellerFinanceiro />} />
                 <Route path="metas" element={<ResellerGoals />} />
                 <Route path="integracoes" element={<ResellerIntegrations />} />
-                <Route path="meus-acessos" element={<ResellerMeusAcessos />} />
-                <Route path="meus-acessos/top-produtos" element={<ResellerTopProdutosVencedores />} />
+                <Route path="meus-acessos" element={
+                  <FeatureRoute feature="top_10_produtos">
+                    <ResellerMeusAcessos />
+                  </FeatureRoute>
+                } />
+                <Route path="meus-acessos/top-produtos" element={
+                  <FeatureRoute feature="top_10_produtos">
+                    <ResellerTopProdutosVencedores />
+                  </FeatureRoute>
+                } />
                 
               </Route>
               
