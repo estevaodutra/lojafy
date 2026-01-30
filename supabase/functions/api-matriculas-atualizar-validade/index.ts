@@ -41,35 +41,40 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { enrollment_id, expires_at } = body;
+    const { user_id, subscription_expires_at } = body;
 
-    if (!enrollment_id) {
+    // Validate required parameters
+    if (!user_id) {
       return new Response(
-        JSON.stringify({ success: false, error: 'enrollment_id é obrigatório' }),
+        JSON.stringify({ 
+          success: false, 
+          error: 'user_id é obrigatório',
+          nota: 'Este endpoint atualiza profiles.subscription_expires_at que controla a expiração de todas as features e matrículas do usuário'
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Buscar matrícula atual
-    const { data: currentData, error: currentError } = await supabase
-      .from('course_enrollments')
-      .select('expires_at')
-      .eq('id', enrollment_id)
+    // Buscar perfil atual
+    const { data: currentProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('subscription_expires_at, first_name, last_name')
+      .eq('user_id', user_id)
       .single();
 
-    if (currentError || !currentData) {
+    if (profileError || !currentProfile) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Matrícula não encontrada' }),
+        JSON.stringify({ success: false, error: 'Usuário não encontrado' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Atualizar validade
+    // Atualizar validade do perfil (e consequentemente de todas features/matrículas)
     const { data, error } = await supabase
-      .from('course_enrollments')
-      .update({ expires_at: expires_at || null })
-      .eq('id', enrollment_id)
-      .select()
+      .from('profiles')
+      .update({ subscription_expires_at: subscription_expires_at || null })
+      .eq('user_id', user_id)
+      .select('subscription_expires_at')
       .single();
 
     if (error) {
@@ -80,17 +85,52 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('Validade atualizada com sucesso:', enrollment_id);
+    // Sincronizar a expiração com todas as matrículas do usuário
+    const { error: syncError } = await supabase
+      .from('course_enrollments')
+      .update({ expires_at: subscription_expires_at || null })
+      .eq('user_id', user_id);
+
+    if (syncError) {
+      console.warn('Aviso: Erro ao sincronizar matrículas:', syncError);
+    }
+
+    // Sincronizar a expiração com todas as features do usuário (exceto vitalicio/cortesia)
+    const { error: featuresSyncError } = await supabase
+      .from('user_features')
+      .update({ data_expiracao: subscription_expires_at || null })
+      .eq('user_id', user_id)
+      .not('tipo_periodo', 'in', '("vitalicio","cortesia")');
+
+    if (featuresSyncError) {
+      console.warn('Aviso: Erro ao sincronizar features:', featuresSyncError);
+    }
+
+    // Calculate days remaining
+    let dias_restantes: number | null = null;
+    if (data.subscription_expires_at) {
+      const expirationDate = new Date(data.subscription_expires_at);
+      const now = new Date();
+      dias_restantes = Math.max(0, Math.ceil((expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    }
+
+    console.log('Validade do perfil atualizada com sucesso:', user_id);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Validade atualizada com sucesso',
+        message: 'Validade da assinatura atualizada com sucesso',
         data: {
-          enrollment_id: data.id,
-          old_expires_at: currentData.expires_at,
-          new_expires_at: data.expires_at,
+          user_id,
+          old_expires_at: currentProfile.subscription_expires_at,
+          new_expires_at: data.subscription_expires_at,
+          dias_restantes,
           updated_at: new Date().toISOString()
+        },
+        sincronizacao: {
+          matriculas: !syncError ? 'sincronizado' : 'falhou',
+          features: !featuresSyncError ? 'sincronizado' : 'falhou',
+          nota: 'Features vitalício/cortesia não são afetadas'
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

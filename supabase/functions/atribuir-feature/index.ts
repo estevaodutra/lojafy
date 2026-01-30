@@ -58,6 +58,20 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Get user profile with subscription_expires_at
+    const { data: userProfile, error: userError } = await supabase
+      .from('profiles')
+      .select('user_id, subscription_expires_at')
+      .eq('user_id', user_id)
+      .single();
+
+    if (userError || !userProfile) {
+      return new Response(
+        JSON.stringify({ error: 'Usuário não encontrado' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Get feature by slug
     const { data: feature, error: featureError } = await supabase
       .from('features')
@@ -91,24 +105,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Calculate expiration date
-    let data_expiracao: string | null = null;
-    const now = new Date();
+    // Determine expiration: vitalicio/cortesia = null, others use profile subscription
+    const isLifetime = tipo_periodo === 'vitalicio' || tipo_periodo === 'cortesia';
+    const data_expiracao = isLifetime ? null : userProfile.subscription_expires_at;
 
-    switch (tipo_periodo) {
-      case 'mensal':
-        data_expiracao = new Date(now.setDate(now.getDate() + 30)).toISOString();
-        break;
-      case 'anual':
-        data_expiracao = new Date(now.setDate(now.getDate() + 365)).toISOString();
-        break;
-      case 'trial':
-        data_expiracao = new Date(now.setDate(now.getDate() + (feature.trial_dias || 7))).toISOString();
-        break;
-      case 'vitalicio':
-      case 'cortesia':
-        data_expiracao = null;
-        break;
+    // Calculate days remaining
+    let dias_restantes: number | null = null;
+    if (data_expiracao) {
+      const expirationDate = new Date(data_expiracao);
+      const now = new Date();
+      dias_restantes = Math.max(0, Math.ceil((expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
     }
 
     // Upsert user_features
@@ -120,7 +126,7 @@ Deno.serve(async (req) => {
         status: tipo_periodo === 'trial' ? 'trial' : 'ativo',
         tipo_periodo,
         data_inicio: new Date().toISOString(),
-        data_expiracao,
+        data_expiracao, // Now uses profile expiration or null for lifetime
         trial_usado: tipo_periodo === 'trial',
         origem: 'admin',
         atribuido_por: caller.id,
@@ -147,13 +153,27 @@ Deno.serve(async (req) => {
       tipo_periodo,
       executado_por: caller.id,
       motivo,
-      metadata: { data_expiracao },
+      metadata: { 
+        usa_expiracao_perfil: !isLifetime,
+        expiracao_perfil: data_expiracao 
+      },
     });
 
     console.log(`Feature "${feature_slug}" assigned to user ${user_id} by ${caller.id}`);
 
     return new Response(
-      JSON.stringify({ success: true, userFeature }),
+      JSON.stringify({ 
+        success: true, 
+        userFeature,
+        expiracao_info: {
+          usa_expiracao_perfil: !isLifetime,
+          expiracao_perfil: data_expiracao,
+          dias_restantes,
+          nota: isLifetime 
+            ? 'Esta feature nunca expira' 
+            : 'Feature expira junto com a assinatura do perfil'
+        }
+      }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
