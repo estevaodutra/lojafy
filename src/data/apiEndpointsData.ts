@@ -578,40 +578,57 @@ const featuresEndpoints: EndpointData[] = [
     title: 'Atribuir Feature',
     method: 'POST',
     url: '/functions/v1/api-features-atribuir',
-    description: 'Atribui uma feature a um usuário. A expiração é controlada pela data do perfil do usuário (subscription_expires_at). Períodos vitalício e cortesia nunca expiram.',
+    description: 'Atribui feature(s) a um usuário. Aceita feature_id (UUID) ou feature_slug. Use all_features: true para atribuir todas as features ativas em lote. A expiração é controlada pela data do perfil (subscription_expires_at). tipo_periodo é opcional (default: mensal).',
     headers: [
       { name: 'X-API-Key', description: 'Chave de API', example: 'sk_...', required: true }
     ],
     requestBody: {
       user_id: 'uuid-do-usuario',
-      feature_slug: 'loja_propria',
-      tipo_periodo: 'mensal',
-      motivo: 'Parceria comercial',
-      _nota: 'tipo_periodo define classificação, não data de expiração individual'
+      feature_id: 'uuid-da-feature (ou vazio se all_features)',
+      all_features: 'true para atribuir todas',
+      tipo_periodo: 'mensal (opcional)',
+      motivo: 'Parceria comercial (opcional)',
+      _alternativa: 'feature_slug também é aceito para retrocompatibilidade'
     },
     responseExample: {
-      success: true,
-      message: 'Feature atribuída com sucesso',
-      data: {
-        user_id: 'uuid',
-        feature_slug: 'loja_propria',
-        status: 'ativo',
-        tipo_periodo: 'mensal',
-        data_inicio: '2026-01-29T00:00:00Z',
-        usa_expiracao_perfil: true,
-        expiracao_perfil: '2026-02-28T00:00:00Z',
-        dias_restantes: 30
+      _exemplo_individual: {
+        success: true,
+        message: 'Feature atribuída com sucesso',
+        data: {
+          user_id: 'uuid',
+          feature_id: 'uuid-da-feature',
+          feature_slug: 'loja_propria',
+          status: 'ativo',
+          tipo_periodo: 'mensal',
+          data_inicio: '2026-01-30T00:00:00Z',
+          usa_expiracao_perfil: true,
+          expiracao_perfil: '2026-02-28T00:00:00Z',
+          dias_restantes: 30
+        }
       },
-      expiracao_info: {
-        fonte: 'profiles.subscription_expires_at',
-        nota: 'Features expiram junto com a assinatura do perfil',
-        excecoes: 'tipo_periodo vitalicio ou cortesia nunca expiram'
+      _exemplo_lote: {
+        success: true,
+        message: '3 feature(s) atribuída(s) com sucesso',
+        data: {
+          total_assigned: 3,
+          assigned_features: [
+            { id: 'uuid', slug: 'loja_propria', nome: 'Loja Completa' }
+          ],
+          skipped_existing: 1,
+          skipped_dependencies: []
+        },
+        expiracao_info: {
+          fonte: 'profiles.subscription_expires_at',
+          expires_at: '2026-02-28T00:00:00Z',
+          dias_restantes: 30
+        }
       }
     },
     errorExamples: [
-      { code: 400, title: 'Parâmetros inválidos', description: 'Campos obrigatórios ausentes', example: { success: false, error: 'Parâmetros obrigatórios: user_id, feature_slug, tipo_periodo' } },
+      { code: 400, title: 'user_id ausente', description: 'Campo obrigatório não informado', example: { success: false, error: 'user_id é obrigatório' } },
+      { code: 400, title: 'feature_id ausente', description: 'Sem feature_id e all_features não ativo', example: { success: false, error: 'feature_id é obrigatório (ou use all_features: true)' } },
       { code: 400, title: 'Dependência ausente', description: 'Usuário não possui feature requerida', example: { success: false, error: 'Feature requer "academy_acesso" que o usuário não possui' } },
-      { code: 404, title: 'Feature não encontrada', description: 'Slug não existe no catálogo', example: { success: false, error: 'Feature não encontrada' } }
+      { code: 404, title: 'Feature não encontrada', description: 'ID ou slug não existe no catálogo', example: { success: false, error: 'Feature não encontrada pelo ID' } }
     ]
   }
 ];
