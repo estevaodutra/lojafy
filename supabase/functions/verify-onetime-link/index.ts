@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
       type: "magiclink",
       email: userData.user.email,
       options: {
-        redirectTo: `https://lojafy.lovable.app${tokenRecord.redirect_url || '/reseller/onboarding'}`,
+        redirectTo: `https://lojafy.lovable.app${tokenRecord.redirect_url || '/reseller/first-access'}`,
       },
     });
 
