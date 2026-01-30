@@ -1,9 +1,9 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraduationCap } from "lucide-react";
 import AdminCourses from "./Courses";
-import CourseEnrollments from "./CourseEnrollments";
 import { AcademyDashboard } from "@/components/admin/AcademyDashboard";
 import { AcademyProgress } from "@/components/admin/AcademyProgress";
+import { AllEnrollmentsTable } from "@/components/admin/AllEnrollmentsTable";
 import { AcademySettings } from "@/components/admin/AcademySettings";
 
 const Academy = () => {
@@ -37,11 +37,7 @@ const Academy = () => {
         </TabsContent>
 
         <TabsContent value="enrollments" className="space-y-4">
-          <div className="text-center py-12">
-            <p className="text-muted-foreground mb-4">
-              Selecione um curso na aba "Cursos" para gerenciar suas matrículas
-            </p>
-          </div>
+          <AllEnrollmentsTable />
         </TabsContent>
 
         <TabsContent value="progress" className="space-y-4">
