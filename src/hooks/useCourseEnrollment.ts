@@ -66,12 +66,14 @@ export const useCourseEnrollment = (userId?: string) => {
 
   // Query for available courses based on access_level
   const { data: availableCourses, isLoading: coursesLoading } = useQuery({
-    queryKey: ['available-courses', role],
+    queryKey: ['available-courses', role, enrollments?.map(e => e.course_id)],
     queryFn: async () => {
+      // First, get courses visible to this role (excluding enrolled_only)
       let query = supabase
         .from('courses')
         .select('*')
         .eq('is_published', true)
+        .neq('access_level', 'enrolled_only')
         .order('position', { ascending: true });
       
       // Filter by access_level based on user role
@@ -81,6 +83,22 @@ export const useCourseEnrollment = (userId?: string) => {
       
       const { data, error } = await query;
       if (error) throw error;
+      
+      // Add enrolled_only courses that the user is already enrolled in
+      const enrolledCourseIds = enrollments?.map(e => e.course_id) || [];
+      if (enrolledCourseIds.length > 0) {
+        const { data: enrolledOnlyCourses } = await supabase
+          .from('courses')
+          .select('*')
+          .eq('is_published', true)
+          .eq('access_level', 'enrolled_only')
+          .in('id', enrolledCourseIds);
+        
+        if (enrolledOnlyCourses && enrolledOnlyCourses.length > 0) {
+          return [...(data || []), ...enrolledOnlyCourses] as Course[];
+        }
+      }
+      
       return data as Course[];
     },
     enabled: !!role,
