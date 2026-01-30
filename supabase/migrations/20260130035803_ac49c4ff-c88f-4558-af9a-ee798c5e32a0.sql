@@ -1,0 +1,31 @@
+INSERT INTO features (
+  slug,
+  nome,
+  descricao,
+  icone,
+  categoria,
+  ordem_exibicao,
+  preco_mensal,
+  preco_anual,
+  preco_vitalicio,
+  trial_dias,
+  ativo,
+  visivel_catalogo,
+  roles_permitidas,
+  requer_features
+) VALUES (
+  'lojafy_academy',
+  'Lojafy Academy',
+  'Acesso aos cursos e treinamentos da plataforma',
+  'GraduationCap',
+  'recursos',
+  2,
+  0.00,
+  0.00,
+  0.00,
+  0,
+  true,
+  true,
+  ARRAY['reseller', 'customer'],
+  ARRAY[]::text[]
+);
