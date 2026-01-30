@@ -129,7 +129,31 @@ Deno.serve(async (req) => {
       console.error('Erro ao atualizar perfil:', profileError);
     }
 
-    console.log('Usuário criado com sucesso:', authData.user.id, 'Expiração:', calculatedExpiresAt);
+    // Gerar link de acesso único
+    const accessToken = crypto.randomUUID();
+    const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
+
+    let accessLink: string | null = null;
+    let accessLinkExpiresAt: string | null = null;
+
+    const { error: tokenError } = await supabase
+      .from('one_time_access_tokens')
+      .insert({
+        user_id: authData.user.id,
+        token: accessToken,
+        expires_at: tokenExpiresAt.toISOString(),
+        created_by: keyData.user_id,
+        redirect_url: '/reseller/onboarding'
+      });
+
+    if (tokenError) {
+      console.error('Erro ao gerar token de acesso:', tokenError);
+    } else {
+      accessLink = `https://lojafy.lovable.app/auth/onetime?token=${accessToken}`;
+      accessLinkExpiresAt = tokenExpiresAt.toISOString();
+    }
+
+    console.log('Usuário criado com sucesso:', authData.user.id, 'Expiração:', calculatedExpiresAt, 'Access Link:', accessLink ? 'gerado' : 'falhou');
 
     return new Response(
       JSON.stringify({
@@ -143,7 +167,9 @@ Deno.serve(async (req) => {
           subscription_plan: subscription_plan || 'free',
           subscription_expires_at: calculatedExpiresAt,
           subscription_days_granted: daysGranted,
-          created_at: authData.user.created_at
+          created_at: authData.user.created_at,
+          access_link: accessLink,
+          access_link_expires_at: accessLinkExpiresAt
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
