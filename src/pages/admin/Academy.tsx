@@ -5,6 +5,7 @@ import { AcademyDashboard } from "@/components/admin/AcademyDashboard";
 import { AcademyProgress } from "@/components/admin/AcademyProgress";
 import { AllEnrollmentsTable } from "@/components/admin/AllEnrollmentsTable";
 import { AcademySettings } from "@/components/admin/AcademySettings";
+import { OnboardingSettings } from "@/components/admin/OnboardingSettings";
 
 const Academy = () => {
   return (
@@ -20,11 +21,12 @@ const Academy = () => {
       </div>
 
       <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="courses">Cursos</TabsTrigger>
           <TabsTrigger value="enrollments">Matrículas</TabsTrigger>
           <TabsTrigger value="progress">Progresso dos Alunos</TabsTrigger>
+          <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
           <TabsTrigger value="settings">Configurações</TabsTrigger>
         </TabsList>
 
@@ -42,6 +44,10 @@ const Academy = () => {
 
         <TabsContent value="progress" className="space-y-4">
           <AcademyProgress />
+        </TabsContent>
+
+        <TabsContent value="onboarding" className="space-y-4">
+          <OnboardingSettings />
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">

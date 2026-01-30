@@ -137,3 +137,9 @@ verify_jwt = false
 
 [functions.api-features-atribuir]
 verify_jwt = false
+
+[functions.generate-onetime-link]
+verify_jwt = false
+
+[functions.verify-onetime-link]
+verify_jwt = false

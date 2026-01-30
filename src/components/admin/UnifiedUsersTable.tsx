@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Power,
   Trash2,
@@ -6,6 +7,7 @@ import {
   MoreHorizontal,
   Eye,
   Store,
+  Link,
 } from 'lucide-react';
 import {
   Table,
@@ -31,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ImpersonationButton } from '@/components/admin/ImpersonationButton';
+import { GenerateAccessLinkModal } from '@/components/admin/GenerateAccessLinkModal';
 import {
   Pagination,
   PaginationContent,
@@ -98,6 +101,8 @@ export const UnifiedUsersTable = ({
   onDeleteUser,
   onUnbanUser,
 }: UnifiedUsersTableProps) => {
+  const [accessLinkModal, setAccessLinkModal] = useState<{ userId: string; userName: string } | null>(null);
+  
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
 
@@ -295,6 +300,17 @@ export const UnifiedUsersTable = ({
                           userName={`${user.first_name} ${user.last_name}`}
                           asMenuItem
                         />
+                        {user.role === 'reseller' && (
+                          <DropdownMenuItem
+                            onClick={() => setAccessLinkModal({
+                              userId: user.user_id,
+                              userName: `${user.first_name} ${user.last_name}`,
+                            })}
+                          >
+                            <Link className="mr-2 h-4 w-4" />
+                            Gerar Link de Acesso
+                          </DropdownMenuItem>
+                        )}
                         {isBanned && (
                           <DropdownMenuItem onClick={() => onUnbanUser(user)}>
                             <ShieldOff className="mr-2 h-4 w-4" />
@@ -385,6 +401,16 @@ export const UnifiedUsersTable = ({
             </PaginationContent>
           </Pagination>
         </div>
+      )}
+
+      {/* Access Link Modal */}
+      {accessLinkModal && (
+        <GenerateAccessLinkModal
+          open={!!accessLinkModal}
+          onOpenChange={(open) => !open && setAccessLinkModal(null)}
+          userId={accessLinkModal.userId}
+          userName={accessLinkModal.userName}
+        />
       )}
     </div>
   );
