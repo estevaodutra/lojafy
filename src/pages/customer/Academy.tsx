@@ -65,7 +65,6 @@ export default function Academy() {
           {availableCourses.map((course) => {
             const enrolled = isEnrolled(course.id);
             const hasAccess = canAccessCourse(course.id);
-            const isFreeForAll = course.access_level === 'all';
             const enrollment = enrollments?.find(e => e.course_id === course.id);
 
             return (
@@ -73,8 +72,7 @@ export default function Academy() {
                 key={course.id} 
                 className={cn(
                   "flex flex-col overflow-hidden transition-all hover:shadow-lg",
-                  enrolled && "border-green-500 border-2",
-                  isFreeForAll && !enrolled && "border-blue-500 border-2"
+                  enrolled && "border-green-500 border-2"
                 )}
               >
                 {/* Thumbnail com overlay de cadeado */}
@@ -104,10 +102,6 @@ export default function Academy() {
                     {enrolled ? (
                       <Badge className="bg-green-600 hover:bg-green-700 shrink-0">
                         🎓 Matriculado
-                      </Badge>
-                    ) : isFreeForAll ? (
-                      <Badge className="bg-blue-600 hover:bg-blue-700 shrink-0">
-                        🌐 Acesso Livre
                       </Badge>
                     ) : (
                       <Badge variant="outline" className="shrink-0">

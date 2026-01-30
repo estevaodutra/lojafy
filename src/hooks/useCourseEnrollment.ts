@@ -91,9 +91,8 @@ export const useCourseEnrollment = (userId?: string) => {
   };
 
   const canAccessCourse = (courseId: string) => {
-    // User can access if enrolled OR if course has access_level='all'
-    const course = availableCourses?.find(c => c.id === courseId);
-    return isEnrolled(courseId) || course?.access_level === 'all';
+    // Acesso SOMENTE via matrícula - access_level controla apenas visibilidade
+    return isEnrolled(courseId);
   };
 
   return {

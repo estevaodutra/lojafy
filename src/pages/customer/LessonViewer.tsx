@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronLeft, ChevronRight, Download, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, FileText, Lock } from 'lucide-react';
 import { CourseBreadcrumb } from '@/components/courses/CourseBreadcrumb';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { toast } from 'sonner';
@@ -19,7 +19,7 @@ export default function LessonViewer() {
   const { user } = useAuth();
   const { lesson, loading: lessonLoading } = useLessonContent(lessonId);
   const { lessons, loading: moduleLessonsLoading } = useModuleContent(lesson?.course_modules?.id);
-  const { enrollments } = useCourseEnrollment();
+  const { enrollments, canAccessCourse, loading: enrollmentLoading } = useCourseEnrollment(user?.id);
   
   const enrollment = enrollments?.find(e => e.course_id === lesson?.course_modules?.course_id);
   const { progress, markLessonComplete } = useCourseProgress(enrollment?.id);
@@ -47,7 +47,7 @@ export default function LessonViewer() {
     });
   };
 
-  if (lessonLoading || moduleLessonsLoading) {
+  if (lessonLoading || moduleLessonsLoading || enrollmentLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Skeleton className="h-8 w-64 mb-6" />
@@ -60,6 +60,23 @@ export default function LessonViewer() {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
         <h1 className="text-2xl font-bold mb-4">Aula não encontrada</h1>
+        <Button asChild>
+          <Link to="/minha-conta/academy">Voltar para Academy</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  // Verificar matrícula antes de exibir aula
+  const courseId = lesson.course_modules?.course_id;
+  if (courseId && !canAccessCourse(courseId)) {
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <Lock className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+        <h1 className="text-2xl font-bold mb-4">Acesso Restrito</h1>
+        <p className="text-muted-foreground mb-6">
+          Você precisa estar matriculado neste curso para assistir esta aula.
+        </p>
         <Button asChild>
           <Link to="/minha-conta/academy">Voltar para Academy</Link>
         </Button>
