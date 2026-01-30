@@ -61,21 +61,30 @@ Deno.serve(async (req) => {
       .eq('id', keyData.id);
 
     // Parse request body
-    const { user_id, feature_slug, tipo_periodo, motivo } = await req.json();
+    const { user_id, feature_id, feature_slug, all_features, tipo_periodo, motivo } = await req.json();
 
-    if (!user_id || !feature_slug || !tipo_periodo) {
+    // Validate user_id is required
+    if (!user_id) {
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Parâmetros obrigatórios: user_id, feature_slug, tipo_periodo' 
-        }),
+        JSON.stringify({ success: false, error: 'user_id é obrigatório' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validate tipo_periodo
+    // If not all_features, need feature_id or feature_slug
+    if (!all_features && !feature_id && !feature_slug) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'feature_id é obrigatório (ou use all_features: true)' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // tipo_periodo is optional - default to 'mensal'
+    const tipoPeriodoFinal = tipo_periodo || 'mensal';
+
+    // Validate tipo_periodo if provided
     const tiposValidos = ['trial', 'mensal', 'anual', 'vitalicio', 'cortesia'];
-    if (!tiposValidos.includes(tipo_periodo)) {
+    if (!tiposValidos.includes(tipoPeriodoFinal)) {
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -99,21 +108,187 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get feature by slug
-    const { data: feature, error: featureError } = await supabase
-      .from('features')
-      .select('*')
-      .eq('slug', feature_slug)
-      .maybeSingle();
+    // Determine expiration: vitalicio/cortesia = null, others use profile subscription
+    const isLifetime = tipoPeriodoFinal === 'vitalicio' || tipoPeriodoFinal === 'cortesia';
+    const data_expiracao = isLifetime ? null : userProfile.subscription_expires_at;
 
-    if (featureError || !feature) {
+    // Calculate days remaining
+    let dias_restantes: number | null = null;
+    if (data_expiracao) {
+      const expirationDate = new Date(data_expiracao);
+      const now = new Date();
+      dias_restantes = Math.max(0, Math.ceil((expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    }
+
+    // Handle all_features mode
+    if (all_features === true) {
+      console.log(`Processing all_features for user ${user_id}`);
+
+      // 1. Fetch all active features
+      const { data: allFeatures, error: featuresError } = await supabase
+        .from('features')
+        .select('*')
+        .eq('ativo', true)
+        .order('ordem_exibicao');
+
+      if (featuresError || !allFeatures || allFeatures.length === 0) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Nenhuma feature ativa encontrada' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // 2. Fetch features user already has (active)
+      const { data: existingFeatures } = await supabase
+        .from('user_features')
+        .select('feature_id')
+        .eq('user_id', user_id)
+        .in('status', ['ativo', 'trial']);
+
+      const existingIds = new Set(existingFeatures?.map(f => f.feature_id) || []);
+
+      // Build a map of slug -> feature for dependency checking
+      const featuresBySlug = new Map(allFeatures.map(f => [f.slug, f]));
+
+      // 3. Process each feature
+      const assignedFeatures: Array<{ id: string; slug: string; nome: string }> = [];
+      const skippedExisting: Array<{ id: string; slug: string; nome: string }> = [];
+      const skippedDependencies: Array<{ slug: string; nome: string; requer: string[] }> = [];
+
+      for (const feat of allFeatures) {
+        // Already has this feature?
+        if (existingIds.has(feat.id)) {
+          skippedExisting.push({ id: feat.id, slug: feat.slug, nome: feat.nome });
+          continue;
+        }
+
+        // Check dependencies
+        if (feat.requer_features && feat.requer_features.length > 0) {
+          let hasDeps = true;
+          for (const reqSlug of feat.requer_features) {
+            // Check if user has the required feature or if it's being assigned in this batch
+            const requiredFeature = featuresBySlug.get(reqSlug);
+            const hasViaExisting = requiredFeature && existingIds.has(requiredFeature.id);
+            
+            if (!hasViaExisting) {
+              const { data: hasReq } = await supabase.rpc('user_has_feature', {
+                _user_id: user_id,
+                _feature_slug: reqSlug,
+              });
+              if (!hasReq) {
+                hasDeps = false;
+                break;
+              }
+            }
+          }
+          if (!hasDeps) {
+            skippedDependencies.push({ 
+              slug: feat.slug, 
+              nome: feat.nome, 
+              requer: feat.requer_features 
+            });
+            continue;
+          }
+        }
+
+        // Assign feature
+        const { error: upsertError } = await supabase
+          .from('user_features')
+          .upsert({
+            user_id,
+            feature_id: feat.id,
+            status: tipoPeriodoFinal === 'trial' ? 'trial' : 'ativo',
+            tipo_periodo: tipoPeriodoFinal,
+            data_inicio: new Date().toISOString(),
+            data_expiracao,
+            trial_usado: tipoPeriodoFinal === 'trial',
+            origem: 'api',
+            atribuido_por: keyData.user_id,
+            motivo,
+          }, {
+            onConflict: 'user_id,feature_id',
+          });
+
+        if (!upsertError) {
+          assignedFeatures.push({ id: feat.id, slug: feat.slug, nome: feat.nome });
+          
+          // Log transaction
+          await supabase.from('feature_transactions').insert({
+            user_id,
+            feature_id: feat.id,
+            tipo: 'atribuicao',
+            tipo_periodo: tipoPeriodoFinal,
+            executado_por: keyData.user_id,
+            motivo: motivo || `Atribuído via API (lote) - ${keyData.key_name}`,
+            metadata: { 
+              usa_expiracao_perfil: !isLifetime,
+              expiracao_perfil: data_expiracao,
+              api_key_name: keyData.key_name,
+              batch_mode: true
+            },
+          });
+        }
+      }
+
+      console.log(`Batch assignment complete: ${assignedFeatures.length} assigned, ${skippedExisting.length} existing, ${skippedDependencies.length} skipped due to dependencies`);
+
       return new Response(
-        JSON.stringify({ success: false, error: 'Feature não encontrada' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({
+          success: true,
+          message: `${assignedFeatures.length} feature(s) atribuída(s) com sucesso`,
+          data: {
+            total_assigned: assignedFeatures.length,
+            assigned_features: assignedFeatures,
+            skipped_existing: skippedExisting.length,
+            skipped_dependencies: skippedDependencies
+          },
+          expiracao_info: {
+            fonte: isLifetime ? 'tipo_periodo (vitalício/cortesia)' : 'profiles.subscription_expires_at',
+            expires_at: data_expiracao,
+            dias_restantes,
+            nota: isLifetime 
+              ? 'Estas features nunca expiram' 
+              : 'Features expiram junto com a assinatura do perfil'
+          }
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (!feature.ativo) {
+    // Single feature assignment mode
+    // Get feature by ID (priority) or slug
+    let feature;
+    if (feature_id) {
+      const { data, error } = await supabase
+        .from('features')
+        .select('*')
+        .eq('id', feature_id)
+        .maybeSingle();
+      
+      if (error || !data) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Feature não encontrada pelo ID' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      feature = data;
+    } else if (feature_slug) {
+      const { data, error } = await supabase
+        .from('features')
+        .select('*')
+        .eq('slug', feature_slug)
+        .maybeSingle();
+      
+      if (error || !data) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Feature não encontrada pelo slug' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      feature = data;
+    }
+
+    if (!feature!.ativo) {
       return new Response(
         JSON.stringify({ success: false, error: 'Feature está inativa' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -121,8 +296,8 @@ Deno.serve(async (req) => {
     }
 
     // Check dependencies
-    if (feature.requer_features && feature.requer_features.length > 0) {
-      for (const requiredSlug of feature.requer_features) {
+    if (feature!.requer_features && feature!.requer_features.length > 0) {
+      for (const requiredSlug of feature!.requer_features) {
         const { data: hasRequired } = await supabase.rpc('user_has_feature', {
           _user_id: user_id,
           _feature_slug: requiredSlug,
@@ -140,29 +315,17 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Determine expiration: vitalicio/cortesia = null, others use profile subscription
-    const isLifetime = tipo_periodo === 'vitalicio' || tipo_periodo === 'cortesia';
-    const data_expiracao = isLifetime ? null : userProfile.subscription_expires_at;
-
-    // Calculate days remaining
-    let dias_restantes: number | null = null;
-    if (data_expiracao) {
-      const expirationDate = new Date(data_expiracao);
-      const now = new Date();
-      dias_restantes = Math.max(0, Math.ceil((expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-    }
-
     // Upsert user_features
     const { data: userFeature, error: upsertError } = await supabase
       .from('user_features')
       .upsert({
         user_id,
-        feature_id: feature.id,
-        status: tipo_periodo === 'trial' ? 'trial' : 'ativo',
-        tipo_periodo,
+        feature_id: feature!.id,
+        status: tipoPeriodoFinal === 'trial' ? 'trial' : 'ativo',
+        tipo_periodo: tipoPeriodoFinal,
         data_inicio: new Date().toISOString(),
-        data_expiracao, // Now uses profile expiration or null for lifetime
-        trial_usado: tipo_periodo === 'trial',
+        data_expiracao,
+        trial_usado: tipoPeriodoFinal === 'trial',
         origem: 'api',
         atribuido_por: keyData.user_id,
         motivo,
@@ -183,9 +346,9 @@ Deno.serve(async (req) => {
     // Log transaction
     await supabase.from('feature_transactions').insert({
       user_id,
-      feature_id: feature.id,
+      feature_id: feature!.id,
       tipo: 'atribuicao',
-      tipo_periodo,
+      tipo_periodo: tipoPeriodoFinal,
       executado_por: keyData.user_id,
       motivo: motivo || `Atribuído via API - ${keyData.key_name}`,
       metadata: { 
@@ -195,7 +358,7 @@ Deno.serve(async (req) => {
       },
     });
 
-    console.log(`Feature "${feature_slug}" assigned to user ${user_id} via API key ${keyData.key_name}`);
+    console.log(`Feature "${feature!.slug}" assigned to user ${user_id} via API key ${keyData.key_name}`);
 
     return new Response(
       JSON.stringify({
@@ -203,9 +366,10 @@ Deno.serve(async (req) => {
         message: 'Feature atribuída com sucesso',
         data: {
           user_id,
-          feature_slug,
+          feature_id: feature!.id,
+          feature_slug: feature!.slug,
           status: userFeature.status,
-          tipo_periodo,
+          tipo_periodo: tipoPeriodoFinal,
           data_inicio: userFeature.data_inicio,
           usa_expiracao_perfil: !isLifetime,
           expiracao_perfil: data_expiracao,
