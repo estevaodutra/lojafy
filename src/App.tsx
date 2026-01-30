@@ -69,6 +69,7 @@ import SupplierSales from "./pages/supplier/Sales";
 
 import ResellerDashboard from "./pages/reseller/Dashboard";
 import ResellerOnboarding from "./pages/reseller/Onboarding";
+import ResellerFirstAccess from "./pages/reseller/FirstAccess";
 import ResellerSales from "./pages/reseller/Sales";
 import ResellerClients from "./pages/reseller/Clients";
 import ResellerFinanceiro from "./pages/reseller/Financeiro";
@@ -354,6 +355,7 @@ const App = () => {
                 }
               >
                 <Route index element={<ResellerDashboard />} />
+                <Route path="first-access" element={<ResellerFirstAccess />} />
                 <Route path="onboarding" element={<ResellerOnboarding />} />
                 <Route path="dashboard" element={<ResellerDashboard />} />
                 <Route path="catalogo" element={<ResellerCatalog />} />

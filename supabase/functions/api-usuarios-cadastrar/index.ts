@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
         token: accessToken,
         expires_at: tokenExpiresAt.toISOString(),
         created_by: keyData.user_id,
-        redirect_url: '/reseller/onboarding'
+        redirect_url: '/reseller/first-access'
       });
 
     if (tokenError) {

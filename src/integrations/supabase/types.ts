@@ -2405,6 +2405,7 @@ export type Database = {
           origem_loja_id: string | null
           origem_metadata: Json | null
           origem_tipo: Database["public"]["Enums"]["origem_tipo"] | null
+          password_set: boolean | null
           phone: string | null
           role: Database["public"]["Enums"]["app_role"]
           subdomain: string | null
@@ -2432,6 +2433,7 @@ export type Database = {
           origem_loja_id?: string | null
           origem_metadata?: Json | null
           origem_tipo?: Database["public"]["Enums"]["origem_tipo"] | null
+          password_set?: boolean | null
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           subdomain?: string | null
@@ -2459,6 +2461,7 @@ export type Database = {
           origem_loja_id?: string | null
           origem_metadata?: Json | null
           origem_tipo?: Database["public"]["Enums"]["origem_tipo"] | null
+          password_set?: boolean | null
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           subdomain?: string | null
