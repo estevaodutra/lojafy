@@ -3728,7 +3728,12 @@ export type Database = {
     }
     Enums: {
       app_role: "customer" | "admin" | "super_admin" | "supplier" | "reseller"
-      course_access_level: "all" | "customer" | "supplier" | "reseller"
+      course_access_level:
+        | "all"
+        | "customer"
+        | "supplier"
+        | "reseller"
+        | "enrolled_only"
       feature_periodo: "mensal" | "anual" | "vitalicio" | "trial" | "cortesia"
       feature_status: "ativo" | "trial" | "expirado" | "cancelado" | "revogado"
       feature_transaction_tipo:
@@ -3895,7 +3900,13 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["customer", "admin", "super_admin", "supplier", "reseller"],
-      course_access_level: ["all", "customer", "supplier", "reseller"],
+      course_access_level: [
+        "all",
+        "customer",
+        "supplier",
+        "reseller",
+        "enrolled_only",
+      ],
       feature_periodo: ["mensal", "anual", "vitalicio", "trial", "cortesia"],
       feature_status: ["ativo", "trial", "expirado", "cancelado", "revogado"],
       feature_transaction_tipo: [

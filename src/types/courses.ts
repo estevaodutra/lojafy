@@ -9,7 +9,7 @@ export interface Course {
   price: number;
   is_published: boolean;
   position: number;
-  access_level: 'all' | 'customer' | 'supplier' | 'reseller';
+  access_level: 'all' | 'customer' | 'supplier' | 'reseller' | 'enrolled_only';
   created_at: string;
   updated_at: string;
 }

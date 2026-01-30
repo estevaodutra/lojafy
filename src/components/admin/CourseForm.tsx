@@ -26,7 +26,7 @@ const courseSchema = z.object({
   price: z.coerce.number().min(0, 'O preço deve ser maior ou igual a zero'),
   is_published: z.boolean(),
   position: z.coerce.number().min(1).optional(),
-  access_level: z.enum(['all', 'customer', 'supplier', 'reseller']).default('all'),
+  access_level: z.enum(['all', 'customer', 'supplier', 'reseller', 'enrolled_only']).default('all'),
 });
 
 type CourseFormData = z.infer<typeof courseSchema>;
@@ -299,10 +299,11 @@ export function CourseForm({ open, onOpenChange, course, onSuccess }: CourseForm
                 <SelectItem value="customer">👤 Apenas Clientes</SelectItem>
                 <SelectItem value="supplier">📦 Apenas Fornecedores</SelectItem>
                 <SelectItem value="reseller">🏪 Apenas Revendedores</SelectItem>
+                <SelectItem value="enrolled_only">🔐 Apenas Matriculados</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-sm text-muted-foreground">
-              Define quem pode se matricular neste curso
+              Define quem pode ver este curso no catálogo. "Apenas Matriculados" oculta o curso do catálogo.
             </p>
           </div>
 
