@@ -1562,6 +1562,42 @@ export type Database = {
           },
         ]
       }
+      one_time_access_tokens: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          redirect_url: string | null
+          token: string
+          used: boolean
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          redirect_url?: string | null
+          token: string
+          used?: boolean
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          redirect_url?: string | null
+          token?: string
+          used?: boolean
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           created_at: string
@@ -2364,6 +2400,8 @@ export type Database = {
           id: string
           is_active: boolean | null
           last_name: string | null
+          onboarding_completed: boolean
+          onboarding_completed_at: string | null
           origem_loja_id: string | null
           origem_metadata: Json | null
           origem_tipo: Database["public"]["Enums"]["origem_tipo"] | null
@@ -2389,6 +2427,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_name?: string | null
+          onboarding_completed?: boolean
+          onboarding_completed_at?: string | null
           origem_loja_id?: string | null
           origem_metadata?: Json | null
           origem_tipo?: Database["public"]["Enums"]["origem_tipo"] | null
@@ -2414,6 +2454,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_name?: string | null
+          onboarding_completed?: boolean
+          onboarding_completed_at?: string | null
           origem_loja_id?: string | null
           origem_metadata?: Json | null
           origem_tipo?: Database["public"]["Enums"]["origem_tipo"] | null
@@ -2535,6 +2577,45 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
         ]
+      }
+      reseller_onboarding_config: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          redirect_after: string | null
+          title: string
+          updated_at: string
+          video_aspect_ratio: string | null
+          video_provider: string | null
+          video_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          redirect_after?: string | null
+          title?: string
+          updated_at?: string
+          video_aspect_ratio?: string | null
+          video_provider?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          redirect_after?: string | null
+          title?: string
+          updated_at?: string
+          video_aspect_ratio?: string | null
+          video_provider?: string | null
+          video_url?: string | null
+        }
+        Relationships: []
       }
       reseller_onboarding_progress: {
         Row: {

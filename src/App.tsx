@@ -28,6 +28,7 @@ import CentralAjuda from "./pages/CentralAjuda";
 import Carrinho from "./pages/Carrinho";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
+import AuthOneTime from "./pages/AuthOneTime";
 import CustomerLayout from "./components/customer/CustomerLayout";
 import CustomerDashboard from "./pages/customer/Dashboard";
 import CustomerOrders from "./pages/customer/Orders";
@@ -67,6 +68,7 @@ import SupplierInventory from "./pages/supplier/Inventory";
 import SupplierSales from "./pages/supplier/Sales";
 
 import ResellerDashboard from "./pages/reseller/Dashboard";
+import ResellerOnboarding from "./pages/reseller/Onboarding";
 import ResellerSales from "./pages/reseller/Sales";
 import ResellerClients from "./pages/reseller/Clients";
 import ResellerFinanceiro from "./pages/reseller/Financeiro";
@@ -210,6 +212,7 @@ const App = () => {
               <Route path="/central-ajuda" element={<CentralAjuda />} />
               <Route path="/carrinho" element={<Carrinho />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/onetime" element={<AuthOneTime />} />
               <Route path="/checkout/curso/:courseId" element={<CourseCheckout />} />
               
               {/* Customer Panel Routes */}
@@ -351,6 +354,7 @@ const App = () => {
                 }
               >
                 <Route index element={<ResellerDashboard />} />
+                <Route path="onboarding" element={<ResellerOnboarding />} />
                 <Route path="dashboard" element={<ResellerDashboard />} />
                 <Route path="catalogo" element={<ResellerCatalog />} />
                 <Route path="produtos" element={<ResellerProducts />} />
