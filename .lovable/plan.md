@@ -1,203 +1,98 @@
 
+# Plano: Separar Acesso à Plataforma do Acesso aos Cursos
 
-# Plano: Simplificar Corpo de Requisição do Endpoint de Atribuição
+## Problema Identificado
 
-## Objetivo
+A lógica atual em `useCourseEnrollment.ts` libera automaticamente cursos com `access_level = 'all'`:
 
-Simplificar o corpo da requisição conforme especificado:
+```typescript
+const canAccessCourse = (courseId: string) => {
+  return isEnrolled(courseId) || course?.access_level === 'all'; // ❌ Libera tudo
+};
+```
 
-```json
-{
-  "user_id": "uuid-usuario",
-  "feature_id": "",
-  "all_features": true
-}
+Como todos os cursos estão configurados com `access_level = 'all'`, qualquer usuário com acesso à plataforma consegue entrar em todos os cursos sem matrícula.
+
+---
+
+## Nova Arquitetura
+
+| Camada | Controle | Função |
+|--------|----------|--------|
+| **Feature `lojafy_academy`** | Entrada na plataforma | Permite ver o catálogo de cursos |
+| **Matrícula (`course_enrollments`)** | Acesso ao conteúdo | Permite assistir aulas |
+| **`access_level` do curso** | Visibilidade no catálogo | Define quais roles podem **ver/comprar** o curso |
+
+---
+
+## Alterações Necessárias
+
+### 1. Hook: `src/hooks/useCourseEnrollment.ts`
+
+**Remover a lógica que libera cursos `access_level = 'all'`:**
+
+```typescript
+// ANTES (linha 93-96)
+const canAccessCourse = (courseId: string) => {
+  const course = availableCourses?.find(c => c.id === courseId);
+  return isEnrolled(courseId) || course?.access_level === 'all';
+};
+
+// DEPOIS - Acesso SOMENTE via matrícula
+const canAccessCourse = (courseId: string) => {
+  return isEnrolled(courseId);
+};
 ```
 
 ---
 
-## Regras de Negócio
+### 2. Página Academy: `src/pages/customer/Academy.tsx`
 
-| Parâmetro | Obrigatório | Comportamento |
-|-----------|-------------|---------------|
-| `user_id` | Sim | UUID do usuário |
-| `feature_id` | Não | UUID da feature (opcional se `all_features: true`) |
-| `all_features` | Não | Se `true`, atribui todas as features ativas |
-| `tipo_periodo` | Não | Default: usa o plano da assinatura do perfil ou "mensal" |
-| `motivo` | Não | Motivo opcional para auditoria |
+**Atualizar a UI para refletir a nova lógica:**
+
+```text
+Linha 67-68 - Remover dependência de 'isFreeForAll' para mostrar acesso
+Linha 77 - Remover borda azul para cursos 'all'
+Linha 108-111 - Remover badge "Acesso Livre"
+```
+
+**Nova lógica visual:**
+- Matriculado → Badge verde "🎓 Matriculado" + Botão "Assistir Aulas"
+- Não matriculado → Badge "🔒 Bloqueado" + Botão "Adquirir Agora" (ou botão desabilitado)
 
 ---
 
-## Alterações Técnicas
+### 3. Campo `access_level` - Nova Interpretação
 
-### 1. Edge Function: `api-features-atribuir/index.ts`
+O campo `access_level` passa a significar apenas **quem pode VER o curso no catálogo**:
 
-**Linha 64 - Novo parse do body:**
-```typescript
-const { user_id, feature_id, feature_slug, all_features, tipo_periodo, motivo } = await req.json();
-```
+| Valor | Significado |
+|-------|-------------|
+| `all` | Visível para todos os usuários com feature Academy |
+| `reseller` | Visível apenas para revendedores |
+| `supplier` | Visível apenas para fornecedores |
+| `customer` | Visível apenas para clientes |
 
-**Linhas 66-86 - Nova validação:**
-```typescript
-// user_id é sempre obrigatório
-if (!user_id) {
-  return erro('user_id é obrigatório');
-}
-
-// Se não for all_features, precisa de feature_id ou feature_slug
-if (!all_features && !feature_id && !feature_slug) {
-  return erro('feature_id é obrigatório (ou use all_features: true)');
-}
-
-// tipo_periodo é opcional - default para 'mensal' se não informado
-const tipoPeriodoFinal = tipo_periodo || 'mensal';
-```
-
-**Após linha 100 - Lógica all_features:**
-```typescript
-if (all_features === true) {
-  // 1. Buscar todas features ativas
-  const { data: allFeatures } = await supabase
-    .from('features')
-    .select('*')
-    .eq('ativo', true)
-    .order('ordem_exibicao');
-
-  // 2. Buscar features que usuário já possui (ativas)
-  const { data: existingFeatures } = await supabase
-    .from('user_features')
-    .select('feature_id')
-    .eq('user_id', user_id)
-    .in('status', ['ativo', 'trial']);
-
-  const existingIds = new Set(existingFeatures?.map(f => f.feature_id) || []);
-
-  // 3. Processar cada feature
-  const assignedFeatures = [];
-  const skippedExisting = [];
-  const skippedDependencies = [];
-
-  for (const feat of allFeatures) {
-    // Já possui?
-    if (existingIds.has(feat.id)) {
-      skippedExisting.push({ id: feat.id, slug: feat.slug, nome: feat.nome });
-      continue;
-    }
-    
-    // Verificar dependências
-    if (feat.requer_features?.length > 0) {
-      let hasDeps = true;
-      for (const reqSlug of feat.requer_features) {
-        const { data: hasReq } = await supabase.rpc('user_has_feature', {
-          _user_id: user_id,
-          _feature_slug: reqSlug,
-        });
-        if (!hasReq && !existingIds.has(/* id da feature requerida */)) {
-          hasDeps = false;
-          break;
-        }
-      }
-      if (!hasDeps) {
-        skippedDependencies.push({ slug: feat.slug, nome: feat.nome, requer: feat.requer_features });
-        continue;
-      }
-    }
-
-    // Atribuir feature
-    await supabase.from('user_features').upsert({...});
-    assignedFeatures.push({ id: feat.id, slug: feat.slug, nome: feat.nome });
-  }
-
-  // 4. Retornar resultado consolidado
-  return Response({ 
-    total_assigned: assignedFeatures.length,
-    assigned_features: assignedFeatures,
-    skipped_existing: skippedExisting.length,
-    skipped_dependencies 
-  });
-}
-```
-
-**Linhas 102-114 - Busca por feature_id (prioridade sobre slug):**
-```typescript
-let feature;
-if (feature_id) {
-  const { data } = await supabase
-    .from('features')
-    .select('*')
-    .eq('id', feature_id)
-    .maybeSingle();
-  feature = data;
-} else if (feature_slug) {
-  const { data } = await supabase
-    .from('features')
-    .select('*')
-    .eq('slug', feature_slug)
-    .maybeSingle();
-  feature = data;
-}
-```
+**Porém, nenhum deles terá ACESSO ao conteúdo sem matrícula.**
 
 ---
 
-### 2. Documentação: `src/data/apiEndpointsData.ts`
+## Fluxo Final
 
-**Atualizar requestBody e responseExample do endpoint "Atribuir Feature":**
-
-**Request Body (atribuição individual):**
-```json
-{
-  "user_id": "uuid-do-usuario",
-  "feature_id": "uuid-da-feature"
-}
-```
-
-**Request Body (todas as features):**
-```json
-{
-  "user_id": "uuid-do-usuario",
-  "feature_id": "",
-  "all_features": true
-}
-```
-
-**Response (all_features):**
-```json
-{
-  "success": true,
-  "message": "3 features atribuídas com sucesso",
-  "data": {
-    "total_assigned": 3,
-    "assigned_features": [
-      { "id": "uuid", "slug": "loja_propria", "nome": "Loja Completa" }
-    ],
-    "skipped_existing": 1,
-    "skipped_dependencies": []
-  }
-}
-```
-
----
-
-## Exemplos de Uso
-
-**Atribuir feature específica por ID:**
-```json
-POST /functions/v1/api-features-atribuir
-{
-  "user_id": "uuid-usuario",
-  "feature_id": "uuid-feature"
-}
-```
-
-**Atribuir todas as features:**
-```json
-POST /functions/v1/api-features-atribuir
-{
-  "user_id": "uuid-usuario",
-  "feature_id": "",
-  "all_features": true
-}
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  USUÁRIO RECEBE FEATURE "lojafy_academy"                    │
+│  → Pode acessar /minha-conta/academy                        │
+│  → Vê catálogo de cursos (filtrado por access_level)        │
+│  → Todos os cursos aparecem como "🔒 Bloqueado"             │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│  USUÁRIO É MATRICULADO VIA API (api-matriculas-cadastrar)   │
+│  → Curso específico aparece como "🎓 Matriculado"           │
+│  → Botão "Assistir Aulas" fica habilitado                   │
+│  → Pode acessar módulos e aulas do curso                    │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -206,6 +101,23 @@ POST /functions/v1/api-features-atribuir
 
 | Arquivo | Mudança |
 |---------|---------|
-| `supabase/functions/api-features-atribuir/index.ts` | Adicionar `feature_id`, `all_features`, tornar `tipo_periodo` opcional |
-| `src/data/apiEndpointsData.ts` | Atualizar documentação com novos parâmetros |
+| `src/hooks/useCourseEnrollment.ts` | Simplificar `canAccessCourse` para verificar apenas matrícula |
+| `src/pages/customer/Academy.tsx` | Remover lógica visual de "Acesso Livre" |
+| `src/pages/customer/CourseModules.tsx` | Adicionar verificação de matrícula antes de exibir módulos |
+| `src/pages/customer/ModuleLessons.tsx` | Adicionar verificação de matrícula antes de exibir aulas |
+| `src/pages/customer/LessonViewer.tsx` | Adicionar verificação de matrícula antes de exibir vídeo |
 
+---
+
+## Opcional: Atualizar RLS do Supabase
+
+Para garantir segurança no backend, podemos atualizar as políticas RLS das tabelas `course_modules` e `course_lessons` para remover a condição `access_level = 'all'` e exigir matrícula.
+
+---
+
+## Resumo
+
+Essa alteração garante que:
+1. A **feature** controla quem entra na plataforma
+2. A **matrícula** controla quem acessa cada curso
+3. O **access_level** controla apenas visibilidade no catálogo (opcional)
