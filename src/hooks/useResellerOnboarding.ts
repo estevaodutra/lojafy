@@ -68,6 +68,21 @@ export const useResellerOnboarding = () => {
 
     const loadProgress = async () => {
       try {
+        // Verificar se o usuário já completou o primeiro acesso
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('password_set, onboarding_completed')
+          .eq('user_id', user.id)
+          .single();
+
+        const firstAccessCompleted = profileData?.password_set && profileData?.onboarding_completed;
+
+        // Se o primeiro acesso não foi concluído, não mostrar o wizard
+        if (!firstAccessCompleted) {
+          setLoading(false);
+          return;
+        }
+
         // Carregar progresso do banco de dados
         const { data: savedProgress } = await supabase
           .from('reseller_onboarding_progress')
