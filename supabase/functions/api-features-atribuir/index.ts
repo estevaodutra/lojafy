@@ -85,10 +85,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if user exists
+    // Check if user exists and get subscription_expires_at
     const { data: userProfile, error: userError } = await supabase
       .from('profiles')
-      .select('user_id')
+      .select('user_id, subscription_expires_at')
       .eq('user_id', user_id)
       .maybeSingle();
 
@@ -140,25 +140,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Calculate expiration date
-    let data_expiracao: string | null = null;
-    const now = new Date();
+    // Determine expiration: vitalicio/cortesia = null, others use profile subscription
+    const isLifetime = tipo_periodo === 'vitalicio' || tipo_periodo === 'cortesia';
+    const data_expiracao = isLifetime ? null : userProfile.subscription_expires_at;
 
-    switch (tipo_periodo) {
-      case 'mensal':
-        data_expiracao = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
-        break;
-      case 'anual':
-        data_expiracao = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString();
-        break;
-      case 'trial':
-        const trialDays = feature.trial_dias || 7;
-        data_expiracao = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000).toISOString();
-        break;
-      case 'vitalicio':
-      case 'cortesia':
-        data_expiracao = null;
-        break;
+    // Calculate days remaining
+    let dias_restantes: number | null = null;
+    if (data_expiracao) {
+      const expirationDate = new Date(data_expiracao);
+      const now = new Date();
+      dias_restantes = Math.max(0, Math.ceil((expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
     }
 
     // Upsert user_features
@@ -170,7 +161,7 @@ Deno.serve(async (req) => {
         status: tipo_periodo === 'trial' ? 'trial' : 'ativo',
         tipo_periodo,
         data_inicio: new Date().toISOString(),
-        data_expiracao,
+        data_expiracao, // Now uses profile expiration or null for lifetime
         trial_usado: tipo_periodo === 'trial',
         origem: 'api',
         atribuido_por: keyData.user_id,
@@ -197,7 +188,11 @@ Deno.serve(async (req) => {
       tipo_periodo,
       executado_por: keyData.user_id,
       motivo: motivo || `Atribuído via API - ${keyData.key_name}`,
-      metadata: { data_expiracao, api_key_name: keyData.key_name },
+      metadata: { 
+        usa_expiracao_perfil: !isLifetime,
+        expiracao_perfil: data_expiracao,
+        api_key_name: keyData.key_name 
+      },
     });
 
     console.log(`Feature "${feature_slug}" assigned to user ${user_id} via API key ${keyData.key_name}`);
@@ -212,7 +207,15 @@ Deno.serve(async (req) => {
           status: userFeature.status,
           tipo_periodo,
           data_inicio: userFeature.data_inicio,
-          data_expiracao: userFeature.data_expiracao
+          usa_expiracao_perfil: !isLifetime,
+          expiracao_perfil: data_expiracao,
+          dias_restantes
+        },
+        expiracao_info: {
+          fonte: isLifetime ? 'tipo_periodo (vitalício/cortesia)' : 'profiles.subscription_expires_at',
+          nota: isLifetime 
+            ? 'Esta feature nunca expira' 
+            : 'Feature expira junto com a assinatura do perfil'
         }
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

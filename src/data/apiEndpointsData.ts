@@ -405,17 +405,28 @@ const academyEnrollmentEndpoints: EndpointData[] = [
     title: 'Matricular Usuário',
     method: 'POST',
     url: '/functions/v1/api-matriculas-cadastrar',
-    description: 'Matricula um usuário em um curso específico ou em todos os cursos publicados (all_courses: true).',
+    description: 'Matricula um usuário em um curso específico ou em todos os cursos publicados (all_courses: true). A validade da matrícula é herdada automaticamente de profiles.subscription_expires_at.',
     requestBody: {
       user_id: 'user123',
       course_id: 'course456',
-      expires_at: '2026-01-12T23:59:59Z',
       all_courses: false,
-      _nota: 'Use course_id para curso específico OU all_courses: true para todos os cursos publicados'
+      _nota: 'Use course_id para curso específico OU all_courses: true para todos. Expiração é herdada do perfil.'
     },
     responseExample: {
       success: true,
       message: 'Matrícula realizada com sucesso',
+      data: {
+        id: 'enrollment123',
+        user_id: 'user123',
+        course_id: 'course456',
+        expires_at: '2026-02-28T00:00:00Z'
+      },
+      expiracao_info: {
+        fonte: 'profiles.subscription_expires_at',
+        expires_at: '2026-02-28T00:00:00Z',
+        dias_restantes: 30,
+        nota: 'Matrícula expira junto com a assinatura do perfil'
+      },
       _exemplo_all_courses: {
         success: true,
         message: 'Matrícula realizada em 5 cursos',
@@ -458,17 +469,30 @@ const academyEnrollmentEndpoints: EndpointData[] = [
     }
   },
   {
-    title: 'Atualizar Validade',
+    title: 'Atualizar Validade da Assinatura',
     method: 'PUT',
     url: '/functions/v1/api-matriculas-atualizar-validade',
-    description: 'Atualiza a data de expiração de uma matrícula.',
+    description: 'Atualiza profiles.subscription_expires_at que controla a expiração global de todas as features e matrículas do usuário. Features vitalício/cortesia não são afetadas.',
     requestBody: {
-      enrollment_id: 'enrollment123',
-      expires_at: '2027-12-31T23:59:59Z'
+      user_id: 'uuid-do-usuario',
+      subscription_expires_at: '2027-12-31T23:59:59Z',
+      _nota: 'Atualiza expiração do perfil e sincroniza com todas as matrículas e features'
     },
     responseExample: {
       success: true,
-      message: 'Validade atualizada'
+      message: 'Validade da assinatura atualizada com sucesso',
+      data: {
+        user_id: 'uuid',
+        old_expires_at: '2026-02-28T00:00:00Z',
+        new_expires_at: '2027-12-31T23:59:59Z',
+        dias_restantes: 700,
+        updated_at: '2026-01-30T00:00:00Z'
+      },
+      sincronizacao: {
+        matriculas: 'sincronizado',
+        features: 'sincronizado',
+        nota: 'Features vitalício/cortesia não são afetadas'
+      }
     }
   }
 ];

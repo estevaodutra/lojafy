@@ -41,7 +41,8 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { user_id, course_id, expires_at, all_courses } = body;
+    const { user_id, course_id, all_courses } = body;
+    // Note: expires_at parameter is intentionally ignored - expiration is controlled by profile
 
     // Validações
     if (!user_id) {
@@ -59,10 +60,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verificar se o usuário existe
+    // Verificar se o usuário existe e obter subscription_expires_at
     const { data: userData, error: userError } = await supabase
       .from('profiles')
-      .select('user_id')
+      .select('user_id, subscription_expires_at')
       .eq('user_id', user_id)
       .single();
 
@@ -71,6 +72,17 @@ Deno.serve(async (req) => {
         JSON.stringify({ success: false, error: 'Usuário não encontrado' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // A expiração da matrícula herda do perfil do usuário
+    const expires_at = userData.subscription_expires_at;
+
+    // Calculate days remaining
+    let dias_restantes: number | null = null;
+    if (expires_at) {
+      const expirationDate = new Date(expires_at);
+      const now = new Date();
+      dias_restantes = Math.max(0, Math.ceil((expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
     }
 
     // Se all_courses === true, matricular em todos os cursos publicados
@@ -117,11 +129,11 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Criar matrículas em lote
+      // Criar matrículas em lote - expiration from profile
       const enrollments = coursesToEnroll.map(course => ({
         user_id,
         course_id: course.id,
-        expires_at: expires_at || null,
+        expires_at, // Inherited from profile.subscription_expires_at
         progress_percentage: 0
       }));
 
@@ -151,6 +163,12 @@ Deno.serve(async (req) => {
               title: c.title
             })),
             skipped_existing: existingCourseIds.size
+          },
+          expiracao_info: {
+            fonte: 'profiles.subscription_expires_at',
+            expires_at,
+            dias_restantes,
+            nota: 'Matrículas expiram junto com a assinatura do perfil'
           }
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -187,13 +205,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Criar matrícula
+    // Criar matrícula - expiration from profile
     const { data, error } = await supabase
       .from('course_enrollments')
       .insert({
         user_id,
         course_id,
-        expires_at: expires_at || null,
+        expires_at, // Inherited from profile.subscription_expires_at
         progress_percentage: 0
       })
       .select()
@@ -213,7 +231,13 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         message: 'Matrícula realizada com sucesso',
-        data
+        data,
+        expiracao_info: {
+          fonte: 'profiles.subscription_expires_at',
+          expires_at,
+          dias_restantes,
+          nota: 'Matrícula expira junto com a assinatura do perfil'
+        }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
