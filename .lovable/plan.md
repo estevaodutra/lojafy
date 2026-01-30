@@ -4,13 +4,11 @@
 
 ## Situação Atual
 
-A feature `lojafy_academy` foi configurada no código (Header, CustomerLayout, App.tsx), mas ainda não existe no banco de dados. Por isso, ela não aparece na página de Features da Plataforma.
+A feature `lojafy_academy` foi configurada no código (Header, CustomerLayout, App.tsx), mas **não existe no banco de dados**. Por isso, não aparece na página de Features.
 
 ## Alteração Necessária
 
-### Migration SQL
-
-Inserir a feature na tabela `features`:
+### SQL para Inserir Feature
 
 ```sql
 INSERT INTO features (
@@ -48,7 +46,7 @@ INSERT INTO features (
 
 ## Resultado Esperado
 
-Após a migration, a feature aparecerá na página de Features:
+Após executar, a feature aparecerá na página `/super-admin/features`:
 
 | Categoria | Feature |
 |-----------|---------|
@@ -58,7 +56,7 @@ Após a migration, a feature aparecerá na página de Features:
 
 ## Próximos Passos Após Inserção
 
-1. A feature aparecerá automaticamente na página `/super-admin/features`
-2. Você poderá atribuí-la a usuários pelo modal de atribuição
+1. A feature aparecerá automaticamente na listagem
+2. Você poderá atribuí-la ao usuário `centraldeerros2@gmail.com`
 3. Usuários com a feature verão o menu da Academy
 
