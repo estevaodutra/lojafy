@@ -133,50 +133,64 @@ export const InstallPWAStep = ({ onComplete }: InstallPWAStepProps) => {
               </p>
             </div>
           ) : (
-            <div className="bg-muted p-4 rounded-lg space-y-4">
-              <p className="text-sm font-medium text-center mb-2">
-                Siga os passos abaixo:
-              </p>
-              
-              <div className="flex items-center gap-3 p-3 bg-background rounded-md">
-                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-sm font-bold text-primary">
-                  1
-                </div>
-                <div className="flex-1 flex items-center gap-2">
-                  <p className="text-sm">
-                    Toque no botão
-                  </p>
-                  <div className="w-6 h-6 bg-primary/10 rounded flex items-center justify-center">
-                    <Share className="h-4 w-4 text-primary" />
-                  </div>
-                  <p className="text-sm">Compartilhar</p>
-                </div>
+            <>
+              {/* Explicação sobre limitação do iOS */}
+              <div className="bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
+                <p className="text-sm text-blue-700 dark:text-blue-300 text-center">
+                  No iPhone, a instalação é feita manualmente seguindo os passos abaixo
+                </p>
               </div>
 
-              <div className="flex items-center gap-3 p-3 bg-background rounded-md">
-                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-sm font-bold text-primary">
-                  2
-                </div>
-                <div className="flex-1 flex items-center gap-2">
-                  <p className="text-sm">Toque em</p>
-                  <div className="w-6 h-6 bg-primary/10 rounded flex items-center justify-center">
-                    <Plus className="h-4 w-4 text-primary" />
+              {/* Instruções visuais */}
+              <div className="bg-muted p-4 rounded-lg space-y-4">
+                <div className="flex items-center gap-3 p-3 bg-background rounded-md">
+                  <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-sm font-bold text-primary">
+                    1
                   </div>
-                  <p className="text-sm">"Tela de Início"</p>
+                  <div className="flex-1 flex items-center gap-2">
+                    <p className="text-sm">
+                      Toque no botão
+                    </p>
+                    <div className="w-6 h-6 bg-primary/10 rounded flex items-center justify-center">
+                      <Share className="h-4 w-4 text-primary" />
+                    </div>
+                    <p className="text-sm">Compartilhar</p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-3 p-3 bg-background rounded-md">
-                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-sm font-bold text-primary">
-                  3
+                <div className="flex items-center gap-3 p-3 bg-background rounded-md">
+                  <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-sm font-bold text-primary">
+                    2
+                  </div>
+                  <div className="flex-1 flex items-center gap-2">
+                    <p className="text-sm">Toque em</p>
+                    <div className="w-6 h-6 bg-primary/10 rounded flex items-center justify-center">
+                      <Plus className="h-4 w-4 text-primary" />
+                    </div>
+                    <p className="text-sm">"Tela de Início"</p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm">
-                    Toque em <strong>"Adicionar"</strong> para confirmar
-                  </p>
+
+                <div className="flex items-center gap-3 p-3 bg-background rounded-md">
+                  <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-sm font-bold text-primary">
+                    3
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm">
+                      Toque em <strong>"Adicionar"</strong> para confirmar
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            </>
+          )}
+
+          {/* Botão de confirmação (só aparece no Safari) */}
+          {isInSafari && (
+            <Button onClick={onComplete} className="w-full" variant="default" size="lg">
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Já instalei o app
+            </Button>
           )}
 
           <Button onClick={onComplete} variant="ghost" className="w-full">
