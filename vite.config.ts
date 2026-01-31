@@ -20,11 +20,13 @@ export default defineConfig(({ mode }) => ({
         name: "Lojafy - Sua Loja Descomplicada",
         short_name: "Lojafy",
         description: "Plataforma de revenda de produtos",
-        theme_color: "#8B5CF6",
+        theme_color: "#2563EB",
         background_color: "#ffffff",
         display: "standalone",
+        orientation: "portrait",
         scope: "/",
         start_url: "/",
+        categories: ["shopping", "business"],
         icons: [
           {
             src: "/icons/icon-192.png",
@@ -37,15 +39,29 @@ export default defineConfig(({ mode }) => ({
             type: "image/png",
           },
           {
-            src: "/icons/icon-512.png",
+            src: "/icons/icon-512-maskable.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "maskable",
           },
         ],
+        shortcuts: [
+          {
+            name: "Meus Pedidos",
+            short_name: "Pedidos",
+            url: "/reseller/orders",
+            icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
+          },
+          {
+            name: "Meu Catálogo",
+            short_name: "Catálogo",
+            url: "/reseller/catalog",
+            icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
+          },
+        ],
       },
       workbox: {
-        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10 MB
+        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         runtimeCaching: [
           {
@@ -55,7 +71,7 @@ export default defineConfig(({ mode }) => ({
               cacheName: "google-fonts-cache",
               expiration: {
                 maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
+                maxAgeSeconds: 60 * 60 * 24 * 365,
               },
               cacheableResponse: {
                 statuses: [0, 200],
