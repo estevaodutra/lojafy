@@ -155,6 +155,35 @@ Deno.serve(async (req) => {
 
     console.log('Usuário criado com sucesso:', authData.user.id, 'Expiração:', calculatedExpiresAt, 'Access Link:', accessLink ? 'gerado' : 'falhou');
 
+    // Disparar webhook user.created
+    try {
+      const webhookPayload = {
+        user_id: authData.user.id,
+        email: authData.user.email,
+        name: full_name || null,
+        phone: phone || null,
+        role: role,
+        origin: {
+          type: 'api',
+          store_id: null,
+          store_name: null,
+        },
+        created_at: authData.user.created_at,
+      };
+
+      await supabase.functions.invoke('dispatch-webhook', {
+        body: {
+          event_type: 'user.created',
+          payload: webhookPayload,
+        },
+      });
+
+      console.log('✅ Webhook user.created disparado com sucesso');
+    } catch (webhookError) {
+      console.error('Erro ao disparar webhook user.created:', webhookError);
+      // Não falha a requisição por erro no webhook
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

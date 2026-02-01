@@ -143,3 +143,9 @@ verify_jwt = false
 
 [functions.verify-onetime-link]
 verify_jwt = false
+
+[functions.dispatch-webhook]
+verify_jwt = false
+
+[functions.check-inactive-users]
+verify_jwt = false
