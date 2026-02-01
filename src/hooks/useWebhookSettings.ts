@@ -139,24 +139,24 @@ export const useWebhookSettings = () => {
     try {
       setUpdating(eventType);
 
-      const testPayload = getTestPayload(eventType);
-
+      // Always use real data from the database
       const { data, error } = await supabase.functions.invoke('dispatch-webhook', {
         body: {
           event_type: eventType,
-          payload: testPayload,
+          payload: undefined, // Edge function will fetch real data
           is_test: true,
+          use_real_data: true,
         },
       });
 
       if (error) throw error;
 
-      await fetchSettings(); // Refresh para pegar último status
+      await fetchSettings(); // Refresh to get latest status
 
       if (data?.success) {
         toast({
           title: 'Teste enviado!',
-          description: `Resposta: ${data.status_code}`,
+          description: `Resposta: ${data.status_code} (dados reais)`,
         });
       } else {
         toast({
@@ -169,7 +169,7 @@ export const useWebhookSettings = () => {
       console.error('Erro ao testar webhook:', error);
       toast({
         title: 'Erro',
-        description: 'Não foi possível enviar o teste',
+        description: error.message || 'Não foi possível enviar o teste',
         variant: 'destructive',
       });
     } finally {
@@ -224,60 +224,3 @@ export const useWebhookSettings = () => {
     refetch: fetchSettings,
   };
 };
-
-function getTestPayload(eventType: string): Record<string, any> {
-  switch (eventType) {
-    case 'order.paid':
-      return {
-        order_id: '00000000-0000-0000-0000-000000000000',
-        order_number: 'ORD-TEST-000001',
-        total_amount: 199.90,
-        payment_method: 'pix',
-        customer: {
-          user_id: '00000000-0000-0000-0000-000000000000',
-          email: 'teste@exemplo.com',
-          name: 'Cliente Teste',
-          phone: '11999999999',
-        },
-        reseller: {
-          user_id: '00000000-0000-0000-0000-000000000000',
-          store_name: 'Loja Teste',
-        },
-        items: [
-          { product_id: '00000000-0000-0000-0000-000000000000', name: 'Produto Teste', quantity: 1, unit_price: 199.90 }
-        ],
-      };
-    
-    case 'user.created':
-      return {
-        user_id: '00000000-0000-0000-0000-000000000000',
-        email: 'novo@exemplo.com',
-        name: 'Novo Usuário Teste',
-        phone: '11988888888',
-        role: 'reseller',
-        origin: {
-          type: 'api',
-          store_id: null,
-          store_name: null,
-        },
-        created_at: new Date().toISOString(),
-      };
-    
-    case 'user.inactive.7days':
-    case 'user.inactive.15days':
-    case 'user.inactive.30days':
-      const days = parseInt(eventType.split('.')[2].replace('days', ''));
-      return {
-        user_id: '00000000-0000-0000-0000-000000000000',
-        email: 'usuario@exemplo.com',
-        name: 'Usuário Inativo Teste',
-        role: 'customer',
-        last_sign_in_at: new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString(),
-        days_inactive: days,
-        created_at: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
-      };
-    
-    default:
-      return { message: 'Evento de teste' };
-  }
-}
