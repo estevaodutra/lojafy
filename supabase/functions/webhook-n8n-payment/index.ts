@@ -181,6 +181,89 @@ serve(async (req) => {
     // Log success for approved payments
     if (webhookData.status.toLowerCase() === 'approved') {
       console.log(`✅ Payment APPROVED for order ${orderData.order_number} - Payment ID: ${paymentId}`);
+      
+      // Disparar webhook order.paid
+      try {
+        // Buscar dados completos do pedido para o payload
+        const { data: fullOrder } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            order_items (
+              id,
+              product_id,
+              quantity,
+              unit_price,
+              product_name_snapshot
+            )
+          `)
+          .eq('id', orderData.id)
+          .single();
+
+        // Buscar dados do cliente
+        let customerData = null;
+        if (fullOrder?.user_id) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('user_id, first_name, last_name, phone')
+            .eq('user_id', fullOrder.user_id)
+            .single();
+          
+          if (profile) {
+            const { data: authUser } = await supabase.auth.admin.getUserById(fullOrder.user_id);
+            customerData = {
+              user_id: profile.user_id,
+              email: authUser?.user?.email || null,
+              name: [profile.first_name, profile.last_name].filter(Boolean).join(' ') || null,
+              phone: profile.phone,
+            };
+          }
+        }
+
+        // Buscar dados do revendedor (se houver)
+        let resellerData = null;
+        if (fullOrder?.reseller_id) {
+          const { data: resellerStore } = await supabase
+            .from('reseller_stores')
+            .select('user_id, store_name')
+            .eq('user_id', fullOrder.reseller_id)
+            .single();
+          
+          if (resellerStore) {
+            resellerData = {
+              user_id: resellerStore.user_id,
+              store_name: resellerStore.store_name,
+            };
+          }
+        }
+
+        const webhookPayload = {
+          order_id: fullOrder?.id,
+          order_number: fullOrder?.order_number,
+          total_amount: fullOrder?.total_amount,
+          payment_method: fullOrder?.payment_method || 'pix',
+          customer: customerData,
+          reseller: resellerData,
+          items: fullOrder?.order_items?.map((item: any) => ({
+            product_id: item.product_id,
+            name: item.product_name_snapshot,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+          })) || [],
+        };
+
+        await supabase.functions.invoke('dispatch-webhook', {
+          body: {
+            event_type: 'order.paid',
+            payload: webhookPayload,
+          },
+        });
+
+        console.log('✅ Webhook order.paid disparado com sucesso');
+      } catch (webhookError) {
+        console.error('Erro ao disparar webhook order.paid:', webhookError);
+        // Não falha a requisição por erro no webhook
+      }
     }
 
     return new Response(

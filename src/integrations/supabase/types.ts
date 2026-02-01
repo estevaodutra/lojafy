@@ -3518,6 +3518,96 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_dispatch_logs: {
+        Row: {
+          dispatched_at: string | null
+          error_message: string | null
+          event_type: string
+          id: string
+          payload: Json | null
+          response_body: string | null
+          status_code: number | null
+        }
+        Insert: {
+          dispatched_at?: string | null
+          error_message?: string | null
+          event_type: string
+          id?: string
+          payload?: Json | null
+          response_body?: string | null
+          status_code?: number | null
+        }
+        Update: {
+          dispatched_at?: string | null
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json | null
+          response_body?: string | null
+          status_code?: number | null
+        }
+        Relationships: []
+      }
+      webhook_inactivity_dispatched: {
+        Row: {
+          dispatched_at: string | null
+          event_type: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          dispatched_at?: string | null
+          event_type: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          dispatched_at?: string | null
+          event_type?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      webhook_settings: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          event_type: string
+          id: string
+          last_error_message: string | null
+          last_status_code: number | null
+          last_triggered_at: string | null
+          secret_token: string | null
+          updated_at: string | null
+          webhook_url: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          event_type: string
+          id?: string
+          last_error_message?: string | null
+          last_status_code?: number | null
+          last_triggered_at?: string | null
+          secret_token?: string | null
+          updated_at?: string | null
+          webhook_url?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          event_type?: string
+          id?: string
+          last_error_message?: string | null
+          last_status_code?: number | null
+          last_triggered_at?: string | null
+          secret_token?: string | null
+          updated_at?: string | null
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
       withdrawal_requests: {
         Row: {
           amount: number
