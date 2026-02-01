@@ -108,7 +108,7 @@ async function fetchLastPaidOrder(supabase: any): Promise<Record<string, any> | 
     // Generate signed URL (valid for 1 hour)
     const { data: signedUrlData } = await supabase.storage
       .from('shipping-files')
-      .createSignedUrl(shippingFile.file_path, 3600);
+      .createSignedUrl(shippingFile.file_path, 604800); // 7 dias
     
     shippingLabel = {
       file_name: shippingFile.file_name,
