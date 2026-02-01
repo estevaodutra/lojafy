@@ -29,6 +29,234 @@ async function generateHmacSignature(secret: string, payload: string): Promise<s
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// Fetch last paid order with customer, reseller and items
+async function fetchLastPaidOrder(supabase: any): Promise<Record<string, any> | null> {
+  console.log('[dispatch-webhook] Buscando último pedido pago...');
+  
+  // Get last paid order
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .select(`
+      id,
+      order_number,
+      total_amount,
+      payment_method,
+      user_id,
+      reseller_id,
+      created_at
+    `)
+    .eq('payment_status', 'paid')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (orderError || !order) {
+    console.log('[dispatch-webhook] Nenhum pedido pago encontrado:', orderError?.message);
+    return null;
+  }
+
+  // Get customer profile
+  const { data: customerProfile } = await supabase
+    .from('profiles')
+    .select('first_name, last_name, phone')
+    .eq('user_id', order.user_id)
+    .single();
+
+  // Get customer email from auth.users via RPC or direct query
+  // Since we can't query auth.users directly, we'll use the profile data
+  let customerEmail = null;
+  
+  // Get reseller store info
+  let resellerData = null;
+  if (order.reseller_id) {
+    const { data: store } = await supabase
+      .from('reseller_stores')
+      .select('store_name')
+      .eq('user_id', order.reseller_id)
+      .single();
+    
+    if (store) {
+      resellerData = {
+        user_id: order.reseller_id,
+        store_name: store.store_name,
+      };
+    }
+  }
+
+  // Get order items
+  const { data: items } = await supabase
+    .from('order_items')
+    .select(`
+      product_id,
+      quantity,
+      unit_price,
+      product_name_snapshot
+    `)
+    .eq('order_id', order.id);
+
+  const customerName = customerProfile 
+    ? `${customerProfile.first_name || ''} ${customerProfile.last_name || ''}`.trim() || 'Cliente'
+    : 'Cliente';
+
+  return {
+    order_id: order.id,
+    order_number: order.order_number,
+    total_amount: order.total_amount,
+    payment_method: order.payment_method,
+    customer: {
+      user_id: order.user_id,
+      email: customerEmail || 'email@exemplo.com',
+      name: customerName,
+      phone: customerProfile?.phone || null,
+    },
+    reseller: resellerData || {
+      user_id: null,
+      store_name: null,
+    },
+    items: (items || []).map(item => ({
+      product_id: item.product_id,
+      name: item.product_name_snapshot || 'Produto',
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+    })),
+  };
+}
+
+// Fetch last created user
+async function fetchLastCreatedUser(supabase: any): Promise<Record<string, any> | null> {
+  console.log('[dispatch-webhook] Buscando último usuário criado...');
+  
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select(`
+      user_id,
+      first_name,
+      last_name,
+      phone,
+      role,
+      created_at
+    `)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error || !profile) {
+    console.log('[dispatch-webhook] Nenhum usuário encontrado:', error?.message);
+    return null;
+  }
+
+  const userName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Usuário';
+
+  return {
+    user_id: profile.user_id,
+    email: 'email@exemplo.com', // Can't access auth.users directly
+    name: userName,
+    phone: profile.phone || null,
+    role: profile.role || 'customer',
+    origin: {
+      type: 'manual',
+      store_id: null,
+      store_name: null,
+    },
+    created_at: profile.created_at,
+  };
+}
+
+// Fetch inactive user by days
+async function fetchInactiveUser(supabase: any, days: number): Promise<Record<string, any> | null> {
+  console.log(`[dispatch-webhook] Buscando usuário inativo há ${days}+ dias...`);
+  
+  // Calculate the date threshold
+  const thresholdDate = new Date();
+  thresholdDate.setDate(thresholdDate.getDate() - days);
+  
+  // We need to use a database function to access auth.users
+  // For now, we'll get profiles and check if they have old updated_at
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select(`
+      user_id,
+      first_name,
+      last_name,
+      phone,
+      role,
+      created_at,
+      updated_at
+    `)
+    .lt('updated_at', thresholdDate.toISOString())
+    .order('updated_at', { ascending: true })
+    .limit(1)
+    .single();
+
+  if (error || !profile) {
+    console.log(`[dispatch-webhook] Nenhum usuário inativo há ${days}+ dias:`, error?.message);
+    return null;
+  }
+
+  const userName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Usuário';
+  
+  // Calculate actual days inactive
+  const lastActivity = new Date(profile.updated_at);
+  const now = new Date();
+  const daysInactive = Math.floor((now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24));
+
+  return {
+    user_id: profile.user_id,
+    email: 'email@exemplo.com',
+    name: userName,
+    role: profile.role || 'customer',
+    last_sign_in_at: profile.updated_at,
+    days_inactive: daysInactive,
+    created_at: profile.created_at,
+  };
+}
+
+// Main function to fetch real test data based on event type
+async function fetchRealTestData(supabase: any, eventType: string): Promise<{ data: Record<string, any> | null; error: string | null }> {
+  switch (eventType) {
+    case 'order.paid':
+      const orderData = await fetchLastPaidOrder(supabase);
+      return {
+        data: orderData,
+        error: orderData ? null : 'Nenhum pedido pago encontrado para teste',
+      };
+    
+    case 'user.created':
+      const userData = await fetchLastCreatedUser(supabase);
+      return {
+        data: userData,
+        error: userData ? null : 'Nenhum usuário encontrado para teste',
+      };
+    
+    case 'user.inactive.7days':
+      const inactive7 = await fetchInactiveUser(supabase, 7);
+      return {
+        data: inactive7,
+        error: inactive7 ? null : 'Nenhum usuário inativo há 7+ dias encontrado',
+      };
+    
+    case 'user.inactive.15days':
+      const inactive15 = await fetchInactiveUser(supabase, 15);
+      return {
+        data: inactive15,
+        error: inactive15 ? null : 'Nenhum usuário inativo há 15+ dias encontrado',
+      };
+    
+    case 'user.inactive.30days':
+      const inactive30 = await fetchInactiveUser(supabase, 30);
+      return {
+        data: inactive30,
+        error: inactive30 ? null : 'Nenhum usuário inativo há 30+ dias encontrado',
+      };
+    
+    default:
+      return {
+        data: null,
+        error: `Evento ${eventType} não suporta dados reais de teste`,
+      };
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -40,7 +268,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const body = await req.json();
-    const { event_type, payload, is_test = false } = body;
+    const { event_type, payload: providedPayload, is_test = false, use_real_data = false } = body;
 
     if (!event_type) {
       return new Response(
@@ -49,7 +277,28 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`[dispatch-webhook] Disparando evento: ${event_type}, is_test: ${is_test}`);
+    console.log(`[dispatch-webhook] Disparando evento: ${event_type}, is_test: ${is_test}, use_real_data: ${use_real_data}`);
+
+    // Fetch real data if requested for test
+    let payload = providedPayload;
+    if (is_test && use_real_data) {
+      console.log(`[dispatch-webhook] Buscando dados reais para teste de ${event_type}...`);
+      const { data: realData, error: realDataError } = await fetchRealTestData(supabase, event_type);
+      
+      if (realDataError || !realData) {
+        console.log(`[dispatch-webhook] Erro ao buscar dados reais: ${realDataError}`);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: realDataError || 'Nenhum dado encontrado para teste' 
+          }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      payload = realData;
+      console.log(`[dispatch-webhook] Dados reais encontrados para ${event_type}`);
+    }
 
     // Buscar configuração do webhook
     const { data: webhookConfig, error: configError } = await supabase
@@ -93,7 +342,9 @@ Deno.serve(async (req) => {
 
     if (is_test) {
       webhookPayload.data._test = true;
-      webhookPayload.data._test_message = 'Este é um evento de teste';
+      webhookPayload.data._test_message = use_real_data 
+        ? 'Dados reais do banco de dados (teste)' 
+        : 'Este é um evento de teste';
     }
 
     const payloadString = JSON.stringify(webhookPayload);
