@@ -1,295 +1,237 @@
 
+# Plano: Corrigir Payload do Webhook order.paid
 
-# Plano: Usar Dados Reais nos Testes de Todos os Webhooks
+## Problema Identificado
 
-## Objetivo
+Analisando o payload enviado no teste do webhook `order.paid`, encontrei 3 problemas:
 
-Modificar o sistema para que ao clicar em "Testar" em qualquer webhook, o sistema busque dados reais do banco de dados, garantindo testes mais realistas e úteis.
-
----
-
-## Eventos e Fontes de Dados
-
-| Evento | Fonte de Dados |
-|--------|----------------|
-| `order.paid` | Último pedido com `payment_status = 'paid'` |
-| `user.created` | Último usuário criado (mais recente) |
-| `user.inactive.7days` | Usuário com `last_sign_in_at` há mais de 7 dias |
-| `user.inactive.15days` | Usuário com `last_sign_in_at` há mais de 15 dias |
-| `user.inactive.30days` | Usuário com `last_sign_in_at` há mais de 30 dias |
+| Campo | Valor Atual | Valor Esperado |
+|-------|-------------|----------------|
+| `customer.email` | `"email@exemplo.com"` | Email real do cliente |
+| `items` | `[]` (vazio) | Lista de produtos do pedido |
+| `etiqueta` | Não existe | URL da etiqueta (shipping label) |
 
 ---
 
-## Arquitetura
+## Causas Raiz
+
+### 1. Email não vem
+O código atual tem comentário dizendo que não consegue acessar `auth.users`:
+```typescript
+// Can't access auth.users directly
+email: customerEmail || 'email@exemplo.com',
+```
+
+**Mas existe a função** `get_users_with_email()` que já resolve isso! Esta função retorna dados de usuários incluindo o email da tabela `auth.users`.
+
+### 2. Items vazio
+O código busca uma coluna que não existe:
+```typescript
+.select(`product_name_snapshot`) // Esta coluna NÃO existe!
+```
+
+A estrutura real de `order_items`:
+- `product_snapshot` (JSONB) - contém `name`, `price`, `sku`, etc.
+- NÃO existe `product_name_snapshot`
+
+### 3. Etiqueta não incluída
+O sistema já tem a etiqueta salva na tabela `order_shipping_files`:
+```
+file_name: "Etiqueta Antonio.pdf"
+file_path: "c40b90a5-.../order_c40b90a5-..._1769828430108.pdf"
+```
+
+Mas o código não busca nem inclui no payload. Como o bucket é privado, precisamos gerar uma URL assinada.
+
+---
+
+## Solução
+
+### Arquivo a Modificar
+
+`supabase/functions/dispatch-webhook/index.ts`
+
+### Alterações na função `fetchLastPaidOrder()`
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    FLUXO DE TESTE COM DADOS REAIS                       │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  Frontend (clica Testar)                                               │
-│         │                                                               │
-│         ▼                                                               │
-│  dispatch-webhook (is_test=true, use_real_data=true)                   │
-│         │                                                               │
-│         ▼                                                               │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │ Switch por event_type:                                          │   │
-│  │                                                                  │   │
-│  │  order.paid ───────────> fetchLastPaidOrder()                   │   │
-│  │  user.created ─────────> fetchLastCreatedUser()                 │   │
-│  │  user.inactive.7days ──> fetchInactiveUser(7)                   │   │
-│  │  user.inactive.15days ─> fetchInactiveUser(15)                  │   │
-│  │  user.inactive.30days ─> fetchInactiveUser(30)                  │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
-│         │                                                               │
-│         ▼                                                               │
-│  Envia para URL configurada com dados reais + flag _test               │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+ANTES:
+├── Busca order
+├── Busca profile (sem email)
+├── customerEmail = null (sempre!)
+├── Busca items com coluna inexistente
+└── NÃO busca etiqueta
+
+DEPOIS:
+├── Busca order
+├── Usa RPC get_users_with_email() para pegar email
+├── Busca items com product_snapshot (JSONB)
+├── Busca etiqueta de order_shipping_files
+└── Gera URL assinada para download da etiqueta
 ```
 
 ---
 
-## Queries para Buscar Dados Reais
+## Código Atualizado
 
-### 1. order.paid - Último Pedido Pago
-
-```sql
-SELECT 
-  o.id, o.order_number, o.total_amount, o.payment_method,
-  o.user_id, p.first_name, p.last_name, p.phone, au.email,
-  o.reseller_id, rs.store_name
-FROM orders o
-LEFT JOIN profiles p ON p.user_id = o.user_id
-LEFT JOIN auth.users au ON au.id = o.user_id
-LEFT JOIN reseller_stores rs ON rs.user_id = o.reseller_id
-WHERE o.payment_status = 'paid'
-ORDER BY o.created_at DESC
-LIMIT 1
-```
-
-### 2. user.created - Último Usuário Criado
-
-```sql
-SELECT 
-  p.user_id, au.email, p.first_name, p.last_name, 
-  p.phone, p.role, p.created_at
-FROM profiles p
-JOIN auth.users au ON au.id = p.user_id
-ORDER BY p.created_at DESC
-LIMIT 1
-```
-
-### 3. user.inactive.Xdays - Usuário Inativo
-
-```sql
-SELECT 
-  p.user_id, au.email, p.first_name, p.last_name, 
-  p.role, au.last_sign_in_at, p.created_at
-FROM profiles p
-JOIN auth.users au ON au.id = p.user_id
-WHERE au.last_sign_in_at < NOW() - INTERVAL 'X days'
-  AND au.last_sign_in_at IS NOT NULL
-ORDER BY au.last_sign_in_at DESC
-LIMIT 1
-```
-
----
-
-## Alterações Necessárias
-
-### 1. dispatch-webhook/index.ts
-
-Adicionar funções para buscar dados reais de cada evento:
+### 1. Buscar Email Real
 
 ```typescript
-// Novas funções a adicionar:
+// ANTES
+const { data: customerProfile } = await supabase
+  .from('profiles')
+  .select('first_name, last_name, phone')
+  .eq('user_id', order.user_id)
+  .single();
+let customerEmail = null;
 
-async function fetchLastPaidOrder(supabase) {
-  // Busca último pedido pago com todos os dados relacionados
-}
+// DEPOIS
+const { data: usersWithEmail } = await supabase
+  .rpc('get_users_with_email');
 
-async function fetchLastCreatedUser(supabase) {
-  // Busca último usuário criado
-}
-
-async function fetchInactiveUser(supabase, days: number) {
-  // Busca usuário inativo há X dias
-}
-
-async function fetchRealTestData(supabase, eventType: string) {
-  switch (eventType) {
-    case 'order.paid':
-      return await fetchLastPaidOrder(supabase);
-    case 'user.created':
-      return await fetchLastCreatedUser(supabase);
-    case 'user.inactive.7days':
-      return await fetchInactiveUser(supabase, 7);
-    case 'user.inactive.15days':
-      return await fetchInactiveUser(supabase, 15);
-    case 'user.inactive.30days':
-      return await fetchInactiveUser(supabase, 30);
-    default:
-      return null;
-  }
-}
+const userWithEmail = usersWithEmail?.find(u => u.user_id === order.user_id);
+const customerEmail = userWithEmail?.email || null;
+const customerProfile = userWithEmail ? {
+  first_name: userWithEmail.first_name,
+  last_name: userWithEmail.last_name,
+  phone: userWithEmail.phone,
+} : null;
 ```
 
-**Lógica principal modificada:**
+### 2. Corrigir Busca de Items
 
 ```typescript
-// No handler principal, após validar is_test:
+// ANTES
+const { data: items } = await supabase
+  .from('order_items')
+  .select(`product_id, quantity, unit_price, product_name_snapshot`)
+  .eq('order_id', order.id);
 
-if (is_test && use_real_data) {
-  const realData = await fetchRealTestData(supabase, event_type);
+// DEPOIS
+const { data: items } = await supabase
+  .from('order_items')
+  .select(`product_id, quantity, unit_price, product_snapshot`)
+  .eq('order_id', order.id);
+
+// Mapear usando product_snapshot
+items: (items || []).map(item => ({
+  product_id: item.product_id,
+  name: item.product_snapshot?.name || 'Produto',
+  sku: item.product_snapshot?.sku || null,
+  image_url: item.product_snapshot?.image_url || null,
+  quantity: item.quantity,
+  unit_price: item.unit_price,
+})),
+```
+
+### 3. Incluir Etiqueta com URL Assinada
+
+```typescript
+// Buscar etiqueta do pedido
+const { data: shippingFiles } = await supabase
+  .from('order_shipping_files')
+  .select('file_name, file_path, file_size, uploaded_at')
+  .eq('order_id', order.id)
+  .limit(1)
+  .maybeSingle();
+
+let shippingLabel = null;
+if (shippingFiles?.file_path) {
+  // Gerar URL assinada (válida por 1 hora)
+  const { data: signedUrl } = await supabase.storage
+    .from('shipping-files')
+    .createSignedUrl(shippingFiles.file_path, 3600);
   
-  if (!realData) {
-    return Response: "Nenhum dado encontrado para teste de " + event_type;
-  }
-  
-  payload = realData;
+  shippingLabel = {
+    file_name: shippingFiles.file_name,
+    file_size: shippingFiles.file_size,
+    uploaded_at: shippingFiles.uploaded_at,
+    download_url: signedUrl?.signedUrl || null,
+  };
 }
 ```
 
-### 2. useWebhookSettings.ts
-
-Modificar para sempre usar dados reais:
-
-```typescript
-const testWebhook = async (eventType: string) => {
-  const { data, error } = await supabase.functions.invoke('dispatch-webhook', {
-    body: {
-      event_type: eventType,
-      payload: undefined,  // Não envia payload mockado
-      is_test: true,
-      use_real_data: true, // Sempre buscar dados reais
-    },
-  });
-  // ...
-};
-```
-
-Remover a função `getTestPayload()` que gera dados mockados.
-
 ---
 
-## Payloads com Dados Reais
-
-### order.paid
+## Payload Final Esperado
 
 ```json
 {
   "event": "order.paid",
-  "timestamp": "2026-02-01T12:00:00Z",
+  "timestamp": "2026-02-01T16:51:21.543Z",
   "data": {
-    "_test": true,
-    "_test_message": "Dados reais do último pedido pago",
-    "order_id": "c40b90a5-...",
+    "order_id": "c40b90a5-bed9-4a11-bd34-358909574b57",
     "order_number": "ORD-1769828426038_865529AC",
     "total_amount": 19.98,
     "payment_method": "pix",
     "customer": {
-      "user_id": "865529ac-...",
-      "email": "cliente@real.com",
+      "user_id": "865529ac-c7cb-4f8b-9e97-8033b32a5876",
+      "email": "dottabruno9@gmail.com",
       "name": "Bruno Dotta",
       "phone": "49999910306"
     },
-    "reseller": { ... },
-    "items": [ ... ]
-  }
-}
-```
-
-### user.created
-
-```json
-{
-  "event": "user.created",
-  "timestamp": "2026-02-01T12:00:00Z",
-  "data": {
-    "_test": true,
-    "_test_message": "Dados reais do último usuário criado",
-    "user_id": "uuid-real",
-    "email": "usuario@real.com",
-    "name": "Maria Silva",
-    "phone": "11988887777",
-    "role": "reseller",
-    "origin": {
-      "type": "manual",
-      "store_id": null,
+    "reseller": {
+      "user_id": null,
       "store_name": null
     },
-    "created_at": "2026-01-30T10:00:00Z"
-  }
-}
-```
-
-### user.inactive.Xdays
-
-```json
-{
-  "event": "user.inactive.7days",
-  "timestamp": "2026-02-01T12:00:00Z",
-  "data": {
+    "items": [
+      {
+        "product_id": "0a8d1f8f-984a-4c52-8c2f-88250ac393ca",
+        "name": "TELA MAIOR PARA CELULAR LUPA 3D AMPLIFICADOR 14 POLEGADAS",
+        "sku": "CELU-001",
+        "image_url": "https://cf.shopee.com.br/...",
+        "quantity": 1,
+        "unit_price": 19.98
+      }
+    ],
+    "shipping_label": {
+      "file_name": "Etiqueta Antonio.pdf",
+      "file_size": 110670,
+      "uploaded_at": "2026-01-31T03:00:28.389Z",
+      "download_url": "https://...storage.../shipping-files/...?token=..."
+    },
     "_test": true,
-    "_test_message": "Dados reais de usuário inativo",
-    "user_id": "uuid-real",
-    "email": "inativo@real.com",
-    "name": "João Santos",
-    "role": "customer",
-    "last_sign_in_at": "2026-01-24T15:30:00Z",
-    "days_inactive": 8,
-    "created_at": "2025-12-01T00:00:00Z"
+    "_test_message": "Dados reais do banco de dados (teste)"
   }
 }
 ```
 
 ---
 
-## Tratamento de Erros
+## Também Corrigir: Eventos de Usuário
 
-| Cenário | Mensagem de Erro |
-|---------|------------------|
-| Nenhum pedido pago | "Nenhum pedido pago encontrado para teste" |
-| Nenhum usuário criado | "Nenhum usuário encontrado para teste" |
-| Nenhum usuário inativo 7d | "Nenhum usuário inativo há 7+ dias encontrado" |
-| Nenhum usuário inativo 15d | "Nenhum usuário inativo há 15+ dias encontrado" |
-| Nenhum usuário inativo 30d | "Nenhum usuário inativo há 30+ dias encontrado" |
+Os eventos `user.created` e `user.inactive.*` também usam `'email@exemplo.com'` como placeholder.
 
----
+Vou atualizar as funções `fetchLastCreatedUser()` e `fetchInactiveUser()` para usar `get_users_with_email()`:
 
-## Arquivos a Modificar
+```typescript
+// fetchLastCreatedUser - usar RPC para pegar email
+const { data: usersWithEmail } = await supabase.rpc('get_users_with_email');
+const lastUser = usersWithEmail?.[0]; // já ordenado por created_at
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `supabase/functions/dispatch-webhook/index.ts` | Adicionar funções de busca de dados reais para todos os eventos |
-| `src/hooks/useWebhookSettings.ts` | Remover `getTestPayload()` e sempre enviar `use_real_data: true` |
-
----
-
-## Resumo das Funções a Adicionar
-
-```text
-dispatch-webhook/index.ts:
-├── fetchLastPaidOrder(supabase)
-│   └── Retorna último pedido pago com customer, reseller e items
-├── fetchLastCreatedUser(supabase)
-│   └── Retorna último usuário criado com profile e role
-├── fetchInactiveUser(supabase, days)
-│   └── Retorna usuário inativo há X dias
-└── fetchRealTestData(supabase, eventType)
-    └── Switch que chama a função correta por evento
+// fetchInactiveUser - filtrar por last_sign_in_at
+const inactiveUsers = usersWithEmail?.filter(u => {
+  if (!u.last_sign_in_at) return false;
+  const lastActivity = new Date(u.last_sign_in_at);
+  const threshold = new Date();
+  threshold.setDate(threshold.getDate() - days);
+  return lastActivity < threshold;
+});
 ```
 
 ---
 
-## Benefícios
+## Resumo das Alterações
 
-| Melhoria | Benefício |
-|----------|-----------|
-| Dados reais em todos os testes | Debugging mais eficiente |
-| Consistência | Todos os eventos funcionam da mesma forma |
-| Sem manutenção de mocks | Menos código para manter |
-| Testes realistas | Payloads idênticos aos de produção |
+| Função | Alteração |
+|--------|-----------|
+| `fetchLastPaidOrder()` | Usar `get_users_with_email()`, corrigir `product_snapshot`, adicionar `shipping_label` |
+| `fetchLastCreatedUser()` | Usar `get_users_with_email()` para email real |
+| `fetchInactiveUser()` | Usar `get_users_with_email()` para email real |
 
+---
+
+## Arquivo a Modificar
+
+| Arquivo | Descrição |
+|---------|-----------|
+| `supabase/functions/dispatch-webhook/index.ts` | Corrigir busca de email, items e adicionar etiqueta |
