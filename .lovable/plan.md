@@ -1,21 +1,22 @@
 
-# Plano: Sistema de Webhooks Configuráveis
+
+# Plano: Usar Dados Reais nos Testes de Todos os Webhooks
 
 ## Objetivo
 
-Implementar um sistema completo de webhooks que permite configurar URLs para receber eventos da plataforma. Inclui uma nova sub-página "Webhooks" dentro de "API Docs" e edge functions para disparar os eventos.
+Modificar o sistema para que ao clicar em "Testar" em qualquer webhook, o sistema busque dados reais do banco de dados, garantindo testes mais realistas e úteis.
 
 ---
 
-## Eventos a Implementar
+## Eventos e Fontes de Dados
 
-| Evento | Trigger | Payload |
-|--------|---------|---------|
-| `order.paid` | Quando payment_status muda para "paid" | Dados do pedido, cliente, produtos |
-| `user.created` | Quando um novo usuário é criado | Dados do usuário, role, loja de origem |
-| `user.inactive.7days` | Usuário sem login há 7 dias | Dados do usuário, última atividade |
-| `user.inactive.15days` | Usuário sem login há 15 dias | Dados do usuário, última atividade |
-| `user.inactive.30days` | Usuário sem login há 30 dias | Dados do usuário, última atividade |
+| Evento | Fonte de Dados |
+|--------|----------------|
+| `order.paid` | Último pedido com `payment_status = 'paid'` |
+| `user.created` | Último usuário criado (mais recente) |
+| `user.inactive.7days` | Usuário com `last_sign_in_at` há mais de 7 dias |
+| `user.inactive.15days` | Usuário com `last_sign_in_at` há mais de 15 dias |
+| `user.inactive.30days` | Usuário com `last_sign_in_at` há mais de 30 dias |
 
 ---
 
@@ -23,63 +24,157 @@ Implementar um sistema completo de webhooks que permite configurar URLs para rec
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           FLUXO DE WEBHOOKS                             │
+│                    FLUXO DE TESTE COM DADOS REAIS                       │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  1. CONFIGURACAO (UI)                                                   │
-│     └─> Sub-página "Webhooks" em API Docs                              │
-│         └─> Campos para URLs de cada evento                            │
-│         └─> Toggle para ativar/desativar                               │
-│         └─> Botão de teste                                             │
-│                                                                         │
-│  2. ARMAZENAMENTO                                                       │
-│     └─> Nova tabela: webhook_settings                                  │
-│         └─> event_type, webhook_url, active, secret_token              │
-│                                                                         │
-│  3. DISPARO                                                             │
-│     └─> Edge Function: dispatch-webhook                                │
-│         └─> Recebe evento + payload                                    │
-│         └─> Busca URL configurada                                      │
-│         └─> Envia POST com signature HMAC                              │
-│         └─> Registra log                                               │
-│                                                                         │
-│  4. TRIGGERS                                                            │
-│     └─> order.paid: Chamado pelo webhook-n8n-payment                   │
-│     └─> user.created: Chamado pelo api-usuarios-cadastrar              │
-│     └─> user.inactive: Edge function scheduled (cron diário)           │
+│  Frontend (clica Testar)                                               │
+│         │                                                               │
+│         ▼                                                               │
+│  dispatch-webhook (is_test=true, use_real_data=true)                   │
+│         │                                                               │
+│         ▼                                                               │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │ Switch por event_type:                                          │   │
+│  │                                                                  │   │
+│  │  order.paid ───────────> fetchLastPaidOrder()                   │   │
+│  │  user.created ─────────> fetchLastCreatedUser()                 │   │
+│  │  user.inactive.7days ──> fetchInactiveUser(7)                   │   │
+│  │  user.inactive.15days ─> fetchInactiveUser(15)                  │   │
+│  │  user.inactive.30days ─> fetchInactiveUser(30)                  │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│         │                                                               │
+│         ▼                                                               │
+│  Envia para URL configurada com dados reais + flag _test               │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Estrutura da Tabela webhook_settings
+## Queries para Buscar Dados Reais
+
+### 1. order.paid - Último Pedido Pago
 
 ```sql
-CREATE TABLE webhook_settings (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  event_type TEXT NOT NULL UNIQUE,
-  webhook_url TEXT,
-  active BOOLEAN DEFAULT false,
-  secret_token TEXT,
-  last_triggered_at TIMESTAMPTZ,
-  last_status_code INTEGER,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+SELECT 
+  o.id, o.order_number, o.total_amount, o.payment_method,
+  o.user_id, p.first_name, p.last_name, p.phone, au.email,
+  o.reseller_id, rs.store_name
+FROM orders o
+LEFT JOIN profiles p ON p.user_id = o.user_id
+LEFT JOIN auth.users au ON au.id = o.user_id
+LEFT JOIN reseller_stores rs ON rs.user_id = o.reseller_id
+WHERE o.payment_status = 'paid'
+ORDER BY o.created_at DESC
+LIMIT 1
+```
 
--- Inserir eventos iniciais
-INSERT INTO webhook_settings (event_type, active) VALUES
-  ('order.paid', false),
-  ('user.created', false),
-  ('user.inactive.7days', false),
-  ('user.inactive.15days', false),
-  ('user.inactive.30days', false);
+### 2. user.created - Último Usuário Criado
+
+```sql
+SELECT 
+  p.user_id, au.email, p.first_name, p.last_name, 
+  p.phone, p.role, p.created_at
+FROM profiles p
+JOIN auth.users au ON au.id = p.user_id
+ORDER BY p.created_at DESC
+LIMIT 1
+```
+
+### 3. user.inactive.Xdays - Usuário Inativo
+
+```sql
+SELECT 
+  p.user_id, au.email, p.first_name, p.last_name, 
+  p.role, au.last_sign_in_at, p.created_at
+FROM profiles p
+JOIN auth.users au ON au.id = p.user_id
+WHERE au.last_sign_in_at < NOW() - INTERVAL 'X days'
+  AND au.last_sign_in_at IS NOT NULL
+ORDER BY au.last_sign_in_at DESC
+LIMIT 1
 ```
 
 ---
 
-## Payloads dos Eventos
+## Alterações Necessárias
+
+### 1. dispatch-webhook/index.ts
+
+Adicionar funções para buscar dados reais de cada evento:
+
+```typescript
+// Novas funções a adicionar:
+
+async function fetchLastPaidOrder(supabase) {
+  // Busca último pedido pago com todos os dados relacionados
+}
+
+async function fetchLastCreatedUser(supabase) {
+  // Busca último usuário criado
+}
+
+async function fetchInactiveUser(supabase, days: number) {
+  // Busca usuário inativo há X dias
+}
+
+async function fetchRealTestData(supabase, eventType: string) {
+  switch (eventType) {
+    case 'order.paid':
+      return await fetchLastPaidOrder(supabase);
+    case 'user.created':
+      return await fetchLastCreatedUser(supabase);
+    case 'user.inactive.7days':
+      return await fetchInactiveUser(supabase, 7);
+    case 'user.inactive.15days':
+      return await fetchInactiveUser(supabase, 15);
+    case 'user.inactive.30days':
+      return await fetchInactiveUser(supabase, 30);
+    default:
+      return null;
+  }
+}
+```
+
+**Lógica principal modificada:**
+
+```typescript
+// No handler principal, após validar is_test:
+
+if (is_test && use_real_data) {
+  const realData = await fetchRealTestData(supabase, event_type);
+  
+  if (!realData) {
+    return Response: "Nenhum dado encontrado para teste de " + event_type;
+  }
+  
+  payload = realData;
+}
+```
+
+### 2. useWebhookSettings.ts
+
+Modificar para sempre usar dados reais:
+
+```typescript
+const testWebhook = async (eventType: string) => {
+  const { data, error } = await supabase.functions.invoke('dispatch-webhook', {
+    body: {
+      event_type: eventType,
+      payload: undefined,  // Não envia payload mockado
+      is_test: true,
+      use_real_data: true, // Sempre buscar dados reais
+    },
+  });
+  // ...
+};
+```
+
+Remover a função `getTestPayload()` que gera dados mockados.
+
+---
+
+## Payloads com Dados Reais
 
 ### order.paid
 
@@ -88,23 +183,20 @@ INSERT INTO webhook_settings (event_type, active) VALUES
   "event": "order.paid",
   "timestamp": "2026-02-01T12:00:00Z",
   "data": {
-    "order_id": "uuid",
-    "order_number": "ORD-20260201-000001",
-    "total_amount": 199.90,
+    "_test": true,
+    "_test_message": "Dados reais do último pedido pago",
+    "order_id": "c40b90a5-...",
+    "order_number": "ORD-1769828426038_865529AC",
+    "total_amount": 19.98,
     "payment_method": "pix",
     "customer": {
-      "user_id": "uuid",
-      "email": "cliente@email.com",
-      "name": "João Silva",
-      "phone": "11999999999"
+      "user_id": "865529ac-...",
+      "email": "cliente@real.com",
+      "name": "Bruno Dotta",
+      "phone": "49999910306"
     },
-    "reseller": {
-      "user_id": "uuid",
-      "store_name": "Loja do João"
-    },
-    "items": [
-      { "product_id": "uuid", "name": "Produto X", "quantity": 2, "unit_price": 99.95 }
-    ]
+    "reseller": { ... },
+    "items": [ ... ]
   }
 }
 ```
@@ -116,17 +208,19 @@ INSERT INTO webhook_settings (event_type, active) VALUES
   "event": "user.created",
   "timestamp": "2026-02-01T12:00:00Z",
   "data": {
-    "user_id": "uuid",
-    "email": "novo@email.com",
-    "name": "Maria Santos",
-    "phone": "11988888888",
+    "_test": true,
+    "_test_message": "Dados reais do último usuário criado",
+    "user_id": "uuid-real",
+    "email": "usuario@real.com",
+    "name": "Maria Silva",
+    "phone": "11988887777",
     "role": "reseller",
     "origin": {
-      "type": "api",
-      "store_id": "uuid-loja",
-      "store_name": "Loja Origem"
+      "type": "manual",
+      "store_id": null,
+      "store_name": null
     },
-    "created_at": "2026-02-01T12:00:00Z"
+    "created_at": "2026-01-30T10:00:00Z"
   }
 }
 ```
@@ -138,217 +232,64 @@ INSERT INTO webhook_settings (event_type, active) VALUES
   "event": "user.inactive.7days",
   "timestamp": "2026-02-01T12:00:00Z",
   "data": {
-    "user_id": "uuid",
-    "email": "usuario@email.com",
-    "name": "Carlos Souza",
+    "_test": true,
+    "_test_message": "Dados reais de usuário inativo",
+    "user_id": "uuid-real",
+    "email": "inativo@real.com",
+    "name": "João Santos",
     "role": "customer",
-    "last_sign_in_at": "2026-01-25T10:30:00Z",
-    "days_inactive": 7,
-    "created_at": "2026-01-01T00:00:00Z"
+    "last_sign_in_at": "2026-01-24T15:30:00Z",
+    "days_inactive": 8,
+    "created_at": "2025-12-01T00:00:00Z"
   }
 }
 ```
 
 ---
 
-## Arquivos a Criar
+## Tratamento de Erros
 
-### 1. Tabela no Banco
-
-```text
-Migration: Criar tabela webhook_settings com campos para cada evento
-```
-
-### 2. Edge Function: dispatch-webhook
-
-```text
-Arquivo: supabase/functions/dispatch-webhook/index.ts
-
-Responsabilidades:
-- Receber event_type e payload
-- Buscar configuração ativa
-- Gerar HMAC signature com secret_token
-- Enviar POST para webhook_url
-- Registrar sucesso/erro no log
-- Atualizar last_triggered_at e last_status_code
-```
-
-### 3. Edge Function: check-inactive-users
-
-```text
-Arquivo: supabase/functions/check-inactive-users/index.ts
-
-Responsabilidades:
-- Buscar usuários com 7, 15 e 30 dias sem login
-- Para cada grupo, disparar dispatch-webhook
-- Evitar duplicatas (registrar último disparo por usuário)
-```
-
-### 4. Componente: WebhooksSection
-
-```text
-Arquivo: src/components/admin/WebhooksSection.tsx
-
-Interface:
-- Lista de eventos disponíveis
-- Campo URL para cada evento
-- Toggle ativo/inativo
-- Botão "Testar" para enviar evento de teste
-- Mostrar último status e data de disparo
-- Campo para visualizar/gerar secret token
-```
-
-### 5. Hook: useWebhookSettings
-
-```text
-Arquivo: src/hooks/useWebhookSettings.ts
-
-Funções:
-- fetchWebhookSettings() - Listar configurações
-- updateWebhookUrl(event_type, url) - Atualizar URL
-- toggleWebhookActive(event_type) - Ativar/desativar
-- testWebhook(event_type) - Enviar evento de teste
-- regenerateSecret(event_type) - Gerar novo token
-```
+| Cenário | Mensagem de Erro |
+|---------|------------------|
+| Nenhum pedido pago | "Nenhum pedido pago encontrado para teste" |
+| Nenhum usuário criado | "Nenhum usuário encontrado para teste" |
+| Nenhum usuário inativo 7d | "Nenhum usuário inativo há 7+ dias encontrado" |
+| Nenhum usuário inativo 15d | "Nenhum usuário inativo há 15+ dias encontrado" |
+| Nenhum usuário inativo 30d | "Nenhum usuário inativo há 30+ dias encontrado" |
 
 ---
 
 ## Arquivos a Modificar
 
-### 1. ApiDocsSidebar.tsx
-
-```text
-Adicionar item "Webhooks" na lista de seções estáticas (após "Chaves de API")
-```
-
-### 2. ApiDocsContent.tsx
-
-```text
-Adicionar renderização condicional para selectedSection === 'webhooks'
-Exibir o componente WebhooksSection
-```
-
-### 3. webhook-n8n-payment/index.ts
-
-```text
-Após atualizar status do pedido para "paid":
-- Chamar dispatch-webhook com event_type="order.paid"
-```
-
-### 4. api-usuarios-cadastrar/index.ts
-
-```text
-Após criar usuário com sucesso:
-- Chamar dispatch-webhook com event_type="user.created"
-- Incluir role e origem_loja_id no payload
-```
-
-### 5. supabase/config.toml
-
-```text
-Adicionar configurações para novas edge functions:
-- dispatch-webhook (verify_jwt = false)
-- check-inactive-users (verify_jwt = false)
-```
-
----
-
-## Interface Visual - Sub-página Webhooks
-
-```text
-┌──────────────────────────────────────────────────────────────────────┐
-│  🔗 Webhooks                                                         │
-│                                                                      │
-│  Configure URLs para receber eventos em tempo real da plataforma.   │
-│  Todos os eventos são enviados via POST com assinatura HMAC-SHA256. │
-│                                                                      │
-│  ────────────────────────────────────────────────────────────────    │
-│                                                                      │
-│  📦 Pedido Pago                                            [Ativo ✓]│
-│  ┌────────────────────────────────────────────────────────────────┐ │
-│  │ https://seu-sistema.com/webhook/order-paid                     │ │
-│  └────────────────────────────────────────────────────────────────┘ │
-│  Último disparo: 01/02/2026 10:30 • Status: 200 OK    [🧪 Testar]  │
-│                                                                      │
-│  ────────────────────────────────────────────────────────────────    │
-│                                                                      │
-│  👤 Usuário Criado                                         [Inativo]│
-│  ┌────────────────────────────────────────────────────────────────┐ │
-│  │ Insira a URL do webhook...                                     │ │
-│  └────────────────────────────────────────────────────────────────┘ │
-│                                                                      │
-│  ────────────────────────────────────────────────────────────────    │
-│                                                                      │
-│  ⏰ Usuário Inativo (7 dias)                               [Inativo]│
-│  ┌────────────────────────────────────────────────────────────────┐ │
-│  │ Insira a URL do webhook...                                     │ │
-│  └────────────────────────────────────────────────────────────────┘ │
-│                                                                      │
-│  ────────────────────────────────────────────────────────────────    │
-│                                                                      │
-│  ⏰ Usuário Inativo (15 dias)                              [Inativo]│
-│  ⏰ Usuário Inativo (30 dias)                              [Inativo]│
-│                                                                      │
-│  ────────────────────────────────────────────────────────────────    │
-│                                                                      │
-│  🔐 Secret Token (para validar assinatura HMAC)                     │
-│  ┌────────────────────────────────────────────────────────────────┐ │
-│  │ whsec_a1b2c3d4e5f6...                              [🔄 Gerar]  │ │
-│  └────────────────────────────────────────────────────────────────┘ │
-│                                                                      │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Resumo de Alterações
-
-### Criar
-
-| Arquivo | Descrição |
-|---------|-----------|
-| `supabase/functions/dispatch-webhook/index.ts` | Edge function para disparar webhooks |
-| `supabase/functions/check-inactive-users/index.ts` | Edge function para verificar usuários inativos |
-| `src/components/admin/WebhooksSection.tsx` | Componente da interface de configuração |
-| `src/hooks/useWebhookSettings.ts` | Hook para gerenciar configurações de webhooks |
-
-### Modificar
-
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/components/admin/ApiDocsSidebar.tsx` | Adicionar item "Webhooks" no menu |
-| `src/components/admin/ApiDocsContent.tsx` | Renderizar WebhooksSection quando selecionado |
-| `supabase/functions/webhook-n8n-payment/index.ts` | Disparar evento order.paid após pagamento |
-| `supabase/functions/api-usuarios-cadastrar/index.ts` | Disparar evento user.created após cadastro |
-| `supabase/config.toml` | Adicionar novas edge functions |
-
-### Migração SQL
-
-| Alteração | Descrição |
-|-----------|-----------|
-| Nova tabela | `webhook_settings` com campos para configuração de cada evento |
-| RLS | Apenas super_admin pode acessar/modificar |
+| `supabase/functions/dispatch-webhook/index.ts` | Adicionar funções de busca de dados reais para todos os eventos |
+| `src/hooks/useWebhookSettings.ts` | Remover `getTestPayload()` e sempre enviar `use_real_data: true` |
 
 ---
 
-## Segurança
+## Resumo das Funções a Adicionar
 
-| Aspecto | Implementação |
-|---------|---------------|
-| Autenticação | HMAC-SHA256 signature no header `X-Webhook-Signature` |
-| Acesso | Apenas super_admin pode configurar webhooks |
-| Secret Token | Gerado automaticamente, pode ser regenerado |
-| Timeout | Máximo 10 segundos para resposta |
-| Retry | Não implementado inicialmente (pode ser adicionado) |
+```text
+dispatch-webhook/index.ts:
+├── fetchLastPaidOrder(supabase)
+│   └── Retorna último pedido pago com customer, reseller e items
+├── fetchLastCreatedUser(supabase)
+│   └── Retorna último usuário criado com profile e role
+├── fetchInactiveUser(supabase, days)
+│   └── Retorna usuário inativo há X dias
+└── fetchRealTestData(supabase, eventType)
+    └── Switch que chama a função correta por evento
+```
 
 ---
 
 ## Benefícios
 
-| Funcionalidade | Benefício |
-|----------------|-----------|
-| Configuração via UI | Sem necessidade de alterar código |
-| Múltiplos eventos | Flexibilidade para integrações |
-| Teste de webhook | Validação antes de ativar |
-| Histórico de status | Monitoramento de falhas |
-| HMAC signature | Segurança na validação |
+| Melhoria | Benefício |
+|----------|-----------|
+| Dados reais em todos os testes | Debugging mais eficiente |
+| Consistência | Todos os eventos funcionam da mesma forma |
+| Sem manutenção de mocks | Menos código para manter |
+| Testes realistas | Payloads idênticos aos de produção |
+
