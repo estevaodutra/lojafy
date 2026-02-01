@@ -29,7 +29,7 @@ async function generateHmacSignature(secret: string, payload: string): Promise<s
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Fetch last paid order with customer, reseller and items
+// Fetch last paid order with customer, reseller, items and shipping label
 async function fetchLastPaidOrder(supabase: any): Promise<Record<string, any> | null> {
   console.log('[dispatch-webhook] Buscando último pedido pago...');
   
@@ -55,16 +55,17 @@ async function fetchLastPaidOrder(supabase: any): Promise<Record<string, any> | 
     return null;
   }
 
-  // Get customer profile
-  const { data: customerProfile } = await supabase
-    .from('profiles')
-    .select('first_name, last_name, phone')
-    .eq('user_id', order.user_id)
-    .single();
-
-  // Get customer email from auth.users via RPC or direct query
-  // Since we can't query auth.users directly, we'll use the profile data
-  let customerEmail = null;
+  // Get users with email using RPC (includes auth.users data)
+  const { data: usersWithEmail } = await supabase.rpc('get_users_with_email');
+  
+  // Find customer data
+  const customerData = usersWithEmail?.find((u: any) => u.user_id === order.user_id);
+  const customerEmail = customerData?.email || null;
+  const customerProfile = customerData ? {
+    first_name: customerData.first_name,
+    last_name: customerData.last_name,
+    phone: customerData.phone,
+  } : null;
   
   // Get reseller store info
   let resellerData = null;
@@ -83,16 +84,39 @@ async function fetchLastPaidOrder(supabase: any): Promise<Record<string, any> | 
     }
   }
 
-  // Get order items
+  // Get order items with product_snapshot (JSONB)
   const { data: items } = await supabase
     .from('order_items')
     .select(`
       product_id,
       quantity,
       unit_price,
-      product_name_snapshot
+      product_snapshot
     `)
     .eq('order_id', order.id);
+
+  // Get shipping label
+  const { data: shippingFile } = await supabase
+    .from('order_shipping_files')
+    .select('file_name, file_path, file_size, uploaded_at')
+    .eq('order_id', order.id)
+    .limit(1)
+    .maybeSingle();
+
+  let shippingLabel = null;
+  if (shippingFile?.file_path) {
+    // Generate signed URL (valid for 1 hour)
+    const { data: signedUrlData } = await supabase.storage
+      .from('shipping-files')
+      .createSignedUrl(shippingFile.file_path, 3600);
+    
+    shippingLabel = {
+      file_name: shippingFile.file_name,
+      file_size: shippingFile.file_size,
+      uploaded_at: shippingFile.uploaded_at,
+      download_url: signedUrlData?.signedUrl || null,
+    };
+  }
 
   const customerName = customerProfile 
     ? `${customerProfile.first_name || ''} ${customerProfile.last_name || ''}`.trim() || 'Cliente'
@@ -113,12 +137,15 @@ async function fetchLastPaidOrder(supabase: any): Promise<Record<string, any> | 
       user_id: null,
       store_name: null,
     },
-    items: (items || []).map(item => ({
+    items: (items || []).map((item: any) => ({
       product_id: item.product_id,
-      name: item.product_name_snapshot || 'Produto',
+      name: item.product_snapshot?.name || 'Produto',
+      sku: item.product_snapshot?.sku || null,
+      image_url: item.product_snapshot?.image_url || null,
       quantity: item.quantity,
       unit_price: item.unit_price,
     })),
+    shipping_label: shippingLabel,
   };
 }
 
@@ -126,39 +153,29 @@ async function fetchLastPaidOrder(supabase: any): Promise<Record<string, any> | 
 async function fetchLastCreatedUser(supabase: any): Promise<Record<string, any> | null> {
   console.log('[dispatch-webhook] Buscando último usuário criado...');
   
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select(`
-      user_id,
-      first_name,
-      last_name,
-      phone,
-      role,
-      created_at
-    `)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+  // Use RPC to get users with email (already ordered by created_at DESC)
+  const { data: usersWithEmail, error } = await supabase.rpc('get_users_with_email');
 
-  if (error || !profile) {
+  if (error || !usersWithEmail || usersWithEmail.length === 0) {
     console.log('[dispatch-webhook] Nenhum usuário encontrado:', error?.message);
     return null;
   }
 
-  const userName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Usuário';
+  const lastUser = usersWithEmail[0];
+  const userName = `${lastUser.first_name || ''} ${lastUser.last_name || ''}`.trim() || 'Usuário';
 
   return {
-    user_id: profile.user_id,
-    email: 'email@exemplo.com', // Can't access auth.users directly
+    user_id: lastUser.user_id,
+    email: lastUser.email || 'email@exemplo.com',
     name: userName,
-    phone: profile.phone || null,
-    role: profile.role || 'customer',
+    phone: lastUser.phone || null,
+    role: lastUser.role || 'customer',
     origin: {
       type: 'manual',
       store_id: null,
       store_name: null,
     },
-    created_at: profile.created_at,
+    created_at: lastUser.created_at,
   };
 }
 
@@ -170,44 +187,47 @@ async function fetchInactiveUser(supabase: any, days: number): Promise<Record<st
   const thresholdDate = new Date();
   thresholdDate.setDate(thresholdDate.getDate() - days);
   
-  // We need to use a database function to access auth.users
-  // For now, we'll get profiles and check if they have old updated_at
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select(`
-      user_id,
-      first_name,
-      last_name,
-      phone,
-      role,
-      created_at,
-      updated_at
-    `)
-    .lt('updated_at', thresholdDate.toISOString())
-    .order('updated_at', { ascending: true })
-    .limit(1)
-    .single();
+  // Use RPC to get users with email and last_sign_in_at from auth.users
+  const { data: usersWithEmail, error } = await supabase.rpc('get_users_with_email');
 
-  if (error || !profile) {
-    console.log(`[dispatch-webhook] Nenhum usuário inativo há ${days}+ dias:`, error?.message);
+  if (error || !usersWithEmail) {
+    console.log(`[dispatch-webhook] Erro ao buscar usuários:`, error?.message);
     return null;
   }
 
-  const userName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Usuário';
+  // Filter users inactive for X+ days based on last_sign_in_at
+  const inactiveUsers = usersWithEmail.filter((u: any) => {
+    if (!u.last_sign_in_at) return false;
+    const lastActivity = new Date(u.last_sign_in_at);
+    return lastActivity < thresholdDate;
+  });
+
+  if (inactiveUsers.length === 0) {
+    console.log(`[dispatch-webhook] Nenhum usuário inativo há ${days}+ dias encontrado`);
+    return null;
+  }
+
+  // Sort by last_sign_in_at ascending to get the most inactive first
+  inactiveUsers.sort((a: any, b: any) => 
+    new Date(a.last_sign_in_at).getTime() - new Date(b.last_sign_in_at).getTime()
+  );
+
+  const user = inactiveUsers[0];
+  const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Usuário';
   
   // Calculate actual days inactive
-  const lastActivity = new Date(profile.updated_at);
+  const lastActivity = new Date(user.last_sign_in_at);
   const now = new Date();
   const daysInactive = Math.floor((now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24));
 
   return {
-    user_id: profile.user_id,
-    email: 'email@exemplo.com',
+    user_id: user.user_id,
+    email: user.email || 'email@exemplo.com',
     name: userName,
-    role: profile.role || 'customer',
-    last_sign_in_at: profile.updated_at,
+    role: user.role || 'customer',
+    last_sign_in_at: user.last_sign_in_at,
     days_inactive: daysInactive,
-    created_at: profile.created_at,
+    created_at: user.created_at,
   };
 }
 
