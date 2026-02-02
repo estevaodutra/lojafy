@@ -84,7 +84,7 @@ export const ApiKeyManager: React.FC = () => {
           permissions: {
             produtos: { read: true, write: true },
             categorias: { read: true, write: true },
-            pedidos: { read: true, write: false }
+            pedidos: { read: true, write: true }
           }
         })
         .select()
