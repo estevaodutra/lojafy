@@ -1,210 +1,134 @@
 
-# Plano: Corrigir Logs Vazios, Disparos Repetidos e Adicionar Disparo Manual de Webhook
+# Plano: Incluir Etiqueta de Envio no Webhook order.paid
 
-## Diagnóstico Detalhado
+## Diagnóstico
 
-### Problema 1: Payload Vazio (items: [], customer: null)
+O pedido `d03f2443-b353-4be7-8b62-2eaae8632eef` possui uma etiqueta de envio registrada na tabela `order_shipping_files`:
 
-**Causa Raiz:**
-- As Edge Functions `check-pending-payments` e `webhook-n8n-payment` usam `product_name_snapshot` que NÃO existe na tabela `order_items`
-- O campo correto é `product_snapshot` (JSONB) com estrutura `{name, sku, image_url, ...}`
-- O `dispatch-webhook` já faz corretamente: `item.product_snapshot?.name`
-
-**Evidência:**
-```sql
--- Colunas reais da tabela order_items:
-id, order_id, product_id, quantity, unit_price, total_price, product_snapshot, created_at
--- Não existe product_name_snapshot!
+```
+file_name: bruna michelle.pdf
+file_path: d03f2443-b353-4be7-8b62-2eaae8632eef/order_d03f2443-b353-4be7-8b62-2eaae8632eef_1770032189816.pdf
+file_size: 57265 bytes
 ```
 
-### Problema 2: Disparo Repetido
+Porém, essa informação não está sendo incluída no payload do webhook `order.paid`.
 
 **Causa Raiz:**
-- Não há verificação se o pedido já foi processado antes de disparar o webhook
-- Se N8N e `check-pending-payments` processarem ao mesmo tempo, ambos disparam
+
+As funções que montam o payload manualmente (`dispatch-order-webhook`, `webhook-n8n-payment`, `check-pending-payments`) não buscam a etiqueta de envio na tabela `order_shipping_files` nem geram a URL assinada.
 
 ---
 
 ## Arquivos a Modificar
 
-### 1. `supabase/functions/check-pending-payments/index.ts`
+### 1. `supabase/functions/dispatch-order-webhook/index.ts`
 
-**Correções:**
-- Adicionar select de `product_snapshot` (JSONB)
-- Mapear items usando `product_snapshot.name`
-- Tratar customer null (pedidos de visitantes)
-- Verificar se webhook já foi disparado
+Adicionar busca da etiqueta de envio e geração de URL assinada:
+
+```typescript
+// Buscar etiqueta de envio
+let shippingLabel = null;
+const { data: shippingFile } = await supabase
+  .from('order_shipping_files')
+  .select('file_name, file_path, file_size, uploaded_at')
+  .eq('order_id', fullOrder.id)
+  .limit(1)
+  .maybeSingle();
+
+if (shippingFile?.file_path) {
+  // Gerar URL assinada (válida por 7 dias)
+  const { data: signedUrlData } = await supabase.storage
+    .from('shipping-files')
+    .createSignedUrl(shippingFile.file_path, 604800);
+  
+  shippingLabel = {
+    file_name: shippingFile.file_name,
+    file_size: shippingFile.file_size,
+    uploaded_at: shippingFile.uploaded_at,
+    download_url: signedUrlData?.signedUrl || null,
+  };
+}
+
+// Adicionar ao payload
+const webhookPayload = {
+  // ... campos existentes ...
+  shipping_label: shippingLabel,
+};
+```
 
 ### 2. `supabase/functions/webhook-n8n-payment/index.ts`
 
-**Correções:**
-- Corrigir mapeamento: `item.product_snapshot?.name`
-- Adicionar verificação: `if (orderData.payment_status === 'paid') return`
-- Tratar customer null
+Mesma lógica: adicionar busca de `order_shipping_files` e inclusão de `shipping_label` no payload.
+
+### 3. `supabase/functions/check-pending-payments/index.ts`
+
+Mesma lógica: adicionar busca de `order_shipping_files` e inclusão de `shipping_label` no payload.
 
 ---
 
-## Novos Arquivos a Criar
+## Payload Final Esperado
 
-### 3. `supabase/functions/dispatch-order-webhook/index.ts`
-
-Nova Edge Function para disparar webhook `order.paid` manualmente de um pedido específico.
-
-**Funcionalidades:**
-- Recebe `order_id` como parâmetro
-- Busca dados completos do pedido (items com product_snapshot, customer, reseller)
-- Verifica se o pedido está pago (`payment_status = 'paid'`)
-- Chama o `dispatch-webhook` com payload correto
-- Retorna status do disparo
-
-**Endpoint:**
-```
-POST /functions/v1/dispatch-order-webhook
-Body: { "order_id": "uuid-do-pedido" }
-```
-
----
-
-## Arquivos de Frontend a Modificar
-
-### 4. `src/components/OrderDetailsModal.tsx`
-
-**Adicionar:**
-- Estado para verificar se webhook foi disparado (`webhookDispatched`)
-- Busca na tabela `webhook_dispatch_logs` para verificar se existe log para este pedido
-- Badge indicando status do webhook:
-  - **Verde**: "Webhook Enviado" + data/hora do último disparo
-  - **Amarelo**: "Webhook Pendente" (pedido pago mas sem log)
-  - **Cinza**: "N/A" (pedido não pago ainda)
-- Botão "Disparar Webhook" (aparece apenas se pedido pago e sem webhook enviado)
-- Loading state durante disparo
-- Toast de sucesso/erro
-
-**Localização no componente:**
-- Após a seção de pagamento
-- Na área de informações do pedido
-
----
-
-## Estrutura da Nova Seção no OrderDetailsModal
-
-```text
-┌─────────────────────────────────────────────────────┐
-│ 📤 Webhook de Pedido Pago                           │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│ Status: [✅ Enviado em 02/02/2026 12:30]           │
-│                                                     │
-│ ──── OU ────                                        │
-│                                                     │
-│ Status: [⚠️ Não enviado]                            │
-│ [🚀 Disparar Webhook]                               │
-│                                                     │
-│ ──── OU (se não pago) ────                          │
-│                                                     │
-│ Status: [⏳ Aguardando pagamento]                   │
-│                                                     │
-└─────────────────────────────────────────────────────┘
-```
-
----
-
-## Correções de Código Detalhadas
-
-### Antes (ERRADO):
-```typescript
-// check-pending-payments e webhook-n8n-payment
-items: fullOrder?.order_items?.map((item: any) => ({
-  product_id: item.product_id,
-  name: item.product_name_snapshot,  // ❌ Campo não existe!
-  quantity: item.quantity,
-  unit_price: item.unit_price,
-})) || [],
-```
-
-### Depois (CORRETO):
-```typescript
-items: fullOrder?.order_items?.map((item: any) => ({
-  product_id: item.product_id,
-  name: item.product_snapshot?.name || 'Produto',
-  sku: item.product_snapshot?.sku || null,
-  image_url: item.product_snapshot?.image_url || null,
-  quantity: item.quantity,
-  unit_price: item.unit_price,
-})) || [],
-```
-
-### Verificação de Duplicidade:
-```typescript
-// No webhook-n8n-payment, antes de processar
-if (orderData.payment_status === 'paid') {
-  console.log('⚠️ Pedido já está pago, ignorando');
-  return new Response(
-    JSON.stringify({ message: 'Order already paid', order_id: orderData.id }),
-    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  );
+```json
+{
+  "event": "order.paid",
+  "timestamp": "2026-02-02T16:12:50.490Z",
+  "data": {
+    "order_id": "d03f2443-b353-4be7-8b62-2eaae8632eef",
+    "order_number": "ORD-1770032188907_0492ACDE",
+    "total_amount": 7.77,
+    "payment_method": "pix",
+    "customer": {
+      "user_id": "...",
+      "email": "rafaelleao88@yahoo.com.br",
+      "name": "RAFAEL LEAO",
+      "phone": "5514997384355"
+    },
+    "reseller": null,
+    "items": [
+      {
+        "product_id": "...",
+        "name": "Urinol Feminino...",
+        "sku": "CASA-001",
+        "quantity": 1,
+        "unit_price": 7.77
+      }
+    ],
+    "shipping_label": {
+      "file_name": "bruna michelle.pdf",
+      "file_size": 57265,
+      "uploaded_at": "2026-02-02T11:36:31.338Z",
+      "download_url": "https://...supabase.co/.../signed-url..."
+    }
+  }
 }
-```
-
----
-
-## Atualização do config.toml
-
-Adicionar nova Edge Function:
-```toml
-[functions.dispatch-order-webhook]
-verify_jwt = false
-```
-
----
-
-## Query para Verificar Webhook no Frontend
-
-```typescript
-// Buscar último log de webhook para este pedido
-const { data: webhookLog } = await supabase
-  .from('webhook_dispatch_logs')
-  .select('id, dispatched_at, status_code, error_message')
-  .eq('event_type', 'order.paid')
-  .contains('payload', { data: { order_id: orderId } })
-  .order('dispatched_at', { ascending: false })
-  .limit(1)
-  .maybeSingle();
 ```
 
 ---
 
 ## Resumo das Alterações
 
-| Arquivo | Ação | Descrição |
-|---------|------|-----------|
-| `check-pending-payments/index.ts` | Modificar | Corrigir mapeamento items, verificar duplicidade |
-| `webhook-n8n-payment/index.ts` | Modificar | Corrigir mapeamento items, verificar `payment_status === 'paid'` |
-| `dispatch-order-webhook/index.ts` | Criar | Endpoint para disparo manual de webhook por pedido |
-| `supabase/config.toml` | Modificar | Adicionar nova função |
-| `OrderDetailsModal.tsx` | Modificar | Adicionar badge + botão de disparo manual |
+| Arquivo | Alteração |
+|---------|-----------|
+| `dispatch-order-webhook/index.ts` | Adicionar busca de etiqueta + URL assinada |
+| `webhook-n8n-payment/index.ts` | Adicionar busca de etiqueta + URL assinada |
+| `check-pending-payments/index.ts` | Adicionar busca de etiqueta + URL assinada |
 
 ---
 
-## Fluxo do Disparo Manual
+## Detalhes Técnicos
 
-```text
-1. Admin abre detalhes do pedido
-2. Sistema verifica se existe log de webhook para este order_id
-3. Se existe: mostra badge "Enviado" com data/hora
-4. Se não existe e pedido está pago: mostra botão "Disparar Webhook"
-5. Admin clica no botão
-6. Frontend chama POST /functions/v1/dispatch-order-webhook
-7. Edge Function busca dados completos e chama dispatch-webhook
-8. Toast de sucesso/erro
-9. Badge atualiza para "Enviado"
-```
+**Bucket de armazenamento:** `shipping-files` (privado)
+
+**Validade da URL assinada:** 7 dias (604800 segundos)
+
+**Estrutura do shipping_label:**
+- `file_name`: Nome original do arquivo
+- `file_size`: Tamanho em bytes
+- `uploaded_at`: Data/hora do upload
+- `download_url`: URL assinada para download (válida por 7 dias)
 
 ---
 
 ## Resultado Esperado
 
-1. **Payloads completos** com items, customer e reseller preenchidos corretamente
-2. **Sem disparos duplicados** - verificação de status antes de processar
-3. **Visibilidade** - Admin sabe se webhook foi enviado ou não
-4. **Controle** - Possibilidade de reenviar webhook manualmente se necessário
+Após as correções, todos os webhooks `order.paid` incluirão a etiqueta de envio (quando existir) com uma URL de download válida por 7 dias, permitindo que o N8N e outros sistemas automatizados acessem o arquivo diretamente.
