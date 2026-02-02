@@ -1,79 +1,152 @@
 
 
-# Plano: Corrigir URL da Etiqueta de Envio
+# Plano: Criar Endpoint para Atualizar Status de Pedidos
 
-## Problema Identificado
+## Visao Geral
 
-A URL assinada da etiqueta está expirando após 1 hora (3600 segundos). Quando o webhook é recebido pelo sistema externo, a URL pode já ter expirado ou estar prestes a expirar.
-
-**URL atual:**
-```
-https://...supabase.co/storage/v1/object/sign/shipping-files/...?token=...
-                                                                   ↑
-                                                            Expira em 1h
-```
-
-## Opções de Solução
-
-| Opção | Descrição | Prós | Contras |
-|-------|-----------|------|---------|
-| 1. Aumentar expiração | Gerar URL com 7 dias (604800s) | Simples, funciona | Ainda expira eventualmente |
-| 2. Tornar bucket público | Alterar `shipping-files` para público | URLs nunca expiram | Menos seguro, qualquer um acessa |
-| 3. Expiração longa (30 dias) | 30 dias de validade | Funcional na prática | Token longo na URL |
-
-## Solução Recomendada: Aumentar Expiração para 7 dias
-
-Para webhooks, 7 dias de validade é suficiente para processar o arquivo. Isso mantém a segurança (bucket privado) enquanto dá tempo suficiente para o sistema receptor baixar o arquivo.
+Criar um novo endpoint `api-pedidos-atualizar-status` que permite atualizar o status de um pedido usando o numero do pedido (`order_number`) como identificador. Incluir os novos status solicitados: "recebido" e "em_preparacao".
 
 ---
 
-## Alteração no Código
+## Status Disponveis
 
-**Arquivo:** `supabase/functions/dispatch-webhook/index.ts`
+| Status | Descricao | Uso |
+|--------|-----------|-----|
+| `pending` | Pendente | Aguardando pagamento |
+| `recebido` | Recebido | Pedido recebido/confirmado |
+| `em_preparacao` | Em preparacao | Sendo preparado para envio |
+| `processing` | Processando | Em processamento geral |
+| `shipped` | Enviado | Despachado para entrega |
+| `delivered` | Entregue | Entregue ao cliente |
+| `cancelled` | Cancelado | Pedido cancelado |
+| `refunded` | Reembolsado | Pagamento devolvido |
 
-```typescript
-// ANTES (1 hora = 3600 segundos)
-const { data: signedUrlData } = await supabase.storage
-  .from('shipping-files')
-  .createSignedUrl(shippingFile.file_path, 3600);
+---
 
-// DEPOIS (7 dias = 604800 segundos)
-const { data: signedUrlData } = await supabase.storage
-  .from('shipping-files')
-  .createSignedUrl(shippingFile.file_path, 604800); // 7 dias
+## Estrutura do Endpoint
+
+### Informacoes Gerais
+
+| Campo | Valor |
+|-------|-------|
+| Nome | `api-pedidos-atualizar-status` |
+| Metodo | `PUT` |
+| URL | `/functions/v1/api-pedidos-atualizar-status` |
+| Autenticacao | API Key via header `X-API-Key` |
+| Permissao | `orders.write` |
+
+### Request Body
+
+```json
+{
+  "order_number": "ORD-1769828426038_865529AC",
+  "status": "shipped",
+  "tracking_number": "BR123456789BR",
+  "notes": "Enviado via Correios SEDEX"
+}
+```
+
+| Campo | Tipo | Obrigatorio | Descricao |
+|-------|------|-------------|-----------|
+| `order_number` | string | Sim | Numero do pedido |
+| `status` | string | Sim | Novo status (ver lista acima) |
+| `tracking_number` | string | Nao | Codigo de rastreio |
+| `notes` | string | Nao | Observacao para o historico |
+
+### Response (Sucesso)
+
+```json
+{
+  "success": true,
+  "message": "Status do pedido atualizado com sucesso",
+  "data": {
+    "order_id": "c40b90a5-bed9-4a11-bd34-358909574b57",
+    "order_number": "ORD-1769828426038_865529AC",
+    "previous_status": "processing",
+    "new_status": "shipped",
+    "tracking_number": "BR123456789BR",
+    "updated_at": "2026-02-02T12:30:00Z"
+  }
+}
+```
+
+### Erros Possiveis
+
+| Codigo | Motivo | Resposta |
+|--------|--------|----------|
+| 400 | Campos ausentes | `{ "success": false, "error": "order_number e status sao obrigatorios" }` |
+| 400 | Status invalido | `{ "success": false, "error": "Status invalido. Use: pending, recebido, em_preparacao, processing, shipped, delivered, cancelled, refunded" }` |
+| 401 | API Key invalida | `{ "success": false, "error": "API Key invalida ou inativa" }` |
+| 403 | Sem permissao | `{ "success": false, "error": "Permissao orders.write nao concedida" }` |
+| 404 | Pedido nao encontrado | `{ "success": false, "error": "Pedido nao encontrado" }` |
+
+---
+
+## Fluxo de Execucao
+
+```text
+1. Validar API Key (header X-API-Key)
+       |
+2. Verificar permissao orders.write
+       |
+3. Validar campos obrigatorios (order_number, status)
+       |
+4. Validar status permitido (8 opcoes)
+       |
+5. Buscar pedido por order_number
+       |
+6. Atualizar status + tracking_number na tabela orders
+       |
+7. Registrar no order_status_history (com notes)
+       |
+8. Retornar sucesso com dados atualizados
 ```
 
 ---
 
-## Alternativa: Tornar Bucket Público
+## Arquivos a Criar/Modificar
 
-Se você preferir que as etiquetas sejam sempre públicas (acessíveis sem token):
+### 1. Nova Edge Function
 
-```sql
-UPDATE storage.buckets 
-SET public = true 
-WHERE id = 'shipping-files';
+Criar: `supabase/functions/api-pedidos-atualizar-status/index.ts`
+
+Conteudo principal:
+- Validacao de API Key e permissoes (orders.write)
+- Lista de status validos incluindo `recebido` e `em_preparacao`
+- Busca pedido por `order_number`
+- Update em `orders` (status, tracking_number, updated_at)
+- Insert em `order_status_history` (status, notes, created_by)
+- Response com dados do pedido atualizado
+
+### 2. Atualizar Configuracao
+
+Modificar: `supabase/config.toml`
+
+Adicionar:
+```toml
+[functions.api-pedidos-atualizar-status]
+verify_jwt = false
 ```
 
-E no código, usar URL pública:
-```typescript
-const publicUrl = supabase.storage
-  .from('shipping-files')
-  .getPublicUrl(shippingFile.file_path);
+### 3. Atualizar Documentacao
 
-shippingLabel = {
-  // ...
-  download_url: publicUrl.data.publicUrl,
-};
-```
+Modificar: `src/data/apiEndpointsData.ts`
 
-**Importante:** Isso permitiria que qualquer pessoa com a URL acessasse as etiquetas.
+Adicionar novo endpoint na categoria `ordersEndpoints` com:
+- Titulo: "Atualizar Status do Pedido"
+- Metodo: PUT
+- Headers com X-API-Key
+- Request body de exemplo
+- Response de sucesso
+- Exemplos de erro
 
 ---
 
-## Resumo
+## Resumo de Arquivos
 
-| Alteração | Arquivo |
-|-----------|---------|
-| Aumentar expiração de 1h para 7 dias | `supabase/functions/dispatch-webhook/index.ts` |
+| Acao | Arquivo |
+|------|---------|
+| Criar | `supabase/functions/api-pedidos-atualizar-status/index.ts` |
+| Modificar | `supabase/config.toml` |
+| Modificar | `src/data/apiEndpointsData.ts` |
 
