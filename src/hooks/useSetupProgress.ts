@@ -48,7 +48,7 @@ export const useSetupProgress = () => {
           title: "Criar nome da loja",
           description: "Defina o nome e URL da sua loja",
           completed: !!store?.store_name && !!store?.store_slug,
-          actionUrl: "/reseller/editor",
+          actionUrl: "/reseller/loja",
           actionLabel: "Configurar",
         },
         {
@@ -56,7 +56,7 @@ export const useSetupProgress = () => {
           title: "Personalizar visual",
           description: "Escolha cores e adicione logo",
           completed: !!store?.primary_color || !!store?.logo_url,
-          actionUrl: "/reseller/editor",
+          actionUrl: "/reseller/loja",
           actionLabel: "Personalizar",
         },
         {
@@ -64,7 +64,7 @@ export const useSetupProgress = () => {
           title: "Adicionar contatos",
           description: "WhatsApp, email e telefone",
           completed: !!store?.whatsapp || !!store?.contact_email,
-          actionUrl: "/reseller/editor",
+          actionUrl: "/reseller/loja",
           actionLabel: "Adicionar",
         },
         {
@@ -72,7 +72,7 @@ export const useSetupProgress = () => {
           title: "Importar produtos",
           description: "Adicione pelo menos 3 produtos",
           completed: (products?.length || 0) >= 3,
-          actionUrl: "/reseller/catalog",
+          actionUrl: "/reseller/catalogo",
           actionLabel: "Importar",
         },
         {
@@ -80,7 +80,7 @@ export const useSetupProgress = () => {
           title: "Ativar produtos",
           description: "Ative produtos para venda",
           completed: activeProducts.length >= 1,
-          actionUrl: "/reseller/products",
+          actionUrl: "/reseller/produtos",
           actionLabel: "Ativar",
         },
         {
@@ -88,7 +88,7 @@ export const useSetupProgress = () => {
           title: "Adicionar vantagens",
           description: "Mostre os benefícios da sua loja",
           completed: hasBenefits,
-          actionUrl: "/reseller/editor",
+          actionUrl: "/reseller/vantagens",
           actionLabel: "Configurar",
         },
       ];
