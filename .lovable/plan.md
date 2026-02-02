@@ -1,172 +1,210 @@
 
-# Plano: Criar Pagina "Logs" na API Docs
+# Plano: Corrigir Logs Vazios, Disparos Repetidos e Adicionar Disparo Manual de Webhook
 
-## Contexto
+## Diagnóstico Detalhado
 
-O sistema ja possui a tabela `webhook_dispatch_logs` que registra todos os eventos de webhooks disparados pela plataforma. A nova pagina "Logs" sera adicionada a documentacao da API para exibir esses registros em tempo real, permitindo aos administradores visualizar todos os eventos enviados/recebidos com seus respectivos payloads.
+### Problema 1: Payload Vazio (items: [], customer: null)
 
-## Estrutura Atual
+**Causa Raiz:**
+- As Edge Functions `check-pending-payments` e `webhook-n8n-payment` usam `product_name_snapshot` que NÃO existe na tabela `order_items`
+- O campo correto é `product_snapshot` (JSONB) com estrutura `{name, sku, image_url, ...}`
+- O `dispatch-webhook` já faz corretamente: `item.product_snapshot?.name`
 
-```text
-API Docs (sidebar)
-  - Introducao
-  - Autenticacao
-  - Chaves de API
-  - Webhooks
-  - [Endpoints...]
+**Evidência:**
+```sql
+-- Colunas reais da tabela order_items:
+id, order_id, product_id, quantity, unit_price, total_price, product_snapshot, created_at
+-- Não existe product_name_snapshot!
 ```
 
-## Estrutura Proposta
+### Problema 2: Disparo Repetido
 
-```text
-API Docs (sidebar)
-  - Introducao
-  - Autenticacao
-  - Chaves de API
-  - Webhooks
-  - Logs (NOVO)      <-- Adicionar aqui
-  - [Endpoints...]
-```
-
----
-
-## Arquivos a Criar
-
-### 1. `src/components/admin/ApiLogsSection.tsx`
-Componente principal que renderiza a pagina de logs com:
-- Tabela de logs com colunas: Data/Hora, Evento, Status, Payload, Resposta
-- Filtros por tipo de evento (order.paid, user.created, etc)
-- Filtro por periodo (ultimas 24h, 7 dias, 30 dias)
-- Filtro por status (sucesso/erro)
-- Paginacao para navegacao
-- Botao de refresh para atualizar dados
-- Funcao de expandir/colapsar para ver payloads completos
-- Indicador visual de status (verde = 2xx, vermelho = erro)
-
-### 2. `src/hooks/useApiLogs.ts`
-Hook customizado para buscar e gerenciar os logs:
-- Query para `webhook_dispatch_logs` com filtros
-- Paginacao
-- Ordenacao por data
-- Refresh automatico opcional
+**Causa Raiz:**
+- Não há verificação se o pedido já foi processado antes de disparar o webhook
+- Se N8N e `check-pending-payments` processarem ao mesmo tempo, ambos disparam
 
 ---
 
 ## Arquivos a Modificar
 
-### 1. `src/components/admin/ApiDocsSidebar.tsx`
-**Adicionar:**
-- Novo item na lista `staticItems` com icone `ScrollText` ou `FileText`
-- Item: `{ id: 'logs', label: 'Logs', icon: ScrollText }`
+### 1. `supabase/functions/check-pending-payments/index.ts`
 
-### 2. `src/components/admin/ApiDocsContent.tsx`
-**Adicionar:**
-- Import do novo componente `ApiLogsSection`
-- Condicional para renderizar quando `selectedSection === 'logs'`
+**Correções:**
+- Adicionar select de `product_snapshot` (JSONB)
+- Mapear items usando `product_snapshot.name`
+- Tratar customer null (pedidos de visitantes)
+- Verificar se webhook já foi disparado
+
+### 2. `supabase/functions/webhook-n8n-payment/index.ts`
+
+**Correções:**
+- Corrigir mapeamento: `item.product_snapshot?.name`
+- Adicionar verificação: `if (orderData.payment_status === 'paid') return`
+- Tratar customer null
 
 ---
 
-## Estrutura do Componente ApiLogsSection
+## Novos Arquivos a Criar
+
+### 3. `supabase/functions/dispatch-order-webhook/index.ts`
+
+Nova Edge Function para disparar webhook `order.paid` manualmente de um pedido específico.
+
+**Funcionalidades:**
+- Recebe `order_id` como parâmetro
+- Busca dados completos do pedido (items com product_snapshot, customer, reseller)
+- Verifica se o pedido está pago (`payment_status = 'paid'`)
+- Chama o `dispatch-webhook` com payload correto
+- Retorna status do disparo
+
+**Endpoint:**
+```
+POST /functions/v1/dispatch-order-webhook
+Body: { "order_id": "uuid-do-pedido" }
+```
+
+---
+
+## Arquivos de Frontend a Modificar
+
+### 4. `src/components/OrderDetailsModal.tsx`
+
+**Adicionar:**
+- Estado para verificar se webhook foi disparado (`webhookDispatched`)
+- Busca na tabela `webhook_dispatch_logs` para verificar se existe log para este pedido
+- Badge indicando status do webhook:
+  - **Verde**: "Webhook Enviado" + data/hora do último disparo
+  - **Amarelo**: "Webhook Pendente" (pedido pago mas sem log)
+  - **Cinza**: "N/A" (pedido não pago ainda)
+- Botão "Disparar Webhook" (aparece apenas se pedido pago e sem webhook enviado)
+- Loading state durante disparo
+- Toast de sucesso/erro
+
+**Localização no componente:**
+- Após a seção de pagamento
+- Na área de informações do pedido
+
+---
+
+## Estrutura da Nova Seção no OrderDetailsModal
 
 ```text
-+------------------------------------------+
-| Logs de API                              |
-| Visualize todos os eventos enviados...   |
-+------------------------------------------+
-| [Filtros]                                |
-| Evento: [Todos   v]  Periodo: [7 dias v] |
-| Status: [Todos   v]  [Atualizar]         |
-+------------------------------------------+
-| Data/Hora    | Evento     | Status  | >> |
-|--------------|------------|---------|-----|
-| 02/02 12:00  | order.paid | 200 OK  | [+] |
-| 02/02 11:45  | order.paid | 200 OK  | [+] |
-| 02/02 10:30  | user.crea  | 500 Err | [+] |
-+------------------------------------------+
-| [<] Pagina 1 de 5 [>]                    |
-+------------------------------------------+
+┌─────────────────────────────────────────────────────┐
+│ 📤 Webhook de Pedido Pago                           │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│ Status: [✅ Enviado em 02/02/2026 12:30]           │
+│                                                     │
+│ ──── OU ────                                        │
+│                                                     │
+│ Status: [⚠️ Não enviado]                            │
+│ [🚀 Disparar Webhook]                               │
+│                                                     │
+│ ──── OU (se não pago) ────                          │
+│                                                     │
+│ Status: [⏳ Aguardando pagamento]                   │
+│                                                     │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Detalhes Tecnicos
+## Correções de Código Detalhadas
 
-### Tabela webhook_dispatch_logs (existente)
-| Coluna | Tipo | Descricao |
-|--------|------|-----------|
-| id | uuid | ID unico |
-| event_type | text | Tipo do evento (order.paid, user.created) |
-| payload | jsonb | Dados enviados no webhook |
-| status_code | integer | Codigo HTTP da resposta |
-| response_body | text | Resposta do destino |
-| error_message | text | Mensagem de erro (se houver) |
-| dispatched_at | timestamp | Data/hora do disparo |
+### Antes (ERRADO):
+```typescript
+// check-pending-payments e webhook-n8n-payment
+items: fullOrder?.order_items?.map((item: any) => ({
+  product_id: item.product_id,
+  name: item.product_name_snapshot,  // ❌ Campo não existe!
+  quantity: item.quantity,
+  unit_price: item.unit_price,
+})) || [],
+```
 
-### Query Principal
-```sql
-SELECT * FROM webhook_dispatch_logs 
-WHERE event_type = $1 (opcional)
-  AND dispatched_at >= $2 (periodo)
-  AND (status_code >= 200 AND status_code < 300) = $3 (sucesso)
-ORDER BY dispatched_at DESC
-LIMIT 20 OFFSET $4;
+### Depois (CORRETO):
+```typescript
+items: fullOrder?.order_items?.map((item: any) => ({
+  product_id: item.product_id,
+  name: item.product_snapshot?.name || 'Produto',
+  sku: item.product_snapshot?.sku || null,
+  image_url: item.product_snapshot?.image_url || null,
+  quantity: item.quantity,
+  unit_price: item.unit_price,
+})) || [],
+```
+
+### Verificação de Duplicidade:
+```typescript
+// No webhook-n8n-payment, antes de processar
+if (orderData.payment_status === 'paid') {
+  console.log('⚠️ Pedido já está pago, ignorando');
+  return new Response(
+    JSON.stringify({ message: 'Order already paid', order_id: orderData.id }),
+    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
 ```
 
 ---
 
-## Funcionalidades da Pagina de Logs
+## Atualização do config.toml
 
-1. **Visualizacao de Logs**
-   - Lista paginada de todos os eventos
-   - Exibe data/hora formatada
-   - Badge colorido para status
-
-2. **Filtros**
-   - Por tipo de evento: Todos, order.paid, user.created, user.inactive.*
-   - Por periodo: 24h, 7 dias, 30 dias, Tudo
-   - Por status: Todos, Sucesso (2xx), Erro (4xx/5xx)
-
-3. **Expansao de Detalhes**
-   - Clicar em uma linha expande para mostrar:
-     - Payload completo (JSON formatado)
-     - Resposta do webhook
-     - Mensagem de erro (se houver)
-
-4. **Atualizacao**
-   - Botao manual de refresh
-   - Indicador de ultima atualizacao
+Adicionar nova Edge Function:
+```toml
+[functions.dispatch-order-webhook]
+verify_jwt = false
+```
 
 ---
 
-## Componentes UI a Utilizar
+## Query para Verificar Webhook no Frontend
 
-- `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableCell`
-- `Badge` (para status codes)
-- `Select` (para filtros)
-- `Button` (refresh)
-- `Collapsible` (expandir detalhes)
-- `Card` (container)
-- `ScrollArea` (para payloads grandes)
-- `CodeBlock` (reutilizar existente para JSON)
-- `Skeleton` (loading state)
+```typescript
+// Buscar último log de webhook para este pedido
+const { data: webhookLog } = await supabase
+  .from('webhook_dispatch_logs')
+  .select('id, dispatched_at, status_code, error_message')
+  .eq('event_type', 'order.paid')
+  .contains('payload', { data: { order_id: orderId } })
+  .order('dispatched_at', { ascending: false })
+  .limit(1)
+  .maybeSingle();
+```
 
 ---
 
-## Resumo das Alteracoes
+## Resumo das Alterações
 
-| Arquivo | Acao |
-|---------|------|
-| `src/components/admin/ApiLogsSection.tsx` | Criar |
-| `src/hooks/useApiLogs.ts` | Criar |
-| `src/components/admin/ApiDocsSidebar.tsx` | Modificar (adicionar item "Logs") |
-| `src/components/admin/ApiDocsContent.tsx` | Modificar (adicionar condicional) |
+| Arquivo | Ação | Descrição |
+|---------|------|-----------|
+| `check-pending-payments/index.ts` | Modificar | Corrigir mapeamento items, verificar duplicidade |
+| `webhook-n8n-payment/index.ts` | Modificar | Corrigir mapeamento items, verificar `payment_status === 'paid'` |
+| `dispatch-order-webhook/index.ts` | Criar | Endpoint para disparo manual de webhook por pedido |
+| `supabase/config.toml` | Modificar | Adicionar nova função |
+| `OrderDetailsModal.tsx` | Modificar | Adicionar badge + botão de disparo manual |
+
+---
+
+## Fluxo do Disparo Manual
+
+```text
+1. Admin abre detalhes do pedido
+2. Sistema verifica se existe log de webhook para este order_id
+3. Se existe: mostra badge "Enviado" com data/hora
+4. Se não existe e pedido está pago: mostra botão "Disparar Webhook"
+5. Admin clica no botão
+6. Frontend chama POST /functions/v1/dispatch-order-webhook
+7. Edge Function busca dados completos e chama dispatch-webhook
+8. Toast de sucesso/erro
+9. Badge atualiza para "Enviado"
+```
 
 ---
 
 ## Resultado Esperado
 
-Uma nova aba "Logs" na documentacao da API que permite:
-- Ver historico completo de webhooks disparados
-- Filtrar por evento, periodo e status
-- Expandir para ver payloads e respostas completas
-- Identificar rapidamente erros de integracao
+1. **Payloads completos** com items, customer e reseller preenchidos corretamente
+2. **Sem disparos duplicados** - verificação de status antes de processar
+3. **Visibilidade** - Admin sabe se webhook foi enviado ou não
+4. **Controle** - Possibilidade de reenviar webhook manualmente se necessário
