@@ -64,9 +64,12 @@ const Dashboard = () => {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'pending': return 'Processando';
-      case 'shipped': return 'Enviado';
-      case 'delivered': return 'Entregue';
+      case 'pending': return 'Pendente';
+      case 'processing': return 'Em preparação';
+      case 'shipped': return 'Despachado';
+      case 'delivered': return 'Finalizado';
+      case 'cancelled': return 'Cancelado';
+      case 'refunded': return 'Reembolsado';
       default: return 'Pendente';
     }
   };

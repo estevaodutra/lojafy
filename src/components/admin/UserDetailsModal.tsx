@@ -219,10 +219,11 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
     const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
       pending: { label: 'Pendente', variant: 'secondary' },
       confirmed: { label: 'Confirmado', variant: 'default' },
-      processing: { label: 'Processando', variant: 'secondary' },
-      shipped: { label: 'Enviado', variant: 'default' },
-      delivered: { label: 'Entregue', variant: 'default' },
+      processing: { label: 'Em preparação', variant: 'secondary' },
+      shipped: { label: 'Despachado', variant: 'default' },
+      delivered: { label: 'Finalizado', variant: 'default' },
       cancelled: { label: 'Cancelado', variant: 'destructive' },
+      refunded: { label: 'Reembolsado', variant: 'secondary' },
     };
     return statusMap[status] || { label: status, variant: 'outline' };
   };

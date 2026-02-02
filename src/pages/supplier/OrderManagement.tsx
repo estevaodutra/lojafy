@@ -23,9 +23,9 @@ const SupplierOrderManagement = () => {
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       pending: { label: "Pendente", variant: "secondary" as const },
-      processing: { label: "Processando", variant: "default" as const },
-      shipped: { label: "Enviado", variant: "default" as const },
-      delivered: { label: "Entregue", variant: "default" as const },
+      processing: { label: "Em preparação", variant: "default" as const },
+      shipped: { label: "Despachado", variant: "default" as const },
+      delivered: { label: "Finalizado", variant: "default" as const },
       cancelled: { label: "Cancelado", variant: "destructive" as const },
       refunded: { label: "Reembolsado", variant: "secondary" as const },
     };
@@ -114,9 +114,9 @@ const SupplierOrderManagement = () => {
               <SelectContent>
                 <SelectItem value="all">Todos os status</SelectItem>
                 <SelectItem value="pending">Pendente</SelectItem>
-                <SelectItem value="processing">Processando</SelectItem>
-                <SelectItem value="shipped">Enviado</SelectItem>
-                <SelectItem value="delivered">Entregue</SelectItem>
+                <SelectItem value="processing">Em preparação</SelectItem>
+                <SelectItem value="shipped">Despachado</SelectItem>
+                <SelectItem value="delivered">Finalizado</SelectItem>
                 <SelectItem value="cancelled">Cancelado</SelectItem>
                 <SelectItem value="refunded">Reembolsado</SelectItem>
               </SelectContent>

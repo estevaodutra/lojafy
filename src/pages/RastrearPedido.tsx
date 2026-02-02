@@ -114,10 +114,13 @@ const RastrearPedido = () => {
     const statusMap = {
       pending: { variant: "secondary" as const, text: "Pendente" },
       confirmed: { variant: "default" as const, text: "Confirmado" },
-      preparing: { variant: "default" as const, text: "Preparando" },
-      shipped: { variant: "default" as const, text: "Enviado" },
+      preparing: { variant: "default" as const, text: "Em preparação" },
+      processing: { variant: "default" as const, text: "Em preparação" },
+      shipped: { variant: "default" as const, text: "Despachado" },
       in_transit: { variant: "default" as const, text: "Em Trânsito" },
-      delivered: { variant: "default" as const, text: "Entregue" }
+      delivered: { variant: "default" as const, text: "Finalizado" },
+      cancelled: { variant: "destructive" as const, text: "Cancelado" },
+      refunded: { variant: "secondary" as const, text: "Reembolsado" }
     };
     
     const config = statusMap[status as keyof typeof statusMap] || statusMap.pending;

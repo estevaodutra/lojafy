@@ -430,13 +430,13 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'pending':
-        return 'Aguardando pagamento';
+        return 'Pendente';
       case 'processing':
-        return 'Processando';
+        return 'Em preparação';
       case 'shipped':
-        return 'Enviado';
+        return 'Despachado';
       case 'delivered':
-        return 'Entregue';
+        return 'Finalizado';
       case 'cancelled':
         return 'Cancelado';
       case 'refunded':
