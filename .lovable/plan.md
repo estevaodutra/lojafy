@@ -1,25 +1,30 @@
 
 
-# Plano: Atualizar Lista de Status de Pedidos
+# Plano: Corrigir Inconsistência de Permissões
 
-## Mudanca Solicitada
+## Problema Identificado
 
-Simplificar a lista de status de pedidos para 6 opcoes claras em portugues:
+A API Key está sendo criada com a permissão `pedidos.write`, mas o endpoint está verificando `orders.write`.
 
-| Status Atual | Novo Status |
-|-------------|-------------|
-| pending, recebido, em_preparacao, processing, shipped, delivered, cancelled, refunded | pendente, em_preparacao, despachado, finalizado, cancelado, reembolsado |
+**No ApiKeyManager (linha 84-88):**
+```typescript
+permissions: {
+  produtos: { read: true, write: true },
+  categorias: { read: true, write: true },
+  pedidos: { read: true, write: false }  // ← Usa "pedidos"
+}
+```
 
-## Novos Status
+**No Edge Function (linha 70):**
+```typescript
+const hasOrdersWrite = permissions?.orders?.write === true;  // ← Verifica "orders"
+```
 
-| Valor | Descricao |
-|-------|-----------|
-| `pendente` | Aguardando pagamento/confirmacao |
-| `em_preparacao` | Pedido sendo preparado para envio |
-| `despachado` | Enviado para entrega |
-| `finalizado` | Entregue ao cliente |
-| `cancelado` | Pedido cancelado |
-| `reembolsado` | Pagamento devolvido |
+---
+
+## Solução
+
+Atualizar o Edge Function para verificar `pedidos.write` em vez de `orders.write`, mantendo consistência com o padrão em português já usado no sistema.
 
 ---
 
@@ -29,48 +34,74 @@ Simplificar a lista de status de pedidos para 6 opcoes claras em portugues:
 
 **Arquivo:** `supabase/functions/api-pedidos-atualizar-status/index.ts`
 
-**Alteracao na linha 8-17:**
+**Alteração nas linhas 68-77:**
 ```typescript
 // ANTES
-const VALID_STATUSES = [
-  'pending',
-  'recebido',
-  'em_preparacao',
-  'processing',
-  'shipped',
-  'delivered',
-  'cancelled',
-  'refunded'
-];
+const permissions = keyData.permissions as Record<string, any> || {};
+const hasOrdersWrite = permissions?.orders?.write === true;
+
+if (!hasOrdersWrite) {
+  return new Response(
+    JSON.stringify({ success: false, error: 'Permissão orders.write não concedida' }),
 
 // DEPOIS
-const VALID_STATUSES = [
-  'pendente',
-  'em_preparacao',
-  'despachado',
-  'finalizado',
-  'cancelado',
-  'reembolsado'
-];
+const permissions = keyData.permissions as Record<string, any> || {};
+const hasPedidosWrite = permissions?.pedidos?.write === true;
+
+if (!hasPedidosWrite) {
+  return new Response(
+    JSON.stringify({ success: false, error: 'Permissão pedidos.write não concedida' }),
 ```
 
-### 2. Documentacao da API
+### 2. Atualizar Permissões Padrão
+
+**Arquivo:** `src/components/admin/ApiKeyManager.tsx`
+
+**Alteração na linha 87:**
+```typescript
+// ANTES
+pedidos: { read: true, write: false }
+
+// DEPOIS  
+pedidos: { read: true, write: true }  // Habilitar escrita por padrão
+```
+
+### 3. Atualizar Documentação
 
 **Arquivo:** `src/data/apiEndpointsData.ts`
 
-**Alteracoes no endpoint "Atualizar Status do Pedido" (linhas 153-188):**
+Atualizar mensagem de erro para refletir `pedidos.write`:
+```typescript
+// ANTES
+{ code: 403, title: 'Sem permissão', description: 'API Key sem permissão orders.write', example: { success: false, error: 'Permissão orders.write não concedida' } }
 
-1. Atualizar `requestBody.status` de `'shipped'` para `'despachado'`
-2. Atualizar `responseExample.data.new_status` de `'shipped'` para `'despachado'`
-3. Atualizar `responseExample._status_disponiveis` para a nova lista
-4. Atualizar `errorExamples` com a nova lista de status
+// DEPOIS
+{ code: 403, title: 'Sem permissão', description: 'API Key sem permissão pedidos.write', example: { success: false, error: 'Permissão pedidos.write não concedida' } }
+```
 
 ---
 
-## Resumo de Alteracoes
+## Ação Adicional Necessária
 
-| Arquivo | Alteracao |
+Após as alterações, você precisará **atualizar as permissões das API Keys existentes** no banco de dados para incluir `pedidos.write: true`. Isso pode ser feito via SQL:
+
+```sql
+UPDATE api_keys 
+SET permissions = jsonb_set(
+  permissions, 
+  '{pedidos,write}', 
+  'true'::jsonb
+)
+WHERE permissions->'pedidos' IS NOT NULL;
+```
+
+---
+
+## Resumo de Alterações
+
+| Arquivo | Alteração |
 |---------|-----------|
-| `supabase/functions/api-pedidos-atualizar-status/index.ts` | Atualizar array `VALID_STATUSES` |
-| `src/data/apiEndpointsData.ts` | Atualizar exemplos e lista de status na documentacao |
+| `supabase/functions/api-pedidos-atualizar-status/index.ts` | Verificar `pedidos.write` em vez de `orders.write` |
+| `src/components/admin/ApiKeyManager.tsx` | Habilitar `pedidos.write: true` por padrão |
+| `src/data/apiEndpointsData.ts` | Atualizar mensagem de erro na documentação |
 
