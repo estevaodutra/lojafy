@@ -1,5 +1,8 @@
 project_id = "bbrmjrjorcgsgeztzbsr"
 
+[functions.check-pending-payments]
+verify_jwt = false
+
 [functions.webhook-role-transition]
 verify_jwt = false
 
