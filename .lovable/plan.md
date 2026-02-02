@@ -1,66 +1,133 @@
 
-## Diagnóstico (por que está dando erro 500 ao atualizar)
-- O endpoint `/functions/v1/api-pedidos-atualizar-status` passou a **receber status em português** (ex.: `em_preparacao`).
-- Porém, a tabela `orders` ainda possui uma **check constraint** (`orders_status_check`) permitindo apenas os status em inglês:
-  - `pending`, `processing`, `shipped`, `delivered`, `cancelled`, `refunded`
-- Resultado: ao tentar salvar `em_preparacao` em `orders.status`, o Postgres rejeita e a Edge Function retorna 500 (“Erro ao atualizar pedido”).
+# Plano: Padronizar Status de Pedidos em Todo o Sistema
 
-## Objetivo da correção
-Manter a API externa com os status em português (como você definiu), mas **persistir no banco os status internos em inglês** (que são os que a tabela `orders` aceita hoje). Assim:
-- A API continua aceitando/mostrando: `pendente`, `em_preparacao`, `despachado`, `finalizado`, `cancelado`, `reembolsado`
-- O banco continua armazenando: `pending`, `processing`, `shipped`, `delivered`, `cancelled`, `refunded`
-- Evitamos quebrar outras funções já existentes (ex.: `create-pix-payment`, webhooks de pagamento) que ainda gravam `pending/processing/...`.
+## Situacao Atual
 
-## Mudanças a implementar
+O sistema apresenta **inconsistencia nos labels de status de pedidos** exibidos na interface. O banco de dados utiliza valores em ingles (`pending`, `processing`, `shipped`, `delivered`, `cancelled`, `refunded`), mas a API externa foi configurada para usar termos em portugues. Os labels exibidos na UI nao estao alinhados com a nova nomenclatura.
 
-### 1) Ajustar a Edge Function para fazer “tradução” de status
-**Arquivo:** `supabase/functions/api-pedidos-atualizar-status/index.ts`
+### Mapeamento Padrao a Ser Adotado
 
-**Ajustes:**
-1. Manter `VALID_STATUSES` com os 6 status em português.
-2. Criar um mapa de conversão:
-   - `pendente` -> `pending`
-   - `em_preparacao` -> `processing`
-   - `despachado` -> `shipped`
-   - `finalizado` -> `delivered`
-   - `cancelado` -> `cancelled`
-   - `reembolsado` -> `refunded`
-3. Antes de atualizar `orders`, converter:
-   - `internalStatus = map[status]`
-   - salvar `internalStatus` na coluna `orders.status`
-4. Para a resposta da API e para logs:
-   - Converter `previousStatus` (que vem do banco em inglês) para a forma em português ao retornar ao cliente.
-   - Retornar `previous_status` e `new_status` em português (consistência da API).
-5. Inserção em `order_status_history`:
-   - Registrar o `status` **interno** (inglês) para manter consistência com o dado real em `orders`.
-   - Usar `notes` para registrar a informação “status via API: {pt}”.
+| Valor no Banco (EN) | Label Exibido na UI (PT) |
+|---------------------|--------------------------|
+| `pending` | **Pendente** |
+| `processing` | **Em preparacao** |
+| `shipped` | **Despachado** |
+| `delivered` | **Finalizado** |
+| `cancelled` | **Cancelado** |
+| `refunded` | **Reembolsado** |
 
-**Melhoria opcional (recomendado):**
-- Se o update falhar com `code: 23514` (check constraint), retornar **400** com uma mensagem explícita sobre status inválido para evitar “500 genérico”.
+---
 
-### 2) Atualizar a documentação para refletir o comportamento correto
-**Arquivo:** `src/data/apiEndpointsData.ts`
+## Arquivos a Modificar
 
-**Ajustes:**
-1. Manter a lista `_status_disponiveis` e exemplos com status em português.
-2. Atualizar o `responseExample` para continuar mostrando `previous_status/new_status` em português (porque o endpoint vai responder assim).
-3. (Recomendado) Acrescentar uma linha curta na `description` do endpoint deixando claro:
-   - “A API recebe status em PT-BR; internamente o sistema mapeia para os status do banco.”
+### 1. `src/pages/admin/Orders.tsx`
+**Linhas 169-177, 257-263, 337-344**
 
-## Como vamos validar (checklist)
-1. Chamar o endpoint com:
-   - `status: "em_preparacao"` e confirmar retorno 200.
-2. Verificar no banco (`orders.status`) que foi salvo como `processing`.
-3. Confirmar que o JSON de resposta mostra:
-   - `new_status: "em_preparacao"` (português).
-4. Testar também `despachado`, `finalizado`, etc.
+Atualizar:
+- `getStatusBadge()`: Alterar labels de `Processando/Enviado/Entregue` para `Em preparacao/Despachado/Finalizado`
+- Filtros de status (Select): Atualizar opcoes
+- Dropdown de edicao de status: Atualizar opcoes
 
-## Observações importantes
-- Esta abordagem é a mais segura agora porque evita quebrar:
-  - criação de pedido (`create-pix-payment` grava `pending`)
-  - webhooks (`webhook-mercadopago` / `webhook-n8n-payment` gravam `processing/cancelled/...`)
-- Se no futuro você quiser que o banco também armazene tudo em português, aí sim faremos uma migração no Postgres (alterar `orders_status_check` + atualizar dados existentes + ajustar webhooks/criação). Mas isso é uma mudança maior.
+### 2. `src/pages/reseller/Orders.tsx`
+**Linhas 12-18, 91-96**
 
-## Arquivos envolvidos (resumo)
-- Editar: `supabase/functions/api-pedidos-atualizar-status/index.ts`
-- Editar: `src/data/apiEndpointsData.ts`
+Atualizar:
+- `statusConfig`: Alterar labels para o novo padrao
+- Adicionar status `refunded` que esta faltando
+- TabsList: Atualizar nomes das abas
+
+### 3. `src/pages/supplier/OrderManagement.tsx`
+**Linhas 24-31, 114-122**
+
+Atualizar:
+- `getStatusBadge()`: Alterar labels
+- Filtros de status: Atualizar opcoes
+
+### 4. `src/components/OrderDetailsModal.tsx`
+**Linhas 430-446**
+
+Atualizar:
+- `getStatusLabel()`: Alterar labels para o novo padrao
+- Mudar `Aguardando pagamento` para `Pendente`
+- Mudar `Processando` para `Em preparacao`
+- Mudar `Enviado` para `Despachado`
+- Mudar `Entregue` para `Finalizado`
+
+### 5. `src/pages/customer/Orders.tsx`
+**Linhas 95-111**
+
+Atualizar:
+- `getStatusLabel()`: Alterar labels para o novo padrao
+
+### 6. `src/pages/customer/Dashboard.tsx`
+**Linhas 65-71**
+
+Atualizar:
+- `getStatusLabel()`: Alterar labels para o novo padrao
+
+### 7. `src/components/admin/OrdersManagementSection.tsx`
+**Linhas 158-166**
+
+Atualizar:
+- `getStatusLabel()`: Alterar labels para o novo padrao
+
+### 8. `src/components/admin/UserDetailsModal.tsx`
+**Linhas 218-227**
+
+Atualizar:
+- `getStatusBadge()`: Alterar labels para o novo padrao
+
+### 9. `src/pages/RastrearPedido.tsx`
+**Linhas 113-124**
+
+Atualizar:
+- `getStatusBadge()`: Alterar labels para o novo padrao (incluindo status adicionais)
+
+---
+
+## Abordagem Alternativa (Recomendada para Futuro)
+
+Para evitar duplicacao de codigo e facilitar manutencao futura, seria ideal criar um arquivo centralizado de constantes:
+
+**Arquivo futuro:** `src/constants/orderStatus.ts`
+```typescript
+export const ORDER_STATUS_LABELS: Record<string, string> = {
+  pending: 'Pendente',
+  processing: 'Em preparacao',
+  shipped: 'Despachado',
+  delivered: 'Finalizado',
+  cancelled: 'Cancelado',
+  refunded: 'Reembolsado',
+};
+```
+
+Porem, para esta implementacao inicial, vamos atualizar cada arquivo individualmente para minimizar o impacto nas importacoes existentes.
+
+---
+
+## Resumo das Alteracoes
+
+| Arquivo | Tipo de Alteracao |
+|---------|-------------------|
+| `src/pages/admin/Orders.tsx` | Labels + Filtros + Dropdown |
+| `src/pages/reseller/Orders.tsx` | Labels + Tabs + Adicionar refunded |
+| `src/pages/supplier/OrderManagement.tsx` | Labels + Filtros |
+| `src/components/OrderDetailsModal.tsx` | Labels |
+| `src/pages/customer/Orders.tsx` | Labels |
+| `src/pages/customer/Dashboard.tsx` | Labels |
+| `src/components/admin/OrdersManagementSection.tsx` | Labels |
+| `src/components/admin/UserDetailsModal.tsx` | Labels |
+| `src/pages/RastrearPedido.tsx` | Labels |
+
+---
+
+## Resultado Esperado
+
+Apos as alteracoes, todos os locais do sistema exibirao os mesmos labels padronizados:
+- **Pendente** (antes: Pendente/Aguardando pagamento)
+- **Em preparacao** (antes: Processando)
+- **Despachado** (antes: Enviado)
+- **Finalizado** (antes: Entregue)
+- **Cancelado** (sem alteracao)
+- **Reembolsado** (sem alteracao)
+
