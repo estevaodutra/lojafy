@@ -65,13 +65,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check orders.write permission
+    // Check pedidos.write permission
     const permissions = keyData.permissions as Record<string, any> || {};
-    const hasOrdersWrite = permissions?.orders?.write === true;
+    const hasPedidosWrite = permissions?.pedidos?.write === true;
 
-    if (!hasOrdersWrite) {
+    if (!hasPedidosWrite) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Permissão orders.write não concedida' }),
+        JSON.stringify({ success: false, error: 'Permissão pedidos.write não concedida' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

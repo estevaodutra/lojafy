@@ -182,7 +182,7 @@ const ordersEndpoints: EndpointData[] = [
       { code: 400, title: 'Campos obrigatórios', description: 'order_number ou status não informados', example: { success: false, error: 'order_number e status são obrigatórios' } },
       { code: 400, title: 'Status inválido', description: 'Status não está na lista permitida', example: { success: false, error: 'Status inválido. Use: pendente, em_preparacao, despachado, finalizado, cancelado, reembolsado' } },
       { code: 401, title: 'API Key inválida', description: 'Chave não fornecida ou inativa', example: { success: false, error: 'API Key inválida ou inativa' } },
-      { code: 403, title: 'Sem permissão', description: 'API Key sem permissão orders.write', example: { success: false, error: 'Permissão orders.write não concedida' } },
+      { code: 403, title: 'Sem permissão', description: 'API Key sem permissão pedidos.write', example: { success: false, error: 'Permissão pedidos.write não concedida' } },
       { code: 404, title: 'Pedido não encontrado', description: 'Número do pedido não existe', example: { success: false, error: 'Pedido não encontrado' } }
     ]
   },
