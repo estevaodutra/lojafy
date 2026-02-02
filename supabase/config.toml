@@ -155,3 +155,6 @@ verify_jwt = false
 
 [functions.check-inactive-users]
 verify_jwt = false
+
+[functions.dispatch-order-webhook]
+verify_jwt = false

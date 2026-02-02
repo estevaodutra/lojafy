@@ -165,12 +165,13 @@ serve(async (req) => {
                       product_id,
                       quantity,
                       unit_price,
-                      product_name_snapshot
+                      product_snapshot
                     )
                   `)
                   .eq('id', order.id)
                   .single();
 
+                // Buscar dados do cliente ou usar dados do pedido (visitantes)
                 let customerData = null;
                 if (fullOrder?.user_id) {
                   const { data: profile } = await supabase
@@ -188,8 +189,17 @@ serve(async (req) => {
                       phone: profile.phone,
                     };
                   }
+                } else {
+                  // Pedidos de visitantes - usar dados do próprio pedido
+                  customerData = {
+                    user_id: null,
+                    email: fullOrder?.customer_email || null,
+                    name: fullOrder?.customer_name || null,
+                    phone: fullOrder?.customer_phone || null,
+                  };
                 }
 
+                // Buscar dados do revendedor (se houver)
                 let resellerData = null;
                 if (fullOrder?.reseller_id) {
                   const { data: resellerStore } = await supabase
@@ -215,7 +225,9 @@ serve(async (req) => {
                   reseller: resellerData,
                   items: fullOrder?.order_items?.map((item: any) => ({
                     product_id: item.product_id,
-                    name: item.product_name_snapshot,
+                    name: item.product_snapshot?.name || 'Produto',
+                    sku: item.product_snapshot?.sku || null,
+                    image_url: item.product_snapshot?.image_url || null,
                     quantity: item.quantity,
                     unit_price: item.unit_price,
                   })) || [],

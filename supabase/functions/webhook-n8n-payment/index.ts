@@ -96,6 +96,31 @@ serve(async (req) => {
 
     console.log('Found order:', orderData.id, 'Current status:', orderData.status);
 
+    // Verificar se o pedido já foi pago - evitar disparo duplicado
+    if (orderData.payment_status === 'paid') {
+      console.log('⚠️ Order already paid, skipping duplicate processing');
+      return new Response(
+        JSON.stringify({ 
+          message: 'Order already paid', 
+          order_id: orderData.id,
+          order_number: orderData.order_number
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verificar se o pedido já foi cancelado por expiração
+    if (orderData.status === 'cancelled' && orderData.payment_status === 'expired') {
+      console.log('⚠️ Order was already cancelled due to expiration');
+      return new Response(
+        JSON.stringify({ 
+          message: 'Order expired and cancelled', 
+          order_id: orderData.id 
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Map N8N status to our system status
     let newStatus = orderData.status; // Keep current status as default
     let paymentStatus = orderData.payment_status; // Keep current payment status as default
@@ -119,18 +144,6 @@ serve(async (req) => {
         break;
       default:
         console.log('Unknown payment status:', webhookData.status, '- keeping current status');
-    }
-
-    // Verificar se o pedido já foi cancelado por expiração
-    if (orderData.status === 'cancelled' && orderData.payment_status === 'expired') {
-      console.log('⚠️ Order was already cancelled due to expiration');
-      return new Response(
-        JSON.stringify({ 
-          message: 'Order expired and cancelled', 
-          order_id: orderData.id 
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
 
     console.log('Updating order status:', { 
@@ -194,13 +207,13 @@ serve(async (req) => {
               product_id,
               quantity,
               unit_price,
-              product_name_snapshot
+              product_snapshot
             )
           `)
           .eq('id', orderData.id)
           .single();
 
-        // Buscar dados do cliente
+        // Buscar dados do cliente ou usar dados do pedido (visitantes)
         let customerData = null;
         if (fullOrder?.user_id) {
           const { data: profile } = await supabase
@@ -218,6 +231,14 @@ serve(async (req) => {
               phone: profile.phone,
             };
           }
+        } else {
+          // Pedidos de visitantes - usar dados do próprio pedido
+          customerData = {
+            user_id: null,
+            email: fullOrder?.customer_email || null,
+            name: fullOrder?.customer_name || null,
+            phone: fullOrder?.customer_phone || null,
+          };
         }
 
         // Buscar dados do revendedor (se houver)
@@ -246,7 +267,9 @@ serve(async (req) => {
           reseller: resellerData,
           items: fullOrder?.order_items?.map((item: any) => ({
             product_id: item.product_id,
-            name: item.product_name_snapshot,
+            name: item.product_snapshot?.name || 'Produto',
+            sku: item.product_snapshot?.sku || null,
+            image_url: item.product_snapshot?.image_url || null,
             quantity: item.quantity,
             unit_price: item.unit_price,
           })) || [],
