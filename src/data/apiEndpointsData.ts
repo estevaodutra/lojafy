@@ -155,9 +155,9 @@ const ordersEndpoints: EndpointData[] = [
     title: 'Atualizar Status do Pedido',
     method: 'PUT',
     url: '/functions/v1/api-pedidos-atualizar-status',
-    description: 'Atualiza o status de um pedido pelo número do pedido. Registra automaticamente no histórico de status.',
+    description: 'Atualiza o status de um pedido pelo número do pedido. A API aceita status em português e mapeia internamente para o banco de dados. Registra automaticamente no histórico de status.',
     headers: [
-      { name: 'X-API-Key', description: 'Chave de API', example: 'sk_...', required: true }
+      { name: 'X-API-Key', description: 'Chave de API com permissão pedidos.write', example: 'sk_...', required: true }
     ],
     requestBody: {
       order_number: 'ORD-1769828426038_865529AC',
@@ -176,7 +176,15 @@ const ordersEndpoints: EndpointData[] = [
         tracking_number: 'BR123456789BR',
         updated_at: '2026-02-02T12:30:00Z'
       },
-      _status_disponiveis: 'pendente, em_preparacao, despachado, finalizado, cancelado, reembolsado'
+      _status_disponiveis: 'pendente, em_preparacao, despachado, finalizado, cancelado, reembolsado',
+      _mapeamento_interno: {
+        pendente: 'pending',
+        em_preparacao: 'processing',
+        despachado: 'shipped',
+        finalizado: 'delivered',
+        cancelado: 'cancelled',
+        reembolsado: 'refunded'
+      }
     },
     errorExamples: [
       { code: 400, title: 'Campos obrigatórios', description: 'order_number ou status não informados', example: { success: false, error: 'order_number e status são obrigatórios' } },

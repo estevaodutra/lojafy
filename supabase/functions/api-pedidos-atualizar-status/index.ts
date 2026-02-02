@@ -5,6 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
 };
 
+// Status aceitos pela API (português)
 const VALID_STATUSES = [
   'pendente',
   'em_preparacao',
@@ -13,6 +14,26 @@ const VALID_STATUSES = [
   'cancelado',
   'reembolsado'
 ];
+
+// Mapeamento PT -> EN (para salvar no banco)
+const STATUS_PT_TO_EN: Record<string, string> = {
+  'pendente': 'pending',
+  'em_preparacao': 'processing',
+  'despachado': 'shipped',
+  'finalizado': 'delivered',
+  'cancelado': 'cancelled',
+  'reembolsado': 'refunded'
+};
+
+// Mapeamento EN -> PT (para retornar na API)
+const STATUS_EN_TO_PT: Record<string, string> = {
+  'pending': 'pendente',
+  'processing': 'em_preparacao',
+  'shipped': 'despachado',
+  'delivered': 'finalizado',
+  'cancelled': 'cancelado',
+  'refunded': 'reembolsado'
+};
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -94,7 +115,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate status
+    // Validate status (deve ser em português)
     if (!VALID_STATUSES.includes(status)) {
       return new Response(
         JSON.stringify({ 
@@ -104,6 +125,9 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Converter status PT -> EN para salvar no banco
+    const internalStatus = STATUS_PT_TO_EN[status];
 
     // Find order by order_number
     const { data: order, error: orderError } = await supabase
@@ -120,11 +144,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    const previousStatus = order.status;
+    const previousStatusEN = order.status;
+    // Converter status anterior EN -> PT para resposta
+    const previousStatusPT = STATUS_EN_TO_PT[previousStatusEN] || previousStatusEN;
 
     // Prepare update data
     const updateData: Record<string, any> = {
-      status,
+      status: internalStatus, // Salvar em inglês
       updated_at: new Date().toISOString()
     };
 
@@ -141,19 +167,31 @@ Deno.serve(async (req) => {
 
     if (updateError) {
       console.error('Order update error:', updateError);
+      
+      // Check for constraint violation
+      if (updateError.code === '23514') {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Status inválido para o banco de dados. Contate o suporte.` 
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       return new Response(
         JSON.stringify({ success: false, error: 'Erro ao atualizar pedido' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Insert into order_status_history
+    // Insert into order_status_history (salvar status interno em inglês)
     const { error: historyError } = await supabase
       .from('order_status_history')
       .insert({
         order_id: order.id,
-        status: status,
-        notes: notes || `Status atualizado via API de ${previousStatus} para ${status}`
+        status: internalStatus, // Status interno em inglês
+        notes: notes || `Status atualizado via API: ${previousStatusPT} → ${status}`
       });
 
     if (historyError) {
@@ -161,7 +199,7 @@ Deno.serve(async (req) => {
       // Don't fail the request, just log the warning
     }
 
-    console.log(`Order ${order_number} status updated: ${previousStatus} -> ${status}`);
+    console.log(`Order ${order_number} status updated: ${previousStatusEN} -> ${internalStatus} (API: ${previousStatusPT} -> ${status})`);
 
     return new Response(
       JSON.stringify({
@@ -170,8 +208,8 @@ Deno.serve(async (req) => {
         data: {
           order_id: order.id,
           order_number: order_number,
-          previous_status: previousStatus,
-          new_status: status,
+          previous_status: previousStatusPT, // Retornar em português
+          new_status: status, // Retornar em português (como recebido)
           tracking_number: tracking_number || order.tracking_number || null,
           updated_at: updateData.updated_at
         }
