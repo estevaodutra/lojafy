@@ -115,6 +115,30 @@ serve(async (req) => {
       }
     }
 
+    // Buscar etiqueta de envio
+    let shippingLabel = null;
+    const { data: shippingFile } = await supabase
+      .from('order_shipping_files')
+      .select('file_name, file_path, file_size, uploaded_at')
+      .eq('order_id', fullOrder.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (shippingFile?.file_path) {
+      // Gerar URL assinada (válida por 7 dias)
+      const { data: signedUrlData } = await supabase.storage
+        .from('shipping-files')
+        .createSignedUrl(shippingFile.file_path, 604800);
+      
+      shippingLabel = {
+        file_name: shippingFile.file_name,
+        file_size: shippingFile.file_size,
+        uploaded_at: shippingFile.uploaded_at,
+        download_url: signedUrlData?.signedUrl || null,
+      };
+      console.log('📦 Etiqueta de envio encontrada:', shippingFile.file_name);
+    }
+
     const webhookPayload = {
       order_id: fullOrder.id,
       order_number: fullOrder.order_number,
@@ -130,6 +154,7 @@ serve(async (req) => {
         quantity: item.quantity,
         unit_price: item.unit_price,
       })) || [],
+      shipping_label: shippingLabel,
     };
 
     console.log('📦 Payload do webhook:', JSON.stringify(webhookPayload, null, 2));
