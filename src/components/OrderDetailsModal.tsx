@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User, FileText, Download, Upload, TrendingUp, MessageSquarePlus } from 'lucide-react';
+import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User, FileText, Download, Upload, TrendingUp, MessageSquarePlus, Send, Loader2, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -73,6 +73,14 @@ interface RefundDocument {
   uploaded_at: string;
   uploaded_by?: string;
 }
+
+interface WebhookLogInfo {
+  id: string;
+  dispatched_at: string;
+  status_code: number | null;
+  error_message: string | null;
+}
+
 interface OrderDetailsModalProps {
   orderId: string | null;
   isOpen: boolean;
@@ -96,6 +104,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const [currentProductCosts, setCurrentProductCosts] = useState<Record<string, number>>({});
   const [existingTicketId, setExistingTicketId] = useState<string | null>(null);
   const [deliveredAt, setDeliveredAt] = useState<string | null>(null);
+  const [webhookLog, setWebhookLog] = useState<WebhookLogInfo | null>(null);
+  const [webhookLoading, setWebhookLoading] = useState(false);
+  const [isDispatchingWebhook, setIsDispatchingWebhook] = useState(false);
   const {
     toast
   } = useToast();
@@ -111,11 +122,15 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       fetchRefundDocuments();
       fetchExistingTicket();
       fetchDeliveredAt();
+      if (isAdmin) {
+        fetchWebhookLog();
+      }
     } else {
       setExistingTicketId(null);
       setDeliveredAt(null);
+      setWebhookLog(null);
     }
-  }, [orderId, isOpen]);
+  }, [orderId, isOpen, isAdmin]);
 
   const fetchExistingTicket = async () => {
     if (!orderId) return;
@@ -148,6 +163,80 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       console.error('Erro ao buscar data de entrega:', error);
     }
   };
+
+  const fetchWebhookLog = async () => {
+    if (!orderId) return;
+    setWebhookLoading(true);
+    try {
+      // Buscar logs de webhook para este pedido usando textSearch no payload
+      const { data, error } = await supabase
+        .from('webhook_dispatch_logs')
+        .select('id, dispatched_at, status_code, error_message, payload')
+        .eq('event_type', 'order.paid')
+        .order('dispatched_at', { ascending: false })
+        .limit(100);
+
+      if (error) {
+        console.error('Erro ao buscar log de webhook:', error);
+        setWebhookLog(null);
+        return;
+      }
+
+      // Filtrar manualmente para encontrar o log do pedido específico
+      const matchingLog = data?.find((log: any) => {
+        const payload = log.payload;
+        return payload?.data?.order_id === orderId;
+      });
+
+      if (matchingLog) {
+        setWebhookLog({
+          id: matchingLog.id,
+          dispatched_at: matchingLog.dispatched_at,
+          status_code: matchingLog.status_code,
+          error_message: matchingLog.error_message,
+        });
+      } else {
+        setWebhookLog(null);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar log de webhook:', error);
+      setWebhookLog(null);
+    } finally {
+      setWebhookLoading(false);
+    }
+  };
+
+  const handleDispatchWebhook = async () => {
+    if (!orderId) return;
+    setIsDispatchingWebhook(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('dispatch-order-webhook', {
+        body: { order_id: orderId },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Sucesso",
+        description: `Webhook order.paid disparado para o pedido ${data?.order_number || orderId}`,
+      });
+
+      // Recarregar o log de webhook
+      await fetchWebhookLog();
+    } catch (error: any) {
+      console.error('Erro ao disparar webhook:', error);
+      toast({
+        title: "Erro",
+        description: error?.message || "Não foi possível disparar o webhook.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDispatchingWebhook(false);
+    }
+  };
+
   const fetchOrderDetails = async () => {
     if (!orderId) return;
     setLoading(true);
@@ -654,6 +743,104 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   </CardContent>
                 </Card>}
             </div>
+
+            {/* Webhook Status - Only for Admin */}
+            {isAdmin && order.payment_status === 'paid' && (
+              <Card className="border-primary/20">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Send className="h-4 w-4 text-primary" />
+                      Webhook de Pedido Pago
+                    </div>
+                    {webhookLoading ? (
+                      <Badge variant="outline" className="gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Verificando...
+                      </Badge>
+                    ) : webhookLog ? (
+                      <Badge 
+                        variant={webhookLog.status_code && webhookLog.status_code >= 200 && webhookLog.status_code < 300 ? "default" : "destructive"}
+                        className="gap-1"
+                      >
+                        <CheckCircle className="h-3 w-3" />
+                        Enviado
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="gap-1 text-amber-600 border-amber-300">
+                        <Clock className="h-3 w-3" />
+                        Não enviado
+                      </Badge>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {webhookLog ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Último disparo:</span>
+                        <span className="font-medium">{formatDate(webhookLog.dispatched_at)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Status:</span>
+                        <span className={`font-medium ${webhookLog.status_code && webhookLog.status_code >= 200 && webhookLog.status_code < 300 ? 'text-green-600' : 'text-red-600'}`}>
+                          {webhookLog.status_code || 'N/A'}
+                        </span>
+                      </div>
+                      {webhookLog.error_message && (
+                        <div className="text-sm text-red-600 bg-red-50 dark:bg-red-950/20 p-2 rounded">
+                          {webhookLog.error_message}
+                        </div>
+                      )}
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full mt-2"
+                        onClick={handleDispatchWebhook}
+                        disabled={isDispatchingWebhook}
+                      >
+                        {isDispatchingWebhook ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Disparando...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Reenviar Webhook
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        O webhook order.paid ainda não foi disparado para este pedido.
+                      </p>
+                      <Button 
+                        variant="default" 
+                        size="sm" 
+                        className="w-full"
+                        onClick={handleDispatchWebhook}
+                        disabled={isDispatchingWebhook}
+                      >
+                        {isDispatchingWebhook ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Disparando...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-2" />
+                            Disparar Webhook
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Products */}
             <Card>
