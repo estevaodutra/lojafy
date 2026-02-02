@@ -1,97 +1,172 @@
 
+# Plano: Criar Pagina "Logs" na API Docs
 
-# Plano: Corrigir Pedidos que Ficam "Pendente" Após Pagamento
+## Contexto
 
-## Diagnóstico do Problema
+O sistema ja possui a tabela `webhook_dispatch_logs` que registra todos os eventos de webhooks disparados pela plataforma. A nova pagina "Logs" sera adicionada a documentacao da API para exibir esses registros em tempo real, permitindo aos administradores visualizar todos os eventos enviados/recebidos com seus respectivos payloads.
 
-Analisando o código, identifiquei que os **webhooks estão implementados corretamente**:
-
-| Edge Function | Comportamento |
-|---------------|---------------|
-| `create-pix-payment` | Cria pedido com `status: 'pending'` (correto - aguardando pagamento) |
-| `webhook-n8n-payment` | Quando recebe `status: 'approved'` → atualiza para `processing` |
-| `webhook-mercadopago` | Quando recebe `status: 'approved'` → atualiza para `processing` |
-
-**O problema:** O N8N não está chamando o webhook `webhook-n8n-payment` quando o pagamento PIX é confirmado.
-
----
-
-## Duas Soluções Possíveis
-
-### Solução 1: Configurar o N8N (Recomendada - Ação Manual)
-
-O workflow do N8N precisa ter um nó adicional que, após receber a confirmação de pagamento do Mercado Pago, faça uma chamada HTTP POST para:
+## Estrutura Atual
 
 ```text
-URL: https://bbrmjrjorcgsgeztzbsr.supabase.co/functions/v1/webhook-n8n-payment
-
-Body (JSON):
-{
-  "paymentId": "{{paymentId do MP}}",
-  "status": "approved",
-  "amount": {{valor}},
-  "external_reference": "{{external_reference}}"
-}
+API Docs (sidebar)
+  - Introducao
+  - Autenticacao
+  - Chaves de API
+  - Webhooks
+  - [Endpoints...]
 ```
 
----
-
-### Solução 2: Adicionar Verificação Ativa de Pagamento (Código)
-
-Criar uma Edge Function que verifica periodicamente os pedidos pendentes no Mercado Pago e atualiza automaticamente.
-
-**Arquivos a criar:**
-
-1. **`supabase/functions/check-pending-payments/index.ts`**
-   - Busca pedidos com `status = 'pending'` e `payment_status = 'pending'`
-   - Para cada pedido, consulta a API do Mercado Pago usando o `payment_id`
-   - Se o pagamento estiver `approved`, atualiza o pedido para `processing`
-   - Pode ser chamado periodicamente via CRON ou manualmente
-
-**Alterações no `supabase/config.toml`:**
-```toml
-[functions.check-pending-payments]
-verify_jwt = false
-```
-
----
-
-## Fluxo Atual vs Esperado
+## Estrutura Proposta
 
 ```text
-ATUAL (problema):
-1. Cliente gera PIX → pedido criado como "pending"
-2. Cliente paga PIX no app do banco
-3. Mercado Pago confirma pagamento
-4. N8N recebe confirmação mas NÃO chama webhook
-5. Pedido permanece "Pendente" ❌
-
-ESPERADO (com correção):
-1. Cliente gera PIX → pedido criado como "pending"
-2. Cliente paga PIX no app do banco
-3. Mercado Pago confirma pagamento
-4. N8N recebe confirmação e CHAMA webhook-n8n-payment
-5. Pedido atualizado para "Em preparação" ✅
+API Docs (sidebar)
+  - Introducao
+  - Autenticacao
+  - Chaves de API
+  - Webhooks
+  - Logs (NOVO)      <-- Adicionar aqui
+  - [Endpoints...]
 ```
 
 ---
 
-## Recomendação
+## Arquivos a Criar
 
-A **Solução 1 (configurar N8N)** é a mais apropriada pois:
-- O sistema já está preparado para receber a confirmação
-- Apenas precisa configurar o N8N para enviar a notificação
-- É mais eficiente (push) do que verificar periodicamente (poll)
+### 1. `src/components/admin/ApiLogsSection.tsx`
+Componente principal que renderiza a pagina de logs com:
+- Tabela de logs com colunas: Data/Hora, Evento, Status, Payload, Resposta
+- Filtros por tipo de evento (order.paid, user.created, etc)
+- Filtro por periodo (ultimas 24h, 7 dias, 30 dias)
+- Filtro por status (sucesso/erro)
+- Paginacao para navegacao
+- Botao de refresh para atualizar dados
+- Funcao de expandir/colapsar para ver payloads completos
+- Indicador visual de status (verde = 2xx, vermelho = erro)
 
-Se preferir a **Solução 2** como fallback de segurança, posso implementar a Edge Function de verificação.
+### 2. `src/hooks/useApiLogs.ts`
+Hook customizado para buscar e gerenciar os logs:
+- Query para `webhook_dispatch_logs` com filtros
+- Paginacao
+- Ordenacao por data
+- Refresh automatico opcional
 
 ---
 
-## Resumo
+## Arquivos a Modificar
 
-| Item | Descrição |
-|------|-----------|
-| **Causa raiz** | N8N não está chamando o webhook de confirmação |
-| **Solução principal** | Configurar nó HTTP no N8N para POST em `webhook-n8n-payment` |
-| **Solução alternativa** | Criar Edge Function `check-pending-payments` para verificar via API do MP |
+### 1. `src/components/admin/ApiDocsSidebar.tsx`
+**Adicionar:**
+- Novo item na lista `staticItems` com icone `ScrollText` ou `FileText`
+- Item: `{ id: 'logs', label: 'Logs', icon: ScrollText }`
 
+### 2. `src/components/admin/ApiDocsContent.tsx`
+**Adicionar:**
+- Import do novo componente `ApiLogsSection`
+- Condicional para renderizar quando `selectedSection === 'logs'`
+
+---
+
+## Estrutura do Componente ApiLogsSection
+
+```text
++------------------------------------------+
+| Logs de API                              |
+| Visualize todos os eventos enviados...   |
++------------------------------------------+
+| [Filtros]                                |
+| Evento: [Todos   v]  Periodo: [7 dias v] |
+| Status: [Todos   v]  [Atualizar]         |
++------------------------------------------+
+| Data/Hora    | Evento     | Status  | >> |
+|--------------|------------|---------|-----|
+| 02/02 12:00  | order.paid | 200 OK  | [+] |
+| 02/02 11:45  | order.paid | 200 OK  | [+] |
+| 02/02 10:30  | user.crea  | 500 Err | [+] |
++------------------------------------------+
+| [<] Pagina 1 de 5 [>]                    |
++------------------------------------------+
+```
+
+---
+
+## Detalhes Tecnicos
+
+### Tabela webhook_dispatch_logs (existente)
+| Coluna | Tipo | Descricao |
+|--------|------|-----------|
+| id | uuid | ID unico |
+| event_type | text | Tipo do evento (order.paid, user.created) |
+| payload | jsonb | Dados enviados no webhook |
+| status_code | integer | Codigo HTTP da resposta |
+| response_body | text | Resposta do destino |
+| error_message | text | Mensagem de erro (se houver) |
+| dispatched_at | timestamp | Data/hora do disparo |
+
+### Query Principal
+```sql
+SELECT * FROM webhook_dispatch_logs 
+WHERE event_type = $1 (opcional)
+  AND dispatched_at >= $2 (periodo)
+  AND (status_code >= 200 AND status_code < 300) = $3 (sucesso)
+ORDER BY dispatched_at DESC
+LIMIT 20 OFFSET $4;
+```
+
+---
+
+## Funcionalidades da Pagina de Logs
+
+1. **Visualizacao de Logs**
+   - Lista paginada de todos os eventos
+   - Exibe data/hora formatada
+   - Badge colorido para status
+
+2. **Filtros**
+   - Por tipo de evento: Todos, order.paid, user.created, user.inactive.*
+   - Por periodo: 24h, 7 dias, 30 dias, Tudo
+   - Por status: Todos, Sucesso (2xx), Erro (4xx/5xx)
+
+3. **Expansao de Detalhes**
+   - Clicar em uma linha expande para mostrar:
+     - Payload completo (JSON formatado)
+     - Resposta do webhook
+     - Mensagem de erro (se houver)
+
+4. **Atualizacao**
+   - Botao manual de refresh
+   - Indicador de ultima atualizacao
+
+---
+
+## Componentes UI a Utilizar
+
+- `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableCell`
+- `Badge` (para status codes)
+- `Select` (para filtros)
+- `Button` (refresh)
+- `Collapsible` (expandir detalhes)
+- `Card` (container)
+- `ScrollArea` (para payloads grandes)
+- `CodeBlock` (reutilizar existente para JSON)
+- `Skeleton` (loading state)
+
+---
+
+## Resumo das Alteracoes
+
+| Arquivo | Acao |
+|---------|------|
+| `src/components/admin/ApiLogsSection.tsx` | Criar |
+| `src/hooks/useApiLogs.ts` | Criar |
+| `src/components/admin/ApiDocsSidebar.tsx` | Modificar (adicionar item "Logs") |
+| `src/components/admin/ApiDocsContent.tsx` | Modificar (adicionar condicional) |
+
+---
+
+## Resultado Esperado
+
+Uma nova aba "Logs" na documentacao da API que permite:
+- Ver historico completo de webhooks disparados
+- Filtrar por evento, periodo e status
+- Expandir para ver payloads e respostas completas
+- Identificar rapidamente erros de integracao
