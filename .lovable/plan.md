@@ -1,133 +1,97 @@
 
-# Plano: Padronizar Status de Pedidos em Todo o Sistema
 
-## Situacao Atual
+# Plano: Corrigir Pedidos que Ficam "Pendente" Após Pagamento
 
-O sistema apresenta **inconsistencia nos labels de status de pedidos** exibidos na interface. O banco de dados utiliza valores em ingles (`pending`, `processing`, `shipped`, `delivered`, `cancelled`, `refunded`), mas a API externa foi configurada para usar termos em portugues. Os labels exibidos na UI nao estao alinhados com a nova nomenclatura.
+## Diagnóstico do Problema
 
-### Mapeamento Padrao a Ser Adotado
+Analisando o código, identifiquei que os **webhooks estão implementados corretamente**:
 
-| Valor no Banco (EN) | Label Exibido na UI (PT) |
-|---------------------|--------------------------|
-| `pending` | **Pendente** |
-| `processing` | **Em preparacao** |
-| `shipped` | **Despachado** |
-| `delivered` | **Finalizado** |
-| `cancelled` | **Cancelado** |
-| `refunded` | **Reembolsado** |
+| Edge Function | Comportamento |
+|---------------|---------------|
+| `create-pix-payment` | Cria pedido com `status: 'pending'` (correto - aguardando pagamento) |
+| `webhook-n8n-payment` | Quando recebe `status: 'approved'` → atualiza para `processing` |
+| `webhook-mercadopago` | Quando recebe `status: 'approved'` → atualiza para `processing` |
+
+**O problema:** O N8N não está chamando o webhook `webhook-n8n-payment` quando o pagamento PIX é confirmado.
 
 ---
 
-## Arquivos a Modificar
+## Duas Soluções Possíveis
 
-### 1. `src/pages/admin/Orders.tsx`
-**Linhas 169-177, 257-263, 337-344**
+### Solução 1: Configurar o N8N (Recomendada - Ação Manual)
 
-Atualizar:
-- `getStatusBadge()`: Alterar labels de `Processando/Enviado/Entregue` para `Em preparacao/Despachado/Finalizado`
-- Filtros de status (Select): Atualizar opcoes
-- Dropdown de edicao de status: Atualizar opcoes
+O workflow do N8N precisa ter um nó adicional que, após receber a confirmação de pagamento do Mercado Pago, faça uma chamada HTTP POST para:
 
-### 2. `src/pages/reseller/Orders.tsx`
-**Linhas 12-18, 91-96**
+```text
+URL: https://bbrmjrjorcgsgeztzbsr.supabase.co/functions/v1/webhook-n8n-payment
 
-Atualizar:
-- `statusConfig`: Alterar labels para o novo padrao
-- Adicionar status `refunded` que esta faltando
-- TabsList: Atualizar nomes das abas
-
-### 3. `src/pages/supplier/OrderManagement.tsx`
-**Linhas 24-31, 114-122**
-
-Atualizar:
-- `getStatusBadge()`: Alterar labels
-- Filtros de status: Atualizar opcoes
-
-### 4. `src/components/OrderDetailsModal.tsx`
-**Linhas 430-446**
-
-Atualizar:
-- `getStatusLabel()`: Alterar labels para o novo padrao
-- Mudar `Aguardando pagamento` para `Pendente`
-- Mudar `Processando` para `Em preparacao`
-- Mudar `Enviado` para `Despachado`
-- Mudar `Entregue` para `Finalizado`
-
-### 5. `src/pages/customer/Orders.tsx`
-**Linhas 95-111**
-
-Atualizar:
-- `getStatusLabel()`: Alterar labels para o novo padrao
-
-### 6. `src/pages/customer/Dashboard.tsx`
-**Linhas 65-71**
-
-Atualizar:
-- `getStatusLabel()`: Alterar labels para o novo padrao
-
-### 7. `src/components/admin/OrdersManagementSection.tsx`
-**Linhas 158-166**
-
-Atualizar:
-- `getStatusLabel()`: Alterar labels para o novo padrao
-
-### 8. `src/components/admin/UserDetailsModal.tsx`
-**Linhas 218-227**
-
-Atualizar:
-- `getStatusBadge()`: Alterar labels para o novo padrao
-
-### 9. `src/pages/RastrearPedido.tsx`
-**Linhas 113-124**
-
-Atualizar:
-- `getStatusBadge()`: Alterar labels para o novo padrao (incluindo status adicionais)
-
----
-
-## Abordagem Alternativa (Recomendada para Futuro)
-
-Para evitar duplicacao de codigo e facilitar manutencao futura, seria ideal criar um arquivo centralizado de constantes:
-
-**Arquivo futuro:** `src/constants/orderStatus.ts`
-```typescript
-export const ORDER_STATUS_LABELS: Record<string, string> = {
-  pending: 'Pendente',
-  processing: 'Em preparacao',
-  shipped: 'Despachado',
-  delivered: 'Finalizado',
-  cancelled: 'Cancelado',
-  refunded: 'Reembolsado',
-};
+Body (JSON):
+{
+  "paymentId": "{{paymentId do MP}}",
+  "status": "approved",
+  "amount": {{valor}},
+  "external_reference": "{{external_reference}}"
+}
 ```
 
-Porem, para esta implementacao inicial, vamos atualizar cada arquivo individualmente para minimizar o impacto nas importacoes existentes.
+---
+
+### Solução 2: Adicionar Verificação Ativa de Pagamento (Código)
+
+Criar uma Edge Function que verifica periodicamente os pedidos pendentes no Mercado Pago e atualiza automaticamente.
+
+**Arquivos a criar:**
+
+1. **`supabase/functions/check-pending-payments/index.ts`**
+   - Busca pedidos com `status = 'pending'` e `payment_status = 'pending'`
+   - Para cada pedido, consulta a API do Mercado Pago usando o `payment_id`
+   - Se o pagamento estiver `approved`, atualiza o pedido para `processing`
+   - Pode ser chamado periodicamente via CRON ou manualmente
+
+**Alterações no `supabase/config.toml`:**
+```toml
+[functions.check-pending-payments]
+verify_jwt = false
+```
 
 ---
 
-## Resumo das Alteracoes
+## Fluxo Atual vs Esperado
 
-| Arquivo | Tipo de Alteracao |
-|---------|-------------------|
-| `src/pages/admin/Orders.tsx` | Labels + Filtros + Dropdown |
-| `src/pages/reseller/Orders.tsx` | Labels + Tabs + Adicionar refunded |
-| `src/pages/supplier/OrderManagement.tsx` | Labels + Filtros |
-| `src/components/OrderDetailsModal.tsx` | Labels |
-| `src/pages/customer/Orders.tsx` | Labels |
-| `src/pages/customer/Dashboard.tsx` | Labels |
-| `src/components/admin/OrdersManagementSection.tsx` | Labels |
-| `src/components/admin/UserDetailsModal.tsx` | Labels |
-| `src/pages/RastrearPedido.tsx` | Labels |
+```text
+ATUAL (problema):
+1. Cliente gera PIX → pedido criado como "pending"
+2. Cliente paga PIX no app do banco
+3. Mercado Pago confirma pagamento
+4. N8N recebe confirmação mas NÃO chama webhook
+5. Pedido permanece "Pendente" ❌
+
+ESPERADO (com correção):
+1. Cliente gera PIX → pedido criado como "pending"
+2. Cliente paga PIX no app do banco
+3. Mercado Pago confirma pagamento
+4. N8N recebe confirmação e CHAMA webhook-n8n-payment
+5. Pedido atualizado para "Em preparação" ✅
+```
 
 ---
 
-## Resultado Esperado
+## Recomendação
 
-Apos as alteracoes, todos os locais do sistema exibirao os mesmos labels padronizados:
-- **Pendente** (antes: Pendente/Aguardando pagamento)
-- **Em preparacao** (antes: Processando)
-- **Despachado** (antes: Enviado)
-- **Finalizado** (antes: Entregue)
-- **Cancelado** (sem alteracao)
-- **Reembolsado** (sem alteracao)
+A **Solução 1 (configurar N8N)** é a mais apropriada pois:
+- O sistema já está preparado para receber a confirmação
+- Apenas precisa configurar o N8N para enviar a notificação
+- É mais eficiente (push) do que verificar periodicamente (poll)
+
+Se preferir a **Solução 2** como fallback de segurança, posso implementar a Edge Function de verificação.
+
+---
+
+## Resumo
+
+| Item | Descrição |
+|------|-----------|
+| **Causa raiz** | N8N não está chamando o webhook de confirmação |
+| **Solução principal** | Configurar nó HTTP no N8N para POST em `webhook-n8n-payment` |
+| **Solução alternativa** | Criar Edge Function `check-pending-payments` para verificar via API do MP |
 
