@@ -161,7 +161,7 @@ const ordersEndpoints: EndpointData[] = [
     ],
     requestBody: {
       order_number: 'ORD-1769828426038_865529AC',
-      status: 'shipped',
+      status: 'despachado',
       tracking_number: 'BR123456789BR',
       notes: 'Enviado via Correios SEDEX'
     },
@@ -171,16 +171,16 @@ const ordersEndpoints: EndpointData[] = [
       data: {
         order_id: 'c40b90a5-bed9-4a11-bd34-358909574b57',
         order_number: 'ORD-1769828426038_865529AC',
-        previous_status: 'processing',
-        new_status: 'shipped',
+        previous_status: 'em_preparacao',
+        new_status: 'despachado',
         tracking_number: 'BR123456789BR',
         updated_at: '2026-02-02T12:30:00Z'
       },
-      _status_disponiveis: 'pending, recebido, em_preparacao, processing, shipped, delivered, cancelled, refunded'
+      _status_disponiveis: 'pendente, em_preparacao, despachado, finalizado, cancelado, reembolsado'
     },
     errorExamples: [
       { code: 400, title: 'Campos obrigatórios', description: 'order_number ou status não informados', example: { success: false, error: 'order_number e status são obrigatórios' } },
-      { code: 400, title: 'Status inválido', description: 'Status não está na lista permitida', example: { success: false, error: 'Status inválido. Use: pending, recebido, em_preparacao, processing, shipped, delivered, cancelled, refunded' } },
+      { code: 400, title: 'Status inválido', description: 'Status não está na lista permitida', example: { success: false, error: 'Status inválido. Use: pendente, em_preparacao, despachado, finalizado, cancelado, reembolsado' } },
       { code: 401, title: 'API Key inválida', description: 'Chave não fornecida ou inativa', example: { success: false, error: 'API Key inválida ou inativa' } },
       { code: 403, title: 'Sem permissão', description: 'API Key sem permissão orders.write', example: { success: false, error: 'Permissão orders.write não concedida' } },
       { code: 404, title: 'Pedido não encontrado', description: 'Número do pedido não existe', example: { success: false, error: 'Pedido não encontrado' } }

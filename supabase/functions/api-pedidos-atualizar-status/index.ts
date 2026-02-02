@@ -6,14 +6,12 @@ const corsHeaders = {
 };
 
 const VALID_STATUSES = [
-  'pending',
-  'recebido',
+  'pendente',
   'em_preparacao',
-  'processing',
-  'shipped',
-  'delivered',
-  'cancelled',
-  'refunded'
+  'despachado',
+  'finalizado',
+  'cancelado',
+  'reembolsado'
 ];
 
 Deno.serve(async (req) => {
