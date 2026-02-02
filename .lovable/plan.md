@@ -1,134 +1,145 @@
 
-# Plano: Incluir Etiqueta de Envio no Webhook order.paid
+# Plano: Corrigir URLs 404 nos Botões de Configuração de Passos
 
 ## Diagnóstico
 
-O pedido `d03f2443-b353-4be7-8b62-2eaae8632eef` possui uma etiqueta de envio registrada na tabela `order_shipping_files`:
+Os botões de configuração do checklist de 6 passos estão retornando erro 404 porque as URLs definidas nos hooks não correspondem às rotas reais do sistema.
 
-```
-file_name: bruna michelle.pdf
-file_path: d03f2443-b353-4be7-8b62-2eaae8632eef/order_d03f2443-b353-4be7-8b62-2eaae8632eef_1770032189816.pdf
-file_size: 57265 bytes
-```
+## Análise Comparativa
 
-Porém, essa informação não está sendo incluída no payload do webhook `order.paid`.
+### Hook `useSetupProgress.ts` (URLs ERRADAS):
 
-**Causa Raiz:**
+| Passo | URL Atual (ERRADA) | Rota Real (CORRETA) |
+|-------|-------------------|---------------------|
+| Criar nome da loja | `/reseller/editor` | `/reseller/loja` |
+| Personalizar visual | `/reseller/editor` | `/reseller/loja` |
+| Adicionar contatos | `/reseller/editor` | `/reseller/loja` |
+| Importar produtos | `/reseller/catalog` | `/reseller/catalogo` |
+| Ativar produtos | `/reseller/products` | `/reseller/produtos` |
+| Adicionar vantagens | `/reseller/editor` | `/reseller/vantagens` |
 
-As funções que montam o payload manualmente (`dispatch-order-webhook`, `webhook-n8n-payment`, `check-pending-payments`) não buscam a etiqueta de envio na tabela `order_shipping_files` nem geram a URL assinada.
+### Hook `useResellerOnboarding.ts` (URLs ERRADAS):
+
+| Passo | URL Atual (ERRADA) | Rota Real (CORRETA) |
+|-------|-------------------|---------------------|
+| Configure sua Loja | `/reseller/loja` | OK |
+| Adicione Produtos | `/reseller/produtos` | OK |
+| Configure Pagamento | `/reseller/financeiro` | OK |
+| Compartilhe sua Loja | `/reseller/loja#share` | OK |
+| Conheça a Academia | `/minha-conta/academy` | OK |
+| Faça sua Primeira Venda | `/reseller/vendas` | OK |
+
+O hook `useResellerOnboarding.ts` já está com as rotas corretas.
 
 ---
 
 ## Arquivos a Modificar
 
-### 1. `supabase/functions/dispatch-order-webhook/index.ts`
+### 1. `src/hooks/useSetupProgress.ts`
 
-Adicionar busca da etiqueta de envio e geração de URL assinada:
+Corrigir as URLs dos passos para corresponder às rotas reais:
+
+**Alterações:**
 
 ```typescript
-// Buscar etiqueta de envio
-let shippingLabel = null;
-const { data: shippingFile } = await supabase
-  .from('order_shipping_files')
-  .select('file_name, file_path, file_size, uploaded_at')
-  .eq('order_id', fullOrder.id)
-  .limit(1)
-  .maybeSingle();
-
-if (shippingFile?.file_path) {
-  // Gerar URL assinada (válida por 7 dias)
-  const { data: signedUrlData } = await supabase.storage
-    .from('shipping-files')
-    .createSignedUrl(shippingFile.file_path, 604800);
-  
-  shippingLabel = {
-    file_name: shippingFile.file_name,
-    file_size: shippingFile.file_size,
-    uploaded_at: shippingFile.uploaded_at,
-    download_url: signedUrlData?.signedUrl || null,
-  };
-}
-
-// Adicionar ao payload
-const webhookPayload = {
-  // ... campos existentes ...
-  shipping_label: shippingLabel,
-};
-```
-
-### 2. `supabase/functions/webhook-n8n-payment/index.ts`
-
-Mesma lógica: adicionar busca de `order_shipping_files` e inclusão de `shipping_label` no payload.
-
-### 3. `supabase/functions/check-pending-payments/index.ts`
-
-Mesma lógica: adicionar busca de `order_shipping_files` e inclusão de `shipping_label` no payload.
-
----
-
-## Payload Final Esperado
-
-```json
-{
-  "event": "order.paid",
-  "timestamp": "2026-02-02T16:12:50.490Z",
-  "data": {
-    "order_id": "d03f2443-b353-4be7-8b62-2eaae8632eef",
-    "order_number": "ORD-1770032188907_0492ACDE",
-    "total_amount": 7.77,
-    "payment_method": "pix",
-    "customer": {
-      "user_id": "...",
-      "email": "rafaelleao88@yahoo.com.br",
-      "name": "RAFAEL LEAO",
-      "phone": "5514997384355"
-    },
-    "reseller": null,
-    "items": [
-      {
-        "product_id": "...",
-        "name": "Urinol Feminino...",
-        "sku": "CASA-001",
-        "quantity": 1,
-        "unit_price": 7.77
-      }
-    ],
-    "shipping_label": {
-      "file_name": "bruna michelle.pdf",
-      "file_size": 57265,
-      "uploaded_at": "2026-02-02T11:36:31.338Z",
-      "download_url": "https://...supabase.co/.../signed-url..."
-    }
-  }
-}
+const steps: SetupStep[] = [
+  {
+    id: "store-name",
+    title: "Criar nome da loja",
+    description: "Defina o nome e URL da sua loja",
+    completed: !!store?.store_name && !!store?.store_slug,
+    actionUrl: "/reseller/loja",  // ✅ Corrigido
+    actionLabel: "Configurar",
+  },
+  {
+    id: "store-design",
+    title: "Personalizar visual",
+    description: "Escolha cores e adicione logo",
+    completed: !!store?.primary_color || !!store?.logo_url,
+    actionUrl: "/reseller/loja",  // ✅ Corrigido
+    actionLabel: "Personalizar",
+  },
+  {
+    id: "contact-info",
+    title: "Adicionar contatos",
+    description: "WhatsApp, email e telefone",
+    completed: !!store?.whatsapp || !!store?.contact_email,
+    actionUrl: "/reseller/loja",  // ✅ Corrigido
+    actionLabel: "Adicionar",
+  },
+  {
+    id: "add-products",
+    title: "Importar produtos",
+    description: "Adicione pelo menos 3 produtos",
+    completed: (products?.length || 0) >= 3,
+    actionUrl: "/reseller/catalogo",  // ✅ Corrigido
+    actionLabel: "Importar",
+  },
+  {
+    id: "activate-products",
+    title: "Ativar produtos",
+    description: "Ative produtos para venda",
+    completed: activeProducts.length >= 1,
+    actionUrl: "/reseller/produtos",  // ✅ Corrigido
+    actionLabel: "Ativar",
+  },
+  {
+    id: "add-benefits",
+    title: "Adicionar vantagens",
+    description: "Mostre os benefícios da sua loja",
+    completed: hasBenefits,
+    actionUrl: "/reseller/vantagens",  // ✅ Corrigido
+    actionLabel: "Configurar",
+  },
+];
 ```
 
 ---
 
-## Resumo das Alterações
+## Resumo das Correções
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `dispatch-order-webhook/index.ts` | Adicionar busca de etiqueta + URL assinada |
-| `webhook-n8n-payment/index.ts` | Adicionar busca de etiqueta + URL assinada |
-| `check-pending-payments/index.ts` | Adicionar busca de etiqueta + URL assinada |
+| Arquivo | Linha | De | Para |
+|---------|-------|----|----|
+| `useSetupProgress.ts` | 51 | `/reseller/editor` | `/reseller/loja` |
+| `useSetupProgress.ts` | 59 | `/reseller/editor` | `/reseller/loja` |
+| `useSetupProgress.ts` | 67 | `/reseller/editor` | `/reseller/loja` |
+| `useSetupProgress.ts` | 75 | `/reseller/catalog` | `/reseller/catalogo` |
+| `useSetupProgress.ts` | 83 | `/reseller/products` | `/reseller/produtos` |
+| `useSetupProgress.ts` | 91 | `/reseller/editor` | `/reseller/vantagens` |
 
 ---
 
-## Detalhes Técnicos
+## Rotas Disponíveis de Referência
 
-**Bucket de armazenamento:** `shipping-files` (privado)
+Baseado no `App.tsx`, as rotas válidas para revendedores são:
 
-**Validade da URL assinada:** 7 dias (604800 segundos)
-
-**Estrutura do shipping_label:**
-- `file_name`: Nome original do arquivo
-- `file_size`: Tamanho em bytes
-- `uploaded_at`: Data/hora do upload
-- `download_url`: URL assinada para download (válida por 7 dias)
+- `/reseller` - Dashboard principal
+- `/reseller/dashboard` - Dashboard
+- `/reseller/loja` - Editor de loja
+- `/reseller/catalogo` - Catálogo para importar produtos
+- `/reseller/produtos` - Produtos importados
+- `/reseller/vantagens` - Configurar benefícios
+- `/reseller/banners` - Gerenciar banners
+- `/reseller/paginas` - Editor de páginas
+- `/reseller/cupons` - Gerenciar cupons
+- `/reseller/frete` - Configurar frete
+- `/reseller/depoimentos` - Gerenciar depoimentos
+- `/reseller/vendas` - Histórico de vendas
+- `/reseller/relatorios` - Relatórios
+- `/reseller/clientes` - Gerenciar clientes
+- `/reseller/financeiro` - Financeiro e saques
+- `/reseller/metas` - Metas de vendas
+- `/reseller/integracoes` - Integrações
 
 ---
 
 ## Resultado Esperado
 
-Após as correções, todos os webhooks `order.paid` incluirão a etiqueta de envio (quando existir) com uma URL de download válida por 7 dias, permitindo que o N8N e outros sistemas automatizados acessem o arquivo diretamente.
+Após a correção, todos os botões de configuração do checklist de 6 passos redirecionarão para as páginas corretas:
+
+1. **Configurar** (nome da loja) → `/reseller/loja`
+2. **Personalizar** (visual) → `/reseller/loja`
+3. **Adicionar** (contatos) → `/reseller/loja`
+4. **Importar** (produtos) → `/reseller/catalogo`
+5. **Ativar** (produtos) → `/reseller/produtos`
+6. **Configurar** (vantagens) → `/reseller/vantagens`
