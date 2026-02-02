@@ -1,107 +1,66 @@
 
+## Diagnóstico (por que está dando erro 500 ao atualizar)
+- O endpoint `/functions/v1/api-pedidos-atualizar-status` passou a **receber status em português** (ex.: `em_preparacao`).
+- Porém, a tabela `orders` ainda possui uma **check constraint** (`orders_status_check`) permitindo apenas os status em inglês:
+  - `pending`, `processing`, `shipped`, `delivered`, `cancelled`, `refunded`
+- Resultado: ao tentar salvar `em_preparacao` em `orders.status`, o Postgres rejeita e a Edge Function retorna 500 (“Erro ao atualizar pedido”).
 
-# Plano: Corrigir Inconsistência de Permissões
+## Objetivo da correção
+Manter a API externa com os status em português (como você definiu), mas **persistir no banco os status internos em inglês** (que são os que a tabela `orders` aceita hoje). Assim:
+- A API continua aceitando/mostrando: `pendente`, `em_preparacao`, `despachado`, `finalizado`, `cancelado`, `reembolsado`
+- O banco continua armazenando: `pending`, `processing`, `shipped`, `delivered`, `cancelled`, `refunded`
+- Evitamos quebrar outras funções já existentes (ex.: `create-pix-payment`, webhooks de pagamento) que ainda gravam `pending/processing/...`.
 
-## Problema Identificado
+## Mudanças a implementar
 
-A API Key está sendo criada com a permissão `pedidos.write`, mas o endpoint está verificando `orders.write`.
-
-**No ApiKeyManager (linha 84-88):**
-```typescript
-permissions: {
-  produtos: { read: true, write: true },
-  categorias: { read: true, write: true },
-  pedidos: { read: true, write: false }  // ← Usa "pedidos"
-}
-```
-
-**No Edge Function (linha 70):**
-```typescript
-const hasOrdersWrite = permissions?.orders?.write === true;  // ← Verifica "orders"
-```
-
----
-
-## Solução
-
-Atualizar o Edge Function para verificar `pedidos.write` em vez de `orders.write`, mantendo consistência com o padrão em português já usado no sistema.
-
----
-
-## Arquivos a Modificar
-
-### 1. Edge Function
-
+### 1) Ajustar a Edge Function para fazer “tradução” de status
 **Arquivo:** `supabase/functions/api-pedidos-atualizar-status/index.ts`
 
-**Alteração nas linhas 68-77:**
-```typescript
-// ANTES
-const permissions = keyData.permissions as Record<string, any> || {};
-const hasOrdersWrite = permissions?.orders?.write === true;
+**Ajustes:**
+1. Manter `VALID_STATUSES` com os 6 status em português.
+2. Criar um mapa de conversão:
+   - `pendente` -> `pending`
+   - `em_preparacao` -> `processing`
+   - `despachado` -> `shipped`
+   - `finalizado` -> `delivered`
+   - `cancelado` -> `cancelled`
+   - `reembolsado` -> `refunded`
+3. Antes de atualizar `orders`, converter:
+   - `internalStatus = map[status]`
+   - salvar `internalStatus` na coluna `orders.status`
+4. Para a resposta da API e para logs:
+   - Converter `previousStatus` (que vem do banco em inglês) para a forma em português ao retornar ao cliente.
+   - Retornar `previous_status` e `new_status` em português (consistência da API).
+5. Inserção em `order_status_history`:
+   - Registrar o `status` **interno** (inglês) para manter consistência com o dado real em `orders`.
+   - Usar `notes` para registrar a informação “status via API: {pt}”.
 
-if (!hasOrdersWrite) {
-  return new Response(
-    JSON.stringify({ success: false, error: 'Permissão orders.write não concedida' }),
+**Melhoria opcional (recomendado):**
+- Se o update falhar com `code: 23514` (check constraint), retornar **400** com uma mensagem explícita sobre status inválido para evitar “500 genérico”.
 
-// DEPOIS
-const permissions = keyData.permissions as Record<string, any> || {};
-const hasPedidosWrite = permissions?.pedidos?.write === true;
-
-if (!hasPedidosWrite) {
-  return new Response(
-    JSON.stringify({ success: false, error: 'Permissão pedidos.write não concedida' }),
-```
-
-### 2. Atualizar Permissões Padrão
-
-**Arquivo:** `src/components/admin/ApiKeyManager.tsx`
-
-**Alteração na linha 87:**
-```typescript
-// ANTES
-pedidos: { read: true, write: false }
-
-// DEPOIS  
-pedidos: { read: true, write: true }  // Habilitar escrita por padrão
-```
-
-### 3. Atualizar Documentação
-
+### 2) Atualizar a documentação para refletir o comportamento correto
 **Arquivo:** `src/data/apiEndpointsData.ts`
 
-Atualizar mensagem de erro para refletir `pedidos.write`:
-```typescript
-// ANTES
-{ code: 403, title: 'Sem permissão', description: 'API Key sem permissão orders.write', example: { success: false, error: 'Permissão orders.write não concedida' } }
+**Ajustes:**
+1. Manter a lista `_status_disponiveis` e exemplos com status em português.
+2. Atualizar o `responseExample` para continuar mostrando `previous_status/new_status` em português (porque o endpoint vai responder assim).
+3. (Recomendado) Acrescentar uma linha curta na `description` do endpoint deixando claro:
+   - “A API recebe status em PT-BR; internamente o sistema mapeia para os status do banco.”
 
-// DEPOIS
-{ code: 403, title: 'Sem permissão', description: 'API Key sem permissão pedidos.write', example: { success: false, error: 'Permissão pedidos.write não concedida' } }
-```
+## Como vamos validar (checklist)
+1. Chamar o endpoint com:
+   - `status: "em_preparacao"` e confirmar retorno 200.
+2. Verificar no banco (`orders.status`) que foi salvo como `processing`.
+3. Confirmar que o JSON de resposta mostra:
+   - `new_status: "em_preparacao"` (português).
+4. Testar também `despachado`, `finalizado`, etc.
 
----
+## Observações importantes
+- Esta abordagem é a mais segura agora porque evita quebrar:
+  - criação de pedido (`create-pix-payment` grava `pending`)
+  - webhooks (`webhook-mercadopago` / `webhook-n8n-payment` gravam `processing/cancelled/...`)
+- Se no futuro você quiser que o banco também armazene tudo em português, aí sim faremos uma migração no Postgres (alterar `orders_status_check` + atualizar dados existentes + ajustar webhooks/criação). Mas isso é uma mudança maior.
 
-## Ação Adicional Necessária
-
-Após as alterações, você precisará **atualizar as permissões das API Keys existentes** no banco de dados para incluir `pedidos.write: true`. Isso pode ser feito via SQL:
-
-```sql
-UPDATE api_keys 
-SET permissions = jsonb_set(
-  permissions, 
-  '{pedidos,write}', 
-  'true'::jsonb
-)
-WHERE permissions->'pedidos' IS NOT NULL;
-```
-
----
-
-## Resumo de Alterações
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `supabase/functions/api-pedidos-atualizar-status/index.ts` | Verificar `pedidos.write` em vez de `orders.write` |
-| `src/components/admin/ApiKeyManager.tsx` | Habilitar `pedidos.write: true` por padrão |
-| `src/data/apiEndpointsData.ts` | Atualizar mensagem de erro na documentação |
-
+## Arquivos envolvidos (resumo)
+- Editar: `supabase/functions/api-pedidos-atualizar-status/index.ts`
+- Editar: `src/data/apiEndpointsData.ts`
