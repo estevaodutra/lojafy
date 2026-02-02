@@ -6,6 +6,7 @@ import { ApiKeyManager } from '@/components/admin/ApiKeyManager';
 import { EndpointCard } from '@/components/admin/EndpointCard';
 import { CodeBlock } from '@/components/admin/CodeBlock';
 import { WebhooksSection } from '@/components/admin/WebhooksSection';
+import { ApiLogsSection } from '@/components/admin/ApiLogsSection';
 import { Shield, Zap, Globe, FileText, BookOpen, Terminal } from 'lucide-react';
 
 interface EndpointData {
@@ -269,6 +270,10 @@ export const ApiDocsContent: React.FC<ApiDocsContentProps> = ({
 
   if (selectedSection === 'webhooks') {
     return <WebhooksSection />;
+  }
+
+  if (selectedSection === 'logs') {
+    return <ApiLogsSection />;
   }
 
   // Endpoint sections

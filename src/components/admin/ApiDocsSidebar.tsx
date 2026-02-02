@@ -13,7 +13,8 @@ import {
   GraduationCap,
   ChevronRight,
   ChevronDown,
-  Zap
+  Zap,
+  ScrollText
 } from 'lucide-react';
 import { apiEndpointsData } from '@/data/apiEndpointsData';
 
@@ -29,6 +30,7 @@ const staticItems = [
   { id: 'auth', label: 'Autenticação', icon: Key },
   { id: 'keys', label: 'Chaves de API', icon: Settings },
   { id: 'webhooks', label: 'Webhooks', icon: Zap },
+  { id: 'logs', label: 'Logs', icon: ScrollText },
 ];
 
 const categoryIcons: Record<string, React.ElementType> = {
