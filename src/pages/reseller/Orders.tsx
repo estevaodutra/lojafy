@@ -11,10 +11,11 @@ import { ptBR } from "date-fns/locale";
 
 const statusConfig = {
   pending: { label: "Pendente", icon: Clock, color: "bg-yellow-100 text-yellow-800" },
-  processing: { label: "Processando", icon: Package, color: "bg-blue-100 text-blue-800" },
-  shipped: { label: "Enviado", icon: Truck, color: "bg-purple-100 text-purple-800" },
-  delivered: { label: "Entregue", icon: CheckCircle, color: "bg-green-100 text-green-800" },
+  processing: { label: "Em preparação", icon: Package, color: "bg-blue-100 text-blue-800" },
+  shipped: { label: "Despachado", icon: Truck, color: "bg-purple-100 text-purple-800" },
+  delivered: { label: "Finalizado", icon: CheckCircle, color: "bg-green-100 text-green-800" },
   cancelled: { label: "Cancelado", icon: XCircle, color: "bg-red-100 text-red-800" },
+  refunded: { label: "Reembolsado", icon: CheckCircle, color: "bg-gray-100 text-gray-800" },
 };
 
 function ResellerOrders() {
@@ -90,9 +91,9 @@ function ResellerOrders() {
         <TabsList>
           <TabsTrigger value="all">Todos ({counts.all})</TabsTrigger>
           <TabsTrigger value="pending">Pendentes ({counts.pending})</TabsTrigger>
-          <TabsTrigger value="processing">Processando ({counts.processing})</TabsTrigger>
-          <TabsTrigger value="shipped">Enviados ({counts.shipped})</TabsTrigger>
-          <TabsTrigger value="delivered">Entregues ({counts.delivered})</TabsTrigger>
+          <TabsTrigger value="processing">Em preparação ({counts.processing})</TabsTrigger>
+          <TabsTrigger value="shipped">Despachados ({counts.shipped})</TabsTrigger>
+          <TabsTrigger value="delivered">Finalizados ({counts.delivered})</TabsTrigger>
           <TabsTrigger value="cancelled">Cancelados ({counts.cancelled})</TabsTrigger>
         </TabsList>
 

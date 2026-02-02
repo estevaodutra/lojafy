@@ -158,9 +158,10 @@ export const OrdersManagementSection = () => {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'pending': return 'Pendente';
-      case 'processing': return 'Processando';
-      case 'shipped': return 'Enviado';
-      case 'delivered': return 'Entregue';
+      case 'processing': return 'Em preparação';
+      case 'shipped': return 'Despachado';
+      case 'delivered': return 'Finalizado';
+      case 'cancelled': return 'Cancelado';
       case 'refunded': return 'Reembolsado';
       default: return 'Desconhecido';
     }
@@ -205,9 +206,10 @@ export const OrdersManagementSection = () => {
             <SelectContent>
               <SelectItem value="all">Todos os Status</SelectItem>
               <SelectItem value="pending">Pendente</SelectItem>
-              <SelectItem value="processing">Processando</SelectItem>
-              <SelectItem value="shipped">Enviado</SelectItem>
-              <SelectItem value="delivered">Entregue</SelectItem>
+              <SelectItem value="processing">Em preparação</SelectItem>
+              <SelectItem value="shipped">Despachado</SelectItem>
+              <SelectItem value="delivered">Finalizado</SelectItem>
+              <SelectItem value="cancelled">Cancelado</SelectItem>
               <SelectItem value="refunded">Reembolsado</SelectItem>
             </SelectContent>
           </Select>
@@ -295,9 +297,10 @@ export const OrdersManagementSection = () => {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="pending">Pendente</SelectItem>
-                              <SelectItem value="processing">Processando</SelectItem>
-                              <SelectItem value="shipped">Enviado</SelectItem>
-                              <SelectItem value="delivered">Entregue</SelectItem>
+                              <SelectItem value="processing">Em preparação</SelectItem>
+                              <SelectItem value="shipped">Despachado</SelectItem>
+                              <SelectItem value="delivered">Finalizado</SelectItem>
+                              <SelectItem value="cancelled">Cancelado</SelectItem>
                               <SelectItem value="refunded">Reembolsado</SelectItem>
                             </SelectContent>
                           </Select>
