@@ -1,126 +1,112 @@
 
-
-# Plano: Alterar Status Inicial para "Pendente" quando Pedido é Pago
+# Plano: Adicionar Atalho da Lojafy Academy no Menu do Revendedor
 
 ## Objetivo
 
-Quando um pagamento é aprovado (status `approved` do Mercado Pago), o status de envio do pedido deve ser definido como `pending` (Pendente) em vez de `processing` (Em preparação).
+Adicionar um item de menu "Lojafy Academy" no painel lateral do revendedor, visível apenas para usuários que possuem a feature `lojafy_academy` ativa.
 
 ---
 
-## Arquivos a Alterar
+## Alterações
 
-### 1. `supabase/functions/webhook-n8n-payment/index.ts`
+### Arquivo: `src/components/layouts/ResellerLayout.tsx`
 
-**Linha 128-132:**
+**1. Adicionar import do ícone GraduationCap (linha 3-24):**
 
-De:
-```typescript
-case 'approved':
-  newStatus = 'processing';
-  paymentStatus = 'paid';
-  console.log('Payment approved - updating to processing status');
-  break;
+```tsx
+import { 
+  // ... imports existentes ...
+  GraduationCap  // Adicionar este
+} from 'lucide-react';
 ```
 
-Para:
-```typescript
-case 'approved':
-  newStatus = 'pending';
-  paymentStatus = 'paid';
-  console.log('Payment approved - order ready for shipping preparation');
-  break;
+**2. Adicionar verificação da feature lojafy_academy (linha 92):**
+
+```tsx
+const { hasFeature: hasTop10Feature } = useFeature('top_10_produtos');
+const { hasFeature: hasAcademyFeature } = useFeature('lojafy_academy');
 ```
 
----
+**3. Atualizar filteredMenuGroups para incluir Academy (linhas 95-109):**
 
-### 2. `supabase/functions/check-pending-payments/index.ts`
+Adicionar um grupo "Aprendizado" com o link da Academy, antes do grupo "Meus Acessos":
 
-**Linha 109-114:**
-
-De:
-```typescript
-case 'approved':
-  newStatus = 'processing';
-  newPaymentStatus = 'paid';
-  action = 'updated_to_processing';
-  break;
-```
-
-Para:
-```typescript
-case 'approved':
-  newStatus = 'pending';
-  newPaymentStatus = 'paid';
-  action = 'updated_to_pending_paid';
-  break;
-```
-
----
-
-### 3. `supabase/functions/webhook-mercadopago/index.ts`
-
-**Linha 133-137:**
-
-De:
-```typescript
-case 'approved':
-  newStatus = 'processing';
-  paymentStatus = 'paid';
-  break;
-```
-
-Para:
-```typescript
-case 'approved':
-  newStatus = 'pending';
-  paymentStatus = 'paid';
-  break;
+```tsx
+const filteredMenuGroups = useMemo(() => {
+  const groups = [...menuGroups];
+  
+  // Adicionar Academy apenas para quem tem a feature
+  if (hasAcademyFeature) {
+    const advancedIndex = groups.findIndex(g => g.label === 'Avançado');
+    groups.splice(advancedIndex, 0, {
+      label: 'Aprendizado',
+      items: [
+        { title: 'Lojafy Academy', url: '/minha-conta/academy', icon: GraduationCap },
+      ]
+    });
+  }
+  
+  // Adicionar Meus Acessos apenas para quem tem a feature
+  if (hasTop10Feature) {
+    const advancedIndex = groups.findIndex(g => g.label === 'Avançado');
+    groups.splice(advancedIndex, 0, {
+      label: 'Meus Acessos',
+      items: [
+        { title: 'Top 10 Produtos Vencedores', url: '/reseller/meus-acessos/top-produtos', icon: Trophy, badge: 'Novo' },
+      ]
+    });
+  }
+  
+  return groups;
+}, [hasTop10Feature, hasAcademyFeature]);
 ```
 
 ---
 
-## Fluxo de Status de Envio Atualizado
+## Layout Visual Esperado
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    FLUXO DE STATUS DE ENVIO                     │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. Pedido Criado (aguardando pagamento)                        │
-│     └─> status: pending, payment_status: pending                │
-│                                                                 │
-│  2. Pagamento Aprovado (ALTERACAO)                              │
-│     └─> status: pending, payment_status: paid                   │
-│         (Antes era: status: processing)                         │
-│                                                                 │
-│  3. Admin altera para "Em preparacao"                           │
-│     └─> status: processing                                      │
-│                                                                 │
-│  4. Admin altera para "Despachado"                              │
-│     └─> status: shipped                                         │
-│                                                                 │
-│  5. Admin altera para "Finalizado"                              │
-│     └─> status: delivered                                       │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+┌────────────────────────────┐
+│ Revendedor          [PRO]  │
+├────────────────────────────┤
+│ Principal                  │
+│   Dashboard                │
+├────────────────────────────┤
+│ Produtos                   │
+│   Catálogo                 │
+│   Meus Produtos            │
+├────────────────────────────┤
+│ Vendas & Finanças          │
+│   ...                      │
+├────────────────────────────┤
+│ Minha Loja                 │
+│   ...                      │
+├────────────────────────────┤
+│ Aprendizado       ← NOVO   │
+│   🎓 Lojafy Academy        │
+├────────────────────────────┤
+│ Avançado                   │
+│   Integrações              │
+├────────────────────────────┤
+│ Ver Minha Loja             │
+│ Sair                       │
+└────────────────────────────┘
 ```
 
 ---
 
-## Resumo das Alteracoes
+## Observações
 
-| Arquivo | Linha | Alteracao |
-|---------|-------|-----------|
-| `webhook-n8n-payment/index.ts` | 130 | `'processing'` -> `'pending'` |
-| `check-pending-payments/index.ts` | 111 | `'processing'` -> `'pending'` |
-| `webhook-mercadopago/index.ts` | 135 | `'processing'` -> `'pending'` |
+- A rota `/minha-conta/academy` já existe e está protegida pela feature `lojafy_academy`
+- O ícone `GraduationCap` é o mesmo usado no CustomerLayout para consistência visual
+- O item só aparece para usuários com a feature ativa (igual ao padrão já existente para Top 10 Produtos)
 
 ---
 
-## Beneficios
+## Resumo das Alterações
 
-1. **Controle manual do fluxo** - Admin decide quando iniciar preparacao
-2. **Visibilidade clara** - Pedidos pagos ficam como "Pendente" aguardando acao
-3. **Diferenciacao** - Distingue pedidos pagos (payment_status: paid) de nao pagos
-
+| Linha | Alteração |
+|-------|-----------|
+| 4-24 | Adicionar import `GraduationCap` |
+| 92 | Adicionar `hasAcademyFeature` via useFeature |
+| 95-109 | Adicionar grupo "Aprendizado" com link da Academy |
