@@ -4,14 +4,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { CodeBlock } from '@/components/admin/CodeBlock';
 import { useApiLogs, LogSource, LogEventType, LogPeriod, LogStatus } from '@/hooks/useApiLogs';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { RefreshCw, ChevronDown, ChevronRight, ScrollText, AlertCircle, CheckCircle2, ArrowDownLeft, ArrowUpRight, Clock, Activity, TrendingUp } from 'lucide-react';
+import { RefreshCw, ScrollText, AlertCircle, CheckCircle2, ArrowDownLeft, ArrowUpRight, Clock, Activity, TrendingUp, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const sourceOptions: { value: LogSource; label: string }[] = [
@@ -86,130 +86,65 @@ const getSourceBadge = (source: 'webhook' | 'api_request') => {
   );
 };
 
-interface LogRowProps {
-  log: {
-    id: string;
-    source: 'webhook' | 'api_request';
-    event_type: string;
-    function_name?: string;
-    method?: string;
-    payload?: Record<string, unknown>;
-    query_params?: Record<string, unknown>;
-    status_code: number | null;
-    response_body?: string | null;
-    error_message: string | null;
-    duration_ms?: number | null;
-    timestamp: string;
-    webhook_url?: string | null;
-  };
+interface LogData {
+  id: string;
+  source: 'webhook' | 'api_request';
+  event_type: string;
+  function_name?: string;
+  method?: string;
+  payload?: Record<string, unknown>;
+  query_params?: Record<string, unknown>;
+  status_code: number | null;
+  response_body?: string | null;
+  error_message: string | null;
+  duration_ms?: number | null;
+  timestamp: string;
+  webhook_url?: string | null;
 }
 
-const LogRow: React.FC<LogRowProps> = ({ log }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+interface LogRowProps {
+  log: LogData;
+  onViewDetails: (log: LogData) => void;
+}
 
+const LogRow: React.FC<LogRowProps> = ({ log, onViewDetails }) => {
   const formattedDate = format(new Date(log.timestamp), "dd/MM/yy HH:mm:ss", { locale: ptBR });
 
   return (
-    <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-      <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => setIsExpanded(!isExpanded)}>
-        <TableCell className="w-[15%] font-mono text-xs text-muted-foreground">
-          {formattedDate}
-        </TableCell>
-        <TableCell className="w-[12%]">
-          {getSourceBadge(log.source)}
-        </TableCell>
-        <TableCell className="w-[33%]">
-          <div className="flex flex-col gap-1">
-            <Badge variant="outline" className="font-mono text-xs w-fit truncate max-w-full">
-              {log.source === 'api_request' ? log.function_name : log.event_type}
-            </Badge>
-            {log.method && (
-              <span className="text-xs text-muted-foreground">{log.method}</span>
-            )}
-          </div>
-        </TableCell>
-        <TableCell className="w-[15%]">
-          {getStatusBadge(log.status_code)}
-        </TableCell>
-        <TableCell className="w-[15%] text-xs text-muted-foreground font-mono">
-          {log.duration_ms !== undefined && log.duration_ms !== null ? `${log.duration_ms}ms` : '-'}
-        </TableCell>
-        <TableCell className="w-[10%] text-right">
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-              {isExpanded ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-            </Button>
-          </CollapsibleTrigger>
-        </TableCell>
-      </TableRow>
-      
-      <CollapsibleContent asChild>
-        <TableRow className="bg-muted/30 hover:bg-muted/30">
-          <TableCell colSpan={6} className="p-0">
-            <div className="p-4 space-y-4">
-              {log.webhook_url && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-1">URL de Destino</p>
-                  <p className="font-mono text-xs break-all">{log.webhook_url}</p>
-                </div>
-              )}
-              
-              {log.payload && Object.keys(log.payload).length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Payload Enviado</p>
-                  <ScrollArea className="max-h-60">
-                    <CodeBlock 
-                      code={JSON.stringify(log.payload, null, 2)} 
-                      language="json"
-                      className="text-xs"
-                    />
-                  </ScrollArea>
-                </div>
-              )}
-
-              {log.query_params && Object.keys(log.query_params).length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Query Parameters</p>
-                  <ScrollArea className="max-h-40">
-                    <CodeBlock 
-                      code={JSON.stringify(log.query_params, null, 2)} 
-                      language="json"
-                      className="text-xs"
-                    />
-                  </ScrollArea>
-                </div>
-              )}
-              
-              {log.response_body && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Resposta</p>
-                  <ScrollArea className="max-h-40">
-                    <CodeBlock 
-                      code={log.response_body} 
-                      language="json"
-                      className="text-xs"
-                    />
-                  </ScrollArea>
-                </div>
-              )}
-              
-              {log.error_message && (
-                <div>
-                  <p className="text-xs font-medium text-destructive mb-1">Mensagem de Erro</p>
-                  <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">
-                    {log.error_message}
-                  </p>
-                </div>
-              )}
-            </div>
-          </TableCell>
-        </TableRow>
-      </CollapsibleContent>
-    </Collapsible>
+    <TableRow className="hover:bg-muted/50">
+      <TableCell className="w-[15%] font-mono text-xs text-muted-foreground">
+        {formattedDate}
+      </TableCell>
+      <TableCell className="w-[12%]">
+        {getSourceBadge(log.source)}
+      </TableCell>
+      <TableCell className="w-[33%]">
+        <div className="flex flex-col gap-1">
+          <Badge variant="outline" className="font-mono text-xs w-fit truncate max-w-full">
+            {log.source === 'api_request' ? log.function_name : log.event_type}
+          </Badge>
+          {log.method && (
+            <span className="text-xs text-muted-foreground">{log.method}</span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="w-[15%]">
+        {getStatusBadge(log.status_code)}
+      </TableCell>
+      <TableCell className="w-[15%] text-xs text-muted-foreground font-mono">
+        {log.duration_ms !== undefined && log.duration_ms !== null ? `${log.duration_ms}ms` : '-'}
+      </TableCell>
+      <TableCell className="w-[10%] text-right">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-6 w-6 p-0"
+          onClick={() => onViewDetails(log)}
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
+      </TableCell>
+    </TableRow>
   );
 };
 
@@ -218,6 +153,7 @@ export const ApiLogsSection: React.FC = () => {
   const [eventType, setEventType] = useState<LogEventType>('all');
   const [period, setPeriod] = useState<LogPeriod>('7d');
   const [status, setStatus] = useState<LogStatus>('all');
+  const [selectedLog, setSelectedLog] = useState<LogData | null>(null);
 
   const { logs, isLoading, refetch, page, setPage, totalPages, totalCount, metrics } = useApiLogs({
     source,
@@ -368,7 +304,7 @@ export const ApiLogsSection: React.FC = () => {
             <Badge variant="secondary">{totalCount} registros</Badge>
           </div>
           <CardDescription>
-            Clique em uma linha para ver os detalhes do payload e resposta
+            Clique no ícone de olho para ver os detalhes do payload e resposta
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -397,18 +333,16 @@ export const ApiLogsSection: React.FC = () => {
               </TableHeader>
               <TableBody>
                 {logs.map((log) => (
-                  <LogRow key={log.id} log={log} />
+                  <LogRow key={log.id} log={log} onViewDetails={setSelectedLog} />
                 ))}
               </TableBody>
             </Table>
           )}
         </CardContent>
-      </Card>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
+        {/* Pagination inline */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between p-4 border-t">
             <span className="text-sm text-muted-foreground">
               Página {page} de {totalPages}
             </span>
@@ -431,8 +365,100 @@ export const ApiLogsSection: React.FC = () => {
               </Button>
             </div>
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
+
+      {/* Log Details Sheet */}
+      <Sheet open={!!selectedLog} onOpenChange={(open) => !open && setSelectedLog(null)}>
+        <SheetContent className="sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Detalhes do Log</SheetTitle>
+            <SheetDescription>
+              {selectedLog?.source === 'webhook' ? 'Webhook enviado' : 'Requisição de API recebida'}
+            </SheetDescription>
+          </SheetHeader>
+          
+          {selectedLog && (
+            <div className="mt-6 space-y-4">
+              {/* Timestamp and Status */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  {format(new Date(selectedLog.timestamp), "dd/MM/yyyy 'às' HH:mm:ss", { locale: ptBR })}
+                </span>
+                {getStatusBadge(selectedLog.status_code)}
+              </div>
+
+              {/* Duration */}
+              {selectedLog.duration_ms !== undefined && selectedLog.duration_ms !== null && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Duração</p>
+                  <p className="font-mono text-sm">{selectedLog.duration_ms}ms</p>
+                </div>
+              )}
+
+              {/* Webhook URL */}
+              {selectedLog.webhook_url && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">URL de Destino</p>
+                  <p className="font-mono text-xs break-all bg-muted p-2 rounded">{selectedLog.webhook_url}</p>
+                </div>
+              )}
+              
+              {/* Payload */}
+              {selectedLog.payload && Object.keys(selectedLog.payload).length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Payload Enviado</p>
+                  <ScrollArea className="max-h-60">
+                    <CodeBlock 
+                      code={JSON.stringify(selectedLog.payload, null, 2)} 
+                      language="json"
+                      className="text-xs"
+                    />
+                  </ScrollArea>
+                </div>
+              )}
+
+              {/* Query Params */}
+              {selectedLog.query_params && Object.keys(selectedLog.query_params).length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Query Parameters</p>
+                  <ScrollArea className="max-h-40">
+                    <CodeBlock 
+                      code={JSON.stringify(selectedLog.query_params, null, 2)} 
+                      language="json"
+                      className="text-xs"
+                    />
+                  </ScrollArea>
+                </div>
+              )}
+              
+              {/* Response */}
+              {selectedLog.response_body && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Resposta</p>
+                  <ScrollArea className="max-h-40">
+                    <CodeBlock 
+                      code={selectedLog.response_body} 
+                      language="json"
+                      className="text-xs"
+                    />
+                  </ScrollArea>
+                </div>
+              )}
+              
+              {/* Error */}
+              {selectedLog.error_message && (
+                <div>
+                  <p className="text-xs font-medium text-destructive mb-1">Mensagem de Erro</p>
+                  <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">
+                    {selectedLog.error_message}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
 
       {/* Retention Notice */}
       <p className="text-xs text-muted-foreground text-center">
