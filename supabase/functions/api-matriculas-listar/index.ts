@@ -5,43 +5,60 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
 };
 
+async function logApiRequest(supabase: any, data: any) {
+  try {
+    await supabase.from('api_request_logs').insert(data);
+  } catch (e) { console.error('[LOG_ERROR]', e); }
+}
+
 Deno.serve(async (req) => {
+  const startTime = Date.now();
+  const url = new URL(req.url);
+  let statusCode = 200;
+  let errorMessage: string | null = null;
+  let apiKeyId: string | null = null;
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
     const apiKey = req.headers.get('X-API-Key');
     
     if (!apiKey) {
+      statusCode = 401;
+      errorMessage = 'API key é obrigatória';
       return new Response(
         JSON.stringify({ success: false, error: 'API key é obrigatória' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
     // Verificar API Key
     const { data: keyData, error: keyError } = await supabase
       .from('api_keys')
-      .select('user_id')
+      .select('id, user_id')
       .eq('api_key', apiKey)
       .eq('active', true)
       .single();
 
     if (keyError || !keyData) {
       console.error('API key inválida:', keyError);
+      statusCode = 401;
+      errorMessage = 'API key inválida';
       return new Response(
         JSON.stringify({ success: false, error: 'API key inválida' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    apiKeyId = keyData.id;
+
     // Parse query params
-    const url = new URL(req.url);
     const userId = url.searchParams.get('user_id');
     const courseId = url.searchParams.get('course_id');
     const completed = url.searchParams.get('completed');
@@ -79,6 +96,8 @@ Deno.serve(async (req) => {
 
     if (error) {
       console.error('Erro ao buscar matrículas:', error);
+      statusCode = 400;
+      errorMessage = error.message;
       return new Response(
         JSON.stringify({ success: false, error: error.message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -105,9 +124,22 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Erro inesperado:', error);
+    statusCode = 500;
+    errorMessage = error instanceof Error ? error.message : 'Erro interno';
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+  } finally {
+    logApiRequest(supabase, {
+      function_name: 'api-matriculas-listar',
+      method: req.method,
+      path: url.pathname,
+      api_key_id: apiKeyId,
+      query_params: Object.fromEntries(url.searchParams),
+      status_code: statusCode,
+      error_message: errorMessage,
+      duration_ms: Date.now() - startTime,
+    });
   }
 });

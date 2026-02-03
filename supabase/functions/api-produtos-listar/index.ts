@@ -5,45 +5,65 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
 };
 
+async function logApiRequest(supabase: any, data: any) {
+  try {
+    await supabase.from('api_request_logs').insert(data);
+  } catch (e) { console.error('[LOG_ERROR]', e); }
+}
+
 Deno.serve(async (req) => {
+  const startTime = Date.now();
+  const url = new URL(req.url);
+  let statusCode = 200;
+  let errorMessage: string | null = null;
+  let apiKeyId: string | null = null;
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
   try {
     // Verify API key
     const apiKey = req.headers.get('x-api-key');
     if (!apiKey) {
+      statusCode = 401;
+      errorMessage = 'API key required';
       return new Response(
         JSON.stringify({ error: 'API key required in X-API-Key header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     // Validate API key and get permissions
     const { data: apiKeyData, error: apiKeyError } = await supabase
       .from('api_keys')
-      .select('user_id, permissions, active')
+      .select('id, user_id, permissions, active')
       .eq('api_key', apiKey)
       .eq('active', true)
       .maybeSingle();
 
     if (apiKeyError || !apiKeyData) {
+      statusCode = 401;
+      errorMessage = 'Invalid or inactive API key';
       return new Response(
         JSON.stringify({ error: 'Invalid or inactive API key' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    apiKeyId = apiKeyData.id;
+
     // Check permissions
     const permissions = apiKeyData.permissions as any;
     if (!permissions?.produtos?.read) {
+      statusCode = 403;
+      errorMessage = 'Insufficient permissions';
       return new Response(
         JSON.stringify({ error: 'Insufficient permissions for this endpoint' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -57,7 +77,6 @@ Deno.serve(async (req) => {
       .eq('api_key', apiKey);
 
     // Parse query parameters
-    const url = new URL(req.url);
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
     const search = url.searchParams.get('search');
@@ -106,6 +125,8 @@ Deno.serve(async (req) => {
 
     if (productsError) {
       console.error('Error fetching products:', productsError);
+      statusCode = 500;
+      errorMessage = productsError.message;
       return new Response(
         JSON.stringify({ 
           error: 'Erro ao buscar produtos',
@@ -116,7 +137,7 @@ Deno.serve(async (req) => {
     }
 
     // Get total count for pagination
-    const { count, error: countError } = await supabase
+    const { count } = await supabase
       .from('products')
       .select('id', { count: 'exact', head: true });
 
@@ -155,9 +176,23 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Error in api-produtos-listar:', error);
+    statusCode = 500;
+    errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+  } finally {
+    // Log request asynchronously
+    logApiRequest(supabase, {
+      function_name: 'api-produtos-listar',
+      method: req.method,
+      path: url.pathname,
+      api_key_id: apiKeyId,
+      query_params: Object.fromEntries(url.searchParams),
+      status_code: statusCode,
+      error_message: errorMessage,
+      duration_ms: Date.now() - startTime,
+    });
   }
 });
