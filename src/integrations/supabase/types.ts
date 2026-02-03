@@ -478,6 +478,65 @@ export type Database = {
         }
         Relationships: []
       }
+      api_request_logs: {
+        Row: {
+          api_key_id: string | null
+          created_at: string | null
+          duration_ms: number | null
+          error_message: string | null
+          function_name: string
+          id: string
+          ip_address: string | null
+          method: string
+          path: string | null
+          query_params: Json | null
+          request_body: Json | null
+          response_summary: Json | null
+          status_code: number | null
+          user_id: string | null
+        }
+        Insert: {
+          api_key_id?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          function_name: string
+          id?: string
+          ip_address?: string | null
+          method: string
+          path?: string | null
+          query_params?: Json | null
+          request_body?: Json | null
+          response_summary?: Json | null
+          status_code?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          api_key_id?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          function_name?: string
+          id?: string
+          ip_address?: string | null
+          method?: string
+          path?: string | null
+          query_params?: Json | null
+          request_body?: Json | null
+          response_summary?: Json | null
+          status_code?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_request_logs_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "api_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       banners: {
         Row: {
           active: boolean
@@ -3679,6 +3738,13 @@ export type Database = {
         Returns: number
       }
       cancel_expired_order: { Args: { p_order_id: string }; Returns: boolean }
+      cleanup_old_api_logs: {
+        Args: never
+        Returns: {
+          deleted_api_logs: number
+          deleted_webhook_logs: number
+        }[]
+      }
       complete_withdrawal: {
         Args: { p_admin_id: string; p_withdrawal_id: string }
         Returns: undefined

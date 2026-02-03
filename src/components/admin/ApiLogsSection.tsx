@@ -8,14 +8,21 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CodeBlock } from '@/components/admin/CodeBlock';
-import { useApiLogs, LogEventType, LogPeriod, LogStatus } from '@/hooks/useApiLogs';
+import { useApiLogs, LogSource, LogEventType, LogPeriod, LogStatus } from '@/hooks/useApiLogs';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { RefreshCw, ChevronDown, ChevronRight, ScrollText, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, ChevronDown, ChevronRight, ScrollText, AlertCircle, CheckCircle2, ArrowDownLeft, ArrowUpRight, Clock, Activity, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+const sourceOptions: { value: LogSource; label: string }[] = [
+  { value: 'all', label: 'Todas as origens' },
+  { value: 'api_request', label: '📥 Requisições de API' },
+  { value: 'webhook', label: '📤 Webhooks Enviados' },
+];
 
 const eventTypeOptions: { value: LogEventType; label: string }[] = [
   { value: 'all', label: 'Todos os eventos' },
+  { value: 'api.request', label: 'Requisições API' },
   { value: 'order.paid', label: 'order.paid' },
   { value: 'user.created', label: 'user.created' },
   { value: 'user.inactive.7d', label: 'user.inactive.7d' },
@@ -26,7 +33,6 @@ const eventTypeOptions: { value: LogEventType; label: string }[] = [
 const periodOptions: { value: LogPeriod; label: string }[] = [
   { value: '24h', label: 'Últimas 24h' },
   { value: '7d', label: 'Últimos 7 dias' },
-  { value: '30d', label: 'Últimos 30 dias' },
   { value: 'all', label: 'Todo o período' },
 ];
 
@@ -48,7 +54,7 @@ const getStatusBadge = (statusCode: number | null) => {
   
   if (statusCode >= 200 && statusCode < 300) {
     return (
-      <Badge className="gap-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+      <Badge variant="secondary" className="gap-1 bg-secondary text-secondary-foreground">
         <CheckCircle2 className="h-3 w-3" />
         {statusCode}
       </Badge>
@@ -63,23 +69,45 @@ const getStatusBadge = (statusCode: number | null) => {
   );
 };
 
+const getSourceBadge = (source: 'webhook' | 'api_request') => {
+  if (source === 'webhook') {
+    return (
+      <Badge variant="outline" className="gap-1">
+        <ArrowUpRight className="h-3 w-3" />
+        OUT
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="secondary" className="gap-1">
+      <ArrowDownLeft className="h-3 w-3" />
+      IN
+    </Badge>
+  );
+};
+
 interface LogRowProps {
   log: {
     id: string;
+    source: 'webhook' | 'api_request';
     event_type: string;
-    payload: Record<string, unknown>;
+    function_name?: string;
+    method?: string;
+    payload?: Record<string, unknown>;
+    query_params?: Record<string, unknown>;
     status_code: number | null;
-    response_body: string | null;
+    response_body?: string | null;
     error_message: string | null;
-    dispatched_at: string;
-    webhook_url: string | null;
+    duration_ms?: number | null;
+    timestamp: string;
+    webhook_url?: string | null;
   };
 }
 
 const LogRow: React.FC<LogRowProps> = ({ log }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const formattedDate = format(new Date(log.dispatched_at), "dd/MM/yy HH:mm:ss", { locale: ptBR });
+  const formattedDate = format(new Date(log.timestamp), "dd/MM/yy HH:mm:ss", { locale: ptBR });
 
   return (
     <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
@@ -88,12 +116,23 @@ const LogRow: React.FC<LogRowProps> = ({ log }) => {
           {formattedDate}
         </TableCell>
         <TableCell>
-          <Badge variant="outline" className="font-mono text-xs">
-            {log.event_type}
-          </Badge>
+          {getSourceBadge(log.source)}
+        </TableCell>
+        <TableCell>
+          <div className="flex flex-col gap-1">
+            <Badge variant="outline" className="font-mono text-xs w-fit">
+              {log.source === 'api_request' ? log.function_name : log.event_type}
+            </Badge>
+            {log.method && (
+              <span className="text-xs text-muted-foreground">{log.method}</span>
+            )}
+          </div>
         </TableCell>
         <TableCell>
           {getStatusBadge(log.status_code)}
+        </TableCell>
+        <TableCell className="text-xs text-muted-foreground font-mono">
+          {log.duration_ms !== undefined && log.duration_ms !== null ? `${log.duration_ms}ms` : '-'}
         </TableCell>
         <TableCell className="text-right">
           <CollapsibleTrigger asChild>
@@ -110,7 +149,7 @@ const LogRow: React.FC<LogRowProps> = ({ log }) => {
       
       <CollapsibleContent asChild>
         <TableRow className="bg-muted/30 hover:bg-muted/30">
-          <TableCell colSpan={4} className="p-0">
+          <TableCell colSpan={6} className="p-0">
             <div className="p-4 space-y-4">
               {log.webhook_url && (
                 <div>
@@ -119,16 +158,31 @@ const LogRow: React.FC<LogRowProps> = ({ log }) => {
                 </div>
               )}
               
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Payload Enviado</p>
-                <ScrollArea className="max-h-60">
-                  <CodeBlock 
-                    code={JSON.stringify(log.payload, null, 2)} 
-                    language="json"
-                    className="text-xs"
-                  />
-                </ScrollArea>
-              </div>
+              {log.payload && Object.keys(log.payload).length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Payload Enviado</p>
+                  <ScrollArea className="max-h-60">
+                    <CodeBlock 
+                      code={JSON.stringify(log.payload, null, 2)} 
+                      language="json"
+                      className="text-xs"
+                    />
+                  </ScrollArea>
+                </div>
+              )}
+
+              {log.query_params && Object.keys(log.query_params).length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Query Parameters</p>
+                  <ScrollArea className="max-h-40">
+                    <CodeBlock 
+                      code={JSON.stringify(log.query_params, null, 2)} 
+                      language="json"
+                      className="text-xs"
+                    />
+                  </ScrollArea>
+                </div>
+              )}
               
               {log.response_body && (
                 <div>
@@ -160,11 +214,13 @@ const LogRow: React.FC<LogRowProps> = ({ log }) => {
 };
 
 export const ApiLogsSection: React.FC = () => {
+  const [source, setSource] = useState<LogSource>('all');
   const [eventType, setEventType] = useState<LogEventType>('all');
   const [period, setPeriod] = useState<LogPeriod>('7d');
   const [status, setStatus] = useState<LogStatus>('all');
 
-  const { logs, isLoading, refetch, page, setPage, totalPages, totalCount } = useApiLogs({
+  const { logs, isLoading, refetch, page, setPage, totalPages, totalCount, metrics } = useApiLogs({
+    source,
     eventType,
     period,
     status,
@@ -175,11 +231,48 @@ export const ApiLogsSection: React.FC = () => {
       <div>
         <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
           <ScrollText className="h-6 w-6" />
-          Logs de Webhooks
+          Logs de API
         </h2>
         <p className="text-muted-foreground">
-          Visualize todos os eventos de webhook enviados pela plataforma com seus respectivos payloads e respostas.
+          Visualize requisições de API recebidas e webhooks enviados com seus respectivos payloads e respostas.
         </p>
+      </div>
+
+      {/* Metrics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total de Logs</p>
+                <p className="text-2xl font-bold">{metrics.totalRequests}</p>
+              </div>
+              <Activity className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Taxa de Sucesso</p>
+                <p className="text-2xl font-bold text-primary">{metrics.successRate.toFixed(1)}%</p>
+              </div>
+              <TrendingUp className="h-8 w-8 text-primary" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Tempo Médio</p>
+                <p className="text-2xl font-bold">{metrics.avgDuration}ms</p>
+              </div>
+              <Clock className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
@@ -189,6 +282,22 @@ export const ApiLogsSection: React.FC = () => {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4 items-end">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Origem</label>
+              <Select value={source} onValueChange={(v) => { setSource(v as LogSource); setPage(1); }}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {sourceOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Evento</label>
               <Select value={eventType} onValueChange={(v) => { setEventType(v as LogEventType); setPage(1); }}>
@@ -279,8 +388,10 @@ export const ApiLogsSection: React.FC = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[140px]">Data/Hora</TableHead>
-                  <TableHead>Evento</TableHead>
+                  <TableHead className="w-[80px]">Origem</TableHead>
+                  <TableHead>Evento/Função</TableHead>
                   <TableHead className="w-[100px]">Status</TableHead>
+                  <TableHead className="w-[80px]">Duração</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -318,6 +429,11 @@ export const ApiLogsSection: React.FC = () => {
           </Button>
         </div>
       )}
+
+      {/* Retention Notice */}
+      <p className="text-xs text-muted-foreground text-center">
+        ⏰ Logs são retidos por 7 dias e excluídos automaticamente após esse período.
+      </p>
     </div>
   );
 };
