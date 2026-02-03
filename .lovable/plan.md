@@ -1,166 +1,223 @@
 
+# Plano: Substituir Collapse por Sheet para Detalhes do Log
 
-# Plano: Reorganizar Layout da Tabela de Logs (Estilo Compacto)
+## Problema
 
-## Objetivo
+O uso do componente `Collapsible` dentro do `TableBody` está quebrando a estrutura HTML da tabela, causando espaços em branco e problemas de formatação. Isso acontece porque o HTML não permite elementos não-tr diretamente dentro de tbody.
 
-Ajustar o layout da tabela de logs para ficar similar à imagem de referência, eliminando espaços em branco excessivos tanto na tabela quanto na paginacao.
+## Solucao
 
----
-
-## Analise da Imagem de Referencia
-
-A tabela na imagem tem:
-- Fundo escuro com linhas alternadas sutis
-- Colunas bem distribuidas sem espacos vazios
-- Layout `table-fixed` com larguras proporcionais
-- Sem botao de expandir visivel na linha principal
-- Badges compactos para status
+Substituir o `Collapsible` por um `Sheet` (painel lateral) que abre ao clicar no botao de detalhes. Isso:
+1. Mantem a tabela com estrutura HTML valida
+2. Elimina os espacos em branco
+3. Melhora a experiencia do usuario com um painel dedicado
 
 ---
 
-## Alteracoes Propostas
+## Alteracoes
 
 ### Arquivo: `src/components/admin/ApiLogsSection.tsx`
 
-**1. Adicionar `table-fixed` a tabela (linha 387):**
+**1. Atualizar imports (linha 7):**
 
-Trocar de:
+Remover `Collapsible` e adicionar `Sheet`:
+
 ```tsx
-<Table>
+// Remover:
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+
+// Adicionar:
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Eye } from 'lucide-react';
 ```
 
-Para:
-```tsx
-<Table className="table-fixed w-full">
-```
+**2. Refatorar o componente LogRow (linhas 107-214):**
 
-**2. Ajustar larguras das colunas no TableHeader (linhas 389-396):**
-
-| Coluna | Largura Atual | Nova Largura |
-|--------|---------------|--------------|
-| Data/Hora | `w-[130px]` | `w-[15%]` |
-| Origem | `w-[70px]` | `w-[12%]` |
-| Evento/Funcao | `min-w-[150px]` | `w-[33%]` |
-| Status | `w-[90px]` | `w-[15%]` |
-| Duracao | `w-[70px]` | `w-[15%]` |
-| Expandir | `w-[40px]` | `w-[10%]` |
-
-**3. Ajustar larguras das TableCell no LogRow (linhas 115-147):**
-
-Aplicar as mesmas larguras percentuais nas celulas para garantir alinhamento.
-
-**4. Melhorar paginacao (linhas 408-431):**
-
-Envolver em um container com background para evitar espacos visuais:
+Transformar em uma linha simples de tabela com botao que abre o Sheet:
 
 ```tsx
-{totalPages > 1 && (
-  <Card className="p-4">
-    <div className="flex items-center justify-between">
-      <span className="text-sm text-muted-foreground">
-        Pagina {page} de {totalPages}
-      </span>
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPage(page - 1)}
-          disabled={page === 1}
+interface LogRowProps {
+  log: { ... };
+  onViewDetails: (log: LogRowProps['log']) => void;
+}
+
+const LogRow: React.FC<LogRowProps> = ({ log, onViewDetails }) => {
+  const formattedDate = format(new Date(log.timestamp), "dd/MM/yy HH:mm:ss", { locale: ptBR });
+
+  return (
+    <TableRow className="hover:bg-muted/50">
+      <TableCell className="w-[15%] font-mono text-xs text-muted-foreground">
+        {formattedDate}
+      </TableCell>
+      <TableCell className="w-[12%]">
+        {getSourceBadge(log.source)}
+      </TableCell>
+      <TableCell className="w-[33%]">
+        <div className="flex flex-col gap-1">
+          <Badge variant="outline" className="font-mono text-xs w-fit truncate max-w-full">
+            {log.source === 'api_request' ? log.function_name : log.event_type}
+          </Badge>
+          {log.method && (
+            <span className="text-xs text-muted-foreground">{log.method}</span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="w-[15%]">
+        {getStatusBadge(log.status_code)}
+      </TableCell>
+      <TableCell className="w-[15%] text-xs text-muted-foreground font-mono">
+        {log.duration_ms !== undefined && log.duration_ms !== null ? `${log.duration_ms}ms` : '-'}
+      </TableCell>
+      <TableCell className="w-[10%] text-right">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-6 w-6 p-0"
+          onClick={() => onViewDetails(log)}
         >
-          Anterior
+          <Eye className="h-4 w-4" />
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPage(page + 1)}
-          disabled={page === totalPages}
-        >
-          Proxima
-        </Button>
-      </div>
-    </div>
-  </Card>
-)}
-```
-
----
-
-## Codigo Final do TableHeader
-
-```tsx
-<Table className="table-fixed w-full">
-  <TableHeader>
-    <TableRow>
-      <TableHead className="w-[15%]">Data/Hora</TableHead>
-      <TableHead className="w-[12%]">Origem</TableHead>
-      <TableHead className="w-[33%]">Evento/Funcao</TableHead>
-      <TableHead className="w-[15%]">Status</TableHead>
-      <TableHead className="w-[15%]">Duracao</TableHead>
-      <TableHead className="w-[10%]"></TableHead>
+      </TableCell>
     </TableRow>
-  </TableHeader>
+  );
+};
+```
+
+**3. Adicionar estado e Sheet no componente principal (linhas 216-443):**
+
+```tsx
+export const ApiLogsSection: React.FC = () => {
+  const [source, setSource] = useState<LogSource>('all');
+  const [eventType, setEventType] = useState<LogEventType>('all');
+  const [period, setPeriod] = useState<LogPeriod>('7d');
+  const [status, setStatus] = useState<LogStatus>('all');
+  const [selectedLog, setSelectedLog] = useState<LogRowProps['log'] | null>(null);
+
+  // ... resto do codigo ...
+
+  return (
+    <div className="space-y-6">
+      {/* ... cards de metricas e filtros ... */}
+
+      {/* Logs Table */}
+      <Card>
+        {/* ... header ... */}
+        <CardContent className="p-0">
+          {/* ... loading e empty state ... */}
+          <Table className="table-fixed w-full">
+            <TableHeader>...</TableHeader>
+            <TableBody>
+              {logs.map((log) => (
+                <LogRow 
+                  key={log.id} 
+                  log={log} 
+                  onViewDetails={setSelectedLog}
+                />
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+
+        {/* Pagination inline dentro do Card */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between p-4 border-t">
+            <span className="text-sm text-muted-foreground">
+              Pagina {page} de {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page === 1}>
+                Anterior
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={page === totalPages}>
+                Proxima
+              </Button>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Sheet de Detalhes */}
+      <Sheet open={!!selectedLog} onOpenChange={(open) => !open && setSelectedLog(null)}>
+        <SheetContent className="sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Detalhes do Log</SheetTitle>
+            <SheetDescription>
+              {selectedLog?.source === 'webhook' ? 'Webhook enviado' : 'Requisicao de API recebida'}
+            </SheetDescription>
+          </SheetHeader>
+          
+          {selectedLog && (
+            <div className="mt-6 space-y-4">
+              {/* Conteudo dos detalhes */}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Retention Notice */}
+      ...
+    </div>
+  );
+};
 ```
 
 ---
 
-## Codigo Final das TableCell no LogRow
+## Layout Visual Esperado
 
-```tsx
-<TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => setIsExpanded(!isExpanded)}>
-  <TableCell className="w-[15%] font-mono text-xs text-muted-foreground">
-    {formattedDate}
-  </TableCell>
-  <TableCell className="w-[12%]">
-    {getSourceBadge(log.source)}
-  </TableCell>
-  <TableCell className="w-[33%]">
-    <div className="flex flex-col gap-1">
-      <Badge variant="outline" className="font-mono text-xs w-fit">
-        {log.source === 'api_request' ? log.function_name : log.event_type}
-      </Badge>
-      {log.method && (
-        <span className="text-xs text-muted-foreground">{log.method}</span>
-      )}
-    </div>
-  </TableCell>
-  <TableCell className="w-[15%]">
-    {getStatusBadge(log.status_code)}
-  </TableCell>
-  <TableCell className="w-[15%] text-xs text-muted-foreground font-mono">
-    {log.duration_ms !== undefined && log.duration_ms !== null ? `${log.duration_ms}ms` : '-'}
-  </TableCell>
-  <TableCell className="w-[10%] text-right">
-    <CollapsibleTrigger asChild>
-      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-        {isExpanded ? (
-          <ChevronDown className="h-4 w-4" />
-        ) : (
-          <ChevronRight className="h-4 w-4" />
-        )}
-      </Button>
-    </CollapsibleTrigger>
-  </TableCell>
-</TableRow>
+**Tabela:**
+```
+┌────────────┬────────┬─────────────────┬────────┬─────────┬──────┐
+│ Data/Hora  │ Origem │ Evento/Funcao   │ Status │ Duracao │      │
+├────────────┼────────┼─────────────────┼────────┼─────────┼──────┤
+│ 01/02/26   │ ↗ OUT  │ order.paid      │ ✓ 200  │   45ms  │  👁  │
+│ 01/02/26   │ ↙ IN   │ api-produtos    │ ✓ 200  │  120ms  │  👁  │
+├────────────┴────────┴─────────────────┴────────┴─────────┴──────┤
+│ Pagina 1 de 5                          [Anterior] [Proxima]     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Sheet (ao clicar no icone de olho):**
+```
+┌──────────────────────────────┐
+│ Detalhes do Log          [X] │
+│ Webhook enviado              │
+├──────────────────────────────┤
+│ URL de Destino               │
+│ https://example.com/webhook  │
+│                              │
+│ Payload Enviado              │
+│ ┌──────────────────────────┐ │
+│ │ {                        │ │
+│ │   "event": "order.paid", │ │
+│ │   "data": {...}          │ │
+│ │ }                        │ │
+│ └──────────────────────────┘ │
+│                              │
+│ Resposta                     │
+│ ┌──────────────────────────┐ │
+│ │ {"success": true}        │ │
+│ └──────────────────────────┘ │
+└──────────────────────────────┘
 ```
 
 ---
 
 ## Resumo das Alteracoes
 
-| Arquivo | Linhas | Alteracao |
-|---------|--------|-----------|
-| `ApiLogsSection.tsx` | 387 | Adicionar `className="table-fixed w-full"` |
-| `ApiLogsSection.tsx` | 389-396 | Trocar larguras fixas por percentuais |
-| `ApiLogsSection.tsx` | 115-147 | Trocar larguras fixas por percentuais |
-| `ApiLogsSection.tsx` | 408-431 | Envolver paginacao em Card |
+| Arquivo | Secao | Alteracao |
+|---------|-------|-----------|
+| `ApiLogsSection.tsx` | Imports | Trocar Collapsible por Sheet, adicionar Eye |
+| `ApiLogsSection.tsx` | LogRow | Remover Collapsible, adicionar botao com Eye |
+| `ApiLogsSection.tsx` | Estado | Adicionar selectedLog para controlar o Sheet |
+| `ApiLogsSection.tsx` | Render | Adicionar Sheet com detalhes do log |
+| `ApiLogsSection.tsx` | Paginacao | Mover para dentro do Card da tabela com border-t |
 
 ---
 
-## Resultado Esperado
+## Beneficios
 
-- Tabela ocupa 100% da largura sem espacos em branco
-- Colunas distribuidas proporcionalmente
-- Paginacao integrada visualmente com o resto da interface
-- Layout similar a imagem de referencia fornecida
-
+1. **Estrutura HTML valida** - Tabela sem elementos invalidos
+2. **Sem espacos em branco** - Layout correto e compacto
+3. **Melhor UX** - Detalhes em painel lateral com scroll proprio
+4. **Paginacao integrada** - Dentro do mesmo Card da tabela
