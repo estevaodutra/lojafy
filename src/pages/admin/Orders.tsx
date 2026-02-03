@@ -274,11 +274,11 @@ const AdminOrders = () => {
                 <TableHead>Número do Pedido</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Data</TableHead>
-                <TableHead>Status</TableHead>
                 <TableHead>Pagamento</TableHead>
                 <TableHead>Etiqueta</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Ações</TableHead>
+                <TableHead>Status de Envio</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -304,7 +304,6 @@ const AdminOrders = () => {
                      <TableCell>
                        {format(new Date(order.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                      </TableCell>
-                     <TableCell>{getStatusBadge(order.status)}</TableCell>
                      <TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
                      <TableCell>
                        {order.has_shipping_file ? (
@@ -318,33 +317,33 @@ const AdminOrders = () => {
                        )}
                      </TableCell>
                      <TableCell>R$ {order.total_amount.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedOrder(order)}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Select
-                          value={order.status}
-                          onValueChange={(value) => updateOrderStatus(order.id, value)}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending">Pendente</SelectItem>
-                            <SelectItem value="processing">Em preparação</SelectItem>
-                            <SelectItem value="shipped">Despachado</SelectItem>
-                            <SelectItem value="delivered">Finalizado</SelectItem>
-                            <SelectItem value="cancelled">Cancelado</SelectItem>
-                            <SelectItem value="refunded">Reembolsado</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </TableCell>
+                     <TableCell>
+                       <Button
+                         variant="outline"
+                         size="sm"
+                         onClick={() => setSelectedOrder(order)}
+                       >
+                         <Eye className="w-4 h-4" />
+                       </Button>
+                     </TableCell>
+                     <TableCell>
+                       <Select
+                         value={order.status}
+                         onValueChange={(value) => updateOrderStatus(order.id, value)}
+                       >
+                         <SelectTrigger className="w-[140px]">
+                           <SelectValue />
+                         </SelectTrigger>
+                         <SelectContent>
+                           <SelectItem value="pending">Pendente</SelectItem>
+                           <SelectItem value="processing">Em preparação</SelectItem>
+                           <SelectItem value="shipped">Despachado</SelectItem>
+                           <SelectItem value="delivered">Finalizado</SelectItem>
+                           <SelectItem value="cancelled">Cancelado</SelectItem>
+                           <SelectItem value="refunded">Reembolsado</SelectItem>
+                         </SelectContent>
+                       </Select>
+                     </TableCell>
                   </TableRow>
                 ))
               )}
