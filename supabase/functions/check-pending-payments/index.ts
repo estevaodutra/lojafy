@@ -108,9 +108,9 @@ serve(async (req) => {
 
         switch (payment.status) {
           case 'approved':
-            newStatus = 'processing';
+            newStatus = 'pending';
             newPaymentStatus = 'paid';
-            action = 'updated_to_processing';
+            action = 'updated_to_pending_paid';
             break;
           case 'rejected':
           case 'cancelled':

@@ -132,7 +132,7 @@ serve(async (req) => {
 
     switch (paymentData.status) {
       case 'approved':
-        newStatus = 'processing';
+        newStatus = 'pending';
         paymentStatus = 'paid';
         break;
       case 'pending':
