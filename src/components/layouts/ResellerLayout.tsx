@@ -20,7 +20,8 @@ import {
   Truck,
   Star,
   TrendingUp,
-  Trophy
+  Trophy,
+  GraduationCap
 } from 'lucide-react';
 import { useFeature } from '@/hooks/useFeature';
 import {
@@ -90,11 +91,24 @@ const ResellerSidebar = () => {
   const navigate = useNavigate();
   const { signOut, profile } = useAuth();
   const { hasFeature: hasTop10Feature } = useFeature('top_10_produtos');
+  const { hasFeature: hasAcademyFeature } = useFeature('lojafy_academy');
   const currentPath = location.pathname;
 
   const filteredMenuGroups = useMemo(() => {
     const groups = [...menuGroups];
     
+    // Adicionar Academy apenas para quem tem a feature
+    if (hasAcademyFeature) {
+      const advancedIndex = groups.findIndex(g => g.label === 'Avançado');
+      groups.splice(advancedIndex, 0, {
+        label: 'Aprendizado',
+        items: [
+          { title: 'Lojafy Academy', url: '/minha-conta/academy', icon: GraduationCap },
+        ]
+      });
+    }
+    
+    // Adicionar Meus Acessos apenas para quem tem a feature
     if (hasTop10Feature) {
       const advancedIndex = groups.findIndex(g => g.label === 'Avançado');
       groups.splice(advancedIndex, 0, {
@@ -106,7 +120,7 @@ const ResellerSidebar = () => {
     }
     
     return groups;
-  }, [hasTop10Feature]);
+  }, [hasTop10Feature, hasAcademyFeature]);
 
   const handleLogout = async () => {
     await signOut();
