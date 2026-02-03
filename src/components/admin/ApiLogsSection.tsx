@@ -112,13 +112,13 @@ const LogRow: React.FC<LogRowProps> = ({ log }) => {
   return (
     <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
       <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => setIsExpanded(!isExpanded)}>
-        <TableCell className="font-mono text-xs text-muted-foreground">
+        <TableCell className="w-[130px] font-mono text-xs text-muted-foreground">
           {formattedDate}
         </TableCell>
-        <TableCell>
+        <TableCell className="w-[70px]">
           {getSourceBadge(log.source)}
         </TableCell>
-        <TableCell>
+        <TableCell className="min-w-[150px]">
           <div className="flex flex-col gap-1">
             <Badge variant="outline" className="font-mono text-xs w-fit">
               {log.source === 'api_request' ? log.function_name : log.event_type}
@@ -128,13 +128,13 @@ const LogRow: React.FC<LogRowProps> = ({ log }) => {
             )}
           </div>
         </TableCell>
-        <TableCell>
+        <TableCell className="w-[90px]">
           {getStatusBadge(log.status_code)}
         </TableCell>
-        <TableCell className="text-xs text-muted-foreground font-mono">
+        <TableCell className="w-[70px] text-xs text-muted-foreground font-mono">
           {log.duration_ms !== undefined && log.duration_ms !== null ? `${log.duration_ms}ms` : '-'}
         </TableCell>
-        <TableCell className="text-right">
+        <TableCell className="w-[40px] text-right">
           <CollapsibleTrigger asChild>
             <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
               {isExpanded ? (
@@ -387,12 +387,12 @@ export const ApiLogsSection: React.FC = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[140px]">Data/Hora</TableHead>
-                  <TableHead className="w-[80px]">Origem</TableHead>
-                  <TableHead>Evento/Função</TableHead>
-                  <TableHead className="w-[100px]">Status</TableHead>
-                  <TableHead className="w-[80px]">Duração</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead className="w-[130px]">Data/Hora</TableHead>
+                  <TableHead className="w-[70px]">Origem</TableHead>
+                  <TableHead className="min-w-[150px]">Evento/Função</TableHead>
+                  <TableHead className="w-[90px]">Status</TableHead>
+                  <TableHead className="w-[70px]">Duração</TableHead>
+                  <TableHead className="w-[40px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
