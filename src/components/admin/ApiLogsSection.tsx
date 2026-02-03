@@ -112,15 +112,15 @@ const LogRow: React.FC<LogRowProps> = ({ log }) => {
   return (
     <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
       <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => setIsExpanded(!isExpanded)}>
-        <TableCell className="w-[130px] font-mono text-xs text-muted-foreground">
+        <TableCell className="w-[15%] font-mono text-xs text-muted-foreground">
           {formattedDate}
         </TableCell>
-        <TableCell className="w-[70px]">
+        <TableCell className="w-[12%]">
           {getSourceBadge(log.source)}
         </TableCell>
-        <TableCell className="min-w-[150px]">
+        <TableCell className="w-[33%]">
           <div className="flex flex-col gap-1">
-            <Badge variant="outline" className="font-mono text-xs w-fit">
+            <Badge variant="outline" className="font-mono text-xs w-fit truncate max-w-full">
               {log.source === 'api_request' ? log.function_name : log.event_type}
             </Badge>
             {log.method && (
@@ -128,13 +128,13 @@ const LogRow: React.FC<LogRowProps> = ({ log }) => {
             )}
           </div>
         </TableCell>
-        <TableCell className="w-[90px]">
+        <TableCell className="w-[15%]">
           {getStatusBadge(log.status_code)}
         </TableCell>
-        <TableCell className="w-[70px] text-xs text-muted-foreground font-mono">
+        <TableCell className="w-[15%] text-xs text-muted-foreground font-mono">
           {log.duration_ms !== undefined && log.duration_ms !== null ? `${log.duration_ms}ms` : '-'}
         </TableCell>
-        <TableCell className="w-[40px] text-right">
+        <TableCell className="w-[10%] text-right">
           <CollapsibleTrigger asChild>
             <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
               {isExpanded ? (
@@ -384,15 +384,15 @@ export const ApiLogsSection: React.FC = () => {
               <p>Nenhum log encontrado para os filtros selecionados.</p>
             </div>
           ) : (
-            <Table>
+            <Table className="table-fixed w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[130px]">Data/Hora</TableHead>
-                  <TableHead className="w-[70px]">Origem</TableHead>
-                  <TableHead className="min-w-[150px]">Evento/Função</TableHead>
-                  <TableHead className="w-[90px]">Status</TableHead>
-                  <TableHead className="w-[70px]">Duração</TableHead>
-                  <TableHead className="w-[40px]"></TableHead>
+                  <TableHead className="w-[15%]">Data/Hora</TableHead>
+                  <TableHead className="w-[12%]">Origem</TableHead>
+                  <TableHead className="w-[33%]">Evento/Função</TableHead>
+                  <TableHead className="w-[15%]">Status</TableHead>
+                  <TableHead className="w-[15%]">Duração</TableHead>
+                  <TableHead className="w-[10%]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -407,27 +407,31 @@ export const ApiLogsSection: React.FC = () => {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage(page - 1)}
-            disabled={page === 1}
-          >
-            Anterior
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            Página {page} de {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage(page + 1)}
-            disabled={page === totalPages}
-          >
-            Próxima
-          </Button>
-        </div>
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">
+              Página {page} de {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(page - 1)}
+                disabled={page === 1}
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(page + 1)}
+                disabled={page === totalPages}
+              >
+                Próxima
+              </Button>
+            </div>
+          </div>
+        </Card>
       )}
 
       {/* Retention Notice */}
