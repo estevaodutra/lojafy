@@ -1,102 +1,166 @@
 
-# Plano: Corrigir Layout da Tabela de Logs
 
-## Problema Identificado
+# Plano: Reorganizar Layout da Tabela de Logs (Estilo Compacto)
 
-Na imagem, a tabela continua com espaço em branco excessivo entre as colunas. O cabeçalho mostra "Data/Hora" à esquerda, depois um grande espaço vazio, e só então aparecem "Origem", "Evento/Função", etc.
+## Objetivo
 
-## Causa Raiz
-
-A tabela usa `w-full` (largura 100%), mas sem `table-fixed`, o navegador distribui o espaço automaticamente entre as colunas, ignorando as larguras definidas.
-
-## Solução
-
-Aplicar `table-fixed` na tabela para forçar o respeito às larguras das colunas, e ajustar as larguras para ocupar 100% do espaço de forma proporcional.
+Ajustar o layout da tabela de logs para ficar similar à imagem de referência, eliminando espaços em branco excessivos tanto na tabela quanto na paginacao.
 
 ---
 
-## Alterações
+## Analise da Imagem de Referencia
+
+A tabela na imagem tem:
+- Fundo escuro com linhas alternadas sutis
+- Colunas bem distribuidas sem espacos vazios
+- Layout `table-fixed` com larguras proporcionais
+- Sem botao de expandir visivel na linha principal
+- Badges compactos para status
+
+---
+
+## Alteracoes Propostas
 
 ### Arquivo: `src/components/admin/ApiLogsSection.tsx`
 
-**1. Adicionar `table-fixed` à tabela:**
+**1. Adicionar `table-fixed` a tabela (linha 387):**
 
+Trocar de:
 ```tsx
-<Table className="table-fixed">
+<Table>
 ```
 
-**2. Ajustar larguras das colunas para somar ~100%:**
+Para:
+```tsx
+<Table className="table-fixed w-full">
+```
 
-| Coluna | Nova Largura |
-|--------|--------------|
-| Data/Hora | `w-[15%]` |
-| Origem | `w-[10%]` |
-| Evento/Função | `w-[35%]` |
-| Status | `w-[15%]` |
-| Duração | `w-[15%]` |
-| Expandir | `w-[10%]` |
+**2. Ajustar larguras das colunas no TableHeader (linhas 389-396):**
 
-**Código do TableHeader:**
+| Coluna | Largura Atual | Nova Largura |
+|--------|---------------|--------------|
+| Data/Hora | `w-[130px]` | `w-[15%]` |
+| Origem | `w-[70px]` | `w-[12%]` |
+| Evento/Funcao | `min-w-[150px]` | `w-[33%]` |
+| Status | `w-[90px]` | `w-[15%]` |
+| Duracao | `w-[70px]` | `w-[15%]` |
+| Expandir | `w-[40px]` | `w-[10%]` |
+
+**3. Ajustar larguras das TableCell no LogRow (linhas 115-147):**
+
+Aplicar as mesmas larguras percentuais nas celulas para garantir alinhamento.
+
+**4. Melhorar paginacao (linhas 408-431):**
+
+Envolver em um container com background para evitar espacos visuais:
 
 ```tsx
-<Table className="table-fixed">
+{totalPages > 1 && (
+  <Card className="p-4">
+    <div className="flex items-center justify-between">
+      <span className="text-sm text-muted-foreground">
+        Pagina {page} de {totalPages}
+      </span>
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage(page - 1)}
+          disabled={page === 1}
+        >
+          Anterior
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage(page + 1)}
+          disabled={page === totalPages}
+        >
+          Proxima
+        </Button>
+      </div>
+    </div>
+  </Card>
+)}
+```
+
+---
+
+## Codigo Final do TableHeader
+
+```tsx
+<Table className="table-fixed w-full">
   <TableHeader>
     <TableRow>
       <TableHead className="w-[15%]">Data/Hora</TableHead>
-      <TableHead className="w-[10%]">Origem</TableHead>
-      <TableHead className="w-[35%]">Evento/Função</TableHead>
+      <TableHead className="w-[12%]">Origem</TableHead>
+      <TableHead className="w-[33%]">Evento/Funcao</TableHead>
       <TableHead className="w-[15%]">Status</TableHead>
-      <TableHead className="w-[15%]">Duração</TableHead>
+      <TableHead className="w-[15%]">Duracao</TableHead>
       <TableHead className="w-[10%]"></TableHead>
     </TableRow>
   </TableHeader>
 ```
 
-**Código das TableCell no LogRow:**
+---
+
+## Codigo Final das TableCell no LogRow
 
 ```tsx
 <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => setIsExpanded(!isExpanded)}>
   <TableCell className="w-[15%] font-mono text-xs text-muted-foreground">
     {formattedDate}
   </TableCell>
-  <TableCell className="w-[10%]">
+  <TableCell className="w-[12%]">
     {getSourceBadge(log.source)}
   </TableCell>
-  <TableCell className="w-[35%]">
-    ...
+  <TableCell className="w-[33%]">
+    <div className="flex flex-col gap-1">
+      <Badge variant="outline" className="font-mono text-xs w-fit">
+        {log.source === 'api_request' ? log.function_name : log.event_type}
+      </Badge>
+      {log.method && (
+        <span className="text-xs text-muted-foreground">{log.method}</span>
+      )}
+    </div>
   </TableCell>
   <TableCell className="w-[15%]">
     {getStatusBadge(log.status_code)}
   </TableCell>
   <TableCell className="w-[15%] text-xs text-muted-foreground font-mono">
-    {log.duration_ms...}
+    {log.duration_ms !== undefined && log.duration_ms !== null ? `${log.duration_ms}ms` : '-'}
   </TableCell>
   <TableCell className="w-[10%] text-right">
-    ...
+    <CollapsibleTrigger asChild>
+      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+        {isExpanded ? (
+          <ChevronDown className="h-4 w-4" />
+        ) : (
+          <ChevronRight className="h-4 w-4" />
+        )}
+      </Button>
+    </CollapsibleTrigger>
   </TableCell>
 </TableRow>
 ```
 
 ---
 
-## Layout Visual Esperado
+## Resumo das Alteracoes
 
-```
-┌────────────┬────────┬─────────────────────┬─────────┬─────────┬──────┐
-│ Data/Hora  │ Origem │ Evento/Função       │ Status  │ Duração │      │
-│ 15%        │ 10%    │ 35%                 │ 15%     │ 15%     │ 10%  │
-├────────────┼────────┼─────────────────────┼─────────┼─────────┼──────┤
-│ 01/02/26   │ ↗ OUT  │ order.paid          │ ✅ 200  │   -     │  >   │
-│ 21:41:02   │        │                     │         │         │      │
-└────────────┴────────┴─────────────────────┴─────────┴─────────┴──────┘
-```
+| Arquivo | Linhas | Alteracao |
+|---------|--------|-----------|
+| `ApiLogsSection.tsx` | 387 | Adicionar `className="table-fixed w-full"` |
+| `ApiLogsSection.tsx` | 389-396 | Trocar larguras fixas por percentuais |
+| `ApiLogsSection.tsx` | 115-147 | Trocar larguras fixas por percentuais |
+| `ApiLogsSection.tsx` | 408-431 | Envolver paginacao em Card |
 
 ---
 
-## Resumo
+## Resultado Esperado
 
-| Arquivo | Linha | Alteração |
-|---------|-------|-----------|
-| `ApiLogsSection.tsx` | 387 | Adicionar `className="table-fixed"` à Table |
-| `ApiLogsSection.tsx` | 390-395 | Mudar larguras do TableHeader para porcentagens |
-| `ApiLogsSection.tsx` | 115-137 | Mudar larguras das TableCell para porcentagens |
+- Tabela ocupa 100% da largura sem espacos em branco
+- Colunas distribuidas proporcionalmente
+- Paginacao integrada visualmente com o resto da interface
+- Layout similar a imagem de referencia fornecida
+
