@@ -1,81 +1,102 @@
 
-# Plano: Reorganizar Layout da Tabela de Logs
+# Plano: Corrigir Layout da Tabela de Logs
 
 ## Problema Identificado
 
-Na imagem, a tabela de logs apresenta um espaço em branco excessivo entre as colunas. Os cabeçalhos "Origem" e "Evento/Função" aparecem deslocados para a direita, criando uma área vazia no meio da tabela.
+Na imagem, a tabela continua com espaço em branco excessivo entre as colunas. O cabeçalho mostra "Data/Hora" à esquerda, depois um grande espaço vazio, e só então aparecem "Origem", "Evento/Função", etc.
 
 ## Causa Raiz
 
-A estrutura atual da tabela define larguras fixas para algumas colunas que podem estar causando o desalinhamento:
+A tabela usa `w-full` (largura 100%), mas sem `table-fixed`, o navegador distribui o espaço automaticamente entre as colunas, ignorando as larguras definidas.
 
-| Coluna | Largura Atual |
-|--------|---------------|
-| Data/Hora | `w-[140px]` |
-| Origem | `w-[80px]` |
-| Evento/Função | (sem limite) |
-| Status | `w-[100px]` |
-| Duração | `w-[80px]` |
-| Expandir | `w-[50px]` |
+## Solução
 
-O problema está no layout flexível da coluna "Evento/Função" que expande demais, empurrando as outras colunas.
+Aplicar `table-fixed` na tabela para forçar o respeito às larguras das colunas, e ajustar as larguras para ocupar 100% do espaço de forma proporcional.
 
 ---
 
-## Solução Proposta
-
-Reorganizar as larguras das colunas para uma distribuição mais equilibrada e eliminar o espaço em branco.
-
-### Alterações no `ApiLogsSection.tsx`
-
-**Cabeçalho da tabela (TableHeader):**
-
-```tsx
-<TableHeader>
-  <TableRow>
-    <TableHead className="w-[130px]">Data/Hora</TableHead>
-    <TableHead className="w-[70px]">Origem</TableHead>
-    <TableHead className="min-w-[150px]">Evento/Função</TableHead>
-    <TableHead className="w-[90px]">Status</TableHead>
-    <TableHead className="w-[70px]">Duração</TableHead>
-    <TableHead className="w-[40px]"></TableHead>
-  </TableRow>
-</TableHeader>
-```
-
-**Células da linha (LogRow):**
-
-Ajustar as classes das `TableCell` para corresponder aos novos tamanhos.
-
----
-
-## Detalhes Técnicos
+## Alterações
 
 ### Arquivo: `src/components/admin/ApiLogsSection.tsx`
 
-**Alterações:**
+**1. Adicionar `table-fixed` à tabela:**
 
-1. **Linhas 389-396** - Ajustar larguras do TableHeader
-2. **Linhas 115-147** - Ajustar classes das TableCell no LogRow
+```tsx
+<Table className="table-fixed">
+```
+
+**2. Ajustar larguras das colunas para somar ~100%:**
+
+| Coluna | Nova Largura |
+|--------|--------------|
+| Data/Hora | `w-[15%]` |
+| Origem | `w-[10%]` |
+| Evento/Função | `w-[35%]` |
+| Status | `w-[15%]` |
+| Duração | `w-[15%]` |
+| Expandir | `w-[10%]` |
+
+**Código do TableHeader:**
+
+```tsx
+<Table className="table-fixed">
+  <TableHeader>
+    <TableRow>
+      <TableHead className="w-[15%]">Data/Hora</TableHead>
+      <TableHead className="w-[10%]">Origem</TableHead>
+      <TableHead className="w-[35%]">Evento/Função</TableHead>
+      <TableHead className="w-[15%]">Status</TableHead>
+      <TableHead className="w-[15%]">Duração</TableHead>
+      <TableHead className="w-[10%]"></TableHead>
+    </TableRow>
+  </TableHeader>
+```
+
+**Código das TableCell no LogRow:**
+
+```tsx
+<TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => setIsExpanded(!isExpanded)}>
+  <TableCell className="w-[15%] font-mono text-xs text-muted-foreground">
+    {formattedDate}
+  </TableCell>
+  <TableCell className="w-[10%]">
+    {getSourceBadge(log.source)}
+  </TableCell>
+  <TableCell className="w-[35%]">
+    ...
+  </TableCell>
+  <TableCell className="w-[15%]">
+    {getStatusBadge(log.status_code)}
+  </TableCell>
+  <TableCell className="w-[15%] text-xs text-muted-foreground font-mono">
+    {log.duration_ms...}
+  </TableCell>
+  <TableCell className="w-[10%] text-right">
+    ...
+  </TableCell>
+</TableRow>
+```
 
 ---
 
 ## Layout Visual Esperado
 
 ```
-┌───────────┬────────┬───────────────┬────────┬────────┬────┐
-│ Data/Hora │ Origem │ Evento/Função │ Status │Duração │    │
-├───────────┼────────┼───────────────┼────────┼────────┼────┤
-│ 01/02/26  │ ↗ OUT  │ order.paid    │ ✅ 200 │   -    │ >  │
-│ 21:41:02  │        │               │        │        │    │
-└───────────┴────────┴───────────────┴────────┴────────┴────┘
+┌────────────┬────────┬─────────────────────┬─────────┬─────────┬──────┐
+│ Data/Hora  │ Origem │ Evento/Função       │ Status  │ Duração │      │
+│ 15%        │ 10%    │ 35%                 │ 15%     │ 15%     │ 10%  │
+├────────────┼────────┼─────────────────────┼─────────┼─────────┼──────┤
+│ 01/02/26   │ ↗ OUT  │ order.paid          │ ✅ 200  │   -     │  >   │
+│ 21:41:02   │        │                     │         │         │      │
+└────────────┴────────┴─────────────────────┴─────────┴─────────┴──────┘
 ```
 
 ---
 
 ## Resumo
 
-| Arquivo | Linhas | Alteração |
-|---------|--------|-----------|
-| `ApiLogsSection.tsx` | 389-396 | Ajustar larguras do cabeçalho |
-| `ApiLogsSection.tsx` | 115-147 | Ajustar larguras das células |
+| Arquivo | Linha | Alteração |
+|---------|-------|-----------|
+| `ApiLogsSection.tsx` | 387 | Adicionar `className="table-fixed"` à Table |
+| `ApiLogsSection.tsx` | 390-395 | Mudar larguras do TableHeader para porcentagens |
+| `ApiLogsSection.tsx` | 115-137 | Mudar larguras das TableCell para porcentagens |
