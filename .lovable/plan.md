@@ -1,223 +1,127 @@
 
-# Plano: Substituir Collapse por Sheet para Detalhes do Log
 
-## Problema
+# Plano: Unificar Colunas Status e Ações
 
-O uso do componente `Collapsible` dentro do `TableBody` está quebrando a estrutura HTML da tabela, causando espaços em branco e problemas de formatação. Isso acontece porque o HTML não permite elementos não-tr diretamente dentro de tbody.
+## Objetivo
 
-## Solucao
-
-Substituir o `Collapsible` por um `Sheet` (painel lateral) que abre ao clicar no botao de detalhes. Isso:
-1. Mantem a tabela com estrutura HTML valida
-2. Elimina os espacos em branco
-3. Melhora a experiencia do usuario com um painel dedicado
+Unificar as colunas "Status" e "Ações" em uma única coluna chamada "Status de Envio" que contém um menu suspenso (dropdown) para alterar o status do pedido.
 
 ---
 
-## Alteracoes
+## Alterações
 
-### Arquivo: `src/components/admin/ApiLogsSection.tsx`
+### Arquivo: `src/pages/admin/Orders.tsx`
 
-**1. Atualizar imports (linha 7):**
+**1. Remover função getStatusBadge (linhas 169-181):**
 
-Remover `Collapsible` e adicionar `Sheet`:
+Esta função não será mais necessária pois o status será exibido diretamente no Select.
 
+**2. Atualizar o TableHeader (linhas 272-282):**
+
+Remover a coluna "Status" e renomear "Ações" para "Status de Envio":
+
+De:
 ```tsx
-// Remover:
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-
-// Adicionar:
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { Eye } from 'lucide-react';
+<TableHead>Status</TableHead>
+<TableHead>Pagamento</TableHead>
+<TableHead>Etiqueta</TableHead>
+<TableHead>Total</TableHead>
+<TableHead>Ações</TableHead>
 ```
 
-**2. Refatorar o componente LogRow (linhas 107-214):**
-
-Transformar em uma linha simples de tabela com botao que abre o Sheet:
-
+Para:
 ```tsx
-interface LogRowProps {
-  log: { ... };
-  onViewDetails: (log: LogRowProps['log']) => void;
-}
-
-const LogRow: React.FC<LogRowProps> = ({ log, onViewDetails }) => {
-  const formattedDate = format(new Date(log.timestamp), "dd/MM/yy HH:mm:ss", { locale: ptBR });
-
-  return (
-    <TableRow className="hover:bg-muted/50">
-      <TableCell className="w-[15%] font-mono text-xs text-muted-foreground">
-        {formattedDate}
-      </TableCell>
-      <TableCell className="w-[12%]">
-        {getSourceBadge(log.source)}
-      </TableCell>
-      <TableCell className="w-[33%]">
-        <div className="flex flex-col gap-1">
-          <Badge variant="outline" className="font-mono text-xs w-fit truncate max-w-full">
-            {log.source === 'api_request' ? log.function_name : log.event_type}
-          </Badge>
-          {log.method && (
-            <span className="text-xs text-muted-foreground">{log.method}</span>
-          )}
-        </div>
-      </TableCell>
-      <TableCell className="w-[15%]">
-        {getStatusBadge(log.status_code)}
-      </TableCell>
-      <TableCell className="w-[15%] text-xs text-muted-foreground font-mono">
-        {log.duration_ms !== undefined && log.duration_ms !== null ? `${log.duration_ms}ms` : '-'}
-      </TableCell>
-      <TableCell className="w-[10%] text-right">
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="h-6 w-6 p-0"
-          onClick={() => onViewDetails(log)}
-        >
-          <Eye className="h-4 w-4" />
-        </Button>
-      </TableCell>
-    </TableRow>
-  );
-};
+<TableHead>Pagamento</TableHead>
+<TableHead>Etiqueta</TableHead>
+<TableHead>Total</TableHead>
+<TableHead>Ações</TableHead>
+<TableHead>Status de Envio</TableHead>
 ```
 
-**3. Adicionar estado e Sheet no componente principal (linhas 216-443):**
+**3. Atualizar as TableCell no body (linhas 299-347):**
 
+Remover a célula de Status (Badge) e reorganizar a célula de Ações para conter apenas o botão de visualizar, enquanto a nova coluna "Status de Envio" terá o Select:
+
+De:
 ```tsx
-export const ApiLogsSection: React.FC = () => {
-  const [source, setSource] = useState<LogSource>('all');
-  const [eventType, setEventType] = useState<LogEventType>('all');
-  const [period, setPeriod] = useState<LogPeriod>('7d');
-  const [status, setStatus] = useState<LogStatus>('all');
-  const [selectedLog, setSelectedLog] = useState<LogRowProps['log'] | null>(null);
-
-  // ... resto do codigo ...
-
-  return (
-    <div className="space-y-6">
-      {/* ... cards de metricas e filtros ... */}
-
-      {/* Logs Table */}
-      <Card>
-        {/* ... header ... */}
-        <CardContent className="p-0">
-          {/* ... loading e empty state ... */}
-          <Table className="table-fixed w-full">
-            <TableHeader>...</TableHeader>
-            <TableBody>
-              {logs.map((log) => (
-                <LogRow 
-                  key={log.id} 
-                  log={log} 
-                  onViewDetails={setSelectedLog}
-                />
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-
-        {/* Pagination inline dentro do Card */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between p-4 border-t">
-            <span className="text-sm text-muted-foreground">
-              Pagina {page} de {totalPages}
-            </span>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page === 1}>
-                Anterior
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={page === totalPages}>
-                Proxima
-              </Button>
-            </div>
-          </div>
-        )}
-      </Card>
-
-      {/* Sheet de Detalhes */}
-      <Sheet open={!!selectedLog} onOpenChange={(open) => !open && setSelectedLog(null)}>
-        <SheetContent className="sm:max-w-lg overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Detalhes do Log</SheetTitle>
-            <SheetDescription>
-              {selectedLog?.source === 'webhook' ? 'Webhook enviado' : 'Requisicao de API recebida'}
-            </SheetDescription>
-          </SheetHeader>
-          
-          {selectedLog && (
-            <div className="mt-6 space-y-4">
-              {/* Conteudo dos detalhes */}
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
-
-      {/* Retention Notice */}
+<TableCell>{getStatusBadge(order.status)}</TableCell>
+<TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
+<TableCell>...</TableCell>
+<TableCell>R$ {order.total_amount.toFixed(2)}</TableCell>
+<TableCell>
+  <div className="flex gap-2">
+    <Button variant="outline" size="sm" onClick={() => setSelectedOrder(order)}>
+      <Eye className="w-4 h-4" />
+    </Button>
+    <Select value={order.status} onValueChange={(value) => updateOrderStatus(order.id, value)}>
       ...
-    </div>
-  );
-};
+    </Select>
+  </div>
+</TableCell>
 ```
+
+Para:
+```tsx
+<TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
+<TableCell>...</TableCell>
+<TableCell>R$ {order.total_amount.toFixed(2)}</TableCell>
+<TableCell>
+  <Button variant="outline" size="sm" onClick={() => setSelectedOrder(order)}>
+    <Eye className="w-4 h-4" />
+  </Button>
+</TableCell>
+<TableCell>
+  <Select value={order.status} onValueChange={(value) => updateOrderStatus(order.id, value)}>
+    <SelectTrigger className="w-[140px]">
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="pending">Pendente</SelectItem>
+      <SelectItem value="processing">Em preparação</SelectItem>
+      <SelectItem value="shipped">Despachado</SelectItem>
+      <SelectItem value="delivered">Finalizado</SelectItem>
+      <SelectItem value="cancelled">Cancelado</SelectItem>
+      <SelectItem value="refunded">Reembolsado</SelectItem>
+    </SelectContent>
+  </Select>
+</TableCell>
+```
+
+**4. Atualizar colSpan dos estados de loading e empty (linhas 287 e 293):**
+
+Alterar de `colSpan={8}` para `colSpan={8}` (mantém igual pois removemos uma coluna e adicionamos outra).
 
 ---
 
 ## Layout Visual Esperado
 
-**Tabela:**
 ```
-┌────────────┬────────┬─────────────────┬────────┬─────────┬──────┐
-│ Data/Hora  │ Origem │ Evento/Funcao   │ Status │ Duracao │      │
-├────────────┼────────┼─────────────────┼────────┼─────────┼──────┤
-│ 01/02/26   │ ↗ OUT  │ order.paid      │ ✓ 200  │   45ms  │  👁  │
-│ 01/02/26   │ ↙ IN   │ api-produtos    │ ✓ 200  │  120ms  │  👁  │
-├────────────┴────────┴─────────────────┴────────┴─────────┴──────┤
-│ Pagina 1 de 5                          [Anterior] [Proxima]     │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**Sheet (ao clicar no icone de olho):**
-```
-┌──────────────────────────────┐
-│ Detalhes do Log          [X] │
-│ Webhook enviado              │
-├──────────────────────────────┤
-│ URL de Destino               │
-│ https://example.com/webhook  │
-│                              │
-│ Payload Enviado              │
-│ ┌──────────────────────────┐ │
-│ │ {                        │ │
-│ │   "event": "order.paid", │ │
-│ │   "data": {...}          │ │
-│ │ }                        │ │
-│ └──────────────────────────┘ │
-│                              │
-│ Resposta                     │
-│ ┌──────────────────────────┐ │
-│ │ {"success": true}        │ │
-│ └──────────────────────────┘ │
-└──────────────────────────────┘
+┌────────────────┬──────────┬────────────┬─────────┬───────────┬─────────┬────────┬────────────────┐
+│ Número Pedido  │ Cliente  │ Data       │ Pagamen │ Etiqueta  │ Total   │ Ações  │ Status Envio   │
+├────────────────┼──────────┼────────────┼─────────┼───────────┼─────────┼────────┼────────────────┤
+│ ORD-123...     │ RAFAEL   │ 03/02/2026 │ Pago    │ 📄 Enviad │ R$7.77  │   👁   │ Em preparação▼ │
+│ ORD-456...     │ RAFAEL   │ 02/02/2026 │ Pago    │ 📄 Enviad │ R$7.77  │   👁   │ Despachado   ▼ │
+└────────────────┴──────────┴────────────┴─────────┴───────────┴─────────┴────────┴────────────────┘
 ```
 
 ---
 
-## Resumo das Alteracoes
+## Resumo das Alterações
 
-| Arquivo | Secao | Alteracao |
-|---------|-------|-----------|
-| `ApiLogsSection.tsx` | Imports | Trocar Collapsible por Sheet, adicionar Eye |
-| `ApiLogsSection.tsx` | LogRow | Remover Collapsible, adicionar botao com Eye |
-| `ApiLogsSection.tsx` | Estado | Adicionar selectedLog para controlar o Sheet |
-| `ApiLogsSection.tsx` | Render | Adicionar Sheet com detalhes do log |
-| `ApiLogsSection.tsx` | Paginacao | Mover para dentro do Card da tabela com border-t |
+| Linha | Alteração |
+|-------|-----------|
+| 169-181 | Manter função `getStatusBadge` (usada no filtro) |
+| 277 | Remover `<TableHead>Status</TableHead>` |
+| 281 | Renomear `<TableHead>Ações</TableHead>` e adicionar `<TableHead>Status de Envio</TableHead>` |
+| 307 | Remover célula `{getStatusBadge(order.status)}` |
+| 321-346 | Separar botão Eye e Select em células distintas |
 
 ---
 
-## Beneficios
+## Benefícios
 
-1. **Estrutura HTML valida** - Tabela sem elementos invalidos
-2. **Sem espacos em branco** - Layout correto e compacto
-3. **Melhor UX** - Detalhes em painel lateral com scroll proprio
-4. **Paginacao integrada** - Dentro do mesmo Card da tabela
+1. Interface mais limpa com menos colunas redundantes
+2. Status diretamente editável pelo dropdown
+3. Coluna "Status de Envio" com nome mais descritivo
+4. Botão de visualização separado para melhor usabilidade
+
