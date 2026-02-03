@@ -1,127 +1,126 @@
 
 
-# Plano: Unificar Colunas Status e Ações
+# Plano: Alterar Status Inicial para "Pendente" quando Pedido é Pago
 
 ## Objetivo
 
-Unificar as colunas "Status" e "Ações" em uma única coluna chamada "Status de Envio" que contém um menu suspenso (dropdown) para alterar o status do pedido.
+Quando um pagamento é aprovado (status `approved` do Mercado Pago), o status de envio do pedido deve ser definido como `pending` (Pendente) em vez de `processing` (Em preparação).
 
 ---
 
-## Alterações
+## Arquivos a Alterar
 
-### Arquivo: `src/pages/admin/Orders.tsx`
+### 1. `supabase/functions/webhook-n8n-payment/index.ts`
 
-**1. Remover função getStatusBadge (linhas 169-181):**
-
-Esta função não será mais necessária pois o status será exibido diretamente no Select.
-
-**2. Atualizar o TableHeader (linhas 272-282):**
-
-Remover a coluna "Status" e renomear "Ações" para "Status de Envio":
+**Linha 128-132:**
 
 De:
-```tsx
-<TableHead>Status</TableHead>
-<TableHead>Pagamento</TableHead>
-<TableHead>Etiqueta</TableHead>
-<TableHead>Total</TableHead>
-<TableHead>Ações</TableHead>
+```typescript
+case 'approved':
+  newStatus = 'processing';
+  paymentStatus = 'paid';
+  console.log('Payment approved - updating to processing status');
+  break;
 ```
 
 Para:
-```tsx
-<TableHead>Pagamento</TableHead>
-<TableHead>Etiqueta</TableHead>
-<TableHead>Total</TableHead>
-<TableHead>Ações</TableHead>
-<TableHead>Status de Envio</TableHead>
+```typescript
+case 'approved':
+  newStatus = 'pending';
+  paymentStatus = 'paid';
+  console.log('Payment approved - order ready for shipping preparation');
+  break;
 ```
 
-**3. Atualizar as TableCell no body (linhas 299-347):**
+---
 
-Remover a célula de Status (Badge) e reorganizar a célula de Ações para conter apenas o botão de visualizar, enquanto a nova coluna "Status de Envio" terá o Select:
+### 2. `supabase/functions/check-pending-payments/index.ts`
+
+**Linha 109-114:**
 
 De:
-```tsx
-<TableCell>{getStatusBadge(order.status)}</TableCell>
-<TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
-<TableCell>...</TableCell>
-<TableCell>R$ {order.total_amount.toFixed(2)}</TableCell>
-<TableCell>
-  <div className="flex gap-2">
-    <Button variant="outline" size="sm" onClick={() => setSelectedOrder(order)}>
-      <Eye className="w-4 h-4" />
-    </Button>
-    <Select value={order.status} onValueChange={(value) => updateOrderStatus(order.id, value)}>
-      ...
-    </Select>
-  </div>
-</TableCell>
+```typescript
+case 'approved':
+  newStatus = 'processing';
+  newPaymentStatus = 'paid';
+  action = 'updated_to_processing';
+  break;
 ```
 
 Para:
-```tsx
-<TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
-<TableCell>...</TableCell>
-<TableCell>R$ {order.total_amount.toFixed(2)}</TableCell>
-<TableCell>
-  <Button variant="outline" size="sm" onClick={() => setSelectedOrder(order)}>
-    <Eye className="w-4 h-4" />
-  </Button>
-</TableCell>
-<TableCell>
-  <Select value={order.status} onValueChange={(value) => updateOrderStatus(order.id, value)}>
-    <SelectTrigger className="w-[140px]">
-      <SelectValue />
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem value="pending">Pendente</SelectItem>
-      <SelectItem value="processing">Em preparação</SelectItem>
-      <SelectItem value="shipped">Despachado</SelectItem>
-      <SelectItem value="delivered">Finalizado</SelectItem>
-      <SelectItem value="cancelled">Cancelado</SelectItem>
-      <SelectItem value="refunded">Reembolsado</SelectItem>
-    </SelectContent>
-  </Select>
-</TableCell>
-```
-
-**4. Atualizar colSpan dos estados de loading e empty (linhas 287 e 293):**
-
-Alterar de `colSpan={8}` para `colSpan={8}` (mantém igual pois removemos uma coluna e adicionamos outra).
-
----
-
-## Layout Visual Esperado
-
-```
-┌────────────────┬──────────┬────────────┬─────────┬───────────┬─────────┬────────┬────────────────┐
-│ Número Pedido  │ Cliente  │ Data       │ Pagamen │ Etiqueta  │ Total   │ Ações  │ Status Envio   │
-├────────────────┼──────────┼────────────┼─────────┼───────────┼─────────┼────────┼────────────────┤
-│ ORD-123...     │ RAFAEL   │ 03/02/2026 │ Pago    │ 📄 Enviad │ R$7.77  │   👁   │ Em preparação▼ │
-│ ORD-456...     │ RAFAEL   │ 02/02/2026 │ Pago    │ 📄 Enviad │ R$7.77  │   👁   │ Despachado   ▼ │
-└────────────────┴──────────┴────────────┴─────────┴───────────┴─────────┴────────┴────────────────┘
+```typescript
+case 'approved':
+  newStatus = 'pending';
+  newPaymentStatus = 'paid';
+  action = 'updated_to_pending_paid';
+  break;
 ```
 
 ---
 
-## Resumo das Alterações
+### 3. `supabase/functions/webhook-mercadopago/index.ts`
 
-| Linha | Alteração |
-|-------|-----------|
-| 169-181 | Manter função `getStatusBadge` (usada no filtro) |
-| 277 | Remover `<TableHead>Status</TableHead>` |
-| 281 | Renomear `<TableHead>Ações</TableHead>` e adicionar `<TableHead>Status de Envio</TableHead>` |
-| 307 | Remover célula `{getStatusBadge(order.status)}` |
-| 321-346 | Separar botão Eye e Select em células distintas |
+**Linha 133-137:**
+
+De:
+```typescript
+case 'approved':
+  newStatus = 'processing';
+  paymentStatus = 'paid';
+  break;
+```
+
+Para:
+```typescript
+case 'approved':
+  newStatus = 'pending';
+  paymentStatus = 'paid';
+  break;
+```
 
 ---
 
-## Benefícios
+## Fluxo de Status de Envio Atualizado
 
-1. Interface mais limpa com menos colunas redundantes
-2. Status diretamente editável pelo dropdown
-3. Coluna "Status de Envio" com nome mais descritivo
-4. Botão de visualização separado para melhor usabilidade
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    FLUXO DE STATUS DE ENVIO                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. Pedido Criado (aguardando pagamento)                        │
+│     └─> status: pending, payment_status: pending                │
+│                                                                 │
+│  2. Pagamento Aprovado (ALTERACAO)                              │
+│     └─> status: pending, payment_status: paid                   │
+│         (Antes era: status: processing)                         │
+│                                                                 │
+│  3. Admin altera para "Em preparacao"                           │
+│     └─> status: processing                                      │
+│                                                                 │
+│  4. Admin altera para "Despachado"                              │
+│     └─> status: shipped                                         │
+│                                                                 │
+│  5. Admin altera para "Finalizado"                              │
+│     └─> status: delivered                                       │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Resumo das Alteracoes
+
+| Arquivo | Linha | Alteracao |
+|---------|-------|-----------|
+| `webhook-n8n-payment/index.ts` | 130 | `'processing'` -> `'pending'` |
+| `check-pending-payments/index.ts` | 111 | `'processing'` -> `'pending'` |
+| `webhook-mercadopago/index.ts` | 135 | `'processing'` -> `'pending'` |
+
+---
+
+## Beneficios
+
+1. **Controle manual do fluxo** - Admin decide quando iniciar preparacao
+2. **Visibilidade clara** - Pedidos pagos ficam como "Pendente" aguardando acao
+3. **Diferenciacao** - Distingue pedidos pagos (payment_status: paid) de nao pagos
 
