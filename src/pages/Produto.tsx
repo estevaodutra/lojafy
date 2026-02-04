@@ -287,17 +287,44 @@ const Produto = ({
     for (let i = 0; i < productImages.length; i++) {
       const imageUrl = productImages[i];
       try {
-        const response = await fetch(imageUrl);
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        const extension = imageUrl.split('.').pop()?.split('?')[0] || 'jpg';
-        link.download = `${product.name.replace(/[^a-z0-9]/gi, '_')}_${i + 1}.${extension}`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+        // Criar imagem e canvas para conversão para JPG
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              // Preencher fundo branco (para imagens PNG com transparência)
+              ctx.fillStyle = '#FFFFFF';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              ctx.drawImage(img, 0, 0);
+              
+              // Converter para JPG com qualidade 90%
+              canvas.toBlob((blob) => {
+                if (blob) {
+                  const url = window.URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = `${product.name.replace(/[^a-z0-9]/gi, '_')}_${i + 1}.jpg`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  window.URL.revokeObjectURL(url);
+                }
+                resolve();
+              }, 'image/jpeg', 0.9);
+            } else {
+              reject(new Error('Canvas context not available'));
+            }
+          };
+          img.onerror = () => reject(new Error('Failed to load image'));
+          img.src = imageUrl;
+        });
       } catch (err) {
         console.error('Erro ao baixar imagem:', err);
       }
