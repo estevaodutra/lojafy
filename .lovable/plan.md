@@ -1,112 +1,111 @@
 
-# Plano: Adicionar Atalho da Lojafy Academy no Menu do Revendedor
+# Plano: Download de Imagens em Formato JPG
 
 ## Objetivo
 
-Adicionar um item de menu "Lojafy Academy" no painel lateral do revendedor, visível apenas para usuários que possuem a feature `lojafy_academy` ativa.
+Alterar a funcionalidade de download de fotos do produto para que todas as imagens sejam baixadas no formato JPG, independentemente do formato original.
 
 ---
 
 ## Alterações
 
-### Arquivo: `src/components/layouts/ResellerLayout.tsx`
+### Arquivo: `src/pages/Produto.tsx`
 
-**1. Adicionar import do ícone GraduationCap (linha 3-24):**
+**Função `handleDownloadPhotos` (linhas 287-304):**
 
-```tsx
-import { 
-  // ... imports existentes ...
-  GraduationCap  // Adicionar este
-} from 'lucide-react';
-```
+Alterar a lógica para:
+1. Converter a imagem para JPG usando Canvas
+2. Definir qualidade de 90% para manter boa qualidade
+3. Usar extensão `.jpg` no nome do arquivo
 
-**2. Adicionar verificação da feature lojafy_academy (linha 92):**
-
-```tsx
-const { hasFeature: hasTop10Feature } = useFeature('top_10_produtos');
-const { hasFeature: hasAcademyFeature } = useFeature('lojafy_academy');
-```
-
-**3. Atualizar filteredMenuGroups para incluir Academy (linhas 95-109):**
-
-Adicionar um grupo "Aprendizado" com o link da Academy, antes do grupo "Meus Acessos":
-
-```tsx
-const filteredMenuGroups = useMemo(() => {
-  const groups = [...menuGroups];
-  
-  // Adicionar Academy apenas para quem tem a feature
-  if (hasAcademyFeature) {
-    const advancedIndex = groups.findIndex(g => g.label === 'Avançado');
-    groups.splice(advancedIndex, 0, {
-      label: 'Aprendizado',
-      items: [
-        { title: 'Lojafy Academy', url: '/minha-conta/academy', icon: GraduationCap },
-      ]
-    });
+**De:**
+```typescript
+for (let i = 0; i < productImages.length; i++) {
+  const imageUrl = productImages[i];
+  try {
+    const response = await fetch(imageUrl);
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const extension = imageUrl.split('.').pop()?.split('?')[0] || 'jpg';
+    link.download = `${product.name.replace(/[^a-z0-9]/gi, '_')}_${i + 1}.${extension}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Erro ao baixar imagem:', err);
   }
-  
-  // Adicionar Meus Acessos apenas para quem tem a feature
-  if (hasTop10Feature) {
-    const advancedIndex = groups.findIndex(g => g.label === 'Avançado');
-    groups.splice(advancedIndex, 0, {
-      label: 'Meus Acessos',
-      items: [
-        { title: 'Top 10 Produtos Vencedores', url: '/reseller/meus-acessos/top-produtos', icon: Trophy, badge: 'Novo' },
-      ]
+}
+```
+
+**Para:**
+```typescript
+for (let i = 0; i < productImages.length; i++) {
+  const imageUrl = productImages[i];
+  try {
+    // Criar imagem e canvas para conversão
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          // Preencher fundo branco (para imagens PNG com transparência)
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0);
+          
+          // Converter para JPG com qualidade 90%
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const url = window.URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `${product.name.replace(/[^a-z0-9]/gi, '_')}_${i + 1}.jpg`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              window.URL.revokeObjectURL(url);
+            }
+            resolve();
+          }, 'image/jpeg', 0.9);
+        } else {
+          reject(new Error('Canvas context not available'));
+        }
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = imageUrl;
     });
+  } catch (err) {
+    console.error('Erro ao baixar imagem:', err);
   }
-  
-  return groups;
-}, [hasTop10Feature, hasAcademyFeature]);
+}
 ```
 
 ---
 
-## Layout Visual Esperado
+## Detalhes Técnicos
 
-```
-┌────────────────────────────┐
-│ Revendedor          [PRO]  │
-├────────────────────────────┤
-│ Principal                  │
-│   Dashboard                │
-├────────────────────────────┤
-│ Produtos                   │
-│   Catálogo                 │
-│   Meus Produtos            │
-├────────────────────────────┤
-│ Vendas & Finanças          │
-│   ...                      │
-├────────────────────────────┤
-│ Minha Loja                 │
-│   ...                      │
-├────────────────────────────┤
-│ Aprendizado       ← NOVO   │
-│   🎓 Lojafy Academy        │
-├────────────────────────────┤
-│ Avançado                   │
-│   Integrações              │
-├────────────────────────────┤
-│ Ver Minha Loja             │
-│ Sair                       │
-└────────────────────────────┘
-```
+| Aspecto | Implementação |
+|---------|---------------|
+| Formato de saída | JPEG (`image/jpeg`) |
+| Qualidade | 90% (0.9) |
+| Fundo transparente | Convertido para branco (#FFFFFF) |
+| Extensão do arquivo | `.jpg` |
+| Dimensões | Mantém tamanho original da imagem |
 
 ---
 
-## Observações
+## Benefícios
 
-- A rota `/minha-conta/academy` já existe e está protegida pela feature `lojafy_academy`
-- O ícone `GraduationCap` é o mesmo usado no CustomerLayout para consistência visual
-- O item só aparece para usuários com a feature ativa (igual ao padrão já existente para Top 10 Produtos)
-
----
-
-## Resumo das Alterações
-
-| Linha | Alteração |
-|-------|-----------|
-| 4-24 | Adicionar import `GraduationCap` |
-| 92 | Adicionar `hasAcademyFeature` via useFeature |
-| 95-109 | Adicionar grupo "Aprendizado" com link da Academy |
+1. **Consistência** - Todas as imagens no mesmo formato
+2. **Compatibilidade** - JPG é universalmente suportado
+3. **Tamanho otimizado** - JPG geralmente tem menor tamanho que PNG
+4. **Transparência tratada** - Imagens PNG com fundo transparente recebem fundo branco
