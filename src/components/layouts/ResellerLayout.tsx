@@ -130,7 +130,7 @@ const ResellerSidebar = () => {
       groups.push({
         label: 'Avançado',
         items: [
-          { title: 'Integrações', url: '/reseller/integracoes', icon: Plug },
+          { title: 'Lojafy Integra', url: '/reseller/integracoes', icon: Plug },
         ]
       });
     }

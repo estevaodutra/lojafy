@@ -87,7 +87,7 @@ import ResellerStoreEditor from "./pages/reseller/StoreEditor";
 import ResellerPagesEditor from "./pages/reseller/PagesEditor";
 import ResellerBenefits from "./pages/reseller/Benefits";
 import ResellerBanners from "./pages/reseller/Banners";
-import ResellerIntegrations from "./pages/reseller/Integrations";
+import ResellerLojafyIntegra from "./pages/reseller/LojafyIntegra";
 import ResellerMeusAcessos from "./pages/reseller/MeusAcessos";
 import ResellerTopProdutosVencedores from "./pages/reseller/TopProdutosVencedores";
 import PublicStore from "./pages/PublicStore";
@@ -377,7 +377,7 @@ const App = () => {
                 <Route path="metas" element={<ResellerGoals />} />
                 <Route path="integracoes" element={
                   <FeatureRoute feature="lojafy_integra">
-                    <ResellerIntegrations />
+                    <ResellerLojafyIntegra />
                   </FeatureRoute>
                 } />
                 <Route path="meus-acessos" element={
