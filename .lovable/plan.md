@@ -1,80 +1,101 @@
 
 
-# Plano: Renomear Página para "Lojafy Integra"
+# Plano: Ativar Integração Mercado Livre
 
-## Contexto Atual
+## Objetivo
 
-A rota `/reseller/integracoes` já está **protegida** com `FeatureRoute feature="lojafy_integra"` (implementado anteriormente). A página atual se chama "Integrações" e precisa ser renomeada para "Lojafy Integra".
+Modificar o card do Mercado Livre na página Lojafy Integra para:
+1. Remover o badge "Em breve"
+2. Renomear o botão de "Conectar" para "Integrar"
+3. Habilitar o botão com link de autenticação OAuth do Mercado Livre
+4. Substituir `{USER_ID_LOJAFY}` pelo ID real do usuário logado
 
 ---
 
-## Arquivos a Modificar
+## Arquivo a Modificar
 
 | Arquivo | Ação | Descrição |
 |---------|------|-----------|
-| `src/pages/reseller/Integrations.tsx` | **Renomear** → `LojafyIntegra.tsx` | Renomear arquivo |
-| `src/pages/reseller/LojafyIntegra.tsx` | **Editar** | Atualizar título para "Lojafy Integra" |
-| `src/App.tsx` | **Editar** | Atualizar import para o novo nome |
-| `src/components/layouts/ResellerLayout.tsx` | **Editar** | Atualizar título do menu para "Lojafy Integra" |
+| `src/pages/reseller/LojafyIntegra.tsx` | **Editar** | Customizar card do Mercado Livre |
 
 ---
 
 ## Detalhes da Implementação
 
-### 1. Criar Nova Página: `src/pages/reseller/LojafyIntegra.tsx`
+### Mudanças Necessárias
 
-Copiar conteúdo de `Integrations.tsx` e atualizar:
-- Título: "Integrações" → "Lojafy Integra"
-- Descrição: manter ou ajustar conforme necessário
-- Nome do componente: `Integrations` → `LojafyIntegra`
+1. **Importar AuthContext** para obter o ID do usuário logado
+2. **Refatorar renderização** para tratar Mercado Livre separadamente dos outros marketplaces
+3. **Card Mercado Livre**:
+   - Remover badge "Em breve"
+   - Remover opacity reduzida (manter visual normal)
+   - Remover barra de progresso (não faz mais sentido se está disponível)
+   - Botão ativo com texto "Integrar"
+   - Link dinâmico: `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=2003351424267574&redirect_uri=https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Callback&state={userId}`
 
-### 2. Atualizar `src/App.tsx`
+### Estrutura do Código
 
-Alterar o import:
 ```tsx
-// De:
-import ResellerIntegrations from "./pages/reseller/Integrations";
+import { useAuth } from '@/contexts/AuthContext';
 
-// Para:
-import ResellerLojafyIntegra from "./pages/reseller/LojafyIntegra";
-```
+const LojafyIntegra = () => {
+  const { user } = useAuth();
 
-Atualizar a rota:
-```tsx
-<Route path="integracoes" element={
-  <FeatureRoute feature="lojafy_integra">
-    <ResellerLojafyIntegra />
-  </FeatureRoute>
-} />
-```
+  const getMercadoLivreAuthUrl = () => {
+    const userId = user?.id || '';
+    return `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=2003351424267574&redirect_uri=https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Callback&state=${userId}`;
+  };
 
-### 3. Atualizar `src/components/layouts/ResellerLayout.tsx`
+  // Separar marketplaces: Mercado Livre ativo, outros "em breve"
+  const comingSoonMarketplaces = marketplaces.filter(m => m.name !== 'Mercado Livre');
+  const mercadoLivre = marketplaces.find(m => m.name === 'Mercado Livre');
 
-Alterar o título no menu:
-```tsx
-// De:
-{ title: 'Integrações', url: '/reseller/integracoes', icon: Plug }
+  return (
+    // ...
+    {/* Card Mercado Livre - ATIVO */}
+    <Card className="border-green-500/50">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="p-3 rounded-lg bg-yellow-100">
+            <Store className="h-8 w-8 text-yellow-600" />
+          </div>
+          <Badge className="bg-green-500">Disponível</Badge>
+        </div>
+        <CardTitle className="mt-4">Mercado Livre</CardTitle>
+        <CardDescription>Integre com o maior marketplace da América Latina</CardDescription>
+      </CardHeader>
+      <CardFooter>
+        <Button className="w-full" asChild>
+          <a href={getMercadoLivreAuthUrl()} target="_blank" rel="noopener noreferrer">
+            <Link2 className="mr-2 h-4 w-4" />
+            Integrar
+          </a>
+        </Button>
+      </CardFooter>
+    </Card>
 
-// Para:
-{ title: 'Lojafy Integra', url: '/reseller/integracoes', icon: Plug }
+    {/* Cards dos outros marketplaces - EM BREVE */}
+    {comingSoonMarketplaces.map(...)}
+  );
+};
 ```
 
 ---
 
-## Comportamento Final
+## Resultado Esperado
 
-| Situação | Menu | Página |
-|----------|------|--------|
-| **Sem feature `lojafy_integra`** | ❌ Menu oculto | ❌ Tela de bloqueio |
-| **Com feature `lojafy_integra`** | ✅ "Lojafy Integra" visível | ✅ Página acessível |
-| **Super Admin** | ✅ "Lojafy Integra" visível | ✅ Página acessível (bypass) |
+| Marketplace | Badge | Botão | Estado |
+|-------------|-------|-------|--------|
+| **Mercado Livre** | "Disponível" (verde) | "Integrar" (ativo, com link) | Funcional |
+| Shopee | "Em breve" (amarelo) | "Conectar" (desabilitado) | Em desenvolvimento |
+| Amazon | "Em breve" (amarelo) | "Conectar" (desabilitado) | Em desenvolvimento |
 
 ---
 
 ## Resumo das Ações
 
-1. Criar arquivo `LojafyIntegra.tsx` com título atualizado
-2. Atualizar import e rota no `App.tsx`
-3. Atualizar título do menu no `ResellerLayout.tsx`
-4. Remover arquivo antigo `Integrations.tsx`
+1. Importar `useAuth` do AuthContext
+2. Criar função `getMercadoLivreAuthUrl()` com o user ID dinâmico
+3. Renderizar card do Mercado Livre separadamente com visual ativo
+4. Manter outros marketplaces com visual "em breve"
 
