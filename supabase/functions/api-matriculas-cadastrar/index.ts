@@ -120,12 +120,25 @@ Deno.serve(async (req) => {
       const coursesToEnroll = courses.filter(c => !existingCourseIds.has(c.id));
 
       if (coursesToEnroll.length === 0) {
+        // Retornar sucesso - usuário já tem acesso completo
         return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: 'Usuário já está matriculado em todos os cursos publicados' 
+          JSON.stringify({
+            success: true,
+            message: 'Usuário já está matriculado em todos os cursos publicados',
+            data: {
+              total_enrolled: 0,
+              enrolled_courses: [],
+              skipped_existing: existingCourseIds.size,
+              already_enrolled_all: true
+            },
+            expiracao_info: {
+              fonte: 'profiles.subscription_expires_at',
+              expires_at,
+              dias_restantes,
+              nota: 'Matrículas expiram junto com a assinatura do perfil'
+            }
           }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
