@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { logApiRequest } from '../_shared/logApiRequest.ts';
 
 const corsHeaders = {
@@ -9,7 +9,6 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   const startTime = Date.now();
   
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -22,7 +21,6 @@ Deno.serve(async (req) => {
   let userId: string | null = null;
 
   try {
-    // Only accept POST requests
     if (req.method !== 'POST') {
       return new Response(
         JSON.stringify({ success: false, error: 'Método não permitido' }),
@@ -30,7 +28,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate API Key
     const apiKey = req.headers.get('x-api-key');
     if (!apiKey) {
       return new Response(
@@ -39,7 +36,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check API Key in database
     const { data: keyData, error: keyError } = await supabase
       .from('api_keys')
       .select('id, user_id, permissions, active')
@@ -64,7 +60,6 @@ Deno.serve(async (req) => {
     apiKeyId = keyData.id;
     userId = keyData.user_id;
 
-    // Check permission for integrations
     const permissions = keyData.permissions as Record<string, { read?: boolean; write?: boolean }> | null;
     if (!permissions?.integracoes?.write) {
       return new Response(
@@ -73,17 +68,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Update last_used
     await supabase
       .from('api_keys')
       .update({ last_used: new Date().toISOString() })
       .eq('id', keyData.id);
 
-    // Parse request body
     const body = await req.json();
     console.log('Received body:', JSON.stringify(body));
 
-    // Extract data - can be array (from n8n) or object
     const tokenData = Array.isArray(body) ? body[0] : body;
     
     const {
@@ -96,7 +88,6 @@ Deno.serve(async (req) => {
       refresh_token
     } = tokenData;
 
-    // Validate required fields
     if (!lojafy_user_id) {
       return new Response(
         JSON.stringify({ success: false, error: 'Campo obrigatório: lojafy_user_id' }),
@@ -118,14 +109,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Calculate expires_at
     const expiresAt = expires_in 
       ? new Date(Date.now() + expires_in * 1000).toISOString()
       : null;
 
     console.log(`Processing ML integration for user ${lojafy_user_id}, ML user ${ml_user_id}`);
 
-    // Upsert integration data
     const { data: integration, error: upsertError } = await supabase
       .from('mercadolivre_integrations')
       .upsert({
@@ -165,17 +154,16 @@ Deno.serve(async (req) => {
       }
     };
 
-    // Log the request
-    await logApiRequest(supabase, {
-      functionName: 'api-integra-ml-token',
+    await logApiRequest({
+      function_name: 'api-integra-ml-token',
       method: req.method,
       path: '/api-integra-ml-token',
-      apiKeyId,
-      userId,
-      statusCode: 200,
-      durationMs: Date.now() - startTime,
-      requestBody: { lojafy_user_id, ml_user_id },
-      responseSummary: { success: true, integration_id: integration.id }
+      api_key_id: apiKeyId,
+      user_id: userId,
+      status_code: 200,
+      duration_ms: Date.now() - startTime,
+      request_body: { lojafy_user_id, ml_user_id },
+      response_summary: { success: true, integration_id: integration.id }
     });
 
     return new Response(
@@ -186,15 +174,15 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Error processing ML token:', error);
 
-    await logApiRequest(supabase, {
-      functionName: 'api-integra-ml-token',
+    await logApiRequest({
+      function_name: 'api-integra-ml-token',
       method: req.method,
       path: '/api-integra-ml-token',
-      apiKeyId,
-      userId,
-      statusCode: 500,
-      durationMs: Date.now() - startTime,
-      errorMessage: error.message
+      api_key_id: apiKeyId,
+      user_id: userId,
+      status_code: 500,
+      duration_ms: Date.now() - startTime,
+      error_message: error.message
     });
 
     return new Response(
@@ -202,4 +190,5 @@ Deno.serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
+});
 });
