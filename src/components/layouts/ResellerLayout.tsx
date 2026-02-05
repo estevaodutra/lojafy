@@ -41,7 +41,19 @@ import { PremiumBadge } from '@/components/premium/PremiumBadge';
 import { Badge } from '@/components/ui/badge';
 import { WelcomeResellerModal } from '@/components/reseller/WelcomeResellerModal';
 
-const menuGroups = [
+interface MenuItem {
+  title: string;
+  url: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string;
+}
+
+interface MenuGroup {
+  label: string;
+  items: MenuItem[];
+}
+
+const menuGroups: MenuGroup[] = [
   {
     label: 'Principal',
     items: [
@@ -78,12 +90,7 @@ const menuGroups = [
       { title: 'Depoimentos', url: '/reseller/depoimentos', icon: Star },
     ]
   },
-  {
-    label: 'Avançado',
-    items: [
-      { title: 'Integrações', url: '/reseller/integracoes', icon: Plug, badge: 'Em breve' },
-    ]
-  },
+  // Avançado agora é adicionado condicionalmente no filteredMenuGroups
 ];
 
 const ResellerSidebar = () => {
@@ -92,6 +99,7 @@ const ResellerSidebar = () => {
   const { signOut, profile } = useAuth();
   const { hasFeature: hasTop10Feature } = useFeature('top_10_produtos');
   const { hasFeature: hasAcademyFeature } = useFeature('lojafy_academy');
+  const { hasFeature: hasIntegraFeature } = useFeature('lojafy_integra');
   const currentPath = location.pathname;
 
   const filteredMenuGroups = useMemo(() => {
@@ -99,8 +107,7 @@ const ResellerSidebar = () => {
     
     // Adicionar Academy apenas para quem tem a feature
     if (hasAcademyFeature) {
-      const advancedIndex = groups.findIndex(g => g.label === 'Avançado');
-      groups.splice(advancedIndex, 0, {
+      groups.push({
         label: 'Aprendizado',
         items: [
           { title: 'Lojafy Academy', url: '/minha-conta/academy', icon: GraduationCap },
@@ -110,8 +117,7 @@ const ResellerSidebar = () => {
     
     // Adicionar Meus Acessos apenas para quem tem a feature
     if (hasTop10Feature) {
-      const advancedIndex = groups.findIndex(g => g.label === 'Avançado');
-      groups.splice(advancedIndex, 0, {
+      groups.push({
         label: 'Meus Acessos',
         items: [
           { title: 'Top 10 Produtos Vencedores', url: '/reseller/meus-acessos/top-produtos', icon: Trophy, badge: 'Novo' },
@@ -119,8 +125,18 @@ const ResellerSidebar = () => {
       });
     }
     
+    // Adicionar Avançado apenas para quem tem a feature Integra
+    if (hasIntegraFeature) {
+      groups.push({
+        label: 'Avançado',
+        items: [
+          { title: 'Integrações', url: '/reseller/integracoes', icon: Plug },
+        ]
+      });
+    }
+    
     return groups;
-  }, [hasTop10Feature, hasAcademyFeature]);
+  }, [hasTop10Feature, hasAcademyFeature, hasIntegraFeature]);
 
   const handleLogout = async () => {
     await signOut();
