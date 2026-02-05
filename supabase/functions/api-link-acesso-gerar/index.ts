@@ -30,12 +30,12 @@ Deno.serve(async (req) => {
     // Validate API Key
     const apiKey = req.headers.get('X-API-Key') || req.headers.get('x-api-key');
     if (!apiKey) {
-      await logApiRequest(supabase, {
-        functionName: 'api-link-acesso-gerar',
+      await logApiRequest({
+        function_name: 'api-link-acesso-gerar',
         method: 'POST',
-        statusCode: 401,
-        durationMs: Date.now() - startTime,
-        errorMessage: 'API Key não fornecida',
+        status_code: 401,
+        duration_ms: Date.now() - startTime,
+        error_message: 'API Key não fornecida',
       });
       return new Response(
         JSON.stringify({ success: false, error: 'API Key não fornecida' }),
@@ -52,12 +52,12 @@ Deno.serve(async (req) => {
       .single();
 
     if (keyError || !keyData) {
-      await logApiRequest(supabase, {
-        functionName: 'api-link-acesso-gerar',
+      await logApiRequest({
+        function_name: 'api-link-acesso-gerar',
         method: 'POST',
-        statusCode: 401,
-        durationMs: Date.now() - startTime,
-        errorMessage: 'API Key inválida ou inativa',
+        status_code: 401,
+        duration_ms: Date.now() - startTime,
+        error_message: 'API Key inválida ou inativa',
       });
       return new Response(
         JSON.stringify({ success: false, error: 'API Key inválida ou inativa' }),
@@ -70,13 +70,13 @@ Deno.serve(async (req) => {
     const hasPermission = permissions?.usuarios?.write === true;
 
     if (!hasPermission) {
-      await logApiRequest(supabase, {
-        functionName: 'api-link-acesso-gerar',
+      await logApiRequest({
+        function_name: 'api-link-acesso-gerar',
         method: 'POST',
-        apiKeyId: keyData.id,
-        statusCode: 403,
-        durationMs: Date.now() - startTime,
-        errorMessage: 'Permissão usuarios.write não concedida',
+        api_key_id: keyData.id,
+        status_code: 403,
+        duration_ms: Date.now() - startTime,
+        error_message: 'Permissão usuarios.write não concedida',
       });
       return new Response(
         JSON.stringify({ success: false, error: 'Permissão usuarios.write não concedida' }),
@@ -94,14 +94,14 @@ Deno.serve(async (req) => {
     const body = await req.json();
 
     if (!body.user_id) {
-      await logApiRequest(supabase, {
-        functionName: 'api-link-acesso-gerar',
+      await logApiRequest({
+        function_name: 'api-link-acesso-gerar',
         method: 'POST',
-        apiKeyId: keyData.id,
-        statusCode: 400,
-        durationMs: Date.now() - startTime,
-        requestBody: body,
-        errorMessage: 'user_id é obrigatório',
+        api_key_id: keyData.id,
+        status_code: 400,
+        duration_ms: Date.now() - startTime,
+        request_body: body,
+        error_message: 'user_id é obrigatório',
       });
       return new Response(
         JSON.stringify({ success: false, error: 'user_id é obrigatório' }),
@@ -117,14 +117,14 @@ Deno.serve(async (req) => {
       .single();
 
     if (userError || !userProfile) {
-      await logApiRequest(supabase, {
-        functionName: 'api-link-acesso-gerar',
+      await logApiRequest({
+        function_name: 'api-link-acesso-gerar',
         method: 'POST',
-        apiKeyId: keyData.id,
-        statusCode: 404,
-        durationMs: Date.now() - startTime,
-        requestBody: body,
-        errorMessage: 'Usuário não encontrado',
+        api_key_id: keyData.id,
+        status_code: 404,
+        duration_ms: Date.now() - startTime,
+        request_body: body,
+        error_message: 'Usuário não encontrado',
       });
       return new Response(
         JSON.stringify({ success: false, error: 'Usuário não encontrado' }),
@@ -150,14 +150,14 @@ Deno.serve(async (req) => {
 
     if (insertError) {
       console.error('Error inserting token:', insertError);
-      await logApiRequest(supabase, {
-        functionName: 'api-link-acesso-gerar',
+      await logApiRequest({
+        function_name: 'api-link-acesso-gerar',
         method: 'POST',
-        apiKeyId: keyData.id,
-        statusCode: 500,
-        durationMs: Date.now() - startTime,
-        requestBody: body,
-        errorMessage: 'Erro ao gerar token: ' + insertError.message,
+        api_key_id: keyData.id,
+        status_code: 500,
+        duration_ms: Date.now() - startTime,
+        request_body: body,
+        error_message: 'Erro ao gerar token: ' + insertError.message,
       });
       return new Response(
         JSON.stringify({ success: false, error: 'Erro ao gerar token' }),
@@ -184,14 +184,14 @@ Deno.serve(async (req) => {
       },
     };
 
-    await logApiRequest(supabase, {
-      functionName: 'api-link-acesso-gerar',
+    await logApiRequest({
+      function_name: 'api-link-acesso-gerar',
       method: 'POST',
-      apiKeyId: keyData.id,
-      statusCode: 200,
-      durationMs: Date.now() - startTime,
-      requestBody: body,
-      responseSummary: { success: true, user_id: body.user_id },
+      api_key_id: keyData.id,
+      status_code: 200,
+      duration_ms: Date.now() - startTime,
+      request_body: body,
+      response_summary: { success: true, user_id: body.user_id },
     });
 
     console.log(`Access link generated for user ${body.user_id}, expires in ${expiresHours}h`);
@@ -203,12 +203,12 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Error in api-link-acesso-gerar:', error);
-    await logApiRequest(supabase, {
-      functionName: 'api-link-acesso-gerar',
+    await logApiRequest({
+      function_name: 'api-link-acesso-gerar',
       method: 'POST',
-      statusCode: 500,
-      durationMs: Date.now() - startTime,
-      errorMessage: error.message,
+      status_code: 500,
+      duration_ms: Date.now() - startTime,
+      error_message: error.message,
     });
     return new Response(
       JSON.stringify({ success: false, error: 'Erro interno do servidor' }),
