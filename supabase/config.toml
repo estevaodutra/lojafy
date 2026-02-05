@@ -161,3 +161,6 @@ verify_jwt = false
 
 [functions.admin-create-user]
 verify_jwt = false
+
+[functions.api-link-acesso-gerar]
+verify_jwt = false

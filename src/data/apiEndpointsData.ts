@@ -369,6 +369,41 @@ const usersEndpoints: EndpointData[] = [
       success: true,
       message: 'Role atualizada com sucesso'
     }
+  },
+  {
+    title: 'Gerar Link de Primeiro Acesso',
+    method: 'POST',
+    url: '/functions/v1/api-link-acesso-gerar',
+    description: 'Gera um link de acesso único para o usuário. O link permite login automático e direciona para a trilha de primeiro acesso. Validade máxima de 7 dias.',
+    headers: [
+      { name: 'X-API-Key', description: 'Chave de API com permissão usuarios.write', example: 'sk_...', required: true }
+    ],
+    requestBody: {
+      user_id: 'uuid-do-usuario',
+      redirect_url: '/reseller/first-access',
+      expires_hours: 24,
+      _nota: 'redirect_url e expires_hours são opcionais. Máximo 168h (7 dias)'
+    },
+    responseExample: {
+      success: true,
+      data: {
+        link: 'https://lojafy.lovable.app/auth/onetime?token=abc123-uuid',
+        token: 'abc123-uuid',
+        expires_at: '2026-02-06T12:00:00Z',
+        expires_hours: 24,
+        redirect_url: '/reseller/first-access',
+        user: {
+          id: 'uuid-do-usuario',
+          name: 'Nome do Usuário'
+        }
+      }
+    },
+    errorExamples: [
+      { code: 400, title: 'user_id ausente', description: 'Campo obrigatório não informado', example: { success: false, error: 'user_id é obrigatório' } },
+      { code: 401, title: 'API Key inválida', description: 'Chave não fornecida ou inativa', example: { success: false, error: 'API Key inválida ou inativa' } },
+      { code: 403, title: 'Sem permissão', description: 'API Key sem permissão usuarios.write', example: { success: false, error: 'Permissão usuarios.write não concedida' } },
+      { code: 404, title: 'Usuário não encontrado', description: 'user_id não existe no sistema', example: { success: false, error: 'Usuário não encontrado' } }
+    ]
   }
 ];
 
