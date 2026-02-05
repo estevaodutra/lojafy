@@ -1,123 +1,129 @@
 
-
-# Plano: Link de Cadastro Premium Automático
+# Plano: Nova Feature "Lojafy Integra"
 
 ## Objetivo
 
-Criar uma nova rota `/auth/premium` que permite o cadastro de usuários com configuração automática de:
-- **Role**: reseller
-- **Plano**: premium  
-- **Features**: todas as funcionalidades
-- **Cursos**: matrícula em todos os cursos publicados
-- **Onboarding**: redireciona para trilha de primeiro acesso
-- **Expiração**: configurável via parâmetro `validity` (ofuscado)
+Criar uma nova funcionalidade (feature) chamada **"Lojafy Integra"** que controlará o acesso à página de Integrações para revendedores, seguindo o mesmo padrão já utilizado para `lojafy_academy` e `top_10_produtos`.
 
 ---
 
-## Fluxo da Solução
+## Arquitetura Atual de Features
+
+O sistema já possui uma arquitetura robusta de features:
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│  Usuário acessa: /auth/premium?validity=12                  │
-└─────────────────────────┬───────────────────────────────────┘
+│  Tabela: features                                           │
+│  - Define funcionalidades disponíveis (slug, nome, etc)     │
+└─────────────────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Página de CADASTRO (sem opção de login)                    │
-│  - Nome, email, telefone, senha                             │
-└─────────────────────────┬───────────────────────────────────┘
-                          │ Submit
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Edge Function: create-premium-reseller                     │
-│  1. Criar usuário no Auth                                   │
-│  2. Atualizar profile (role=reseller, plan=premium)         │
-│  3. Atribuir ALL features                                   │
-│  4. Matricular em TODOS cursos                              │
-│  5. Retornar sessão                                         │
-└─────────────────────────┬───────────────────────────────────┘
+│  Tabela: user_features                                      │
+│  - Vincula usuários às features                             │
+│  - Controla status (ativo/trial/expirado)                   │
+└─────────────────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  Redireciona para /reseller/first-access                    │
-│  (Trilha de onboarding: senha → vídeo → PWA)                │
+│  Componentes React:                                         │
+│  - useFeature(slug) → hasFeature                            │
+│  - FeatureGate → oculta/mostra elementos                    │
+│  - FeatureRoute → protege rotas                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Arquivos a Criar/Modificar
+## Arquivos a Modificar
 
 | Arquivo | Ação | Descrição |
 |---------|------|-----------|
-| `src/pages/AuthPremium.tsx` | **Criar** | Página de cadastro premium (SEM login) |
-| `supabase/functions/create-premium-reseller/index.ts` | **Criar** | Edge Function que faz todo o setup |
-| `supabase/config.toml` | **Editar** | Registrar nova função |
-| `src/App.tsx` | **Editar** | Adicionar rota `/auth/premium` |
+| **Banco de dados** | **INSERT** | Adicionar feature `lojafy_integra` na tabela `features` |
+| `src/components/layouts/ResellerLayout.tsx` | **Editar** | Condicionar menu "Integrações" à feature |
+| `src/App.tsx` | **Editar** | Proteger rota `/reseller/integracoes` com FeatureRoute |
 
 ---
 
 ## Detalhes da Implementação
 
-### 1. Nova Página: `src/pages/AuthPremium.tsx`
+### 1. Inserir Feature no Banco de Dados
 
-Página de **CADASTRO DIRETO** (sem tabs, sem opção de login):
-- Parâmetro `validity` lido da URL (nome ofuscado)
-- Default: 1 mês se não informado
-- Formulário simples: nome, email, telefone, senha, confirmar senha
-- Validação de WhatsApp via webhook existente
-- Chamada à Edge Function `create-premium-reseller`
-- Redirecionamento automático para `/reseller/first-access`
+Executar SQL para criar a nova feature:
 
-### 2. Nova Edge Function: `create-premium-reseller`
+```sql
+INSERT INTO features (
+  slug,
+  nome,
+  descricao,
+  icone,
+  categoria,
+  ordem_exibicao,
+  ativo,
+  visivel_catalogo
+) VALUES (
+  'lojafy_integra',
+  'Lojafy Integra',
+  'Acesso à página de integrações com marketplaces (Shopee, Mercado Livre, Amazon)',
+  'Plug',
+  'recursos',
+  30,
+  true,
+  true
+);
+```
 
-**Processo interno:**
-1. Criar usuário no `auth.users` com `email_confirm: true`
-2. Atualizar `profiles`:
-   - `role = 'reseller'`
-   - `subscription_plan = 'premium'`
-   - `subscription_expires_at = now + X meses` (ou null se vitalício)
-3. Buscar todas as features ativas e inserir em `user_features`
-4. Buscar todos os cursos publicados e inserir em `course_enrollments`
-5. Gerar sessão e retornar tokens de autenticação
+### 2. Modificar ResellerLayout.tsx
 
-### 3. Atualização do `supabase/config.toml`
+Adicionar verificação da feature para o item de menu "Integrações":
 
-Registrar a função com `verify_jwt = false` (é para cadastro público).
+- Importar o hook `useFeature` para verificar `lojafy_integra`
+- Remover o item "Integrações" do array estático `menuGroups`
+- Adicionar condicionalmente o item no `filteredMenuGroups` (igual ao padrão Academy)
+- Manter badge "Em breve" para usuários sem a feature que vejam referências
 
-### 4. Atualização do `src/App.tsx`
+**Alterações específicas:**
 
-Adicionar rota `/auth/premium` apontando para `AuthPremium`.
+1. Adicionar: `const { hasFeature: hasIntegraFeature } = useFeature('lojafy_integra');`
+2. Remover do `menuGroups` o item "Integrações" da seção "Avançado"
+3. No `filteredMenuGroups`, adicionar condição para incluir a seção "Avançado" somente se `hasIntegraFeature` for true
+
+### 3. Modificar App.tsx
+
+Proteger a rota `/reseller/integracoes` com `FeatureRoute`:
+
+```tsx
+<Route path="integracoes" element={
+  <FeatureRoute feature="lojafy_integra">
+    <ResellerIntegrations />
+  </FeatureRoute>
+} />
+```
 
 ---
 
-## Parâmetros da URL (Ofuscado)
+## Comportamento Esperado
 
-| Parâmetro | Tipo | Default | Descrição |
-|-----------|------|---------|-----------|
-| `validity` | number | 1 | Quantidade de meses de acesso. Use `0` para vitalício. |
-
-**Exemplos de uso:**
-- `https://lojafy.lovable.app/auth/premium` → 1 mês
-- `https://lojafy.lovable.app/auth/premium?validity=6` → 6 meses
-- `https://lojafy.lovable.app/auth/premium?validity=12` → 1 ano
-- `https://lojafy.lovable.app/auth/premium?validity=0` → vitalício
-
----
-
-## Segurança
-
-- Parâmetro `validity` não revela propósito (evita manipulação óbvia)
-- A Edge Function NÃO requer autenticação prévia
-- Validação de WhatsApp antes de criar usuário
-- Email único (validação existente)
+| Usuário | Menu "Integrações" | Acesso Rota |
+|---------|-------------------|-------------|
+| **Sem feature** | ❌ Oculto | ❌ Bloqueado (tela de recurso bloqueado) |
+| **Com feature** | ✅ Visível | ✅ Permitido |
+| **Super Admin** | ✅ Visível (bypass) | ✅ Permitido (bypass) |
 
 ---
 
 ## Resumo das Ações
 
-1. Criar página `AuthPremium.tsx` com formulário de cadastro DIRETO
-2. Criar Edge Function `create-premium-reseller` com lógica completa
-3. Registrar função no `config.toml`
-4. Adicionar rota no `App.tsx`
+1. **Banco**: Inserir nova feature `lojafy_integra` via migration
+2. **ResellerLayout.tsx**: Condicionar exibição do menu "Integrações" à feature
+3. **App.tsx**: Envolver rota com `FeatureRoute`
+4. **Testar**: Verificar que menu aparece/desaparece conforme feature atribuída
 
+---
+
+## Notas Técnicas
+
+- O slug `lojafy_integra` segue o padrão snake_case das outras features
+- O ícone `Plug` já é utilizado na página de integrações
+- A categoria `recursos` agrupa com outras funcionalidades premium
+- Super admins têm bypass automático via função `user_has_feature_or_superadmin`
