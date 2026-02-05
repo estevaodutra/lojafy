@@ -158,3 +158,6 @@ verify_jwt = false
 
 [functions.dispatch-order-webhook]
 verify_jwt = false
+
+[functions.admin-create-user]
+verify_jwt = false

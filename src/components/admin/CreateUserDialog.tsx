@@ -135,88 +135,34 @@ export const CreateUserDialog = ({ onSuccess }: { onSuccess?: () => void }) => {
   const onSubmit = async (values: FormValues) => {
     setIsCreating(true);
     try {
-      const tempPassword = generatePassword();
-      const names = values.name.trim().split(' ');
-      const firstName = names[0];
-      const lastName = names.slice(1).join(' ') || '';
-
-      // 1. Criar usuário no Auth
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: values.email,
-        password: tempPassword,
-        email_confirm: true,
-        user_metadata: { first_name: firstName, last_name: lastName },
-      });
-
-      if (authError) throw authError;
-
-      // 2. Calcular data de expiração
-      const expirationDate = calculateExpirationDate(values.expiration_period);
-
-      // 3. Atualizar profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          first_name: firstName,
-          last_name: lastName,
+      // Chamar Edge Function para criar usuário (usa SERVICE_ROLE_KEY no backend)
+      const { data, error } = await supabase.functions.invoke('admin-create-user', {
+        body: {
+          name: values.name,
+          email: values.email,
           phone: cleanPhone(values.phone),
           cpf: values.cpf ? cleanCPF(values.cpf) : null,
           role: values.role,
-          subscription_plan: values.plan,
-          subscription_expires_at: expirationDate?.toISOString() || null,
-        })
-        .eq('user_id', authData.user.id);
-
-      if (profileError) throw profileError;
-
-      // 4. Atribuir features selecionadas
-      if (selectedFeatures.length > 0) {
-        const { data: { user } } = await supabase.auth.getUser();
-        const featureInserts = selectedFeatures.map(featureId => ({
-          user_id: authData.user.id,
-          feature_id: featureId,
-          status: 'ativo' as const,
-          tipo_periodo: values.expiration_period === 'lifetime' ? 'vitalicio' as const : 'mensal' as const,
-          data_inicio: new Date().toISOString(),
-          data_expiracao: expirationDate?.toISOString() || null,
-          atribuido_por: user?.id,
-          motivo: 'Atribuição na criação do usuário',
-        }));
-        await supabase.from('user_features').insert(featureInserts);
-      }
-
-      // 5. Disparar webhook se toggle ativo
-      if (values.send_post_sale) {
-        try {
-          const selectedPlan = values.plan === 'free' ? 'Free' : 'Premium';
-          await fetch('https://n8n-n8n.nuwfic.easypanel.host/webhook/FN_onboarding', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              usuario_id: authData.user.id,
-              nome: values.name,
-              cpf: values.cpf ? cleanCPF(values.cpf) : null,
-              email: values.email,
-              telefone: cleanPhone(values.phone),
-              role: values.role,
-              plano_id: values.plan,
-              plano_nome: selectedPlan,
-              periodo_expiracao: values.expiration_period,
-              expiracao: expirationDate?.toISOString() || null,
-              features: selectedFeatures,
-              created_at: new Date().toISOString(),
-            }),
-          });
-          toast({ title: 'Usuário criado!', description: 'Pós-venda enviado.' });
-        } catch {
-          toast({
-            title: 'Usuário criado',
-            description: 'Falha ao enviar pós-venda',
-          });
+          plan: values.plan,
+          expiration_period: values.expiration_period,
+          features: selectedFeatures,
+          send_post_sale: values.send_post_sale,
         }
-      } else {
-        toast({ title: 'Usuário criado com sucesso!' });
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Erro ao criar usuário');
       }
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Erro ao criar usuário');
+      }
+
+      // Sucesso - a Edge Function já cuidou do webhook se necessário
+      toast({ 
+        title: 'Usuário criado com sucesso!', 
+        description: values.send_post_sale ? 'Pós-venda enviado.' : undefined 
+      });
 
       handleClose();
       if (onSuccess) onSuccess();
