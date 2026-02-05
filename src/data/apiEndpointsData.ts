@@ -711,6 +711,46 @@ const featuresEndpoints: EndpointData[] = [
   }
 ];
 
+// Lojafy Integra - Mercado Livre Endpoints
+const integraMLEndpoints: EndpointData[] = [
+  {
+    title: 'Salvar Token OAuth',
+    method: 'POST',
+    url: '/functions/v1/api-integra-ml-token',
+    description: 'Recebe e armazena os tokens OAuth do Mercado Livre após o fluxo de autorização. Este endpoint é chamado pelo n8n após o callback do Mercado Livre.',
+    headers: [
+      { name: 'X-API-Key', description: 'Chave de API com permissão integracoes.write', example: 'sk_...', required: true }
+    ],
+    requestBody: {
+      lojafy_user_id: 'uuid-do-usuario-lojafy',
+      access_token: 'APP_USR-2003351424267574-...',
+      token_type: 'Bearer',
+      expires_in: 21600,
+      scope: 'read write ...',
+      user_id: 395399092,
+      refresh_token: 'TG-...'
+    },
+    responseExample: {
+      success: true,
+      message: 'Integração Mercado Livre salva com sucesso',
+      data: {
+        integration_id: 'uuid',
+        lojafy_user_id: 'uuid',
+        ml_user_id: 395399092,
+        expires_at: '2026-02-06T06:00:00Z',
+        is_active: true
+      }
+    },
+    errorExamples: [
+      { code: 400, title: 'lojafy_user_id ausente', description: 'ID do usuário Lojafy não fornecido', example: { success: false, error: 'Campo obrigatório: lojafy_user_id' } },
+      { code: 400, title: 'access_token ausente', description: 'Token de acesso não fornecido', example: { success: false, error: 'Campo obrigatório: access_token' } },
+      { code: 400, title: 'user_id ML ausente', description: 'ID do usuário no Mercado Livre não fornecido', example: { success: false, error: 'Campo obrigatório: user_id (ID do Mercado Livre)' } },
+      { code: 401, title: 'API Key inválida', description: 'Chave não fornecida ou inativa', example: { success: false, error: 'API Key inválida' } },
+      { code: 403, title: 'Sem permissão', description: 'API Key sem permissão integracoes.write', example: { success: false, error: 'Permissão insuficiente. Requer: integracoes.write' } }
+    ]
+  }
+];
+
 // Export organized data structure
 export const apiEndpointsData: EndpointCategory[] = [
   {
@@ -745,6 +785,13 @@ export const apiEndpointsData: EndpointCategory[] = [
       { id: 'academy-courses', title: 'Cursos', endpoints: academyCourseEndpoints },
       { id: 'academy-enrollments', title: 'Matrículas', endpoints: academyEnrollmentEndpoints },
       { id: 'academy-progress', title: 'Progresso', endpoints: academyProgressEndpoints }
+    ]
+  },
+  {
+    id: 'integra',
+    title: 'Lojafy Integra',
+    subcategories: [
+      { id: 'integra-ml', title: 'Mercado Livre', endpoints: integraMLEndpoints }
     ]
   }
 ];

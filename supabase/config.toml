@@ -167,3 +167,6 @@ verify_jwt = false
 
 [functions.create-premium-reseller]
 verify_jwt = false
+
+[functions.api-integra-ml-token]
+verify_jwt = false
