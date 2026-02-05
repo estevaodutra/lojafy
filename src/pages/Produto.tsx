@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { ImageZoomModal } from "@/components/ImageZoomModal";
-import { ChevronRight, Star, Heart, ShoppingCart, Truck, Shield, RotateCcw, Plus, Minus, Share2, ZoomIn, Package, Info, ExternalLink, Copy, Download } from "lucide-react";
+import { ChevronRight, Star, Heart, ShoppingCart, Truck, Shield, RotateCcw, Plus, Minus, Share2, ZoomIn, Package, Info, ExternalLink, Copy, Download, Loader2 } from "lucide-react";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCart } from "@/contexts/CartContext";
@@ -45,6 +45,7 @@ const Produto = ({
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState("");
+  const [isDownloading, setIsDownloading] = useState(false);
   const { isReseller } = useUserRole();
 
   // Fetch product from Supabase
@@ -279,61 +280,76 @@ const Produto = ({
 
   // Baixar todas as fotos do produto
   const handleDownloadPhotos = async () => {
+    // Prevenir execução se já estiver baixando
+    if (isDownloading) return;
+    
+    setIsDownloading(true);
+    
     toast({
       title: "Baixando fotos...",
       description: `Preparando ${productImages.length} imagem(ns) para download.`,
     });
 
-    for (let i = 0; i < productImages.length; i++) {
-      const imageUrl = productImages[i];
-      try {
-        // Criar imagem e canvas para conversão para JPG
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        
-        await new Promise<void>((resolve, reject) => {
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.naturalWidth;
-            canvas.height = img.naturalHeight;
-            
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              // Preencher fundo branco (para imagens PNG com transparência)
-              ctx.fillStyle = '#FFFFFF';
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
-              ctx.drawImage(img, 0, 0);
+    try {
+      for (let i = 0; i < productImages.length; i++) {
+        const imageUrl = productImages[i];
+        try {
+          // Criar imagem e canvas para conversão para JPG
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              canvas.width = img.naturalWidth;
+              canvas.height = img.naturalHeight;
               
-              // Converter para JPG com qualidade 90%
-              canvas.toBlob((blob) => {
-                if (blob) {
-                  const url = window.URL.createObjectURL(blob);
-                  const link = document.createElement('a');
-                  link.href = url;
-                  link.download = `${product.name.replace(/[^a-z0-9]/gi, '_')}_${i + 1}.jpg`;
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                  window.URL.revokeObjectURL(url);
-                }
-                resolve();
-              }, 'image/jpeg', 0.9);
-            } else {
-              reject(new Error('Canvas context not available'));
-            }
-          };
-          img.onerror = () => reject(new Error('Failed to load image'));
-          img.src = imageUrl;
-        });
-      } catch (err) {
-        console.error('Erro ao baixar imagem:', err);
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                // Preencher fundo branco (para imagens PNG com transparência)
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+                
+                // Converter para JPG com qualidade 90%
+                canvas.toBlob((blob) => {
+                  if (blob) {
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `${product.name.replace(/[^a-z0-9]/gi, '_')}_${i + 1}.jpg`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                  }
+                  resolve();
+                }, 'image/jpeg', 0.9);
+              } else {
+                reject(new Error('Canvas context not available'));
+              }
+            };
+            img.onerror = () => reject(new Error('Failed to load image'));
+            img.src = imageUrl;
+          });
+        } catch (err) {
+          console.error('Erro ao baixar imagem:', err);
+        }
       }
-    }
 
-    toast({
-      title: "Download concluído!",
-      description: `${productImages.length} foto(s) baixada(s) com sucesso.`,
-    });
+      toast({
+        title: "Download concluído!",
+        description: `${productImages.length} foto(s) baixada(s) com sucesso.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Erro no download",
+        description: "Algumas imagens podem não ter sido baixadas.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
   };
   return <div className="min-h-screen bg-background">
       {showHeader && <Header />}
@@ -378,10 +394,20 @@ const Produto = ({
                 variant="outline"
                 size="sm"
                 onClick={handleDownloadPhotos}
+                disabled={isDownloading}
                 className="w-full sm:w-auto gap-2"
               >
-                <Download className="h-4 w-4" />
-                Baixar {productImages.length > 1 ? `${productImages.length} Fotos` : 'Foto'}
+                {isDownloading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Baixando...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4" />
+                    Baixar {productImages.length > 1 ? `${productImages.length} Fotos` : 'Foto'}
+                  </>
+                )}
               </Button>
             )}
           </div>
