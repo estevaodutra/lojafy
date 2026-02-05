@@ -375,7 +375,11 @@ const App = () => {
                 <Route path="clientes" element={<ResellerClients />} />
                 <Route path="financeiro" element={<ResellerFinanceiro />} />
                 <Route path="metas" element={<ResellerGoals />} />
-                <Route path="integracoes" element={<ResellerIntegrations />} />
+                <Route path="integracoes" element={
+                  <FeatureRoute feature="lojafy_integra">
+                    <ResellerIntegrations />
+                  </FeatureRoute>
+                } />
                 <Route path="meus-acessos" element={
                   <FeatureRoute feature="top_10_produtos">
                     <ResellerMeusAcessos />
