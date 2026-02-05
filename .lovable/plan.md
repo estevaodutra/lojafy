@@ -1,37 +1,10 @@
 
-# Plano: Nova Feature "Lojafy Integra"
 
-## Objetivo
+# Plano: Renomear Página para "Lojafy Integra"
 
-Criar uma nova funcionalidade (feature) chamada **"Lojafy Integra"** que controlará o acesso à página de Integrações para revendedores, seguindo o mesmo padrão já utilizado para `lojafy_academy` e `top_10_produtos`.
+## Contexto Atual
 
----
-
-## Arquitetura Atual de Features
-
-O sistema já possui uma arquitetura robusta de features:
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│  Tabela: features                                           │
-│  - Define funcionalidades disponíveis (slug, nome, etc)     │
-└─────────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Tabela: user_features                                      │
-│  - Vincula usuários às features                             │
-│  - Controla status (ativo/trial/expirado)                   │
-└─────────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Componentes React:                                         │
-│  - useFeature(slug) → hasFeature                            │
-│  - FeatureGate → oculta/mostra elementos                    │
-│  - FeatureRoute → protege rotas                             │
-└─────────────────────────────────────────────────────────────┘
-```
+A rota `/reseller/integracoes` já está **protegida** com `FeatureRoute feature="lojafy_integra"` (implementado anteriormente). A página atual se chama "Integrações" e precisa ser renomeada para "Lojafy Integra".
 
 ---
 
@@ -39,91 +12,69 @@ O sistema já possui uma arquitetura robusta de features:
 
 | Arquivo | Ação | Descrição |
 |---------|------|-----------|
-| **Banco de dados** | **INSERT** | Adicionar feature `lojafy_integra` na tabela `features` |
-| `src/components/layouts/ResellerLayout.tsx` | **Editar** | Condicionar menu "Integrações" à feature |
-| `src/App.tsx` | **Editar** | Proteger rota `/reseller/integracoes` com FeatureRoute |
+| `src/pages/reseller/Integrations.tsx` | **Renomear** → `LojafyIntegra.tsx` | Renomear arquivo |
+| `src/pages/reseller/LojafyIntegra.tsx` | **Editar** | Atualizar título para "Lojafy Integra" |
+| `src/App.tsx` | **Editar** | Atualizar import para o novo nome |
+| `src/components/layouts/ResellerLayout.tsx` | **Editar** | Atualizar título do menu para "Lojafy Integra" |
 
 ---
 
 ## Detalhes da Implementação
 
-### 1. Inserir Feature no Banco de Dados
+### 1. Criar Nova Página: `src/pages/reseller/LojafyIntegra.tsx`
 
-Executar SQL para criar a nova feature:
+Copiar conteúdo de `Integrations.tsx` e atualizar:
+- Título: "Integrações" → "Lojafy Integra"
+- Descrição: manter ou ajustar conforme necessário
+- Nome do componente: `Integrations` → `LojafyIntegra`
 
-```sql
-INSERT INTO features (
-  slug,
-  nome,
-  descricao,
-  icone,
-  categoria,
-  ordem_exibicao,
-  ativo,
-  visivel_catalogo
-) VALUES (
-  'lojafy_integra',
-  'Lojafy Integra',
-  'Acesso à página de integrações com marketplaces (Shopee, Mercado Livre, Amazon)',
-  'Plug',
-  'recursos',
-  30,
-  true,
-  true
-);
+### 2. Atualizar `src/App.tsx`
+
+Alterar o import:
+```tsx
+// De:
+import ResellerIntegrations from "./pages/reseller/Integrations";
+
+// Para:
+import ResellerLojafyIntegra from "./pages/reseller/LojafyIntegra";
 ```
 
-### 2. Modificar ResellerLayout.tsx
-
-Adicionar verificação da feature para o item de menu "Integrações":
-
-- Importar o hook `useFeature` para verificar `lojafy_integra`
-- Remover o item "Integrações" do array estático `menuGroups`
-- Adicionar condicionalmente o item no `filteredMenuGroups` (igual ao padrão Academy)
-- Manter badge "Em breve" para usuários sem a feature que vejam referências
-
-**Alterações específicas:**
-
-1. Adicionar: `const { hasFeature: hasIntegraFeature } = useFeature('lojafy_integra');`
-2. Remover do `menuGroups` o item "Integrações" da seção "Avançado"
-3. No `filteredMenuGroups`, adicionar condição para incluir a seção "Avançado" somente se `hasIntegraFeature` for true
-
-### 3. Modificar App.tsx
-
-Proteger a rota `/reseller/integracoes` com `FeatureRoute`:
-
+Atualizar a rota:
 ```tsx
 <Route path="integracoes" element={
   <FeatureRoute feature="lojafy_integra">
-    <ResellerIntegrations />
+    <ResellerLojafyIntegra />
   </FeatureRoute>
 } />
 ```
 
+### 3. Atualizar `src/components/layouts/ResellerLayout.tsx`
+
+Alterar o título no menu:
+```tsx
+// De:
+{ title: 'Integrações', url: '/reseller/integracoes', icon: Plug }
+
+// Para:
+{ title: 'Lojafy Integra', url: '/reseller/integracoes', icon: Plug }
+```
+
 ---
 
-## Comportamento Esperado
+## Comportamento Final
 
-| Usuário | Menu "Integrações" | Acesso Rota |
-|---------|-------------------|-------------|
-| **Sem feature** | ❌ Oculto | ❌ Bloqueado (tela de recurso bloqueado) |
-| **Com feature** | ✅ Visível | ✅ Permitido |
-| **Super Admin** | ✅ Visível (bypass) | ✅ Permitido (bypass) |
+| Situação | Menu | Página |
+|----------|------|--------|
+| **Sem feature `lojafy_integra`** | ❌ Menu oculto | ❌ Tela de bloqueio |
+| **Com feature `lojafy_integra`** | ✅ "Lojafy Integra" visível | ✅ Página acessível |
+| **Super Admin** | ✅ "Lojafy Integra" visível | ✅ Página acessível (bypass) |
 
 ---
 
 ## Resumo das Ações
 
-1. **Banco**: Inserir nova feature `lojafy_integra` via migration
-2. **ResellerLayout.tsx**: Condicionar exibição do menu "Integrações" à feature
-3. **App.tsx**: Envolver rota com `FeatureRoute`
-4. **Testar**: Verificar que menu aparece/desaparece conforme feature atribuída
+1. Criar arquivo `LojafyIntegra.tsx` com título atualizado
+2. Atualizar import e rota no `App.tsx`
+3. Atualizar título do menu no `ResellerLayout.tsx`
+4. Remover arquivo antigo `Integrations.tsx`
 
----
-
-## Notas Técnicas
-
-- O slug `lojafy_integra` segue o padrão snake_case das outras features
-- O ícone `Plug` já é utilizado na página de integrações
-- A categoria `recursos` agrupa com outras funcionalidades premium
-- Super admins têm bypass automático via função `user_has_feature_or_superadmin`
