@@ -19,6 +19,8 @@ import {
   X,
   Clock,
   AlertCircle,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -33,8 +35,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useUserFeatures, UserFeature } from '@/hooks/useUserFeatures';
 import { AssignFeatureModal } from './AssignFeatureModal';
+import { UserCoursesSection } from './UserCoursesSection';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -74,6 +78,7 @@ export const UserFeaturesSection: React.FC<UserFeaturesSectionProps> = ({
   const [revokeDialogOpen, setRevokeDialogOpen] = useState(false);
   const [selectedFeature, setSelectedFeature] = useState<UserFeature | null>(null);
   const [revoking, setRevoking] = useState(false);
+  const [expandedFeature, setExpandedFeature] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleRevoke = async () => {
@@ -150,63 +155,80 @@ export const UserFeaturesSection: React.FC<UserFeaturesSectionProps> = ({
             <div className="space-y-3">
               {features.map((feature) => {
                 const Icon = getIcon(feature.feature_icone);
-                return (
-                  <div
-                    key={feature.feature_id}
-                    className="p-3 border rounded-lg"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                          <Icon className="w-4 h-4 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">
-                            {feature.feature_nome}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <Badge variant="outline" className="text-xs">
-                              {periodLabels[feature.tipo_periodo]}
-                            </Badge>
-                            <Badge
-                              variant={
-                                feature.status === 'ativo'
-                                  ? 'default'
-                                  : 'secondary'
-                              }
-                              className="text-xs"
-                            >
-                              {feature.status}
-                            </Badge>
-                          </div>
-                          {feature.data_expiracao && (
-                            <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-                              <Clock className="w-3 h-3" />
-                              {feature.dias_restantes !== null &&
-                              feature.dias_restantes <= 7 ? (
-                                <span className="text-destructive flex items-center gap-1">
-                                  <AlertCircle className="w-3 h-3" />
-                                  Expira em {feature.dias_restantes} dias
-                                </span>
-                              ) : (
-                                <span>
-                                  Expira em{' '}
-                                  {format(
-                                    new Date(feature.data_expiracao),
-                                    "dd/MM/yyyy",
-                                    { locale: ptBR }
-                                  )}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          {feature.motivo && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Motivo: {feature.motivo}
-                            </p>
-                          )}
-                        </div>
+                const isAcademy = feature.feature_slug === 'lojafy_academy';
+                const isExpanded = expandedFeature === feature.feature_slug;
+
+                const featureContent = (
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <Icon className="w-4 h-4 text-primary" />
                       </div>
+                      <div>
+                        <p className="font-medium text-sm">
+                          {feature.feature_nome}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <Badge variant="outline" className="text-xs">
+                            {periodLabels[feature.tipo_periodo]}
+                          </Badge>
+                          <Badge
+                            variant={
+                              feature.status === 'ativo'
+                                ? 'default'
+                                : 'secondary'
+                            }
+                            className="text-xs"
+                          >
+                            {feature.status}
+                          </Badge>
+                        </div>
+                        {feature.data_expiracao && (
+                          <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                            <Clock className="w-3 h-3" />
+                            {feature.dias_restantes !== null &&
+                            feature.dias_restantes <= 7 ? (
+                              <span className="text-destructive flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" />
+                                Expira em {feature.dias_restantes} dias
+                              </span>
+                            ) : (
+                              <span>
+                                Expira em{' '}
+                                {format(
+                                  new Date(feature.data_expiracao),
+                                  "dd/MM/yyyy",
+                                  { locale: ptBR }
+                                )}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {feature.motivo && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Motivo: {feature.motivo}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {isAcademy && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedFeature(isExpanded ? null : feature.feature_slug);
+                          }}
+                        >
+                          {isExpanded ? (
+                            <ChevronUp className="w-4 h-4" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4" />
+                          )}
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -219,6 +241,34 @@ export const UserFeaturesSection: React.FC<UserFeaturesSectionProps> = ({
                         <X className="w-4 h-4" />
                       </Button>
                     </div>
+                  </div>
+                );
+
+                if (isAcademy) {
+                  return (
+                    <Collapsible
+                      key={feature.feature_id}
+                      open={isExpanded}
+                      onOpenChange={(open) =>
+                        setExpandedFeature(open ? feature.feature_slug : null)
+                      }
+                    >
+                      <div className="p-3 border rounded-lg">
+                        {featureContent}
+                        <CollapsibleContent>
+                          <UserCoursesSection userId={userId} />
+                        </CollapsibleContent>
+                      </div>
+                    </Collapsible>
+                  );
+                }
+
+                return (
+                  <div
+                    key={feature.feature_id}
+                    className="p-3 border rounded-lg"
+                  >
+                    {featureContent}
                   </div>
                 );
               })}
