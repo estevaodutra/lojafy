@@ -2,15 +2,12 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { UserPlus, CalendarIcon, Mail, X } from 'lucide-react';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { UserPlus, Mail, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Calendar } from '@/components/ui/calendar';
 import {
   Dialog,
   DialogContent,
@@ -27,11 +24,6 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -42,7 +34,6 @@ import {
 } from '@/components/ui/select';
 import { formatCPF, cleanCPF } from '@/lib/cpf';
 import { formatPhone, cleanPhone } from '@/lib/phone';
-import { cn } from '@/lib/utils';
 
 const formSchema = z.object({
   name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
@@ -54,10 +45,30 @@ const formSchema = z.object({
   phone: z.string().min(10, 'Telefone obrigatório'),
   role: z.enum(['customer', 'reseller', 'supplier']),
   plan: z.enum(['free', 'premium']),
-  expires_at: z.date({ required_error: 'Data de expiração obrigatória' }),
+  expiration_period: z.enum(['monthly', 'quarterly', 'semiannual', 'annual', 'lifetime'], {
+    required_error: 'Período de expiração obrigatório'
+  }),
   features: z.array(z.string()).optional(),
   send_post_sale: z.boolean().default(true),
 });
+
+const calculateExpirationDate = (period: string): Date | null => {
+  const now = new Date();
+  switch (period) {
+    case 'monthly':
+      return new Date(now.setMonth(now.getMonth() + 1));
+    case 'quarterly':
+      return new Date(now.setMonth(now.getMonth() + 3));
+    case 'semiannual':
+      return new Date(now.setMonth(now.getMonth() + 6));
+    case 'annual':
+      return new Date(now.setFullYear(now.getFullYear() + 1));
+    case 'lifetime':
+      return null;
+    default:
+      return null;
+  }
+};
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -139,7 +150,10 @@ export const CreateUserDialog = ({ onSuccess }: { onSuccess?: () => void }) => {
 
       if (authError) throw authError;
 
-      // 2. Atualizar profile
+      // 2. Calcular data de expiração
+      const expirationDate = calculateExpirationDate(values.expiration_period);
+
+      // 3. Atualizar profile
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
@@ -149,29 +163,29 @@ export const CreateUserDialog = ({ onSuccess }: { onSuccess?: () => void }) => {
           cpf: values.cpf ? cleanCPF(values.cpf) : null,
           role: values.role,
           subscription_plan: values.plan,
-          subscription_expires_at: values.expires_at.toISOString(),
+          subscription_expires_at: expirationDate?.toISOString() || null,
         })
         .eq('user_id', authData.user.id);
 
       if (profileError) throw profileError;
 
-      // 3. Atribuir features selecionadas
+      // 4. Atribuir features selecionadas
       if (selectedFeatures.length > 0) {
         const { data: { user } } = await supabase.auth.getUser();
         const featureInserts = selectedFeatures.map(featureId => ({
           user_id: authData.user.id,
           feature_id: featureId,
           status: 'ativo' as const,
-          tipo_periodo: 'mensal' as const,
+          tipo_periodo: values.expiration_period === 'lifetime' ? 'vitalicio' as const : 'mensal' as const,
           data_inicio: new Date().toISOString(),
-          data_expiracao: values.expires_at.toISOString(),
+          data_expiracao: expirationDate?.toISOString() || null,
           atribuido_por: user?.id,
           motivo: 'Atribuição na criação do usuário',
         }));
         await supabase.from('user_features').insert(featureInserts);
       }
 
-      // 4. Disparar webhook se toggle ativo
+      // 5. Disparar webhook se toggle ativo
       if (values.send_post_sale) {
         try {
           const selectedPlan = values.plan === 'free' ? 'Free' : 'Premium';
@@ -187,7 +201,8 @@ export const CreateUserDialog = ({ onSuccess }: { onSuccess?: () => void }) => {
               role: values.role,
               plano_id: values.plan,
               plano_nome: selectedPlan,
-              expiracao: values.expires_at.toISOString(),
+              periodo_expiracao: values.expiration_period,
+              expiracao: expirationDate?.toISOString() || null,
               features: selectedFeatures,
               created_at: new Date().toISOString(),
             }),
@@ -357,43 +372,27 @@ export const CreateUserDialog = ({ onSuccess }: { onSuccess?: () => void }) => {
               />
             </div>
 
-            {/* Expiração */}
+            {/* Período de Expiração */}
             <FormField
               control={form.control}
-              name="expires_at"
+              name="expiration_period"
               render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Expiração *</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            'w-full pl-3 text-left font-normal',
-                            !field.value && 'text-muted-foreground'
-                          )}
-                        >
-                          {field.value ? (
-                            format(field.value, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
-                          ) : (
-                            <span>Selecione a data de expiração</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        disabled={(date) => date < new Date()}
-                        locale={ptBR}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                <FormItem>
+                  <FormLabel>Período de Expiração *</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o período" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="monthly">📅 Mensal (30 dias)</SelectItem>
+                      <SelectItem value="quarterly">📅 Trimestral (3 meses)</SelectItem>
+                      <SelectItem value="semiannual">📅 Semestral (6 meses)</SelectItem>
+                      <SelectItem value="annual">📅 Anual (12 meses)</SelectItem>
+                      <SelectItem value="lifetime">♾️ Vitalício</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
