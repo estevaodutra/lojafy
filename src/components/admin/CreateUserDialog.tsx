@@ -301,7 +301,7 @@ export const CreateUserDialog = ({ onSuccess }: { onSuccess?: () => void }) => {
                       placeholder="(00) 00000-0000"
                       value={field.value || ''}
                       onChange={(e) => handlePhoneChange(e, field.onChange)}
-                      maxLength={15}
+                      maxLength={19}
                     />
                   </FormControl>
                   <FormMessage />
