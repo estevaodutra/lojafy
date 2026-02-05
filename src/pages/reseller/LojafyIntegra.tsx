@@ -55,13 +55,13 @@ const benefits = [
   },
 ];
 
-const Integrations = () => {
+const LojafyIntegra = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-3xl font-bold">Integrações</h1>
+          <h1 className="text-3xl font-bold">Lojafy Integra</h1>
           <Badge className="bg-amber-500 hover:bg-amber-600">Em breve</Badge>
         </div>
         <p className="text-muted-foreground">
@@ -137,4 +137,4 @@ const Integrations = () => {
   );
 };
 
-export default Integrations;
+export default LojafyIntegra;
