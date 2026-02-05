@@ -1427,6 +1427,54 @@ export type Database = {
         }
         Relationships: []
       }
+      mercadolivre_integrations: {
+        Row: {
+          access_token: string
+          created_at: string | null
+          expires_at: string | null
+          expires_in: number | null
+          id: string
+          is_active: boolean | null
+          last_refreshed_at: string | null
+          ml_user_id: number
+          refresh_token: string | null
+          scope: string | null
+          token_type: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string | null
+          expires_at?: string | null
+          expires_in?: number | null
+          id?: string
+          is_active?: boolean | null
+          last_refreshed_at?: string | null
+          ml_user_id: number
+          refresh_token?: string | null
+          scope?: string | null
+          token_type?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string | null
+          expires_at?: string | null
+          expires_in?: number | null
+          id?: string
+          is_active?: boolean | null
+          last_refreshed_at?: string | null
+          ml_user_id?: number
+          refresh_token?: string | null
+          scope?: string | null
+          token_type?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       newsletter_config: {
         Row: {
           active: boolean

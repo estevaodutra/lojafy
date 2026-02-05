@@ -14,7 +14,8 @@ import {
   ChevronRight,
   ChevronDown,
   Zap,
-  ScrollText
+  ScrollText,
+  Plug
 } from 'lucide-react';
 import { apiEndpointsData } from '@/data/apiEndpointsData';
 
@@ -38,6 +39,7 @@ const categoryIcons: Record<string, React.ElementType> = {
   orders: ShoppingCart,
   ranking: BarChart3,
   academy: GraduationCap,
+  integra: Plug,
 };
 
 const getMethodColor = (method: string) => {
