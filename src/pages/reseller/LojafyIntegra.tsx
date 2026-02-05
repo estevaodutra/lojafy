@@ -4,8 +4,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
+import { useAuth } from '@/contexts/AuthContext';
 
-const marketplaces = [
+const comingSoonMarketplaces = [
   {
     name: 'Shopee',
     icon: ShoppingBag,
@@ -13,14 +14,6 @@ const marketplaces = [
     color: 'text-orange-600',
     bgColor: 'bg-orange-100',
     progress: 65,
-  },
-  {
-    name: 'Mercado Livre',
-    icon: Store,
-    description: 'Integre com o maior marketplace da América Latina',
-    color: 'text-yellow-600',
-    bgColor: 'bg-yellow-100',
-    progress: 58,
   },
   {
     name: 'Amazon',
@@ -56,6 +49,13 @@ const benefits = [
 ];
 
 const LojafyIntegra = () => {
+  const { user } = useAuth();
+
+  const getMercadoLivreAuthUrl = () => {
+    const userId = user?.id || '';
+    return `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=2003351424267574&redirect_uri=https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Callback&state=${userId}`;
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -98,9 +98,32 @@ const LojafyIntegra = () => {
 
       {/* Grid de marketplaces */}
       <div>
-        <h2 className="text-xl font-semibold mb-4">Marketplaces Disponíveis em Breve</h2>
+        <h2 className="text-xl font-semibold mb-4">Marketplaces Disponíveis</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {marketplaces.map((marketplace) => (
+          {/* Card Mercado Livre - ATIVO */}
+          <Card className="border-green-500/50">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="p-3 rounded-lg bg-yellow-100">
+                  <Store className="h-8 w-8 text-yellow-600" />
+                </div>
+                <Badge className="bg-green-500 hover:bg-green-600">Disponível</Badge>
+              </div>
+              <CardTitle className="mt-4">Mercado Livre</CardTitle>
+              <CardDescription>Integre com o maior marketplace da América Latina</CardDescription>
+            </CardHeader>
+            <CardFooter>
+              <Button className="w-full" asChild>
+                <a href={getMercadoLivreAuthUrl()} target="_blank" rel="noopener noreferrer">
+                  <Link2 className="mr-2 h-4 w-4" />
+                  Integrar
+                </a>
+              </Button>
+            </CardFooter>
+          </Card>
+
+          {/* Cards dos outros marketplaces - EM BREVE */}
+          {comingSoonMarketplaces.map((marketplace) => (
             <Card key={marketplace.name} className="opacity-75 hover:opacity-90 transition-opacity">
               <CardHeader>
                 <div className="flex items-center justify-between">
