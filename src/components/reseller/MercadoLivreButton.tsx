@@ -9,6 +9,7 @@ interface MercadoLivreButtonProps {
   isInStore: boolean;
   onPublish: (addToStoreFirst?: () => Promise<void>) => Promise<void>;
   onAddToStore: () => Promise<void>;
+  compact?: boolean;
 }
 
 export const MercadoLivreButton: React.FC<MercadoLivreButtonProps> = ({
@@ -18,6 +19,7 @@ export const MercadoLivreButton: React.FC<MercadoLivreButtonProps> = ({
   isInStore,
   onPublish,
   onAddToStore,
+  compact = false,
 }) => {
   const handleClick = async () => {
     if (isPublished || isPublishing) return;
@@ -60,7 +62,7 @@ export const MercadoLivreButton: React.FC<MercadoLivreButtonProps> = ({
       onClick={handleClick}
     >
       <Send className="h-4 w-4 mr-2" />
-      Publicar no Mercado Livre
+      {compact ? "Mercado Livre" : "Publicar no Mercado Livre"}
     </Button>
   );
 };

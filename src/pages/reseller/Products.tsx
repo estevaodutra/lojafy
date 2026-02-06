@@ -333,12 +333,12 @@ const ResellerProducts = () => {
                         </div>
                       </div>
                       
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-2 min-w-[130px]">
                         <Button
                           size="sm"
                           variant={product.active ? "default" : "outline"}
                           onClick={() => toggleProductActive(product.id, !product.active)}
-                          className="text-xs px-3"
+                          className="w-full"
                         >
                           {product.active ? "Desativar" : "Ativar"}
                         </Button>
@@ -348,7 +348,7 @@ const ResellerProducts = () => {
                             size="sm"
                             variant="outline"
                             asChild
-                            className="text-xs px-3"
+                            className="w-full"
                           >
                             <a 
                               href={`/loja/${store.store_slug}/produto/${product.product_id}`}
@@ -361,12 +361,24 @@ const ResellerProducts = () => {
                           </Button>
                         )}
                         
+                        {hasActiveIntegration && product.product && (
+                          <MercadoLivreButton
+                            productId={product.product_id}
+                            isPublished={isProductPublished(product.product_id)}
+                            isPublishing={isProductPublishing(product.product_id)}
+                            isInStore={true}
+                            onPublish={async () => { await publishProduct(product.product_id); }}
+                            onAddToStore={async () => {}}
+                            compact
+                          />
+                        )}
+                        
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button
                               size="sm"
                               variant="destructive"
-                              className="text-xs px-3"
+                              className="w-full"
                             >
                               <Trash2 className="h-3 w-3 mr-1" />
                               Remover
@@ -393,20 +405,6 @@ const ResellerProducts = () => {
                         </AlertDialog>
                       </div>
                     </div>
-                    
-                    {/* Mercado Livre Button */}
-                    {hasActiveIntegration && product.product && (
-                      <div className="mt-4 pt-4 border-t">
-                        <MercadoLivreButton
-                          productId={product.product_id}
-                          isPublished={isProductPublished(product.product_id)}
-                          isPublishing={isProductPublishing(product.product_id)}
-                          isInStore={true}
-                          onPublish={async () => { await publishProduct(product.product_id); }}
-                          onAddToStore={async () => {}}
-                        />
-                      </div>
-                    )}
                   </Card>
                 ))}
               </div>
