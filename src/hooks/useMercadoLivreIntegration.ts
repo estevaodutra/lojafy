@@ -17,6 +17,7 @@ export const useMercadoLivreIntegration = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [publishingProducts, setPublishingProducts] = useState<Set<string>>(new Set());
+  const [unpublishingProducts, setUnpublishingProducts] = useState<Set<string>>(new Set());
 
   // Check if user has active ML integration
   const { data: hasActiveIntegration, isLoading: isLoadingIntegration } = useQuery({
@@ -76,6 +77,10 @@ export const useMercadoLivreIntegration = () => {
   const isProductPublishing = useCallback((productId: string): boolean => {
     return publishingProducts.has(productId);
   }, [publishingProducts]);
+
+  const isProductUnpublishing = useCallback((productId: string): boolean => {
+    return unpublishingProducts.has(productId);
+  }, [unpublishingProducts]);
 
   // Mutation to publish product
   const publishProductMutation = useMutation({
@@ -189,12 +194,114 @@ export const useMercadoLivreIntegration = () => {
     return publishProductMutation.mutateAsync({ productId, addToStoreFirst });
   }, [publishProductMutation]);
 
+  // Mutation to unpublish product
+  const unpublishProductMutation = useMutation({
+    mutationFn: async ({ productId }: { productId: string }) => {
+      if (!user?.id) throw new Error('Usuário não autenticado');
+
+      // 1. Fetch integration data
+      const { data: integrationData, error: integrationError } = await supabase
+        .from('mercadolivre_integrations')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .single();
+
+      if (integrationError || !integrationData) {
+        throw new Error('Integração Mercado Livre não encontrada');
+      }
+
+      // 2. Fetch ml_item_id from published products
+      const { data: publishedData, error: publishedError } = await supabase
+        .from('mercadolivre_published_products')
+        .select('ml_item_id')
+        .eq('user_id', user.id)
+        .eq('product_id', productId)
+        .single();
+
+      if (publishedError || !publishedData) {
+        throw new Error('Produto publicado não encontrado');
+      }
+
+      // 3. Call unpublish webhook
+      const response = await fetch(
+        'https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Unpublish',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ml_item_id: publishedData.ml_item_id,
+            integration: {
+              access_token: integrationData.access_token,
+              refresh_token: integrationData.refresh_token,
+              token_type: integrationData.token_type,
+              expires_at: integrationData.expires_at,
+              ml_user_id: integrationData.ml_user_id,
+              scope: integrationData.scope
+            },
+            user_id: user.id,
+            product_id: productId
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Erro ao despublicar: ${errorText}`);
+      }
+
+      // 4. Update status to 'unpublished'
+      const { error: updateError } = await supabase
+        .from('mercadolivre_published_products')
+        .update({ status: 'unpublished' })
+        .eq('user_id', user.id)
+        .eq('product_id', productId);
+
+      if (updateError) {
+        console.error('Error updating published product status:', updateError);
+        throw new Error('Erro ao atualizar status de publicação');
+      }
+
+      return { productId };
+    },
+    onMutate: async ({ productId }) => {
+      setUnpublishingProducts(prev => new Set(prev).add(productId));
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Produto despublicado!',
+        description: 'O anúncio foi removido do Mercado Livre.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['ml-published-products'] });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Erro ao despublicar',
+        description: error instanceof Error ? error.message : 'Tente novamente mais tarde.',
+        variant: 'destructive',
+      });
+    },
+    onSettled: (_, __, { productId }) => {
+      setUnpublishingProducts(prev => {
+        const next = new Set(prev);
+        next.delete(productId);
+        return next;
+      });
+    },
+  });
+
+  const unpublishProduct = useCallback(async (productId: string) => {
+    return unpublishProductMutation.mutateAsync({ productId });
+  }, [unpublishProductMutation]);
+
   return {
     hasActiveIntegration: hasActiveIntegration ?? false,
     isLoading: isLoadingIntegration || isLoadingPublished,
     publishedProducts,
     isProductPublished,
     isProductPublishing,
+    isProductUnpublishing,
     publishProduct,
+    unpublishProduct,
   };
 };

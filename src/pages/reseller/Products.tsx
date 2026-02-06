@@ -40,7 +40,9 @@ const ResellerProducts = () => {
     hasActiveIntegration,
     isProductPublished,
     isProductPublishing,
+    isProductUnpublishing,
     publishProduct,
+    unpublishProduct,
   } = useMercadoLivreIntegration();
 
   const [editingPrice, setEditingPrice] = useState<string | null>(null);
@@ -366,8 +368,10 @@ const ResellerProducts = () => {
                             productId={product.product_id}
                             isPublished={isProductPublished(product.product_id)}
                             isPublishing={isProductPublishing(product.product_id)}
+                            isUnpublishing={isProductUnpublishing(product.product_id)}
                             isInStore={true}
                             onPublish={async () => { await publishProduct(product.product_id); }}
+                            onUnpublish={async () => { await unpublishProduct(product.product_id); }}
                             onAddToStore={async () => {}}
                             compact
                           />
