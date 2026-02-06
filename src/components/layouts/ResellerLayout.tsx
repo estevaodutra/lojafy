@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/sidebar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useAuth } from '@/contexts/AuthContext';
+import { useResellerStore } from '@/hooks/useResellerStore';
 import { PremiumBadge } from '@/components/premium/PremiumBadge';
 import { Badge } from '@/components/ui/badge';
 import { WelcomeResellerModal } from '@/components/reseller/WelcomeResellerModal';
@@ -103,6 +104,7 @@ const ResellerSidebar = () => {
   const { hasFeature: hasTop10Feature } = useFeature('top_10_produtos');
   const { hasFeature: hasAcademyFeature } = useFeature('lojafy_academy');
   const { hasFeature: hasIntegraFeature } = useFeature('lojafy_integra');
+  const { store: resellerStore } = useResellerStore();
   const currentPath = location.pathname;
 
   const filteredMenuGroups = useMemo(() => {
@@ -226,9 +228,17 @@ const ResellerSidebar = () => {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild className="bg-primary/10 hover:bg-primary/20">
-                  <button onClick={() => navigate('/')}>
+                  <button onClick={() => navigate(resellerStore?.store_slug ? `/loja/${resellerStore.store_slug}` : '/')}>
                     <Store className="mr-2 h-4 w-4 text-primary" />
                     <span className="font-medium text-primary">Ver Minha Loja</span>
+                  </button>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild className="bg-primary/10 hover:bg-primary/20">
+                  <button onClick={() => navigate('/')}>
+                    <ShoppingBag className="mr-2 h-4 w-4 text-primary" />
+                    <span className="font-medium text-primary">Ver Catálogo</span>
                   </button>
                 </SidebarMenuButton>
               </SidebarMenuItem>
