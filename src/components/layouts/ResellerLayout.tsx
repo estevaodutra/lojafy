@@ -236,7 +236,7 @@ const ResellerSidebar = () => {
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild className="bg-primary/10 hover:bg-primary/20">
-                  <button onClick={() => navigate('/')}>
+                  <button onClick={() => navigate('/?viewCatalog=true')}>
                     <ShoppingBag className="mr-2 h-4 w-4 text-primary" />
                     <span className="font-medium text-primary">Ver Catálogo</span>
                   </button>

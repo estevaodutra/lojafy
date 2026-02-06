@@ -35,9 +35,10 @@ export const useAuthRedirect = () => {
     const currentPath = location.pathname;
     if (currentPath !== '/auth' && currentPath !== '/') return;
 
-    // Don't redirect if user is viewing store intentionally
+    // Don't redirect if user is viewing store or catalog intentionally
     const searchParams = new URLSearchParams(location.search);
     if (searchParams.get('view') === 'store') return;
+    if (searchParams.get('viewCatalog') === 'true') return;
 
     // Mark as redirected to prevent loops
     hasRedirected.current = true;
