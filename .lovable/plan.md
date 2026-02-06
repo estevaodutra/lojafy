@@ -1,185 +1,111 @@
 
-# Plano: Adicionar Botão "Mercado Livre" no Catálogo de Produtos
+
+# Plano: Adicionar Botão Mercado Livre na Página "Meus Produtos"
 
 ## Resumo
 
-Implementar um botão de integração com Mercado Livre em cada card de produto no catálogo do revendedor. O botão permitirá publicar produtos diretamente no Mercado Livre com um clique.
+Adicionar o mesmo botão "Publicar no Mercado Livre" na página de "Meus Produtos" (`/reseller/produtos`), seguindo o mesmo padrão visual e funcional já implementado no Catálogo.
 
 ---
 
-## 1. Criar Tabela para Rastrear Produtos Publicados
+## Alterações Necessárias
 
-Precisamos de uma nova tabela para registrar quais produtos já foram publicados no Mercado Livre por cada usuário.
+### 1. Modificar Página "Meus Produtos"
 
-**Nova tabela: `mercadolivre_published_products`**
+**Arquivo:** `src/pages/reseller/Products.tsx`
 
-| Coluna | Tipo | Descrição |
-|--------|------|-----------|
-| id | UUID | Chave primária |
-| user_id | UUID | Referência ao usuário que publicou |
-| product_id | UUID | Referência ao produto |
-| ml_item_id | TEXT | ID do anúncio no Mercado Livre (opcional, para referência futura) |
-| published_at | TIMESTAMPTZ | Data/hora da publicação |
-| status | TEXT | Status: 'pending', 'published', 'error' |
+Alterações a fazer:
 
-Políticas RLS:
-- Usuários podem ver/inserir seus próprios registros
-- Service role pode gerenciar todos
+1. **Importar dependências:**
+   - `useMercadoLivreIntegration` hook
+   - `MercadoLivreButton` componente
+   - `TooltipProvider` do Radix UI
+
+2. **Integrar o hook:**
+   - Chamar `useMercadoLivreIntegration()` para verificar integração ativa e produtos publicados
+
+3. **Adicionar botão em cada card de produto:**
+   - Posicionar na parte inferior do card, após as informações do produto
+   - Ocupar largura total com texto "Publicar no Mercado Livre" + ícone
+   - Mostrar apenas se usuário tem integração ML ativa
 
 ---
 
-## 2. Criar Hook `useMercadoLivreIntegration`
-
-**Novo arquivo: `src/hooks/useMercadoLivreIntegration.ts`**
-
-Este hook irá:
-- Verificar se o usuário tem integração ativa com ML
-- Buscar lista de produtos já publicados
-- Fornecer função para publicar novo produto
-- Gerenciar estados de loading
+## Layout Atualizado do Card
 
 ```text
-┌─────────────────────────────────────────────────┐
-│        useMercadoLivreIntegration               │
-├─────────────────────────────────────────────────┤
-│ • hasActiveIntegration: boolean                 │
-│ • publishedProducts: Set<string>                │
-│ • isPublishing: Map<productId, boolean>         │
-│ • publishProduct(productId): Promise            │
-│ • isProductPublished(productId): boolean        │
-│ • isLoading: boolean                            │
-└─────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│  [Imagem]  │  Nome do Produto          │  [Ativo/Inativo] │
+│            │  SKU: ABC123              │                  │
+│            │  Preço Original | Seu Preço │  [Desativar]   │
+│            │                           │  [Ver na Loja]   │
+│            │                           │  [Remover]       │
+├──────────────────────────────────────────────────────────┤
+│  [🛫 Publicar no Mercado Livre]                          │  ← Novo botão
+└──────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 3. Criar Componente `MercadoLivreButton`
+## Diferença do Catálogo
 
-**Novo arquivo: `src/components/reseller/MercadoLivreButton.tsx`**
-
-Componente que renderiza o botão com lógica condicional:
-
-| Estado | Cor | Ícone | Tooltip |
-|--------|-----|-------|---------|
-| Não publicado | Amarelo/Laranja | Send (avião de papel) | "Publicar no Mercado Livre" |
-| Publicando | Amarelo | Loader (spinner) | "Publicando..." |
-| Publicado | Verde | Check | "Publicado no Mercado Livre" |
-
-Ação ao clicar (amarelo):
-1. Verificar se produto está em "Meus Produtos"
-2. Se não estiver, adicionar automaticamente
-3. Enviar POST para `https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Advertise`
-4. Body: `{ product_id, user_id }`
-5. Mostrar spinner durante processamento
-6. Ao receber sucesso, inserir registro em `mercadolivre_published_products`
-7. Atualizar estado visual para verde com check
-
----
-
-## 4. Modificar Página do Catálogo
-
-**Arquivo: `src/pages/reseller/Catalog.tsx`**
-
-Alterações:
-- Importar o hook `useMercadoLivreIntegration`
-- Importar componente `MercadoLivreButton`
-- Adicionar TooltipProvider no nível adequado
-- Renderizar o botão ML ao lado dos botões existentes (Adicionar/Remover e Calcular)
-
-Posicionamento do botão:
-```text
-┌────────────────────────────────┐
-│       Card do Produto          │
-├────────────────────────────────┤
-│         [Imagem]               │
-│  Nome do Produto               │
-│  Custo | Preço Sugerido        │
-│  Margem | Estoque              │
-├────────────────────────────────┤
-│ [Adicionar] [Calcular] [ML 🛫] │
-└────────────────────────────────┘
-```
-
----
-
-## 5. Fluxo de Publicação
-
-```text
-┌──────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  Clica no    │────▶│ Produto está em  │────▶│ Enviar POST     │
-│  botão ML    │ Não │ "Meus Produtos"? │ Sim │ para webhook    │
-└──────────────┘     └──────────────────┘     └─────────────────┘
-                            │                         │
-                            ▼                         ▼
-                     ┌──────────────┐         ┌─────────────────┐
-                     │ Adicionar    │         │ Mostrar spinner │
-                     │ produto      │────────▶│ no botão        │
-                     └──────────────┘         └─────────────────┘
-                                                      │
-                                                      ▼
-                                              ┌─────────────────┐
-                                              │ Resposta OK?    │
-                                              └─────────────────┘
-                                                 │         │
-                                                Sim       Não
-                                                 ▼         ▼
-                                          ┌──────────┐ ┌─────────┐
-                                          │ Salvar   │ │ Mostrar │
-                                          │ registro │ │ erro    │
-                                          │ + botão  │ └─────────┘
-                                          │ verde    │
-                                          └──────────┘
-```
-
----
-
-## 6. Arquivos a Criar/Modificar
-
-| Arquivo | Ação | Descrição |
-|---------|------|-----------|
-| `supabase/migrations/xxx_create_ml_published_products.sql` | Criar | Tabela + RLS |
-| `src/hooks/useMercadoLivreIntegration.ts` | Criar | Hook de integração |
-| `src/components/reseller/MercadoLivreButton.tsx` | Criar | Componente do botão |
-| `src/pages/reseller/Catalog.tsx` | Modificar | Integrar botão nos cards |
+Na página "Meus Produtos", todos os produtos já estão adicionados à loja, então:
+- `isInStore` será sempre `true`
+- `onAddToStore` não será necessário (função vazia)
+- O botão apenas enviará para o webhook do Mercado Livre
 
 ---
 
 ## Detalhes Técnicos
 
-### Verificação de Integração ML
+### Imports a adicionar:
 ```typescript
-const { data } = await supabase
-  .from('mercadolivre_integrations')
-  .select('is_active')
-  .eq('user_id', userId)
-  .eq('is_active', true)
-  .maybeSingle();
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { useMercadoLivreIntegration } from '@/hooks/useMercadoLivreIntegration';
+import { MercadoLivreButton } from '@/components/reseller/MercadoLivreButton';
 ```
 
-### Chamada ao Webhook n8n
+### Uso do hook:
 ```typescript
-const response = await fetch(
-  'https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Advertise',
-  {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ product_id, user_id })
-  }
-);
+const {
+  hasActiveIntegration,
+  isProductPublished,
+  publishingProducts,
+  publishProduct,
+} = useMercadoLivreIntegration();
 ```
 
-### Ícones Lucide
-- Publicar: `Send` (avião de papel)
-- Publicado: `Check`
-- Loading: `Loader2` com animação `animate-spin`
+### Renderização do botão (dentro do card, após a div principal):
+```jsx
+{hasActiveIntegration && product.product && (
+  <div className="mt-4 pt-4 border-t">
+    <MercadoLivreButton
+      productId={product.product_id}
+      isPublished={isProductPublished(product.product_id)}
+      isPublishing={publishingProducts.has(product.product_id)}
+      isInStore={true}
+      onPublish={() => publishProduct(product.product_id)}
+      onAddToStore={async () => {}}
+    />
+  </div>
+)}
+```
+
+---
+
+## Arquivos a Modificar
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/pages/reseller/Products.tsx` | Importar hook e componente, adicionar botão ML em cada card |
+| `src/components/reseller/MercadoLivreButton.tsx` | Atualizar para versão com texto completo (já planejado anteriormente) |
 
 ---
 
 ## Resultado Esperado
 
-Após a implementação:
-1. Usuários SEM integração ML ativa não verão o botão
-2. Usuários COM integração verão botão amarelo em produtos não publicados
-3. Ao clicar, produto é adicionado automaticamente + enviado ao ML
-4. Após sucesso, botão fica verde com check
-5. Produtos já publicados mostram botão verde desde o início
+1. Na página "Meus Produtos", cada card terá o botão "Publicar no Mercado Livre" na parte inferior
+2. Botão só aparece se o usuário tem integração ML ativa
+3. Mesmos estados visuais: amarelo (publicar), spinner (publicando), verde (publicado)
+4. Comportamento idêntico ao do Catálogo
+
