@@ -1,63 +1,68 @@
 
-
-# Plano: Ajustar Posição do Botão Mercado Livre no Catálogo
+# Plano: Reorganizar Layout dos Botões no Card do Catálogo
 
 ## Resumo
 
-Modificar o layout dos botões no catálogo para que o botão "Publicar no Mercado Livre" fique na mesma linha dos botões "Adicionar" e "Calcular", conforme mostrado na imagem de referência.
+Modificar o layout dos botões para que fiquem em duas linhas:
+- **Linha 1**: Botões "Adicionar" e "Calcular" lado a lado
+- **Linha 2**: Botão "Publicar no Mercado Livre" ocupando largura total
 
 ---
 
-## Layout Atual vs Desejado
+## Layout Desejado
 
-**Atual:**
-O botão ML está na mesma linha, mas como um botão de largura total (w-full) pode não estar alinhado corretamente.
-
-**Desejado (conforme imagem):**
 ```text
-┌────────────────────────────────────────────────┐
-│  [+ Adicionar] [Calcular] [Publicar no ML]     │
-└────────────────────────────────────────────────┘
+┌────────────────────────────────────────────┐
+│  [+ Adicionar]  [Calcular]                 │
+│  ─────────────────────────────────────     │
+│  [Publicar no Mercado Livre]               │
+└────────────────────────────────────────────┘
 ```
-
-Todos os três botões lado a lado, ocupando proporcionalmente a largura disponível.
 
 ---
 
 ## Alterações Necessárias
 
-### 1. Modificar `MercadoLivreButton.tsx`
+### 1. Modificar `src/pages/reseller/Catalog.tsx`
 
-Remover `w-full` e ajustar para funcionar em linha com outros botões:
-- Usar `flex-1` para ocupar espaço proporcional
-- Manter texto "Publicar no Mercado Livre"
-- Manter cores amber (publicar), amber+spinner (publicando), verde (publicado)
+Reorganizar a estrutura dos botões no CardContent:
 
-### 2. Verificar `Catalog.tsx`
+**De (atual):**
+```jsx
+<div className="flex space-x-2">
+  [Adicionar] [Calcular] [MercadoLivreButton]
+</div>
+```
 
-Confirmar que o botão está dentro da div `flex space-x-2` junto com "Adicionar" e "Calcular", todos usando `flex-1` para distribuição igual.
+**Para (novo):**
+```jsx
+<div className="space-y-2">
+  <div className="flex space-x-2">
+    [Adicionar] [Calcular]
+  </div>
+  {hasMLIntegration && (
+    <MercadoLivreButton ... />
+  )}
+</div>
+```
+
+### 2. Componente `MercadoLivreButton`
+
+O componente já está com `w-full`, então funcionará corretamente na nova estrutura.
 
 ---
 
-## Código a Modificar
+## Arquivos a Modificar
 
-**Arquivo:** `src/components/reseller/MercadoLivreButton.tsx`
-
-| Estado | Classe |
-|--------|--------|
-| Publicar | `flex-1 bg-amber-500 hover:bg-amber-600 text-white` |
-| Publicando | `flex-1 bg-amber-500 hover:bg-amber-500 text-white` |
-| Publicado | `flex-1 bg-green-500 hover:bg-green-500 text-white` |
-
-**Arquivo:** `src/pages/reseller/Catalog.tsx`
-
-O botão já está dentro da div de botões (linha 495-509), só precisa garantir que use `flex-1` igual aos outros.
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/pages/reseller/Catalog.tsx` | Separar botões em duas linhas dentro de uma div com `space-y-2` |
 
 ---
 
 ## Resultado Esperado
 
-1. Três botões alinhados horizontalmente na parte inferior do card
-2. Botões com largura proporcional (cada um ocupando 1/3 do espaço)
-3. Visual consistente com a imagem de referência fornecida
-
+1. Botões "Adicionar/Remover" e "Calcular" ficam na primeira linha
+2. Botão "Publicar no Mercado Livre" fica na segunda linha, ocupando largura total
+3. Espaçamento vertical de 8px (space-y-2) entre as linhas
+4. Visual limpo e organizado conforme solicitado
