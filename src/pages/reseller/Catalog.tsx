@@ -464,34 +464,36 @@ const ResellerCatalog = () => {
                     </span>
                   </div>
 
-                  <div className="flex space-x-2">
-                    {product.isInMyStore ? (
-                      <Button 
+                  <div className="space-y-2">
+                    <div className="flex space-x-2">
+                      {product.isInMyStore ? (
+                        <Button 
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => handleRemoveFromStore(product.id)}
+                        >
+                          <Minus className="h-4 w-4 mr-1" />
+                          Remover
+                        </Button>
+                      ) : (
+                        <Button 
+                          className="flex-1"
+                          onClick={() => handleAddToStore(product.id)}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Adicionar
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
                         variant="outline"
                         className="flex-1"
-                        onClick={() => handleRemoveFromStore(product.id)}
+                        onClick={() => handleOpenCalculator(product)}
                       >
-                        <Minus className="h-4 w-4 mr-1" />
-                        Remover
+                        <Calculator className="h-4 w-4 mr-1" />
+                        Calcular
                       </Button>
-                    ) : (
-                      <Button 
-                        className="flex-1"
-                        onClick={() => handleAddToStore(product.id)}
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Adicionar
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => handleOpenCalculator(product)}
-                    >
-                      <Calculator className="h-4 w-4 mr-1" />
-                      Calcular
-                    </Button>
+                    </div>
                     {hasMLIntegration && (
                       <MercadoLivreButton
                         productId={product.id}
