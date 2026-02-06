@@ -42,6 +42,7 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   const [showCategorySelector, setShowCategorySelector] = useState(false);
   const [isCreatingTicket, setIsCreatingTicket] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [manuallyReturnedToMenu, setManuallyReturnedToMenu] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { tickets, createTicket } = useSupportTickets();
@@ -51,26 +52,24 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
 
   // Buscar ticket existente ou mostrar seletor de categoria
   useEffect(() => {
-    if (isOpen && !currentTicketId) {
-      const now = new Date();
-      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    if (!isOpen || currentTicketId || manuallyReturnedToMenu) return;
 
-      const openTicket = tickets.find(t => {
-        if (t.status === 'closed' || t.status === 'resolved') return false;
-        
-        // Só reabre se a última mensagem foi nas últimas 24h
-        const lastMessageDate = new Date(t.last_message_at);
-        return lastMessageDate > twentyFourHoursAgo;
-      });
-      
-      if (openTicket) {
-        setCurrentTicketId(openTicket.id);
-        setShowCategorySelector(false);
-      } else {
-        setShowCategorySelector(true);
-      }
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    const openTicket = tickets.find(t => {
+      if (t.status === 'closed' || t.status === 'resolved') return false;
+      const lastMessageDate = new Date(t.last_message_at);
+      return lastMessageDate > twentyFourHoursAgo;
+    });
+    
+    if (openTicket) {
+      setCurrentTicketId(openTicket.id);
+      setShowCategorySelector(false);
+    } else {
+      setShowCategorySelector(true);
     }
-  }, [isOpen, tickets, currentTicketId]);
+  }, [isOpen, tickets, currentTicketId, manuallyReturnedToMenu]);
 
   // Auto scroll para última mensagem
   useEffect(() => {
@@ -82,6 +81,7 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   const handleCategorySelect = async (categoryId: string) => {
     setSelectedCategory(categoryId);
     setIsCreatingTicket(true);
+    setManuallyReturnedToMenu(false);
     
     const category = SUPPORT_CATEGORIES.find(c => c.id === categoryId);
     const newTicket = await createTicket(category?.label || 'Atendimento via Chat');
@@ -273,6 +273,7 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
                   size="icon"
                   className="h-7 w-7"
                   onClick={() => {
+                    setManuallyReturnedToMenu(true);
                     setCurrentTicketId(null);
                     setShowCategorySelector(true);
                   }}
