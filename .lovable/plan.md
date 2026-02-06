@@ -1,58 +1,46 @@
 
 
-# Plano: Otimizar disposição dos cards de categorias no chat de suporte
+# Plano: Botão de voltar ao menu e atalho "Como Processar Pedido"
 
-## Problema
+## Alterações
 
-O seletor de categorias do chat de suporte tem 12 categorias exibidas em um grid 2x2 com ícone grande, nome e descrição. Isso causa:
-- Cards grandes demais para o espaço do widget (400x600px)
-- Descrições cortadas (`line-clamp-2`)
-- Muito scroll necessário para ver todas as categorias
-- Layout visualmente pesado
+### 1. Botão "Voltar ao Menu" na tela de conversa
 
-## Solução
+Quando o usuário está dentro de uma conversa (tela com mensagens), adicionar um botão no header ou na barra de status para voltar ao seletor de categorias e iniciar um novo assunto.
 
-Reorganizar os cards com um layout mais compacto e eficiente:
+**Lógica:**
+- Ao clicar, limpar o `currentTicketId` e ativar `showCategorySelector`
+- Isso permite ao usuário voltar ao menu de assuntos sem fechar o chat
 
-### Alterações no `src/components/support/ChatInterface.tsx`
+### 2. Botão "Como Processar Pedido" nas Ações Rápidas
 
-1. **Reduzir padding dos cards** de `p-4` para `p-3`
-2. **Layout horizontal nos cards** - ícone ao lado do texto (em linha), em vez de ícone em cima e texto embaixo (em coluna)
-3. **Reduzir tamanho do ícone** de `h-6 w-6` para `h-5 w-5`
-4. **Reduzir gap do grid** de `gap-3` para `gap-2`
-5. **Limitar descrição a 1 linha** - trocar `line-clamp-2` para `line-clamp-1`
-6. **Reduzir espaçamento geral** do container de `p-6 space-y-6` para `p-4 space-y-4`
+Adicionar um novo botão na seção "Ações Rápidas" do seletor de categorias que redireciona diretamente para a aula "Como Processar Pedidos".
 
-### Resultado visual esperado
+**Destino:** `/minha-conta/aula/74ad0121-0428-4e21-a027-5911dc2443ef`
 
-Cada card ficará mais compacto com layout horizontal:
-
-```text
-+------------------+------------------+
-| [icon] Pedidos   | [icon] Entrega   |
-| Dúvidas sobre... | Rastreamento,... |
-+------------------+------------------+
-| [icon] Pagamento | [icon] Produtos  |
-| Problemas com... | Informações s... |
-+------------------+------------------+
-```
-
-Isso permitirá que mais categorias fiquem visíveis sem scroll, mantendo a usabilidade e legibilidade.
+---
 
 ## Detalhes Técnicos
 
-No grid de categorias (linhas 172-192), as mudanças serão:
+### Arquivo: `src/components/support/ChatInterface.tsx`
 
-**Container:**
-- `p-6 space-y-6` para `p-4 space-y-4`
-- `grid grid-cols-2 gap-3` para `grid grid-cols-2 gap-2`
+**Importações:** Adicionar o ícone `ArrowLeft` e `GraduationCap` do lucide-react.
 
-**Cards (Button):**
-- `h-auto p-4 flex flex-col items-start gap-2` para `h-auto p-3 flex flex-row items-start gap-2`
+**Botão voltar (na barra de status, linhas 255-273):** Adicionar um botão com ícone de seta para a esquerda ao lado do status do ticket. Ao clicar, executa:
+```typescript
+setCurrentTicketId(null);
+setShowCategorySelector(true);
+```
 
-**Ícone:**
-- `h-6 w-6` para `h-5 w-5 shrink-0 mt-0.5`
+**Botão "Como Processar Pedido" (na seção Ações Rápidas, linhas 195-250):** Adicionar um novo item na lista de ações rápidas:
+```tsx
+<Button variant="ghost" size="sm" className="justify-start hover:bg-accent" asChild onClick={() => onClose()}>
+  <Link to="/minha-conta/aula/74ad0121-0428-4e21-a027-5911dc2443ef">
+    <GraduationCap className="h-4 w-4 mr-2" />
+    Como Processar Pedido
+  </Link>
+</Button>
+```
 
-**Descrição:**
-- `line-clamp-2` para `line-clamp-1`
+Este botão ficara visivel para todos os usuarios, pois e uma aula util para clientes e revendedores.
 
