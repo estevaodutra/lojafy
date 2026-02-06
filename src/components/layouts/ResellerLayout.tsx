@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -21,7 +21,9 @@ import {
   Star,
   TrendingUp,
   Trophy,
-  GraduationCap
+  GraduationCap,
+  ChevronRight,
+  ChevronDown
 } from 'lucide-react';
 import { useFeature } from '@/hooks/useFeature';
 import {
@@ -36,6 +38,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useAuth } from '@/contexts/AuthContext';
 import { PremiumBadge } from '@/components/premium/PremiumBadge';
 import { Badge } from '@/components/ui/badge';
@@ -102,6 +105,25 @@ const ResellerSidebar = () => {
   const { hasFeature: hasIntegraFeature } = useFeature('lojafy_integra');
   const currentPath = location.pathname;
 
+  const [openCategories, setOpenCategories] = useState<Set<string>>(() => {
+    const initial = new Set<string>();
+    filteredMenuGroups.forEach(group => {
+      if (group.items.some(item => currentPath === item.url)) {
+        initial.add(group.label);
+      }
+    });
+    return initial;
+  });
+
+  const toggleCategory = (label: string, open: boolean) => {
+    setOpenCategories(prev => {
+      const next = new Set(prev);
+      if (open) next.add(label);
+      else next.delete(label);
+      return next;
+    });
+  };
+
   const filteredMenuGroups = useMemo(() => {
     const groups = [...menuGroups];
     
@@ -153,33 +175,50 @@ const ResellerSidebar = () => {
         </div>
         
         {filteredMenuGroups.map((group) => (
-          <SidebarGroup key={group.label}>
-            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton 
-                      asChild
-                      className={currentPath === item.url ? 'bg-sidebar-accent' : ''}
-                    >
-                      <button onClick={() => navigate(item.url)} className="flex items-center justify-between w-full">
-                        <div className="flex items-center">
-                          <item.icon className="mr-2 h-4 w-4" />
-                          <span>{item.title}</span>
-                        </div>
-                        {item.badge && (
-                          <Badge variant="secondary" className="ml-auto text-xs">
-                            {item.badge}
-                          </Badge>
-                        )}
-                      </button>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          <Collapsible
+            key={group.label}
+            open={openCategories.has(group.label)}
+            onOpenChange={(open) => toggleCategory(group.label, open)}
+          >
+            <SidebarGroup>
+              <CollapsibleTrigger asChild>
+                <SidebarGroupLabel className="cursor-pointer flex items-center justify-between hover:bg-sidebar-accent/50 rounded-md transition-colors">
+                  <span>{group.label}</span>
+                  {openCategories.has(group.label) ? (
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                  )}
+                </SidebarGroupLabel>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {group.items.map((item) => (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton 
+                          asChild
+                          className={currentPath === item.url ? 'bg-sidebar-accent' : ''}
+                        >
+                          <button onClick={() => navigate(item.url)} className="flex items-center justify-between w-full">
+                            <div className="flex items-center">
+                              <item.icon className="mr-2 h-4 w-4" />
+                              <span>{item.title}</span>
+                            </div>
+                            {item.badge && (
+                              <Badge variant="secondary" className="ml-auto text-xs">
+                                {item.badge}
+                              </Badge>
+                            )}
+                          </button>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
         ))}
 
         <SidebarGroup className="mt-auto">
