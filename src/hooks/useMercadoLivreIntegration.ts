@@ -224,29 +224,39 @@ export const useMercadoLivreIntegration = () => {
       }
 
       // 3. Call unpublish webhook
-      const response = await fetch(
-        'https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Unpublish',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ml_item_id: publishedData.ml_item_id,
-            integration: {
-              access_token: integrationData.access_token,
-              refresh_token: integrationData.refresh_token,
-              token_type: integrationData.token_type,
-              expires_at: integrationData.expires_at,
-              ml_user_id: integrationData.ml_user_id,
-              scope: integrationData.scope
-            },
-            user_id: user.id,
-            product_id: productId
-          })
+      let response: Response;
+      try {
+        response = await fetch(
+          'https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Unpublish',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ml_item_id: publishedData.ml_item_id,
+              integration: {
+                access_token: integrationData.access_token,
+                refresh_token: integrationData.refresh_token,
+                token_type: integrationData.token_type,
+                expires_at: integrationData.expires_at,
+                ml_user_id: integrationData.ml_user_id,
+                scope: integrationData.scope
+              },
+              user_id: user.id,
+              product_id: productId
+            })
+          }
+        );
+      } catch (fetchError) {
+        console.error('Fetch error (unpublish):', fetchError);
+        if (fetchError instanceof TypeError && fetchError.message === 'Failed to fetch') {
+          throw new Error('Webhook de despublicação não está disponível. Configure o workflow MercadoLivre_Unpublish no n8n.');
         }
-      );
+        throw fetchError;
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('Webhook unpublish error:', response.status, errorText);
         throw new Error(`Erro ao despublicar: ${errorText}`);
       }
 
