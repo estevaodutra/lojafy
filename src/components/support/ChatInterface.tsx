@@ -52,7 +52,16 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   // Buscar ticket existente ou mostrar seletor de categoria
   useEffect(() => {
     if (isOpen && !currentTicketId) {
-      const openTicket = tickets.find(t => t.status !== 'closed' && t.status !== 'resolved');
+      const now = new Date();
+      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+      const openTicket = tickets.find(t => {
+        if (t.status === 'closed' || t.status === 'resolved') return false;
+        
+        // Só reabre se a última mensagem foi nas últimas 24h
+        const lastMessageDate = new Date(t.last_message_at);
+        return lastMessageDate > twentyFourHoursAgo;
+      });
       
       if (openTicket) {
         setCurrentTicketId(openTicket.id);
