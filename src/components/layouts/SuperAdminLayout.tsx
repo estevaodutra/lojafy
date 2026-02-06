@@ -22,10 +22,7 @@ import {
   DollarSign,
   GraduationCap,
   Code,
-  Sparkles,
-  ShoppingBag,
-  TrendingUp,
-  FileBarChart
+  Sparkles
 } from 'lucide-react';
 import {
   Sidebar,
@@ -105,49 +102,6 @@ const academyMenuItems = [
   },
 ];
 
-const resellerMenuItems = [
-  {
-    title: 'Dashboard',
-    url: '/super-admin/reseller',
-    icon: LayoutDashboard,
-  },
-  {
-    title: 'Catálogo',
-    url: '/super-admin/reseller/catalogo',
-    icon: Package,
-  },
-  {
-    title: 'Produtos',
-    url: '/super-admin/reseller/produtos',
-    icon: ShoppingBag,
-  },
-  {
-    title: 'Pedidos',
-    url: '/super-admin/reseller/pedidos',
-    icon: ShoppingCart,
-  },
-  {
-    title: 'Vendas',
-    url: '/super-admin/reseller/vendas',
-    icon: TrendingUp,
-  },
-  {
-    title: 'Configurar Loja',
-    url: '/super-admin/reseller/loja',
-    icon: Store,
-  },
-  {
-    title: 'Financeiro',
-    url: '/super-admin/reseller/financeiro',
-    icon: DollarSign,
-  },
-  {
-    title: 'Relatórios',
-    url: '/super-admin/reseller/relatorios',
-    icon: FileBarChart,
-  },
-];
-
 const SuperAdminSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -170,27 +124,6 @@ const SuperAdminSidebar = () => {
           <SidebarGroupContent>
             <SidebarMenu>
               {superAdminMenuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild
-                    className={currentPath === item.url ? 'bg-sidebar-accent' : ''}
-                  >
-                    <button onClick={() => navigate(item.url)}>
-                      <item.icon className="mr-2 h-4 w-4" />
-                      <span>{item.title}</span>
-                    </button>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Painel Revendedor</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {resellerMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton 
                     asChild

@@ -327,27 +327,6 @@ const App = () => {
                 <Route path="base-conhecimento" element={<AIKnowledgeBase />} />
                 <Route path="suporte" element={<SupportManagement />} />
                 <Route path="api-docs" element={<ApiDocumentation />} />
-
-                {/* Reseller Panel inside Super Admin */}
-                <Route path="reseller" element={<ResellerDashboard />} />
-                <Route path="reseller/catalogo" element={<ResellerCatalog />} />
-                <Route path="reseller/produtos" element={<ResellerProducts />} />
-                <Route path="reseller/pedidos" element={<ResellerOrders />} />
-                <Route path="reseller/loja" element={<ResellerStoreEditor />} />
-                <Route path="reseller/paginas" element={<ResellerPagesEditor />} />
-                <Route path="reseller/vantagens" element={<ResellerBenefits />} />
-                <Route path="reseller/banners" element={<ResellerBanners />} />
-                <Route path="reseller/cupons" element={<ResellerCoupons />} />
-                <Route path="reseller/frete" element={<ResellerShipping />} />
-                <Route path="reseller/depoimentos" element={<ResellerTestimonials />} />
-                <Route path="reseller/vendas" element={<ResellerSales />} />
-                <Route path="reseller/relatorios" element={<ResellerReports />} />
-                <Route path="reseller/clientes" element={<ResellerClients />} />
-                <Route path="reseller/financeiro" element={<ResellerFinanceiro />} />
-                <Route path="reseller/metas" element={<ResellerGoals />} />
-                <Route path="reseller/integracoes" element={<ResellerLojafyIntegra />} />
-                <Route path="reseller/meus-acessos" element={<ResellerMeusAcessos />} />
-                <Route path="reseller/meus-acessos/top-produtos" element={<ResellerTopProdutosVencedores />} />
               </Route>
 
               {/* Supplier Panel Routes */}
