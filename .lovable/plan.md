@@ -1,40 +1,43 @@
 
 
-# Plano: Corrigir redirecionamento do "Ver Catálogo"
+# Plano: Limpar chat de suporte após 24h sem conversa
 
 ## Problema
 
-O botão "Ver Catálogo" navega para `/`, mas a página Index usa o hook `useAuthRedirect` que detecta o role `reseller` e redireciona automaticamente de volta para `/reseller`. Por isso parece que o botão não funciona.
+Atualmente, quando o cliente abre o balão de suporte, ele sempre reabre o último ticket aberto, mesmo que a conversa esteja parada há dias. O cliente fica preso na conversa antiga sem poder iniciar uma nova.
 
 ## Solução
 
-Passar um parâmetro na navegação para que a página Index saiba que o revendedor quer ver o catálogo e não deve ser redirecionado. Usaremos um query parameter `?viewCatalog=true`.
+Modificar a lógica do `ChatInterface.tsx` para considerar um ticket como "ativo" apenas se a última mensagem foi enviada nas últimas 24 horas. Se passou mais de 24h sem mensagens, o chat mostra o seletor de categorias (como se fosse uma conversa nova).
 
-## Alterações
+## Alteração
 
-### 1. `src/components/layouts/ResellerLayout.tsx`
-- Alterar o `navigate('/')` do botão "Ver Catálogo" para `navigate('/?viewCatalog=true')`
+### Arquivo: `src/components/support/ChatInterface.tsx`
 
-### 2. `src/hooks/useAuthRedirect.ts`
-- Verificar se o parâmetro `viewCatalog` está presente na URL
-- Se estiver, pular o redirecionamento automático para permitir que o revendedor veja o catálogo
+Na lógica que busca o ticket existente (linhas 52-64), adicionar verificação de tempo:
 
----
-
-## Detalhes Técnicos
-
-No `useAuthRedirect.ts`, adicionar verificação antes do redirect:
-
+**Antes:**
 ```typescript
-const searchParams = new URLSearchParams(location.search);
-if (searchParams.get('viewCatalog') === 'true') return;
+const openTicket = tickets.find(t => t.status !== 'closed' && t.status !== 'resolved');
 ```
 
-No `ResellerLayout.tsx`, atualizar a navegação:
+**Depois:**
+```typescript
+const now = new Date();
+const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-```tsx
-<button onClick={() => navigate('/?viewCatalog=true')}>
+const openTicket = tickets.find(t => {
+  if (t.status === 'closed' || t.status === 'resolved') return false;
+  
+  // Verificar se a última mensagem foi nas últimas 24h
+  const lastMessageDate = new Date(t.last_message_at);
+  return lastMessageDate > twentyFourHoursAgo;
+});
 ```
 
-Isso permite que revendedores acessem o catálogo público quando desejam, sem quebrar o redirecionamento automático padrão ao fazer login.
+## Resultado
+
+- Se o ticket tem mensagens recentes (menos de 24h): reabre a conversa normalmente
+- Se o ticket não tem mensagens há mais de 24h: mostra o seletor de categorias, permitindo iniciar uma nova conversa
+- Nenhuma alteração no banco de dados necessária, pois o campo `last_message_at` já existe nos tickets
 
