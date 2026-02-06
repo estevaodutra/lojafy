@@ -1,50 +1,40 @@
 
 
-# Plano: Atualizar botões da sidebar
+# Plano: Corrigir redirecionamento do "Ver Catálogo"
 
-## Resumo
+## Problema
 
-Atualizar o botão "Ver Minha Loja" para navegar para a URL pública da loja do revendedor (`/loja/{store_slug}`) e adicionar o botão "Ver Catálogo" que navega para `/`.
+O botão "Ver Catálogo" navega para `/`, mas a página Index usa o hook `useAuthRedirect` que detecta o role `reseller` e redireciona automaticamente de volta para `/reseller`. Por isso parece que o botão não funciona.
 
----
+## Solução
+
+Passar um parâmetro na navegação para que a página Index saiba que o revendedor quer ver o catálogo e não deve ser redirecionado. Usaremos um query parameter `?viewCatalog=true`.
 
 ## Alterações
 
-### Arquivo: `src/components/layouts/ResellerLayout.tsx`
+### 1. `src/components/layouts/ResellerLayout.tsx`
+- Alterar o `navigate('/')` do botão "Ver Catálogo" para `navigate('/?viewCatalog=true')`
 
-1. **Importar** o hook `useResellerStore` para obter o `store_slug` da loja do revendedor
-
-2. **Usar o hook** dentro do componente `ResellerSidebar`:
-```typescript
-const { store: resellerStore } = useResellerStore();
-```
-
-3. **Atualizar "Ver Minha Loja"** (linha 229) para navegar para `/loja/{store_slug}`:
-```tsx
-<button onClick={() => navigate(resellerStore?.store_slug ? `/loja/${resellerStore.store_slug}` : '/')}>
-  <Store className="mr-2 h-4 w-4 text-primary" />
-  <span className="font-medium text-primary">Ver Minha Loja</span>
-</button>
-```
-
-4. **Adicionar "Ver Catálogo"** logo após "Ver Minha Loja", navegando para `/`:
-```tsx
-<SidebarMenuItem>
-  <SidebarMenuButton asChild className="bg-primary/10 hover:bg-primary/20">
-    <button onClick={() => navigate('/')}>
-      <ShoppingBag className="mr-2 h-4 w-4 text-primary" />
-      <span className="font-medium text-primary">Ver Catálogo</span>
-    </button>
-  </SidebarMenuButton>
-</SidebarMenuItem>
-```
+### 2. `src/hooks/useAuthRedirect.ts`
+- Verificar se o parâmetro `viewCatalog` está presente na URL
+- Se estiver, pular o redirecionamento automático para permitir que o revendedor veja o catálogo
 
 ---
 
-## Resultado
+## Detalhes Técnicos
 
-A seção inferior da sidebar terá 3 botões:
-1. **Ver Minha Loja** - navega para `/loja/topdanet` (slug dinâmico da loja)
-2. **Ver Catálogo** - navega para `/`
-3. **Sair** - faz logout
+No `useAuthRedirect.ts`, adicionar verificação antes do redirect:
+
+```typescript
+const searchParams = new URLSearchParams(location.search);
+if (searchParams.get('viewCatalog') === 'true') return;
+```
+
+No `ResellerLayout.tsx`, atualizar a navegação:
+
+```tsx
+<button onClick={() => navigate('/?viewCatalog=true')}>
+```
+
+Isso permite que revendedores acessem o catálogo público quando desejam, sem quebrar o redirecionamento automático padrão ao fazer login.
 
