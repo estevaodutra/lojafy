@@ -105,25 +105,6 @@ const ResellerSidebar = () => {
   const { hasFeature: hasIntegraFeature } = useFeature('lojafy_integra');
   const currentPath = location.pathname;
 
-  const [openCategories, setOpenCategories] = useState<Set<string>>(() => {
-    const initial = new Set<string>();
-    filteredMenuGroups.forEach(group => {
-      if (group.items.some(item => currentPath === item.url)) {
-        initial.add(group.label);
-      }
-    });
-    return initial;
-  });
-
-  const toggleCategory = (label: string, open: boolean) => {
-    setOpenCategories(prev => {
-      const next = new Set(prev);
-      if (open) next.add(label);
-      else next.delete(label);
-      return next;
-    });
-  };
-
   const filteredMenuGroups = useMemo(() => {
     const groups = [...menuGroups];
     
@@ -159,6 +140,25 @@ const ResellerSidebar = () => {
     
     return groups;
   }, [hasTop10Feature, hasAcademyFeature, hasIntegraFeature]);
+
+  const [openCategories, setOpenCategories] = useState<Set<string>>(() => {
+    const initial = new Set<string>();
+    filteredMenuGroups.forEach(group => {
+      if (group.items.some(item => currentPath === item.url)) {
+        initial.add(group.label);
+      }
+    });
+    return initial;
+  });
+
+  const toggleCategory = (label: string, open: boolean) => {
+    setOpenCategories(prev => {
+      const next = new Set(prev);
+      if (open) next.add(label);
+      else next.delete(label);
+      return next;
+    });
+  };
 
   const handleLogout = async () => {
     await signOut();
