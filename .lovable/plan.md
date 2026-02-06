@@ -1,43 +1,58 @@
 
 
-# Plano: Limpar chat de suporte após 24h sem conversa
+# Plano: Otimizar disposição dos cards de categorias no chat de suporte
 
 ## Problema
 
-Atualmente, quando o cliente abre o balão de suporte, ele sempre reabre o último ticket aberto, mesmo que a conversa esteja parada há dias. O cliente fica preso na conversa antiga sem poder iniciar uma nova.
+O seletor de categorias do chat de suporte tem 12 categorias exibidas em um grid 2x2 com ícone grande, nome e descrição. Isso causa:
+- Cards grandes demais para o espaço do widget (400x600px)
+- Descrições cortadas (`line-clamp-2`)
+- Muito scroll necessário para ver todas as categorias
+- Layout visualmente pesado
 
 ## Solução
 
-Modificar a lógica do `ChatInterface.tsx` para considerar um ticket como "ativo" apenas se a última mensagem foi enviada nas últimas 24 horas. Se passou mais de 24h sem mensagens, o chat mostra o seletor de categorias (como se fosse uma conversa nova).
+Reorganizar os cards com um layout mais compacto e eficiente:
 
-## Alteração
+### Alterações no `src/components/support/ChatInterface.tsx`
 
-### Arquivo: `src/components/support/ChatInterface.tsx`
+1. **Reduzir padding dos cards** de `p-4` para `p-3`
+2. **Layout horizontal nos cards** - ícone ao lado do texto (em linha), em vez de ícone em cima e texto embaixo (em coluna)
+3. **Reduzir tamanho do ícone** de `h-6 w-6` para `h-5 w-5`
+4. **Reduzir gap do grid** de `gap-3` para `gap-2`
+5. **Limitar descrição a 1 linha** - trocar `line-clamp-2` para `line-clamp-1`
+6. **Reduzir espaçamento geral** do container de `p-6 space-y-6` para `p-4 space-y-4`
 
-Na lógica que busca o ticket existente (linhas 52-64), adicionar verificação de tempo:
+### Resultado visual esperado
 
-**Antes:**
-```typescript
-const openTicket = tickets.find(t => t.status !== 'closed' && t.status !== 'resolved');
+Cada card ficará mais compacto com layout horizontal:
+
+```text
++------------------+------------------+
+| [icon] Pedidos   | [icon] Entrega   |
+| Dúvidas sobre... | Rastreamento,... |
++------------------+------------------+
+| [icon] Pagamento | [icon] Produtos  |
+| Problemas com... | Informações s... |
++------------------+------------------+
 ```
 
-**Depois:**
-```typescript
-const now = new Date();
-const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+Isso permitirá que mais categorias fiquem visíveis sem scroll, mantendo a usabilidade e legibilidade.
 
-const openTicket = tickets.find(t => {
-  if (t.status === 'closed' || t.status === 'resolved') return false;
-  
-  // Verificar se a última mensagem foi nas últimas 24h
-  const lastMessageDate = new Date(t.last_message_at);
-  return lastMessageDate > twentyFourHoursAgo;
-});
-```
+## Detalhes Técnicos
 
-## Resultado
+No grid de categorias (linhas 172-192), as mudanças serão:
 
-- Se o ticket tem mensagens recentes (menos de 24h): reabre a conversa normalmente
-- Se o ticket não tem mensagens há mais de 24h: mostra o seletor de categorias, permitindo iniciar uma nova conversa
-- Nenhuma alteração no banco de dados necessária, pois o campo `last_message_at` já existe nos tickets
+**Container:**
+- `p-6 space-y-6` para `p-4 space-y-4`
+- `grid grid-cols-2 gap-3` para `grid grid-cols-2 gap-2`
+
+**Cards (Button):**
+- `h-auto p-4 flex flex-col items-start gap-2` para `h-auto p-3 flex flex-row items-start gap-2`
+
+**Ícone:**
+- `h-6 w-6` para `h-5 w-5 shrink-0 mt-0.5`
+
+**Descrição:**
+- `line-clamp-2` para `line-clamp-1`
 
