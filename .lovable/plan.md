@@ -1,30 +1,43 @@
 
-
-# Corrigir botão "Voltar ao Menu" no chat de suporte
+# Simplificar despublicação do Mercado Livre (sem webhook)
 
 ## Problema
 
-Quando o usuário clica no botão de voltar (seta), o código faz:
-1. `setCurrentTicketId(null)` 
-2. `setShowCategorySelector(true)`
-
-Porém, o `useEffect` que busca tickets abertos tem `currentTicketId` como dependência. Quando o `currentTicketId` muda para `null`, o efeito roda novamente, encontra o mesmo ticket aberto (que está dentro das 24h), e imediatamente define o `currentTicketId` de volta — anulando a ação do botão.
+Atualmente, ao despublicar um produto do Mercado Livre, o sistema tenta chamar o webhook `MercadoLivre_Unpublish` no n8n. Se o webhook não estiver configurado ou disponível, a operação falha com erro.
 
 ## Solução
 
-Adicionar uma variável de estado `manuallyReturnedToMenu` que funciona como uma "trava". Quando o usuário clica no botão de voltar, essa flag é ativada, impedindo o `useEffect` de re-selecionar o ticket automaticamente.
+Remover a chamada ao webhook de despublicação e apenas atualizar o status diretamente no banco de dados (`mercadolivre_published_products`), marcando o produto como `unpublished`.
 
 ## Detalhes Técnicos
 
-### Arquivo: `src/components/support/ChatInterface.tsx`
+### Arquivo: `src/hooks/useMercadoLivreIntegration.ts`
 
-1. **Novo estado**: Adicionar `const [manuallyReturnedToMenu, setManuallyReturnedToMenu] = useState(false);`
+Na mutation `unpublishProductMutation` (linhas 198-301), simplificar o `mutationFn` para:
 
-2. **Modificar o useEffect** (linhas 53-73): Adicionar verificação no início — se `manuallyReturnedToMenu` for `true`, não buscar ticket automaticamente.
+1. **Remover** a busca de dados da integração (linhas 202-212) -- não é mais necessário pois não vai chamar webhook
+2. **Remover** a busca do `ml_item_id` (linhas 214-224) -- idem
+3. **Remover** toda a chamada ao webhook `MercadoLivre_Unpublish` (linhas 226-261)
+4. **Manter** apenas a atualização do status no banco (linhas 263-273), mudando de `published` para `unpublished`
 
-3. **No botão de voltar** (linhas 272-280): Ao clicar, além de limpar o ticket e mostrar o seletor, ativar `setManuallyReturnedToMenu(true)`.
+O `mutationFn` ficará resumido a:
+```typescript
+mutationFn: async ({ productId }: { productId: string }) => {
+  if (!user?.id) throw new Error('Usuário não autenticado');
 
-4. **Na seleção de categoria** (`handleCategorySelect`): Resetar `setManuallyReturnedToMenu(false)` para que o comportamento automático volte ao normal após iniciar uma nova conversa.
+  const { error: updateError } = await supabase
+    .from('mercadolivre_published_products')
+    .update({ status: 'unpublished' })
+    .eq('user_id', user.id)
+    .eq('product_id', productId);
 
-5. **Quando o chat fecha** (`onClose`): Resetar a flag para que ao reabrir o chat, o comportamento automático funcione normalmente.
+  if (updateError) {
+    console.error('Error updating published product status:', updateError);
+    throw new Error('Erro ao atualizar status de publicação');
+  }
 
+  return { productId };
+},
+```
+
+Os callbacks `onMutate`, `onSuccess`, `onError` e `onSettled` permanecem inalterados.
