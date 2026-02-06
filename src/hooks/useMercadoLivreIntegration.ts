@@ -199,68 +199,6 @@ export const useMercadoLivreIntegration = () => {
     mutationFn: async ({ productId }: { productId: string }) => {
       if (!user?.id) throw new Error('Usuário não autenticado');
 
-      // 1. Fetch integration data
-      const { data: integrationData, error: integrationError } = await supabase
-        .from('mercadolivre_integrations')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .single();
-
-      if (integrationError || !integrationData) {
-        throw new Error('Integração Mercado Livre não encontrada');
-      }
-
-      // 2. Fetch ml_item_id from published products
-      const { data: publishedData, error: publishedError } = await supabase
-        .from('mercadolivre_published_products')
-        .select('ml_item_id')
-        .eq('user_id', user.id)
-        .eq('product_id', productId)
-        .single();
-
-      if (publishedError || !publishedData) {
-        throw new Error('Produto publicado não encontrado');
-      }
-
-      // 3. Call unpublish webhook
-      let response: Response;
-      try {
-        response = await fetch(
-          'https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Unpublish',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              ml_item_id: publishedData.ml_item_id,
-              integration: {
-                access_token: integrationData.access_token,
-                refresh_token: integrationData.refresh_token,
-                token_type: integrationData.token_type,
-                expires_at: integrationData.expires_at,
-                ml_user_id: integrationData.ml_user_id,
-                scope: integrationData.scope
-              },
-              user_id: user.id,
-              product_id: productId
-            })
-          }
-        );
-      } catch (fetchError) {
-        console.error('Fetch error (unpublish):', fetchError);
-        if (fetchError instanceof TypeError && fetchError.message === 'Failed to fetch') {
-          throw new Error('Webhook de despublicação não está disponível. Configure o workflow MercadoLivre_Unpublish no n8n.');
-        }
-        throw fetchError;
-      }
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Webhook unpublish error:', response.status, errorText);
-        throw new Error(`Erro ao despublicar: ${errorText}`);
-      }
-
-      // 4. Update status to 'unpublished'
       const { error: updateError } = await supabase
         .from('mercadolivre_published_products')
         .update({ status: 'unpublished' })
