@@ -147,7 +147,7 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
       {/* Seletor de categoria (primeira interação) */}
       {showCategorySelector ? (
         <ScrollArea className="flex-1">
-          <div className="p-6 space-y-6">
+          <div className="p-4 space-y-4">
             <div className="text-center space-y-3">
               <h4 className="font-semibold text-lg">Como podemos ajudar?</h4>
               <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -169,21 +169,21 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
             />
             
             {/* Grid de botões de categorias */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2">
               {filteredCategories.map((category) => {
                 const Icon = category.icon;
                 return (
                   <Button
                     key={category.id}
                     variant="outline"
-                    className="h-auto p-4 flex flex-col items-start gap-2 hover:bg-accent hover:scale-[1.02] transition-all"
+                    className="h-auto p-3 flex flex-row items-start gap-2 text-left hover:border-primary/50 hover:bg-accent transition-all"
                     onClick={() => handleCategorySelect(category.id)}
                     disabled={isCreatingTicket}
                   >
-                    <Icon className="h-6 w-6" style={{ color: category.color }} />
-                    <div className="text-left">
-                      <div className="font-semibold text-sm">{category.label}</div>
-                      <div className="text-xs text-muted-foreground line-clamp-2">
+                    <Icon className="h-5 w-5 shrink-0 mt-0.5" style={{ color: category.color }} />
+                    <div className="min-w-0">
+                      <div className="font-medium text-sm leading-tight">{category.label}</div>
+                      <div className="text-xs text-muted-foreground line-clamp-1">
                         {category.description}
                       </div>
                     </div>
