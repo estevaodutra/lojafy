@@ -1,43 +1,59 @@
 
-# Simplificar despublicação do Mercado Livre (sem webhook)
 
-## Problema
+# Adicionar Painel do Revendedor no Super Admin
 
-Atualmente, ao despublicar um produto do Mercado Livre, o sistema tenta chamar o webhook `MercadoLivre_Unpublish` no n8n. Se o webhook não estiver configurado ou disponível, a operação falha com erro.
+## Objetivo
 
-## Solução
+Permitir que o Super Admin acesse todas as funcionalidades do painel de revendedor diretamente dentro do painel de administração, sem precisar impersonar um revendedor.
 
-Remover a chamada ao webhook de despublicação e apenas atualizar o status diretamente no banco de dados (`mercadolivre_published_products`), marcando o produto como `unpublished`.
+## Alterações
+
+### 1. Adicionar rotas do revendedor no Super Admin (`src/App.tsx`)
+
+Duplicar todas as rotas do painel de revendedor dentro do bloco de rotas do Super Admin, com o prefixo `/super-admin/reseller/`:
+
+- `/super-admin/reseller` - Dashboard do Revendedor
+- `/super-admin/reseller/catalogo` - Catálogo
+- `/super-admin/reseller/produtos` - Meus Produtos
+- `/super-admin/reseller/pedidos` - Pedidos
+- `/super-admin/reseller/loja` - Configurar Loja
+- `/super-admin/reseller/paginas` - Páginas
+- `/super-admin/reseller/vantagens` - Vantagens
+- `/super-admin/reseller/banners` - Banners
+- `/super-admin/reseller/cupons` - Cupons
+- `/super-admin/reseller/frete` - Frete
+- `/super-admin/reseller/depoimentos` - Depoimentos
+- `/super-admin/reseller/vendas` - Vendas
+- `/super-admin/reseller/relatorios` - Relatórios
+- `/super-admin/reseller/clientes` - Clientes
+- `/super-admin/reseller/financeiro` - Financeiro
+- `/super-admin/reseller/metas` - Metas
+- `/super-admin/reseller/integracoes` - Lojafy Integra
+- `/super-admin/reseller/meus-acessos` - Meus Acessos
+- `/super-admin/reseller/meus-acessos/top-produtos` - Top Produtos Vencedores
+
+### 2. Adicionar menu "Painel Revendedor" na sidebar do Super Admin (`src/components/layouts/SuperAdminLayout.tsx`)
+
+Criar uma nova seção no menu lateral chamada "Painel Revendedor" com os principais itens de navegação do revendedor, agrupados de forma simplificada:
+
+- Dashboard (`/super-admin/reseller`)
+- Catálogo (`/super-admin/reseller/catalogo`)
+- Produtos (`/super-admin/reseller/produtos`)
+- Pedidos (`/super-admin/reseller/pedidos`)
+- Vendas (`/super-admin/reseller/vendas`)
+- Configurar Loja (`/super-admin/reseller/loja`)
+- Financeiro (`/super-admin/reseller/financeiro`)
+- Relatórios (`/super-admin/reseller/relatorios`)
+
+---
 
 ## Detalhes Técnicos
 
-### Arquivo: `src/hooks/useMercadoLivreIntegration.ts`
+### Arquivo: `src/App.tsx`
 
-Na mutation `unpublishProductMutation` (linhas 198-301), simplificar o `mutationFn` para:
+Dentro do bloco `<Route path="/super-admin" ...>` (linhas 290-330), adicionar as novas rotas reutilizando os mesmos componentes de página já importados (ResellerDashboard, ResellerCatalog, etc.). Sem necessidade de novas importações pois todas já existem no arquivo.
 
-1. **Remover** a busca de dados da integração (linhas 202-212) -- não é mais necessário pois não vai chamar webhook
-2. **Remover** a busca do `ml_item_id` (linhas 214-224) -- idem
-3. **Remover** toda a chamada ao webhook `MercadoLivre_Unpublish` (linhas 226-261)
-4. **Manter** apenas a atualização do status no banco (linhas 263-273), mudando de `published` para `unpublished`
+### Arquivo: `src/components/layouts/SuperAdminLayout.tsx`
 
-O `mutationFn` ficará resumido a:
-```typescript
-mutationFn: async ({ productId }: { productId: string }) => {
-  if (!user?.id) throw new Error('Usuário não autenticado');
+Adicionar um novo array `resellerMenuItems` com os itens de navegação e uma nova seção `<SidebarGroup>` com label "Painel Revendedor" na sidebar, usando os mesmos icones já importados (LayoutDashboard, Package, ShoppingCart, etc.). Importar icones adicionais necessarios como `ShoppingBag` e `TrendingUp`.
 
-  const { error: updateError } = await supabase
-    .from('mercadolivre_published_products')
-    .update({ status: 'unpublished' })
-    .eq('user_id', user.id)
-    .eq('product_id', productId);
-
-  if (updateError) {
-    console.error('Error updating published product status:', updateError);
-    throw new Error('Erro ao atualizar status de publicação');
-  }
-
-  return { productId };
-},
-```
-
-Os callbacks `onMutate`, `onSuccess`, `onError` e `onSettled` permanecem inalterados.
