@@ -15,6 +15,7 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from '@/components/ui/pagination';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Search, 
@@ -36,6 +37,8 @@ import { useResellerStore } from '@/hooks/useResellerStore';
 import { ProductCalculatorModal } from '@/components/reseller/ProductCalculatorModal';
 import { useSubscriptionCheck } from '@/hooks/useSubscriptionCheck';
 import { PremiumRequiredModal } from '@/components/premium/PremiumRequiredModal';
+import { useMercadoLivreIntegration } from '@/hooks/useMercadoLivreIntegration';
+import { MercadoLivreButton } from '@/components/reseller/MercadoLivreButton';
 
 const ResellerCatalog = () => {
   const { toast } = useToast();
@@ -72,6 +75,13 @@ const ResellerCatalog = () => {
   } = useResellerCatalog();
 
   const { addProduct, removeProduct } = useResellerStore();
+  
+  const {
+    hasActiveIntegration: hasMLIntegration,
+    isProductPublished,
+    isProductPublishing,
+    publishProduct,
+  } = useMercadoLivreIntegration();
 
   const stats = getProductStats();
 
@@ -198,6 +208,7 @@ const ResellerCatalog = () => {
   };
 
   return (
+    <TooltipProvider>
     <div className="space-y-6">
       {/* Header */}
       <div>
@@ -481,6 +492,21 @@ const ResellerCatalog = () => {
                       <Calculator className="h-4 w-4 mr-1" />
                       Calcular
                     </Button>
+                    {hasMLIntegration && (
+                      <MercadoLivreButton
+                        productId={product.id}
+                        isPublished={isProductPublished(product.id)}
+                        isPublishing={isProductPublishing(product.id)}
+                        isInStore={product.isInMyStore}
+                        onPublish={async (addToStoreFirst) => {
+                          await publishProduct(product.id, addToStoreFirst);
+                        }}
+                        onAddToStore={async () => {
+                          const price = getSuggestedPrice(product);
+                          await addProduct(product.id, price);
+                        }}
+                      />
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -612,6 +638,7 @@ const ResellerCatalog = () => {
         onAddToStore={handleAddToStore}
       />
     </div>
+    </TooltipProvider>
   );
 };
 
