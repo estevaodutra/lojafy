@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Send, User, Bot, Clock, MessageCircle, Package } from 'lucide-react';
+import { X, Send, User, Bot, Clock, MessageCircle, Package, ArrowLeft, GraduationCap } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
@@ -227,9 +227,21 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
                   asChild
                   onClick={() => onClose()}
                 >
-                  <Link to="/minha-conta/academy">
+                <Link to="/minha-conta/academy">
                     <Bot className="h-4 w-4 mr-2" />
                     Acessar Academia
+                  </Link>
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="justify-start hover:bg-accent" 
+                  asChild
+                  onClick={() => onClose()}
+                >
+                  <Link to="/minha-conta/aula/74ad0121-0428-4e21-a027-5911dc2443ef">
+                    <GraduationCap className="h-4 w-4 mr-2" />
+                    Como Processar Pedido
                   </Link>
                 </Button>
                 {profile?.role === 'reseller' && (
@@ -256,7 +268,17 @@ export default function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
           {currentTicket && (
             <div className="px-4 py-2 border-b bg-muted/50 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => {
+                    setCurrentTicketId(null);
+                    setShowCategorySelector(true);
+                  }}
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
                 <span className="text-sm text-muted-foreground">Status:</span>
               </div>
               <Badge variant={
