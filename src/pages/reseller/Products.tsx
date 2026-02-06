@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useResellerStore } from '@/hooks/useResellerStore';
 import { useToast } from '@/hooks/use-toast';
+import { useMercadoLivreIntegration } from '@/hooks/useMercadoLivreIntegration';
+import { MercadoLivreButton } from '@/components/reseller/MercadoLivreButton';
 import { 
   Package, 
   Edit,
@@ -33,6 +35,13 @@ const ResellerProducts = () => {
     updateProductPrice,
     removeProduct 
   } = useResellerStore();
+
+  const {
+    hasActiveIntegration,
+    isProductPublished,
+    isProductPublishing,
+    publishProduct,
+  } = useMercadoLivreIntegration();
 
   const [editingPrice, setEditingPrice] = useState<string | null>(null);
   const [newPrice, setNewPrice] = useState<string>('');
@@ -384,6 +393,20 @@ const ResellerProducts = () => {
                         </AlertDialog>
                       </div>
                     </div>
+                    
+                    {/* Mercado Livre Button */}
+                    {hasActiveIntegration && product.product && (
+                      <div className="mt-4 pt-4 border-t">
+                        <MercadoLivreButton
+                          productId={product.product_id}
+                          isPublished={isProductPublished(product.product_id)}
+                          isPublishing={isProductPublishing(product.product_id)}
+                          isInStore={true}
+                          onPublish={async () => { await publishProduct(product.product_id); }}
+                          onAddToStore={async () => {}}
+                        />
+                      </div>
+                    )}
                   </Card>
                 ))}
               </div>
