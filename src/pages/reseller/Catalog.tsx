@@ -80,7 +80,9 @@ const ResellerCatalog = () => {
     hasActiveIntegration: hasMLIntegration,
     isProductPublished,
     isProductPublishing,
+    isProductUnpublishing,
     publishProduct,
+    unpublishProduct,
   } = useMercadoLivreIntegration();
 
   const stats = getProductStats();
@@ -499,9 +501,13 @@ const ResellerCatalog = () => {
                         productId={product.id}
                         isPublished={isProductPublished(product.id)}
                         isPublishing={isProductPublishing(product.id)}
+                        isUnpublishing={isProductUnpublishing(product.id)}
                         isInStore={product.isInMyStore}
                         onPublish={async (addToStoreFirst) => {
                           await publishProduct(product.id, addToStoreFirst);
+                        }}
+                        onUnpublish={async () => {
+                          await unpublishProduct(product.id);
                         }}
                         onAddToStore={async () => {
                           const price = getSuggestedPrice(product);
