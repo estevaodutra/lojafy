@@ -87,14 +87,49 @@ export const useMercadoLivreIntegration = () => {
         await addToStoreFirst();
       }
 
-      // Call the n8n webhook
+      // 1. Buscar dados completos do produto
+      const { data: productData, error: productError } = await supabase
+        .from('products')
+        .select(`
+          *,
+          category:categories(id, name),
+          subcategory:subcategories(id, name)
+        `)
+        .eq('id', productId)
+        .single();
+
+      if (productError || !productData) {
+        throw new Error('Produto não encontrado');
+      }
+
+      // 2. Buscar dados da integração (incluindo access_token)
+      const { data: integrationData, error: integrationError } = await supabase
+        .from('mercadolivre_integrations')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .single();
+
+      if (integrationError || !integrationData) {
+        throw new Error('Integração Mercado Livre não encontrada');
+      }
+
+      // 3. Enviar payload completo ao webhook
       const response = await fetch(
         'https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Advertise',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            product_id: productId,
+            product: productData,
+            integration: {
+              access_token: integrationData.access_token,
+              refresh_token: integrationData.refresh_token,
+              token_type: integrationData.token_type,
+              expires_at: integrationData.expires_at,
+              ml_user_id: integrationData.ml_user_id,
+              scope: integrationData.scope
+            },
             user_id: user.id
           })
         }
