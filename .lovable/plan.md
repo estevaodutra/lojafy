@@ -1,111 +1,63 @@
 
 
-# Plano: Adicionar Botão Mercado Livre na Página "Meus Produtos"
+# Plano: Ajustar Posição do Botão Mercado Livre no Catálogo
 
 ## Resumo
 
-Adicionar o mesmo botão "Publicar no Mercado Livre" na página de "Meus Produtos" (`/reseller/produtos`), seguindo o mesmo padrão visual e funcional já implementado no Catálogo.
+Modificar o layout dos botões no catálogo para que o botão "Publicar no Mercado Livre" fique na mesma linha dos botões "Adicionar" e "Calcular", conforme mostrado na imagem de referência.
+
+---
+
+## Layout Atual vs Desejado
+
+**Atual:**
+O botão ML está na mesma linha, mas como um botão de largura total (w-full) pode não estar alinhado corretamente.
+
+**Desejado (conforme imagem):**
+```text
+┌────────────────────────────────────────────────┐
+│  [+ Adicionar] [Calcular] [Publicar no ML]     │
+└────────────────────────────────────────────────┘
+```
+
+Todos os três botões lado a lado, ocupando proporcionalmente a largura disponível.
 
 ---
 
 ## Alterações Necessárias
 
-### 1. Modificar Página "Meus Produtos"
+### 1. Modificar `MercadoLivreButton.tsx`
 
-**Arquivo:** `src/pages/reseller/Products.tsx`
+Remover `w-full` e ajustar para funcionar em linha com outros botões:
+- Usar `flex-1` para ocupar espaço proporcional
+- Manter texto "Publicar no Mercado Livre"
+- Manter cores amber (publicar), amber+spinner (publicando), verde (publicado)
 
-Alterações a fazer:
+### 2. Verificar `Catalog.tsx`
 
-1. **Importar dependências:**
-   - `useMercadoLivreIntegration` hook
-   - `MercadoLivreButton` componente
-   - `TooltipProvider` do Radix UI
-
-2. **Integrar o hook:**
-   - Chamar `useMercadoLivreIntegration()` para verificar integração ativa e produtos publicados
-
-3. **Adicionar botão em cada card de produto:**
-   - Posicionar na parte inferior do card, após as informações do produto
-   - Ocupar largura total com texto "Publicar no Mercado Livre" + ícone
-   - Mostrar apenas se usuário tem integração ML ativa
+Confirmar que o botão está dentro da div `flex space-x-2` junto com "Adicionar" e "Calcular", todos usando `flex-1` para distribuição igual.
 
 ---
 
-## Layout Atualizado do Card
+## Código a Modificar
 
-```text
-┌──────────────────────────────────────────────────────────┐
-│  [Imagem]  │  Nome do Produto          │  [Ativo/Inativo] │
-│            │  SKU: ABC123              │                  │
-│            │  Preço Original | Seu Preço │  [Desativar]   │
-│            │                           │  [Ver na Loja]   │
-│            │                           │  [Remover]       │
-├──────────────────────────────────────────────────────────┤
-│  [🛫 Publicar no Mercado Livre]                          │  ← Novo botão
-└──────────────────────────────────────────────────────────┘
-```
+**Arquivo:** `src/components/reseller/MercadoLivreButton.tsx`
 
----
+| Estado | Classe |
+|--------|--------|
+| Publicar | `flex-1 bg-amber-500 hover:bg-amber-600 text-white` |
+| Publicando | `flex-1 bg-amber-500 hover:bg-amber-500 text-white` |
+| Publicado | `flex-1 bg-green-500 hover:bg-green-500 text-white` |
 
-## Diferença do Catálogo
+**Arquivo:** `src/pages/reseller/Catalog.tsx`
 
-Na página "Meus Produtos", todos os produtos já estão adicionados à loja, então:
-- `isInStore` será sempre `true`
-- `onAddToStore` não será necessário (função vazia)
-- O botão apenas enviará para o webhook do Mercado Livre
-
----
-
-## Detalhes Técnicos
-
-### Imports a adicionar:
-```typescript
-import { TooltipProvider } from '@/components/ui/tooltip';
-import { useMercadoLivreIntegration } from '@/hooks/useMercadoLivreIntegration';
-import { MercadoLivreButton } from '@/components/reseller/MercadoLivreButton';
-```
-
-### Uso do hook:
-```typescript
-const {
-  hasActiveIntegration,
-  isProductPublished,
-  publishingProducts,
-  publishProduct,
-} = useMercadoLivreIntegration();
-```
-
-### Renderização do botão (dentro do card, após a div principal):
-```jsx
-{hasActiveIntegration && product.product && (
-  <div className="mt-4 pt-4 border-t">
-    <MercadoLivreButton
-      productId={product.product_id}
-      isPublished={isProductPublished(product.product_id)}
-      isPublishing={publishingProducts.has(product.product_id)}
-      isInStore={true}
-      onPublish={() => publishProduct(product.product_id)}
-      onAddToStore={async () => {}}
-    />
-  </div>
-)}
-```
-
----
-
-## Arquivos a Modificar
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/pages/reseller/Products.tsx` | Importar hook e componente, adicionar botão ML em cada card |
-| `src/components/reseller/MercadoLivreButton.tsx` | Atualizar para versão com texto completo (já planejado anteriormente) |
+O botão já está dentro da div de botões (linha 495-509), só precisa garantir que use `flex-1` igual aos outros.
 
 ---
 
 ## Resultado Esperado
 
-1. Na página "Meus Produtos", cada card terá o botão "Publicar no Mercado Livre" na parte inferior
-2. Botão só aparece se o usuário tem integração ML ativa
-3. Mesmos estados visuais: amarelo (publicar), spinner (publicando), verde (publicado)
-4. Comportamento idêntico ao do Catálogo
+1. Três botões alinhados horizontalmente na parte inferior do card
+2. Botões com largura proporcional (cada um ocupando 1/3 do espaço)
+3. Visual consistente com a imagem de referência fornecida
 
