@@ -170,3 +170,9 @@ verify_jwt = false
 
 [functions.api-integra-ml-token]
 verify_jwt = false
+
+[functions.lojafy-integra]
+verify_jwt = false
+
+[functions.cancel-expired-orders]
+verify_jwt = false

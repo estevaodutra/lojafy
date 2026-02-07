@@ -2288,6 +2288,98 @@ export type Database = {
           },
         ]
       }
+      product_marketplace_data: {
+        Row: {
+          attributes: Json | null
+          category_id: string | null
+          category_name: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          images: Json | null
+          last_sync_at: string | null
+          last_sync_status: string | null
+          listing_id: string | null
+          listing_type: string | null
+          listing_url: string | null
+          marketplace: string
+          marketplace_metadata: Json | null
+          price: number
+          product_id: string
+          promotional_price: number | null
+          published_at: string | null
+          status: string
+          stock_quantity: number | null
+          sync_error_log: string | null
+          title: string
+          updated_at: string | null
+          user_id: string | null
+          variations: Json | null
+        }
+        Insert: {
+          attributes?: Json | null
+          category_id?: string | null
+          category_name?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          images?: Json | null
+          last_sync_at?: string | null
+          last_sync_status?: string | null
+          listing_id?: string | null
+          listing_type?: string | null
+          listing_url?: string | null
+          marketplace: string
+          marketplace_metadata?: Json | null
+          price: number
+          product_id: string
+          promotional_price?: number | null
+          published_at?: string | null
+          status?: string
+          stock_quantity?: number | null
+          sync_error_log?: string | null
+          title: string
+          updated_at?: string | null
+          user_id?: string | null
+          variations?: Json | null
+        }
+        Update: {
+          attributes?: Json | null
+          category_id?: string | null
+          category_name?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          images?: Json | null
+          last_sync_at?: string | null
+          last_sync_status?: string | null
+          listing_id?: string | null
+          listing_type?: string | null
+          listing_url?: string | null
+          marketplace?: string
+          marketplace_metadata?: Json | null
+          price?: number
+          product_id?: string
+          promotional_price?: number | null
+          published_at?: string | null
+          status?: string
+          stock_quantity?: number | null
+          sync_error_log?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string | null
+          variations?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_marketplace_data_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_ranking: {
         Row: {
           average_profit: number
