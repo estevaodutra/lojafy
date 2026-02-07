@@ -126,20 +126,25 @@ serve(async (req) => {
             action = `unknown_status_${payment.status}`;
         }
 
-        if (newStatus !== 'pending') {
-          // Atualizar o pedido
-          const { error: updateError } = await supabase
+        if (newPaymentStatus !== 'pending') {
+          // Atualizar o pedido - atomic update para evitar duplicatas
+          const { data: updatedOrder, error: updateError } = await supabase
             .from('orders')
             .update({
               status: newStatus,
               payment_status: newPaymentStatus,
               updated_at: new Date().toISOString()
             })
-            .eq('id', order.id);
+            .eq('id', order.id)
+            .neq('payment_status', 'paid')
+            .select('id')
+            .maybeSingle();
 
           if (updateError) {
             console.error(`❌ Erro ao atualizar pedido ${order.order_number}:`, updateError);
             results.errors++;
+          } else if (!updatedOrder) {
+            console.log(`⚠️ Pedido ${order.order_number} já foi processado por outro processo, ignorando`);
           } else {
             console.log(`✅ Pedido ${order.order_number} atualizado para ${newStatus}`);
             results.updated++;

@@ -152,21 +152,33 @@ serve(async (req) => {
       to: { status: newStatus, payment_status: paymentStatus }
     });
 
-    // Update order status
-    const { error: updateError } = await supabase
+    // Update order status - atomic update to prevent race conditions
+    const { data: updatedOrder, error: updateError } = await supabase
       .from('orders')
       .update({
         status: newStatus,
         payment_status: paymentStatus,
         updated_at: new Date().toISOString()
       })
-      .eq('id', orderData.id);
+      .eq('id', orderData.id)
+      .neq('payment_status', 'paid')
+      .select('id')
+      .maybeSingle();
 
     if (updateError) {
       console.error('Failed to update order:', updateError);
       return new Response(
         JSON.stringify({ error: 'Failed to update order status' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // If no row was updated, another process already marked it as paid
+    if (!updatedOrder) {
+      console.log('⚠️ Order already updated by another process, skipping webhook dispatch');
+      return new Response(
+        JSON.stringify({ success: true, message: 'Already processed by another request' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 

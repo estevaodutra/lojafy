@@ -353,6 +353,34 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Deduplicação: verificar se order.paid já foi disparado para este pedido nos últimos 60 segundos
+    if (event_type === 'order.paid' && !is_test && payload?.order_id) {
+      const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
+      
+      const { data: recentDispatches } = await supabase
+        .from('webhook_dispatch_logs')
+        .select('id, payload')
+        .eq('event_type', 'order.paid')
+        .gte('dispatched_at', oneMinuteAgo)
+        .limit(20);
+      
+      const duplicateFound = recentDispatches?.find(
+        (log: any) => log.payload?.data?.order_id === payload.order_id
+      );
+      
+      if (duplicateFound) {
+        console.log(`[dispatch-webhook] Deduplicação: order.paid para ${payload.order_id} já disparado há menos de 60s, ignorando`);
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            deduplicated: true,
+            message: 'Webhook já disparado recentemente para este pedido' 
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // Montar payload final
     const webhookPayload: WebhookPayload = {
       event: event_type,
