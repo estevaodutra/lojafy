@@ -1,98 +1,142 @@
 
-# Adicionar Endpoints do Lojafy Integra na Documentacao da API
+
+# Novo Endpoint: Buscar Produto Nao Publicado em Marketplace
 
 ## Resumo
 
-Adicionar os 7 endpoints da Edge Function `lojafy-integra` (CRUD de produtos para marketplaces) na documentacao de API existente, dentro da categoria "Lojafy Integra" que ja existe no sidebar.
+Criar um endpoint `GET /products/unpublished` na Edge Function `lojafy-integra` que retorna **1 produto** do catalogo Lojafy (`products`) que ainda **nao esta cadastrado** na tabela `product_marketplace_data` para um marketplace especifico. Ideal para reprocessamento em lote via n8n ou automacoes externas.
+
+## Logica do Endpoint
+
+O endpoint faz uma query na tabela `products` buscando produtos ativos que **nao possuem** registro na `product_marketplace_data` para o marketplace informado. Retorna apenas 1 resultado por vez (para processar um a um).
+
+```text
+products (ativo)  --->  Tem registro em product_marketplace_data para o marketplace X?
+                           |
+                     NAO --+-- SIM
+                      |          |
+                  Retorna    Ignora (ja publicado)
+```
 
 ## Alteracoes
 
-### 1. Adicionar dados dos endpoints (`src/data/apiEndpointsData.ts`)
+### 1. Edge Function `supabase/functions/lojafy-integra/index.ts`
 
-Criar um novo array `integraProductsEndpoints` com os 7 endpoints documentados:
+Adicionar novo handler **antes** do handler generico `GET /products/:id` (para evitar conflito de roteamento):
 
-| Metodo | Path | Titulo |
-|--------|------|--------|
-| POST | `/functions/v1/lojafy-integra/products` | Criar Produto para Marketplace |
-| POST | `/functions/v1/lojafy-integra/products/bulk` | Criar Produtos em Lote |
-| GET | `/functions/v1/lojafy-integra/products` | Listar Produtos por Marketplace |
-| GET | `/functions/v1/lojafy-integra/products/:id` | Buscar Produto por ID |
-| GET | `/functions/v1/lojafy-integra/products/by-product/:productId` | Listar Marketplaces de um Produto |
-| PUT | `/functions/v1/lojafy-integra/products/:id` | Atualizar Produto no Marketplace |
-| DELETE | `/functions/v1/lojafy-integra/products/:id` | Remover Produto do Marketplace |
+**Rota:** `GET /products/unpublished?marketplace=mercadolivre`
 
-Cada endpoint tera:
-- Headers (X-API-Key)
-- Request body ou query params conforme o caso
-- Response example realista
-- Error examples (400, 401, 404, 409 conforme aplicavel)
+**Parametros de query:**
+- `marketplace` (obrigatorio) - Filtrar por marketplace (mercadolivre, shopee, amazon, etc.)
+- `user_id` (opcional) - Filtrar por usuario
 
-Adicionar a nova subcategoria `integra-products` com titulo "Produtos Marketplace" dentro da categoria `integra` existente, junto com a subcategoria `integra-ml` (Mercado Livre) que ja existe.
+**Logica:**
+1. Validar que `marketplace` foi informado (retornar 400 se nao)
+2. Buscar todos os `product_id` da `product_marketplace_data` filtrados pelo marketplace
+3. Buscar 1 produto da tabela `products` que esteja ativo (`active = true`) e cujo `id` **nao esteja** na lista acima
+4. Retornar o produto encontrado ou `null` se todos ja estiverem publicados
 
-### 2. Atualizar titulo da categoria no conteudo (`src/components/admin/ApiDocsContent.tsx`)
-
-Na funcao `getCategoryTitle`, adicionar o case para `integra`:
-
+**Codigo do handler:**
 ```typescript
-case 'integra': return { 
-  title: 'Endpoints Lojafy Integra', 
-  desc: 'API para gestao de produtos em marketplaces (Mercado Livre, Shopee, Amazon, etc.)' 
-};
+// GET /products/unpublished?marketplace=mercadolivre
+if (method === 'GET' && endpoint === 'products' && subEndpoint === 'unpublished') {
+  const marketplace = url.searchParams.get('marketplace');
+  if (!marketplace) {
+    return jsonResponse({ success: false, error: 'marketplace é obrigatório' }, 400);
+  }
+
+  const filterUserId = url.searchParams.get('user_id');
+
+  // Buscar IDs de produtos ja cadastrados neste marketplace
+  let existingQuery = supabase
+    .from('product_marketplace_data')
+    .select('product_id')
+    .eq('marketplace', marketplace);
+  if (filterUserId) existingQuery = existingQuery.eq('user_id', filterUserId);
+  const { data: existing } = await existingQuery;
+  const existingIds = (existing || []).map(e => e.product_id);
+
+  // Buscar 1 produto ativo que NAO esta na lista
+  let productQuery = supabase
+    .from('products')
+    .select('id, name, description, price, sku, gtin_ean13, main_image_url, brand, stock_quantity, category_id')
+    .eq('active', true)
+    .order('created_at', { ascending: true })
+    .limit(1);
+
+  if (existingIds.length > 0) {
+    productQuery = productQuery.not('id', 'in', `(${existingIds.join(',')})`);
+  }
+
+  const { data: product, error } = await productQuery.maybeSingle();
+  if (error) throw error;
+
+  return jsonResponse({
+    success: true,
+    data: product,
+    marketplace,
+    remaining: product ? 'Existem mais produtos pendentes' : 'Todos os produtos ja estao cadastrados'
+  });
+}
 ```
 
-Tambem adicionar o card "Integra" na secao de categorias do IntroSection.
+### 2. Documentacao - `src/data/apiEndpointsData.ts`
 
-### Arquivos modificados
-
-1. **`src/data/apiEndpointsData.ts`** - Adicionar array `integraProductsEndpoints` (~130 linhas) e incluir como subcategoria na categoria `integra`
-2. **`src/components/admin/ApiDocsContent.tsx`** - Adicionar case `integra` no `getCategoryTitle` e card na intro
-
-## Detalhes Tecnicos
-
-### Exemplo de endpoint documentado (Criar Produto):
+Adicionar o 8o endpoint no array `integraProductsEndpoints`:
 
 ```typescript
 {
-  title: 'Criar Produto para Marketplace',
-  method: 'POST',
-  url: '/functions/v1/lojafy-integra/products',
-  description: 'Cria um produto customizado para um marketplace especifico...',
+  title: 'Buscar Produto Não Publicado',
+  method: 'GET',
+  url: '/functions/v1/lojafy-integra/products/unpublished',
+  description: 'Retorna 1 produto do catálogo Lojafy que ainda não foi cadastrado para o marketplace informado.',
   headers: [
     { name: 'X-API-Key', description: 'Chave de API', example: 'sk_...', required: true }
   ],
-  requestBody: {
-    product_id: 'uuid-do-produto-lojafy',
+  queryParams: [
+    { name: 'marketplace', description: 'Marketplace alvo (obrigatório)', example: 'mercadolivre' },
+    { name: 'user_id', description: 'Filtrar por usuário (opcional)', example: 'uuid' }
+  ],
+  responseExample: {
+    success: true,
+    data: {
+      id: 'uuid-produto',
+      name: 'Mini Máquina de Waffles',
+      price: 24.90,
+      sku: 'PROD-001',
+      gtin_ean13: '7891234567890',
+      main_image_url: 'https://...',
+      brand: 'Genérica',
+      stock_quantity: 50
+    },
     marketplace: 'mercadolivre',
-    title: 'Mini Maquina de Waffles Eletrica',
-    price: 29.90,
-    attributes: { BRAND: 'Generica', VOLTAGE: '110V' },
-    variations: [],
-    stock_quantity: 50,
-    images: ['https://...'],
-    status: 'draft',
-    listing_type: 'gold_special'
+    remaining: 'Existem mais produtos pendentes'
   },
-  responseExample: { success: true, data: { id: 'uuid', ... } },
   errorExamples: [
-    { code: 400, title: 'Campos obrigatorios', ... },
-    { code: 404, title: 'Produto nao encontrado', ... },
-    { code: 409, title: 'Duplicado', ... }
+    { code: 400, title: 'Marketplace obrigatório', ... },
+    { code: 200, title: 'Todos publicados', data: null, remaining: 'Todos os produtos já estão cadastrados' }
   ]
 }
 ```
 
-### Estrutura final da categoria Integra no sidebar:
+## Arquivos Modificados
 
+1. **`supabase/functions/lojafy-integra/index.ts`** - Adicionar handler `GET /products/unpublished` (antes do handler `GET /products/:id`)
+2. **`src/data/apiEndpointsData.ts`** - Adicionar endpoint na documentacao (8o item do `integraProductsEndpoints`)
+
+## Uso Pratico
+
+```bash
+# Buscar proximo produto nao publicado no Mercado Livre
+curl "https://[PROJECT].supabase.co/functions/v1/lojafy-integra/products/unpublished?marketplace=mercadolivre" \
+  -H "X-API-Key: sk_..."
+
+# Retorno quando ha produto pendente:
+{ "success": true, "data": { "id": "abc-123", "name": "...", ... }, "marketplace": "mercadolivre" }
+
+# Retorno quando todos ja foram publicados:
+{ "success": true, "data": null, "marketplace": "mercadolivre", "remaining": "Todos os produtos já estão cadastrados" }
 ```
-Lojafy Integra (8 endpoints)
-  |- Mercado Livre (1 endpoint existente)
-  |    |- POST Salvar Token OAuth
-  |- Produtos Marketplace (7 novos endpoints)
-       |- POST Criar Produto para Marketplace
-       |- POST Criar Produtos em Lote
-       |- GET Listar Produtos por Marketplace
-       |- GET Buscar Produto por ID
-       |- GET Listar Marketplaces de um Produto
-       |- PUT Atualizar Produto no Marketplace
-       |- DELETE Remover Produto do Marketplace
-```
+
+Isso permite que o n8n chame esse endpoint em loop ate receber `data: null`, processando todos os produtos pendentes um a um.
+
