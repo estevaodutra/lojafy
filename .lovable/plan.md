@@ -1,108 +1,99 @@
 
 
-# Incluir Credenciais OAuth no Endpoint `/products/unpublished`
+# Novo Endpoint: Listar Tokens ML Expirando
 
 ## Resumo
 
-Modificar o endpoint `GET /products/unpublished` para tambem retornar as credenciais OAuth do Mercado Livre (da tabela `mercadolivre_integrations`), permitindo que automacoes como n8n recebam tudo em uma unica chamada: produto + token de acesso.
-
-## Logica
-
-- Se o parametro `user_id` foi informado: buscar a integracao ativa daquele usuario
-- Se `user_id` nao foi informado: buscar qualquer integracao ativa do marketplace
-- Se nao houver integracao ativa, retornar erro 404 informando que nenhuma integracao esta configurada
+Criar o endpoint `GET /lojafy-integra/mercadolivre/expiring-tokens` que lista integracoes ativas do Mercado Livre com tokens proximos de expirar. O n8n consultara este endpoint a cada 5 horas para renovar tokens antes que expirem (ciclo de 6 horas do ML).
 
 ## Alteracoes
 
 ### 1. Edge Function (`supabase/functions/lojafy-integra/index.ts`)
 
-No handler `GET /products/unpublished`, apos buscar o produto, adicionar uma query na tabela `mercadolivre_integrations` para trazer as credenciais OAuth:
+Adicionar novo handler para a rota `GET /mercadolivre/expiring-tokens` **antes** do bloco "Endpoint nao encontrado" (linha 460). O roteamento usara `endpoint === 'mercadolivre'` e `subEndpoint === 'expiring-tokens'`.
 
-```typescript
-// Buscar credenciais OAuth ativas
-let oauthQuery = supabase
-  .from('mercadolivre_integrations')
-  .select('user_id, access_token, token_type, refresh_token, expires_at, ml_user_id, is_active')
-  .eq('is_active', true);
+**Logica do handler:**
+1. Ler parametro `minutes` (default: 60) e `include_expired` (default: false)
+2. Calcular threshold = agora + X minutos
+3. Query em `mercadolivre_integrations` onde `is_active = true` e `expires_at < threshold`
+4. Se `include_expired = false`, filtrar tambem `expires_at > now`
+5. Enriquecer cada registro com `minutes_until_expiration` e `is_expired`
+6. Logar a requisicao e retornar
 
-if (filterUserId) {
-  oauthQuery = oauthQuery.eq('user_id', filterUserId);
-}
-
-const { data: oauth, error: oauthError } = await oauthQuery.limit(1).maybeSingle();
-```
-
-O objeto `oauth` sera incluido na resposta junto com o produto:
-
-```json
-{
-  "success": true,
-  "data": { "id": "...", "name": "..." },
-  "marketplace": "mercadolivre",
-  "oauth": {
-    "user_id": "uuid-do-usuario",
-    "access_token": "APP_USR-123...",
-    "token_type": "Bearer",
-    "refresh_token": "TG-abc...",
-    "expires_at": "2026-02-08T12:00:00Z",
-    "ml_user_id": 123456789
-  },
-  "remaining": "Existem mais produtos pendentes"
-}
-```
-
-Se nenhuma integracao ativa for encontrada, `oauth` sera `null` na resposta (sem bloquear o retorno do produto).
+**Campos retornados por integracao:**
+- `id` - UUID da integracao
+- `user_id` - UUID do usuario Lojafy
+- `ml_user_id` - ID do usuario no Mercado Livre
+- `refresh_token` - Token para renovacao (usado pelo n8n)
+- `expires_at` - Data/hora de expiracao do access_token
+- `is_active` - Status da integracao
+- `minutes_until_expiration` - Minutos restantes (negativo se expirado)
+- `is_expired` - Boolean indicando se ja expirou
 
 ### 2. Documentacao (`src/data/apiEndpointsData.ts`)
 
-Atualizar o endpoint "Buscar Produto Nao Publicado" no array `integraProductsEndpoints`:
+Adicionar o endpoint na subcategoria "Mercado Livre" (`integraMLEndpoints`), que atualmente tem apenas 1 endpoint (Salvar Token OAuth). O novo endpoint ficara como segundo item do array.
 
-- Atualizar a `description` para mencionar que retorna credenciais OAuth
-- Atualizar o `responseExample` para incluir o campo `oauth` com exemplo realista
-- Adicionar um `errorExample` para o caso de integracao nao encontrada (retorna produto com `oauth: null`)
+**Documentacao incluira:**
+- Descricao do endpoint
+- Headers (X-API-Key)
+- Query params: `minutes` (number, default 60) e `include_expired` (boolean, default false)
+- Response example com 2 integracoes
+- Error examples: nenhum token expirando (array vazio com count 0)
 
 ### Arquivos Modificados
 
-1. **`supabase/functions/lojafy-integra/index.ts`** - Adicionar query em `mercadolivre_integrations` e incluir `oauth` na resposta
-2. **`src/data/apiEndpointsData.ts`** - Atualizar documentacao do endpoint com novo campo `oauth`
+1. **`supabase/functions/lojafy-integra/index.ts`** - Adicionar handler `GET /mercadolivre/expiring-tokens` (~50 linhas)
+2. **`src/data/apiEndpointsData.ts`** - Adicionar endpoint no array `integraMLEndpoints` (~60 linhas)
 
-## Resposta Final do Endpoint
+## Resposta do Endpoint
 
 ```json
 {
   "success": true,
-  "data": {
-    "id": "uuid-produto",
-    "name": "Mini Máquina de Waffles",
-    "price": 24.90,
-    "sku": "PROD-001",
-    "gtin_ean13": "7891234567890",
-    "main_image_url": "https://exemplo.com/imagem.jpg",
-    "brand": "Genérica",
-    "stock_quantity": 50,
-    "category_id": "uuid-categoria"
-  },
-  "marketplace": "mercadolivre",
-  "oauth": {
-    "user_id": "uuid-do-usuario",
-    "access_token": "APP_USR-123456-abcdef",
-    "token_type": "Bearer",
-    "refresh_token": "TG-abc123-xyz",
-    "expires_at": "2026-02-08T12:00:00.000Z",
-    "ml_user_id": 123456789
-  },
-  "remaining": "Existem mais produtos pendentes"
+  "data": [
+    {
+      "id": "abc-123-def-456",
+      "user_id": "02e09339-0ebb-4fe4-a816-b8aca7294e16",
+      "ml_user_id": 1253724320,
+      "refresh_token": "TG-69862b0ccbcccce00017dd04b-1253724320",
+      "expires_at": "2026-02-07T14:30:00.000Z",
+      "is_active": true,
+      "minutes_until_expiration": 45,
+      "is_expired": false
+    }
+  ],
+  "count": 1,
+  "checked_at": "2026-02-07T13:45:00.000Z",
+  "threshold_minutes": 60
 }
 ```
 
-Quando nao ha produto pendente:
+Quando nenhum token esta expirando:
 ```json
 {
   "success": true,
-  "data": null,
-  "marketplace": "mercadolivre",
-  "oauth": { "..." },
-  "remaining": "Todos os produtos já estão cadastrados"
+  "data": [],
+  "count": 0,
+  "checked_at": "2026-02-07T13:45:00.000Z",
+  "threshold_minutes": 60
 }
+```
+
+## Fluxo Completo
+
+```text
+n8n (Schedule 5h)
+       |
+       v
+GET /mercadolivre/expiring-tokens?minutes=90
+       |
+       v
+Para cada integracao retornada:
+  1. POST api.mercadolibre.com/oauth/token (refresh)
+  2. PATCH mercadolivre_integrations (novos tokens)
+       |
+       v
+Tokens sempre validos
 ```
 
