@@ -154,6 +154,13 @@ const IntroSection: React.FC = () => (
               <p className="text-xs text-muted-foreground">Cursos e matrículas</p>
             </div>
           </div>
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+            <span className="text-2xl">🔗</span>
+            <div>
+              <p className="font-medium">Integra</p>
+              <p className="text-xs text-muted-foreground">Produtos para marketplaces</p>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -283,6 +290,7 @@ export const ApiDocsContent: React.FC<ApiDocsContentProps> = ({
       case 'orders': return { title: 'Endpoints de Pedidos', desc: 'Consulte pedidos reais e informações de vendas' };
       case 'ranking': return { title: 'Endpoints de Ranking & Demo', desc: 'Gerencie dados de demonstração e ranking de produtos' };
       case 'academy': return { title: 'Endpoints da Academy', desc: 'API completa para gestão de cursos, matrículas e progresso' };
+      case 'integra': return { title: 'Endpoints Lojafy Integra', desc: 'API para gestão de produtos em marketplaces (Mercado Livre, Shopee, Amazon, etc.)' };
       default: return { title: 'Endpoints', desc: '' };
     }
   };

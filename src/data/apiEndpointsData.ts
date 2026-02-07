@@ -751,6 +751,229 @@ const integraMLEndpoints: EndpointData[] = [
   }
 ];
 
+// Lojafy Integra - Produtos Marketplace Endpoints
+const integraProductsEndpoints: EndpointData[] = [
+  {
+    title: 'Criar Produto para Marketplace',
+    method: 'POST',
+    url: '/functions/v1/lojafy-integra/products',
+    description: 'Cria um produto customizado para um marketplace específico. Permite definir título, preço, atributos e variações diferentes do produto original da Lojafy.',
+    headers: [
+      { name: 'X-API-Key', description: 'Chave de API com permissão integracoes.write', example: 'sk_...', required: true }
+    ],
+    requestBody: {
+      product_id: 'uuid-do-produto-lojafy',
+      marketplace: 'mercadolivre',
+      title: 'Mini Máquina de Waffles Elétrica Antiaderente 110V',
+      description: 'Máquina compacta para waffles perfeitos...',
+      price: 29.90,
+      attributes: { BRAND: 'Genérica', VOLTAGE: '110V', MODEL: 'WF-100' },
+      variations: [
+        { sku: 'WF-100-PINK', attributes: { COLOR: 'Rosa' }, stock_quantity: 25, price: 29.90 }
+      ],
+      stock_quantity: 50,
+      images: ['https://exemplo.com/waffle1.jpg', 'https://exemplo.com/waffle2.jpg'],
+      status: 'draft',
+      listing_type: 'gold_special'
+    },
+    responseExample: {
+      success: true,
+      data: {
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        product_id: 'uuid-do-produto-lojafy',
+        marketplace: 'mercadolivre',
+        title: 'Mini Máquina de Waffles Elétrica Antiaderente 110V',
+        price: 29.90,
+        status: 'draft',
+        created_at: '2026-02-07T15:30:00Z'
+      }
+    },
+    errorExamples: [
+      { code: 400, title: 'Campos obrigatórios', description: 'product_id, marketplace, title ou price ausentes', example: { success: false, error: 'Campos obrigatórios: product_id, marketplace, title, price' } },
+      { code: 400, title: 'Preço inválido', description: 'Preço deve ser maior que zero', example: { success: false, error: 'price deve ser maior que 0' } },
+      { code: 404, title: 'Produto não encontrado', description: 'product_id não existe na tabela products', example: { success: false, error: 'Produto não encontrado na base Lojafy' } },
+      { code: 409, title: 'Duplicado', description: 'Produto já cadastrado neste marketplace', example: { success: false, error: 'Este produto já possui cadastro para o marketplace mercadolivre' } }
+    ]
+  },
+  {
+    title: 'Criar Produtos em Lote',
+    method: 'POST',
+    url: '/functions/v1/lojafy-integra/products/bulk',
+    description: 'Cria múltiplos produtos para marketplaces em uma única requisição. Retorna resultado individual de cada item.',
+    headers: [
+      { name: 'X-API-Key', description: 'Chave de API com permissão integracoes.write', example: 'sk_...', required: true }
+    ],
+    requestBody: {
+      products: [
+        {
+          product_id: 'uuid-produto-1',
+          marketplace: 'mercadolivre',
+          title: 'Produto A para ML',
+          price: 49.90,
+          stock_quantity: 100,
+          status: 'draft'
+        },
+        {
+          product_id: 'uuid-produto-2',
+          marketplace: 'shopee',
+          title: 'Produto B para Shopee',
+          price: 39.90,
+          stock_quantity: 200,
+          status: 'draft'
+        }
+      ]
+    },
+    responseExample: {
+      success: true,
+      data: {
+        total: 2,
+        created: 2,
+        errors: 0,
+        results: [
+          { index: 0, success: true, data: { id: 'uuid-1', marketplace: 'mercadolivre' } },
+          { index: 1, success: true, data: { id: 'uuid-2', marketplace: 'shopee' } }
+        ]
+      }
+    },
+    errorExamples: [
+      { code: 400, title: 'Array vazio', description: 'Nenhum produto enviado', example: { success: false, error: 'products deve ser um array com pelo menos 1 item' } }
+    ]
+  },
+  {
+    title: 'Listar Produtos por Marketplace',
+    method: 'GET',
+    url: '/functions/v1/lojafy-integra/products',
+    description: 'Lista produtos cadastrados para marketplaces com filtros e paginação.',
+    headers: [
+      { name: 'X-API-Key', description: 'Chave de API com permissão integracoes.read', example: 'sk_...', required: true }
+    ],
+    queryParams: [
+      { name: 'marketplace', description: 'Filtrar por marketplace', example: 'mercadolivre' },
+      { name: 'status', description: 'Filtrar por status (draft, active, paused, etc.)', example: 'active' },
+      { name: 'user_id', description: 'Filtrar por usuário', example: 'uuid-do-usuario' },
+      { name: 'page', description: 'Página (padrão: 1)', example: '1' },
+      { name: 'limit', description: 'Itens por página (padrão: 50, máx: 100)', example: '20' }
+    ],
+    responseExample: {
+      success: true,
+      data: [
+        {
+          id: 'uuid',
+          product_id: 'uuid-produto',
+          marketplace: 'mercadolivre',
+          title: 'Mini Máquina de Waffles',
+          price: 29.90,
+          status: 'active',
+          listing_id: 'MLB-123456789'
+        }
+      ],
+      pagination: { page: 1, limit: 50, total: 1, totalPages: 1 }
+    },
+    errorExamples: [
+      { code: 401, title: 'API Key inválida', description: 'Chave não fornecida ou inativa', example: { success: false, error: 'API Key inválida' } }
+    ]
+  },
+  {
+    title: 'Buscar Produto por ID',
+    method: 'GET',
+    url: '/functions/v1/lojafy-integra/products/:id',
+    description: 'Retorna os dados completos de um produto marketplace específico, incluindo dados do produto original da Lojafy via join.',
+    headers: [
+      { name: 'X-API-Key', description: 'Chave de API com permissão integracoes.read', example: 'sk_...', required: true }
+    ],
+    responseExample: {
+      success: true,
+      data: {
+        id: 'uuid-marketplace-product',
+        product_id: 'uuid-produto-lojafy',
+        marketplace: 'mercadolivre',
+        title: 'Mini Máquina de Waffles Elétrica',
+        price: 29.90,
+        status: 'active',
+        listing_id: 'MLB-123456789',
+        listing_url: 'https://www.mercadolivre.com.br/...',
+        attributes: { BRAND: 'Genérica', VOLTAGE: '110V' },
+        variations: [],
+        original_product: {
+          id: 'uuid-produto-lojafy',
+          nome: 'Mini Waffle Maker',
+          preco: 24.90,
+          sku: 'SKU-WF100'
+        }
+      }
+    },
+    errorExamples: [
+      { code: 404, title: 'Não encontrado', description: 'ID do produto marketplace não existe', example: { success: false, error: 'Produto marketplace não encontrado' } }
+    ]
+  },
+  {
+    title: 'Listar Marketplaces de um Produto',
+    method: 'GET',
+    url: '/functions/v1/lojafy-integra/products/by-product/:productId',
+    description: 'Retorna todos os marketplaces em que um produto Lojafy está cadastrado, com status e dados de cada listagem.',
+    headers: [
+      { name: 'X-API-Key', description: 'Chave de API com permissão integracoes.read', example: 'sk_...', required: true }
+    ],
+    responseExample: {
+      success: true,
+      data: [
+        { id: 'uuid-1', marketplace: 'mercadolivre', status: 'active', listing_id: 'MLB-123', price: 29.90 },
+        { id: 'uuid-2', marketplace: 'shopee', status: 'draft', listing_id: null, price: 27.90 }
+      ]
+    },
+    errorExamples: [
+      { code: 401, title: 'API Key inválida', description: 'Chave não fornecida ou inativa', example: { success: false, error: 'API Key inválida' } }
+    ]
+  },
+  {
+    title: 'Atualizar Produto no Marketplace',
+    method: 'PUT',
+    url: '/functions/v1/lojafy-integra/products/:id',
+    description: 'Atualiza os dados de um produto marketplace. Campos imutáveis (id, product_id, created_at) são ignorados.',
+    headers: [
+      { name: 'X-API-Key', description: 'Chave de API com permissão integracoes.write', example: 'sk_...', required: true }
+    ],
+    requestBody: {
+      title: 'Mini Máquina de Waffles - PROMOÇÃO',
+      price: 24.90,
+      status: 'active',
+      stock_quantity: 30,
+      listing_id: 'MLB-123456789',
+      listing_url: 'https://www.mercadolivre.com.br/...'
+    },
+    responseExample: {
+      success: true,
+      data: {
+        id: 'uuid-marketplace-product',
+        title: 'Mini Máquina de Waffles - PROMOÇÃO',
+        price: 24.90,
+        status: 'active',
+        updated_at: '2026-02-07T16:00:00Z'
+      }
+    },
+    errorExamples: [
+      { code: 404, title: 'Não encontrado', description: 'ID do produto marketplace não existe', example: { success: false, error: 'Produto marketplace não encontrado' } },
+      { code: 400, title: 'Sem dados', description: 'Nenhum campo para atualizar', example: { success: false, error: 'Nenhum dado para atualizar' } }
+    ]
+  },
+  {
+    title: 'Remover Produto do Marketplace',
+    method: 'DELETE',
+    url: '/functions/v1/lojafy-integra/products/:id',
+    description: 'Remove permanentemente o cadastro de um produto em um marketplace. Esta ação não pode ser desfeita.',
+    headers: [
+      { name: 'X-API-Key', description: 'Chave de API com permissão integracoes.write', example: 'sk_...', required: true }
+    ],
+    responseExample: {
+      success: true,
+      message: 'Produto removido do marketplace com sucesso'
+    },
+    errorExamples: [
+      { code: 404, title: 'Não encontrado', description: 'ID do produto marketplace não existe', example: { success: false, error: 'Produto marketplace não encontrado' } }
+    ]
+  }
+];
+
 // Export organized data structure
 export const apiEndpointsData: EndpointCategory[] = [
   {
@@ -791,7 +1014,8 @@ export const apiEndpointsData: EndpointCategory[] = [
     id: 'integra',
     title: 'Lojafy Integra',
     subcategories: [
-      { id: 'integra-ml', title: 'Mercado Livre', endpoints: integraMLEndpoints }
+      { id: 'integra-ml', title: 'Mercado Livre', endpoints: integraMLEndpoints },
+      { id: 'integra-products', title: 'Produtos Marketplace', endpoints: integraProductsEndpoints }
     ]
   }
 ];
