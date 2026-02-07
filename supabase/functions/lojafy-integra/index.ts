@@ -267,7 +267,7 @@ Deno.serve(async (req) => {
       // Buscar 1 produto ativo que NAO esta na lista
       let productQuery = supabase
         .from('products')
-        .select('id, name, description, price, sku, gtin_ean13, main_image_url, brand, stock_quantity, category_id')
+        .select('*')
         .eq('active', true)
         .order('created_at', { ascending: true })
         .limit(1);
