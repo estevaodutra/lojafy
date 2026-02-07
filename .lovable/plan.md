@@ -1,142 +1,108 @@
 
 
-# Novo Endpoint: Buscar Produto Nao Publicado em Marketplace
+# Incluir Credenciais OAuth no Endpoint `/products/unpublished`
 
 ## Resumo
 
-Criar um endpoint `GET /products/unpublished` na Edge Function `lojafy-integra` que retorna **1 produto** do catalogo Lojafy (`products`) que ainda **nao esta cadastrado** na tabela `product_marketplace_data` para um marketplace especifico. Ideal para reprocessamento em lote via n8n ou automacoes externas.
+Modificar o endpoint `GET /products/unpublished` para tambem retornar as credenciais OAuth do Mercado Livre (da tabela `mercadolivre_integrations`), permitindo que automacoes como n8n recebam tudo em uma unica chamada: produto + token de acesso.
 
-## Logica do Endpoint
+## Logica
 
-O endpoint faz uma query na tabela `products` buscando produtos ativos que **nao possuem** registro na `product_marketplace_data` para o marketplace informado. Retorna apenas 1 resultado por vez (para processar um a um).
-
-```text
-products (ativo)  --->  Tem registro em product_marketplace_data para o marketplace X?
-                           |
-                     NAO --+-- SIM
-                      |          |
-                  Retorna    Ignora (ja publicado)
-```
+- Se o parametro `user_id` foi informado: buscar a integracao ativa daquele usuario
+- Se `user_id` nao foi informado: buscar qualquer integracao ativa do marketplace
+- Se nao houver integracao ativa, retornar erro 404 informando que nenhuma integracao esta configurada
 
 ## Alteracoes
 
-### 1. Edge Function `supabase/functions/lojafy-integra/index.ts`
+### 1. Edge Function (`supabase/functions/lojafy-integra/index.ts`)
 
-Adicionar novo handler **antes** do handler generico `GET /products/:id` (para evitar conflito de roteamento):
+No handler `GET /products/unpublished`, apos buscar o produto, adicionar uma query na tabela `mercadolivre_integrations` para trazer as credenciais OAuth:
 
-**Rota:** `GET /products/unpublished?marketplace=mercadolivre`
-
-**Parametros de query:**
-- `marketplace` (obrigatorio) - Filtrar por marketplace (mercadolivre, shopee, amazon, etc.)
-- `user_id` (opcional) - Filtrar por usuario
-
-**Logica:**
-1. Validar que `marketplace` foi informado (retornar 400 se nao)
-2. Buscar todos os `product_id` da `product_marketplace_data` filtrados pelo marketplace
-3. Buscar 1 produto da tabela `products` que esteja ativo (`active = true`) e cujo `id` **nao esteja** na lista acima
-4. Retornar o produto encontrado ou `null` se todos ja estiverem publicados
-
-**Codigo do handler:**
 ```typescript
-// GET /products/unpublished?marketplace=mercadolivre
-if (method === 'GET' && endpoint === 'products' && subEndpoint === 'unpublished') {
-  const marketplace = url.searchParams.get('marketplace');
-  if (!marketplace) {
-    return jsonResponse({ success: false, error: 'marketplace é obrigatório' }, 400);
-  }
+// Buscar credenciais OAuth ativas
+let oauthQuery = supabase
+  .from('mercadolivre_integrations')
+  .select('user_id, access_token, token_type, refresh_token, expires_at, ml_user_id, is_active')
+  .eq('is_active', true);
 
-  const filterUserId = url.searchParams.get('user_id');
-
-  // Buscar IDs de produtos ja cadastrados neste marketplace
-  let existingQuery = supabase
-    .from('product_marketplace_data')
-    .select('product_id')
-    .eq('marketplace', marketplace);
-  if (filterUserId) existingQuery = existingQuery.eq('user_id', filterUserId);
-  const { data: existing } = await existingQuery;
-  const existingIds = (existing || []).map(e => e.product_id);
-
-  // Buscar 1 produto ativo que NAO esta na lista
-  let productQuery = supabase
-    .from('products')
-    .select('id, name, description, price, sku, gtin_ean13, main_image_url, brand, stock_quantity, category_id')
-    .eq('active', true)
-    .order('created_at', { ascending: true })
-    .limit(1);
-
-  if (existingIds.length > 0) {
-    productQuery = productQuery.not('id', 'in', `(${existingIds.join(',')})`);
-  }
-
-  const { data: product, error } = await productQuery.maybeSingle();
-  if (error) throw error;
-
-  return jsonResponse({
-    success: true,
-    data: product,
-    marketplace,
-    remaining: product ? 'Existem mais produtos pendentes' : 'Todos os produtos ja estao cadastrados'
-  });
+if (filterUserId) {
+  oauthQuery = oauthQuery.eq('user_id', filterUserId);
 }
+
+const { data: oauth, error: oauthError } = await oauthQuery.limit(1).maybeSingle();
 ```
 
-### 2. Documentacao - `src/data/apiEndpointsData.ts`
+O objeto `oauth` sera incluido na resposta junto com o produto:
 
-Adicionar o 8o endpoint no array `integraProductsEndpoints`:
-
-```typescript
+```json
 {
-  title: 'Buscar Produto Não Publicado',
-  method: 'GET',
-  url: '/functions/v1/lojafy-integra/products/unpublished',
-  description: 'Retorna 1 produto do catálogo Lojafy que ainda não foi cadastrado para o marketplace informado.',
-  headers: [
-    { name: 'X-API-Key', description: 'Chave de API', example: 'sk_...', required: true }
-  ],
-  queryParams: [
-    { name: 'marketplace', description: 'Marketplace alvo (obrigatório)', example: 'mercadolivre' },
-    { name: 'user_id', description: 'Filtrar por usuário (opcional)', example: 'uuid' }
-  ],
-  responseExample: {
-    success: true,
-    data: {
-      id: 'uuid-produto',
-      name: 'Mini Máquina de Waffles',
-      price: 24.90,
-      sku: 'PROD-001',
-      gtin_ean13: '7891234567890',
-      main_image_url: 'https://...',
-      brand: 'Genérica',
-      stock_quantity: 50
-    },
-    marketplace: 'mercadolivre',
-    remaining: 'Existem mais produtos pendentes'
+  "success": true,
+  "data": { "id": "...", "name": "..." },
+  "marketplace": "mercadolivre",
+  "oauth": {
+    "user_id": "uuid-do-usuario",
+    "access_token": "APP_USR-123...",
+    "token_type": "Bearer",
+    "refresh_token": "TG-abc...",
+    "expires_at": "2026-02-08T12:00:00Z",
+    "ml_user_id": 123456789
   },
-  errorExamples: [
-    { code: 400, title: 'Marketplace obrigatório', ... },
-    { code: 200, title: 'Todos publicados', data: null, remaining: 'Todos os produtos já estão cadastrados' }
-  ]
+  "remaining": "Existem mais produtos pendentes"
 }
 ```
 
-## Arquivos Modificados
+Se nenhuma integracao ativa for encontrada, `oauth` sera `null` na resposta (sem bloquear o retorno do produto).
 
-1. **`supabase/functions/lojafy-integra/index.ts`** - Adicionar handler `GET /products/unpublished` (antes do handler `GET /products/:id`)
-2. **`src/data/apiEndpointsData.ts`** - Adicionar endpoint na documentacao (8o item do `integraProductsEndpoints`)
+### 2. Documentacao (`src/data/apiEndpointsData.ts`)
 
-## Uso Pratico
+Atualizar o endpoint "Buscar Produto Nao Publicado" no array `integraProductsEndpoints`:
 
-```bash
-# Buscar proximo produto nao publicado no Mercado Livre
-curl "https://[PROJECT].supabase.co/functions/v1/lojafy-integra/products/unpublished?marketplace=mercadolivre" \
-  -H "X-API-Key: sk_..."
+- Atualizar a `description` para mencionar que retorna credenciais OAuth
+- Atualizar o `responseExample` para incluir o campo `oauth` com exemplo realista
+- Adicionar um `errorExample` para o caso de integracao nao encontrada (retorna produto com `oauth: null`)
 
-# Retorno quando ha produto pendente:
-{ "success": true, "data": { "id": "abc-123", "name": "...", ... }, "marketplace": "mercadolivre" }
+### Arquivos Modificados
 
-# Retorno quando todos ja foram publicados:
-{ "success": true, "data": null, "marketplace": "mercadolivre", "remaining": "Todos os produtos já estão cadastrados" }
+1. **`supabase/functions/lojafy-integra/index.ts`** - Adicionar query em `mercadolivre_integrations` e incluir `oauth` na resposta
+2. **`src/data/apiEndpointsData.ts`** - Atualizar documentacao do endpoint com novo campo `oauth`
+
+## Resposta Final do Endpoint
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid-produto",
+    "name": "Mini Máquina de Waffles",
+    "price": 24.90,
+    "sku": "PROD-001",
+    "gtin_ean13": "7891234567890",
+    "main_image_url": "https://exemplo.com/imagem.jpg",
+    "brand": "Genérica",
+    "stock_quantity": 50,
+    "category_id": "uuid-categoria"
+  },
+  "marketplace": "mercadolivre",
+  "oauth": {
+    "user_id": "uuid-do-usuario",
+    "access_token": "APP_USR-123456-abcdef",
+    "token_type": "Bearer",
+    "refresh_token": "TG-abc123-xyz",
+    "expires_at": "2026-02-08T12:00:00.000Z",
+    "ml_user_id": 123456789
+  },
+  "remaining": "Existem mais produtos pendentes"
+}
 ```
 
-Isso permite que o n8n chame esse endpoint em loop ate receber `data: null`, processando todos os produtos pendentes um a um.
+Quando nao ha produto pendente:
+```json
+{
+  "success": true,
+  "data": null,
+  "marketplace": "mercadolivre",
+  "oauth": { "..." },
+  "remaining": "Todos os produtos já estão cadastrados"
+}
+```
 
