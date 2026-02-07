@@ -749,6 +749,52 @@ const integraMLEndpoints: EndpointData[] = [
       { code: 403, title: 'Sem permissão', description: 'API Key sem permissão integracoes.write', example: { success: false, error: 'Permissão insuficiente. Requer: integracoes.write' } }
     ]
   }
+  ,
+  {
+    title: 'Listar Tokens Expirando',
+    method: 'GET',
+    url: '/functions/v1/lojafy-integra/mercadolivre/expiring-tokens',
+    description: 'Lista todas as integrações ativas do Mercado Livre cujos tokens estão próximos de expirar. Retorna os dados necessários (incluindo refresh_token) para que o n8n possa renovar os tokens automaticamente. O n8n executa este endpoint a cada 5 horas para garantir que os tokens (ciclo de 6h do ML) estejam sempre válidos.',
+    headers: [
+      { name: 'X-API-Key', description: 'Chave de API com permissão integracoes.write', example: 'sk_...', required: true }
+    ],
+    queryParams: [
+      { name: 'minutes', description: 'Buscar tokens que expiram nos próximos X minutos (default: 60)', example: '90', required: false },
+      { name: 'include_expired', description: 'Incluir tokens já expirados na lista (default: false)', example: 'true', required: false }
+    ],
+    responseExample: {
+      success: true,
+      data: [
+        {
+          id: 'abc-123-def-456',
+          user_id: '02e09339-0ebb-4fe4-a816-b8aca7294e16',
+          ml_user_id: 1253724320,
+          refresh_token: 'TG-69862b0ccbcccce00017dd04b-1253724320',
+          expires_at: '2026-02-07T14:30:00.000Z',
+          is_active: true,
+          minutes_until_expiration: 45,
+          is_expired: false
+        },
+        {
+          id: 'xyz-789-ghi-012',
+          user_id: '11111111-2222-3333-4444-555555555555',
+          ml_user_id: 9876543210,
+          refresh_token: 'TG-aaaabbbbccccdddd-9876543210',
+          expires_at: '2026-02-07T14:15:00.000Z',
+          is_active: true,
+          minutes_until_expiration: 30,
+          is_expired: false
+        }
+      ],
+      count: 2,
+      checked_at: '2026-02-07T13:45:00.000Z',
+      threshold_minutes: 60
+    },
+    errorExamples: [
+      { code: 200, title: 'Nenhum token expirando', description: 'Todos os tokens estão válidos', example: { success: true, data: [], count: 0, checked_at: '2026-02-07T13:45:00.000Z', threshold_minutes: 60 } },
+      { code: 401, title: 'API Key inválida', description: 'Chave não fornecida ou inativa', example: { success: false, error: 'API Key inválida ou desativada' } }
+    ]
+  }
 ];
 
 // Lojafy Integra - Produtos Marketplace Endpoints

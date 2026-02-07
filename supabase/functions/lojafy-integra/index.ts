@@ -30,6 +30,7 @@ Deno.serve(async (req) => {
   const pathParts = url.pathname.split('/').filter(Boolean);
   // pathParts: ["lojafy-integra", "products", ...]
 
+
   const method = req.method;
   const endpoint = pathParts[1]; // "products"
   const subEndpoint = pathParts[2]; // id, "by-product", "bulk"
@@ -455,6 +456,65 @@ Deno.serve(async (req) => {
       });
 
       return jsonResponse({ success: true, message: 'Produto removido', data });
+    }
+
+    // ============================================
+    // GET /mercadolivre/expiring-tokens
+    // Lista integrações com tokens próximos de expirar
+    // ============================================
+    if (method === 'GET' && endpoint === 'mercadolivre' && subEndpoint === 'expiring-tokens') {
+      const minutes = parseInt(url.searchParams.get('minutes') || '60');
+      const includeExpired = url.searchParams.get('include_expired') === 'true';
+
+      const now = new Date();
+      const threshold = new Date(now.getTime() + minutes * 60 * 1000);
+
+      let query = supabase
+        .from('mercadolivre_integrations')
+        .select('id, user_id, ml_user_id, refresh_token, expires_at, is_active')
+        .eq('is_active', true)
+        .lt('expires_at', threshold.toISOString());
+
+      if (!includeExpired) {
+        query = query.gt('expires_at', now.toISOString());
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      const enrichedData = (data || []).map((integration: Record<string, unknown>) => {
+        const expiresAt = new Date(integration.expires_at as string);
+        const minutesUntilExpiration = Math.round((expiresAt.getTime() - now.getTime()) / 60000);
+        return {
+          ...integration,
+          minutes_until_expiration: minutesUntilExpiration,
+          is_expired: minutesUntilExpiration < 0,
+        };
+      });
+
+      console.log(`[lojafy-integra] Expiring tokens check: ${enrichedData.length} found (threshold: ${minutes}min, include_expired: ${includeExpired})`);
+
+      await logApiRequest({
+        function_name: 'lojafy-integra',
+        method,
+        path: url.pathname,
+        api_key_id: apiKeyId || undefined,
+        user_id: userId || undefined,
+        ip_address: ipAddress,
+        status_code: 200,
+        duration_ms: Date.now() - startTime,
+        query_params: { minutes, include_expired: includeExpired } as Record<string, unknown>,
+        response_summary: { success: true, count: enrichedData.length },
+      });
+
+      return jsonResponse({
+        success: true,
+        data: enrichedData,
+        count: enrichedData.length,
+        checked_at: now.toISOString(),
+        threshold_minutes: minutes,
+      });
     }
 
     // Endpoint não encontrado
