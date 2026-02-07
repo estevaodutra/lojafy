@@ -244,6 +244,64 @@ Deno.serve(async (req) => {
     }
 
     // ============================================
+    // GET /products/unpublished?marketplace=...
+    // ============================================
+    if (method === 'GET' && endpoint === 'products' && subEndpoint === 'unpublished') {
+      const marketplace = url.searchParams.get('marketplace');
+      if (!marketplace) {
+        return jsonResponse({ success: false, error: 'marketplace é obrigatório' }, 400);
+      }
+
+      const filterUserId = url.searchParams.get('user_id');
+
+      // Buscar IDs de produtos já cadastrados neste marketplace
+      let existingQuery = supabase
+        .from('product_marketplace_data')
+        .select('product_id')
+        .eq('marketplace', marketplace);
+      if (filterUserId) existingQuery = existingQuery.eq('user_id', filterUserId);
+      const { data: existing } = await existingQuery;
+      const existingIds = (existing || []).map((e: { product_id: string }) => e.product_id);
+
+      // Buscar 1 produto ativo que NAO esta na lista
+      let productQuery = supabase
+        .from('products')
+        .select('id, name, description, price, sku, gtin_ean13, main_image_url, brand, stock_quantity, category_id')
+        .eq('active', true)
+        .order('created_at', { ascending: true })
+        .limit(1);
+
+      if (existingIds.length > 0) {
+        productQuery = productQuery.not('id', 'in', `(${existingIds.join(',')})`);
+      }
+
+      const { data: product, error } = await productQuery.maybeSingle();
+      if (error) throw error;
+
+      console.log(`[lojafy-integra] Unpublished product lookup for ${marketplace}: ${product ? product.id : 'none found'}`);
+
+      await logApiRequest({
+        function_name: 'lojafy-integra',
+        method,
+        path: url.pathname,
+        api_key_id: apiKeyId || undefined,
+        user_id: userId || undefined,
+        ip_address: ipAddress,
+        status_code: 200,
+        duration_ms: Date.now() - startTime,
+        query_params: { marketplace, user_id: filterUserId } as Record<string, unknown>,
+        response_summary: { success: true, has_product: !!product },
+      });
+
+      return jsonResponse({
+        success: true,
+        data: product,
+        marketplace,
+        remaining: product ? 'Existem mais produtos pendentes' : 'Todos os produtos já estão cadastrados'
+      });
+    }
+
+    // ============================================
     // GET /products/by-product/:productId
     // ============================================
     if (method === 'GET' && endpoint === 'products' && subEndpoint === 'by-product' && subId) {

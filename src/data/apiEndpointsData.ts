@@ -971,6 +971,40 @@ const integraProductsEndpoints: EndpointData[] = [
     errorExamples: [
       { code: 404, title: 'Não encontrado', description: 'ID do produto marketplace não existe', example: { success: false, error: 'Produto marketplace não encontrado' } }
     ]
+  },
+  {
+    title: 'Buscar Produto Não Publicado',
+    method: 'GET',
+    url: '/functions/v1/lojafy-integra/products/unpublished',
+    description: 'Retorna 1 produto do catálogo Lojafy que ainda não foi cadastrado na tabela product_marketplace_data para o marketplace informado. Ideal para reprocessamento em lote via n8n ou automações externas — chame em loop até receber data: null.',
+    headers: [
+      { name: 'X-API-Key', description: 'Chave de API com permissão integracoes.write', example: 'sk_...', required: true }
+    ],
+    queryParams: [
+      { name: 'marketplace', description: 'Marketplace alvo (obrigatório). Ex: mercadolivre, shopee, amazon', example: 'mercadolivre' },
+      { name: 'user_id', description: 'Filtrar por usuário (opcional)', example: 'uuid-do-usuario' }
+    ],
+    responseExample: {
+      success: true,
+      data: {
+        id: 'uuid-produto',
+        name: 'Mini Máquina de Waffles Elétrica',
+        description: 'Máquina compacta para waffles...',
+        price: 24.90,
+        sku: 'PROD-001',
+        gtin_ean13: '7891234567890',
+        main_image_url: 'https://exemplo.com/imagem.jpg',
+        brand: 'Genérica',
+        stock_quantity: 50,
+        category_id: 'uuid-categoria'
+      },
+      marketplace: 'mercadolivre',
+      remaining: 'Existem mais produtos pendentes'
+    },
+    errorExamples: [
+      { code: 400, title: 'Marketplace obrigatório', description: 'Parâmetro marketplace não foi informado', example: { success: false, error: 'marketplace é obrigatório' } },
+      { code: 200, title: 'Todos publicados', description: 'Todos os produtos já estão cadastrados no marketplace', example: { success: true, data: null, marketplace: 'mercadolivre', remaining: 'Todos os produtos já estão cadastrados' } }
+    ]
   }
 ];
 
