@@ -976,13 +976,13 @@ const integraProductsEndpoints: EndpointData[] = [
     title: 'Buscar Produto Não Publicado',
     method: 'GET',
     url: '/functions/v1/lojafy-integra/products/unpublished',
-    description: 'Retorna 1 produto do catálogo Lojafy que ainda não foi cadastrado na tabela product_marketplace_data para o marketplace informado. Ideal para reprocessamento em lote via n8n ou automações externas — chame em loop até receber data: null.',
+    description: 'Retorna 1 produto do catálogo Lojafy que ainda não foi cadastrado na tabela product_marketplace_data para o marketplace informado, junto com as credenciais OAuth ativas do Mercado Livre. Ideal para reprocessamento em lote via n8n ou automações externas — chame em loop até receber data: null.',
     headers: [
       { name: 'X-API-Key', description: 'Chave de API com permissão integracoes.write', example: 'sk_...', required: true }
     ],
     queryParams: [
       { name: 'marketplace', description: 'Marketplace alvo (obrigatório). Ex: mercadolivre, shopee, amazon', example: 'mercadolivre' },
-      { name: 'user_id', description: 'Filtrar por usuário (opcional)', example: 'uuid-do-usuario' }
+      { name: 'user_id', description: 'Filtrar por usuário (opcional). Se informado, busca a integração OAuth desse usuário; caso contrário, retorna qualquer integração ativa.', example: 'uuid-do-usuario' }
     ],
     responseExample: {
       success: true,
@@ -999,11 +999,20 @@ const integraProductsEndpoints: EndpointData[] = [
         category_id: 'uuid-categoria'
       },
       marketplace: 'mercadolivre',
+      oauth: {
+        user_id: 'uuid-do-usuario',
+        access_token: 'APP_USR-123456-abcdef',
+        token_type: 'Bearer',
+        refresh_token: 'TG-abc123-xyz',
+        expires_at: '2026-02-08T12:00:00.000Z',
+        ml_user_id: 123456789
+      },
       remaining: 'Existem mais produtos pendentes'
     },
     errorExamples: [
       { code: 400, title: 'Marketplace obrigatório', description: 'Parâmetro marketplace não foi informado', example: { success: false, error: 'marketplace é obrigatório' } },
-      { code: 200, title: 'Todos publicados', description: 'Todos os produtos já estão cadastrados no marketplace', example: { success: true, data: null, marketplace: 'mercadolivre', remaining: 'Todos os produtos já estão cadastrados' } }
+      { code: 200, title: 'Todos publicados', description: 'Todos os produtos já estão cadastrados no marketplace', example: { success: true, data: null, marketplace: 'mercadolivre', oauth: { user_id: 'uuid', access_token: 'APP_USR-...', token_type: 'Bearer', refresh_token: 'TG-...', expires_at: '2026-02-08T12:00:00.000Z', ml_user_id: 123456789 }, remaining: 'Todos os produtos já estão cadastrados' } },
+      { code: 200, title: 'Sem integração OAuth', description: 'Nenhuma integração ativa encontrada', example: { success: true, data: { id: 'uuid-produto', name: '...' }, marketplace: 'mercadolivre', oauth: null, remaining: 'Existem mais produtos pendentes' } }
     ]
   }
 ];

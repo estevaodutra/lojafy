@@ -278,7 +278,22 @@ Deno.serve(async (req) => {
       const { data: product, error } = await productQuery.maybeSingle();
       if (error) throw error;
 
-      console.log(`[lojafy-integra] Unpublished product lookup for ${marketplace}: ${product ? product.id : 'none found'}`);
+      // Buscar credenciais OAuth ativas
+      let oauthQuery = supabase
+        .from('mercadolivre_integrations')
+        .select('user_id, access_token, token_type, refresh_token, expires_at, ml_user_id')
+        .eq('is_active', true);
+
+      if (filterUserId) {
+        oauthQuery = oauthQuery.eq('user_id', filterUserId);
+      }
+
+      const { data: oauth, error: oauthError } = await oauthQuery.limit(1).maybeSingle();
+      if (oauthError) {
+        console.error('[lojafy-integra] OAuth lookup error:', oauthError);
+      }
+
+      console.log(`[lojafy-integra] Unpublished product lookup for ${marketplace}: ${product ? product.id : 'none found'}, oauth: ${oauth ? 'found' : 'not found'}`);
 
       await logApiRequest({
         function_name: 'lojafy-integra',
@@ -290,13 +305,14 @@ Deno.serve(async (req) => {
         status_code: 200,
         duration_ms: Date.now() - startTime,
         query_params: { marketplace, user_id: filterUserId } as Record<string, unknown>,
-        response_summary: { success: true, has_product: !!product },
+        response_summary: { success: true, has_product: !!product, has_oauth: !!oauth },
       });
 
       return jsonResponse({
         success: true,
         data: product,
         marketplace,
+        oauth: oauth || null,
         remaining: product ? 'Existem mais produtos pendentes' : 'Todos os produtos já estão cadastrados'
       });
     }
