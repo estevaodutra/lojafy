@@ -56,24 +56,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Mark token as used
-    const { error: updateError } = await supabaseAdmin
-      .from("one_time_access_tokens")
-      .update({
-        used: true,
-        used_at: new Date().toISOString(),
-      })
-      .eq("id", tokenRecord.id);
-
-    if (updateError) {
-      console.error("Error updating token:", updateError);
-      return new Response(
-        JSON.stringify({ error: "Erro ao processar o link" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Get user email for magic link
+    // Get user email for magic link BEFORE marking as used
+    console.log("Fetching user data for user_id:", tokenRecord.user_id);
     const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(tokenRecord.user_id);
 
     if (userError || !userData?.user?.email) {
@@ -83,6 +67,8 @@ Deno.serve(async (req) => {
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    console.log("Generating magic link for email:", userData.user.email);
 
     // Generate magic link for automatic login
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
@@ -101,11 +87,21 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Extract the token from the magic link
-    const magicLinkUrl = new URL(linkData.properties.action_link);
-    const magicToken = magicLinkUrl.searchParams.get("token");
-    const tokenType = magicLinkUrl.searchParams.get("type");
-    const tokenHash = magicLinkUrl.hash;
+    console.log("Magic link generated successfully. Marking token as used.");
+
+    // Mark token as used AFTER generating magic link successfully
+    const { error: updateError } = await supabaseAdmin
+      .from("one_time_access_tokens")
+      .update({
+        used: true,
+        used_at: new Date().toISOString(),
+      })
+      .eq("id", tokenRecord.id);
+
+    if (updateError) {
+      console.error("Error updating token (non-blocking):", updateError);
+      // Continue anyway - the magic link was already generated
+    }
 
     return new Response(
       JSON.stringify({
@@ -114,6 +110,7 @@ Deno.serve(async (req) => {
         magic_link: linkData.properties.action_link,
         email_otp: linkData.properties.email_otp,
         hashed_token: linkData.properties.hashed_token,
+        email: userData.user.email,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
