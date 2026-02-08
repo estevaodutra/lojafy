@@ -41,28 +41,51 @@ const AuthOneTime = () => {
 
         setMessage('Autenticando...');
 
-        // Use the email OTP to sign in
-        if (data.email_otp && data.hashed_token) {
+        // Attempt 1: verifyOtp with token_hash + type 'magiclink'
+        let authenticated = false;
+
+        if (data.hashed_token) {
+          console.log('Attempt 1: verifyOtp with token_hash + magiclink');
           const { error: signInError } = await supabase.auth.verifyOtp({
             token_hash: data.hashed_token,
-            type: 'email',
+            type: 'magiclink',
           });
 
-          if (signInError) {
-            // Try alternative approach - redirect to magic link
-            if (data.magic_link) {
-              window.location.href = data.magic_link;
-              return;
-            }
-            
-            console.error('Sign in error:', signInError);
-            setStatus('error');
-            setErrorMessage('Erro ao realizar login automático.');
-            return;
+          if (!signInError) {
+            authenticated = true;
+          } else {
+            console.warn('Attempt 1 failed:', signInError.message);
           }
-        } else if (data.magic_link) {
-          // Redirect to magic link
+        }
+
+        // Attempt 2: verifyOtp with email + email_otp
+        if (!authenticated && data.email_otp && data.email) {
+          console.log('Attempt 2: verifyOtp with email + email_otp');
+          setMessage('Tentando método alternativo...');
+          const { error: otpError } = await supabase.auth.verifyOtp({
+            email: data.email,
+            token: data.email_otp,
+            type: 'magiclink',
+          });
+
+          if (!otpError) {
+            authenticated = true;
+          } else {
+            console.warn('Attempt 2 failed:', otpError.message);
+          }
+        }
+
+        // Attempt 3: redirect to magic_link as last resort
+        if (!authenticated && data.magic_link) {
+          console.log('Attempt 3: redirecting to magic_link');
+          setMessage('Redirecionando para autenticação...');
           window.location.href = data.magic_link;
+          return;
+        }
+
+        if (!authenticated) {
+          setStatus('error');
+          setErrorMessage('Não foi possível realizar o login automático. Tente fazer login manualmente.');
           return;
         }
 
