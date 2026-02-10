@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useEffectiveUser } from '@/hooks/useEffectiveUser';
 import { Package, MapPin, Heart, Clock, Truck, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { getStatusConfig, getStatusLabel as getLabel, getStatusVariant as getVariant } from '@/constants/orderStatus';
 
 interface Order {
   id: string;
@@ -54,34 +55,13 @@ const Dashboard = () => {
   }, [effectiveUserId]);
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pending': return <Clock className="h-4 w-4" />;
-      case 'shipped': return <Truck className="h-4 w-4" />;
-      case 'delivered': return <CheckCircle className="h-4 w-4" />;
-      default: return <Package className="h-4 w-4" />;
-    }
+    const Icon = getStatusConfig(status).icon;
+    return <Icon className="h-4 w-4" />;
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'pending': return 'Pendente';
-      case 'processing': return 'Em preparação';
-      case 'shipped': return 'Despachado';
-      case 'delivered': return 'Finalizado';
-      case 'cancelled': return 'Cancelado';
-      case 'refunded': return 'Reembolsado';
-      default: return 'Pendente';
-    }
-  };
+  const getStatusLabel = (status: string) => getLabel(status);
 
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'delivered': return 'default';
-      case 'shipped': return 'secondary';
-      case 'pending': return 'outline';
-      default: return 'outline';
-    }
-  };
+  const getStatusVariant = (status: string) => getVariant(status);
 
   return (
     <div className="space-y-6">

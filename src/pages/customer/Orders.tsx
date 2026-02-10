@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import OrderDetailsModal from '@/components/OrderDetailsModal';
 import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { getStatusConfig, getStatusLabel as getLabel, getStatusVariant as getVariant } from '@/constants/orderStatus';
 interface OrderItem {
   id: string;
   quantity: number;
@@ -75,59 +76,11 @@ const Orders = () => {
     fetchOrders();
   }, [effectiveUserId]);
   const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return <Clock className="h-4 w-4" />;
-      case 'processing':
-        return <Package className="h-4 w-4" />;
-      case 'shipped':
-        return <Truck className="h-4 w-4" />;
-      case 'delivered':
-        return <CheckCircle className="h-4 w-4" />;
-      case 'cancelled':
-        return <XCircle className="h-4 w-4" />;
-      case 'refunded':
-        return <CheckCircle className="h-4 w-4" />;
-      default:
-        return <Package className="h-4 w-4" />;
-    }
+    const Icon = getStatusConfig(status).icon;
+    return <Icon className="h-4 w-4" />;
   };
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'Pendente';
-      case 'processing':
-        return 'Em preparação';
-      case 'shipped':
-        return 'Despachado';
-      case 'delivered':
-        return 'Finalizado';
-      case 'cancelled':
-        return 'Cancelado';
-      case 'refunded':
-        return 'Reembolsado';
-      default:
-        return 'Desconhecido';
-    }
-  };
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return 'default';
-      case 'shipped':
-        return 'secondary';
-      case 'processing':
-        return 'outline';
-      case 'pending':
-        return 'outline';
-      case 'cancelled':
-        return 'destructive';
-      case 'refunded':
-        return 'secondary';
-      default:
-        return 'outline';
-    }
-  };
+  const getStatusLabel = (status: string) => getLabel(status);
+  const getStatusVariant = (status: string) => getVariant(status);
   const handleViewDetails = (orderId: string) => {
     setSelectedOrderId(orderId);
     setIsModalOpen(true);

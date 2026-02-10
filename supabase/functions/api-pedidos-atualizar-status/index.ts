@@ -5,43 +5,39 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
 };
 
-// Status aceitos pela API (português)
+// Status aceitos pela API (já em português, igual ao banco)
 const VALID_STATUSES = [
   'pendente',
+  'recebido',
   'em_preparacao',
-  'despachado',
+  'embalado',
+  'enviado',
+  'em_reposicao',
+  'em_falta',
   'finalizado',
   'cancelado',
   'reembolsado'
 ];
 
-// Mapeamento PT -> EN (para salvar no banco)
-const STATUS_PT_TO_EN: Record<string, string> = {
-  'pendente': 'pending',
-  'em_preparacao': 'processing',
-  'despachado': 'shipped',
-  'finalizado': 'delivered',
-  'cancelado': 'cancelled',
-  'reembolsado': 'refunded'
-};
-
-// Mapeamento EN -> PT (para retornar na API)
-const STATUS_EN_TO_PT: Record<string, string> = {
-  'pending': 'pendente',
-  'processing': 'em_preparacao',
-  'shipped': 'despachado',
-  'delivered': 'finalizado',
-  'cancelled': 'cancelado',
-  'refunded': 'reembolsado'
+// Transições permitidas
+const STATUS_TRANSITIONS: Record<string, string[]> = {
+  pendente: ['recebido', 'cancelado'],
+  recebido: ['em_preparacao', 'em_falta', 'cancelado'],
+  em_preparacao: ['embalado', 'em_reposicao', 'em_falta', 'cancelado'],
+  embalado: ['enviado', 'em_reposicao', 'cancelado'],
+  enviado: ['finalizado', 'cancelado'],
+  em_reposicao: ['em_preparacao', 'embalado', 'enviado', 'cancelado'],
+  em_falta: ['cancelado', 'reembolsado'],
+  finalizado: ['reembolsado'],
+  cancelado: ['reembolsado'],
+  reembolsado: [],
 };
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  // Only allow PUT method
   if (req.method !== 'PUT') {
     return new Response(
       JSON.stringify({ success: false, error: 'Método não permitido. Use PUT.' }),
@@ -64,7 +60,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify API Key and get permissions
     const { data: keyData, error: keyError } = await supabase
       .from('api_keys')
       .select('id, user_id, permissions, active')
@@ -72,7 +67,6 @@ Deno.serve(async (req) => {
       .single();
 
     if (keyError || !keyData) {
-      console.error('API Key validation error:', keyError);
       return new Response(
         JSON.stringify({ success: false, error: 'API Key inválida ou inativa' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -86,28 +80,22 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check pedidos.write permission
     const permissions = keyData.permissions as Record<string, any> || {};
-    const hasPedidosWrite = permissions?.pedidos?.write === true;
-
-    if (!hasPedidosWrite) {
+    if (!permissions?.pedidos?.write) {
       return new Response(
         JSON.stringify({ success: false, error: 'Permissão pedidos.write não concedida' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Update last_used timestamp
     await supabase
       .from('api_keys')
       .update({ last_used: new Date().toISOString() })
       .eq('id', keyData.id);
 
-    // Parse request body
     const body = await req.json();
-    const { order_number, status, tracking_number, notes } = body;
+    const { order_number, status, tracking_number, notes, previsao_envio, motivo } = body;
 
-    // Validate required fields
     if (!order_number || !status) {
       return new Response(
         JSON.stringify({ success: false, error: 'order_number e status são obrigatórios' }),
@@ -115,7 +103,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate status (deve ser em português)
     if (!VALID_STATUSES.includes(status)) {
       return new Response(
         JSON.stringify({ 
@@ -126,10 +113,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Converter status PT -> EN para salvar no banco
-    const internalStatus = STATUS_PT_TO_EN[status];
-
-    // Find order by order_number
+    // Find order
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select('id, order_number, status, tracking_number, updated_at')
@@ -137,27 +121,43 @@ Deno.serve(async (req) => {
       .single();
 
     if (orderError || !order) {
-      console.error('Order lookup error:', orderError);
       return new Response(
         JSON.stringify({ success: false, error: 'Pedido não encontrado' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const previousStatusEN = order.status;
-    // Converter status anterior EN -> PT para resposta
-    const previousStatusPT = STATUS_EN_TO_PT[previousStatusEN] || previousStatusEN;
+    // Validate transition
+    const allowedTransitions = STATUS_TRANSITIONS[order.status] || [];
+    if (!allowedTransitions.includes(status)) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `Transição não permitida: ${order.status} → ${status}. Transições válidas: ${allowedTransitions.join(', ')}` 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate em_reposicao requires previsao_envio
+    if (status === 'em_reposicao' && !previsao_envio) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'previsao_envio é obrigatório para status em_reposicao' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const previousStatus = order.status;
 
     // Prepare update data
     const updateData: Record<string, any> = {
-      status: internalStatus, // Salvar em inglês
+      status,
       updated_at: new Date().toISOString()
     };
 
-    // Add tracking_number if provided
-    if (tracking_number) {
-      updateData.tracking_number = tracking_number;
-    }
+    if (tracking_number) updateData.tracking_number = tracking_number;
+    if (previsao_envio) updateData.estimated_shipping_date = previsao_envio;
+    if (motivo) updateData.status_reason = motivo;
 
     // Update order
     const { error: updateError } = await supabase
@@ -167,39 +167,38 @@ Deno.serve(async (req) => {
 
     if (updateError) {
       console.error('Order update error:', updateError);
-      
-      // Check for constraint violation
-      if (updateError.code === '23514') {
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: `Status inválido para o banco de dados. Contate o suporte.` 
-          }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
       return new Response(
         JSON.stringify({ success: false, error: 'Erro ao atualizar pedido' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Insert into order_status_history (salvar status interno em inglês)
-    const { error: historyError } = await supabase
+    // Insert status history
+    await supabase
       .from('order_status_history')
       .insert({
         order_id: order.id,
-        status: internalStatus, // Status interno em inglês
-        notes: notes || `Status atualizado via API: ${previousStatusPT} → ${status}`
+        status,
+        notes: notes || motivo || `Status atualizado via API: ${previousStatus} → ${status}`
       });
 
-    if (historyError) {
-      console.warn('History insert warning:', historyError);
-      // Don't fail the request, just log the warning
+    // If em_falta, deactivate products
+    if (status === 'em_falta') {
+      const { data: items } = await supabase
+        .from('order_items')
+        .select('product_id')
+        .eq('order_id', order.id);
+
+      if (items && items.length > 0) {
+        const productIds = items.map(i => i.product_id);
+        await supabase
+          .from('products')
+          .update({ active: false })
+          .in('id', productIds);
+      }
     }
 
-    console.log(`Order ${order_number} status updated: ${previousStatusEN} -> ${internalStatus} (API: ${previousStatusPT} -> ${status})`);
+    console.log(`Order ${order_number} status updated: ${previousStatus} -> ${status}`);
 
     return new Response(
       JSON.stringify({
@@ -207,9 +206,9 @@ Deno.serve(async (req) => {
         message: 'Status do pedido atualizado com sucesso',
         data: {
           order_id: order.id,
-          order_number: order_number,
-          previous_status: previousStatusPT, // Retornar em português
-          new_status: status, // Retornar em português (como recebido)
+          order_number,
+          previous_status: previousStatus,
+          new_status: status,
           tracking_number: tracking_number || order.tracking_number || null,
           updated_at: updateData.updated_at
         }

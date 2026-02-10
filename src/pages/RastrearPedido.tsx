@@ -116,11 +116,22 @@ const RastrearPedido = () => {
       confirmed: { variant: "default" as const, text: "Confirmado" },
       preparing: { variant: "default" as const, text: "Em preparação" },
       processing: { variant: "default" as const, text: "Em preparação" },
-      shipped: { variant: "default" as const, text: "Despachado" },
+      shipped: { variant: "default" as const, text: "Enviado" },
       in_transit: { variant: "default" as const, text: "Em Trânsito" },
       delivered: { variant: "default" as const, text: "Finalizado" },
       cancelled: { variant: "destructive" as const, text: "Cancelado" },
-      refunded: { variant: "secondary" as const, text: "Reembolsado" }
+      refunded: { variant: "secondary" as const, text: "Reembolsado" },
+      // Portuguese status keys
+      pendente: { variant: "secondary" as const, text: "Pendente" },
+      recebido: { variant: "default" as const, text: "Recebido" },
+      em_preparacao: { variant: "default" as const, text: "Em Preparação" },
+      embalado: { variant: "default" as const, text: "Embalado" },
+      enviado: { variant: "default" as const, text: "Enviado" },
+      em_reposicao: { variant: "outline" as const, text: "Em Reposição" },
+      em_falta: { variant: "destructive" as const, text: "Em Falta" },
+      finalizado: { variant: "default" as const, text: "Finalizado" },
+      cancelado: { variant: "destructive" as const, text: "Cancelado" },
+      reembolsado: { variant: "secondary" as const, text: "Reembolsado" },
     };
     
     const config = statusMap[status as keyof typeof statusMap] || statusMap.pending;
