@@ -2063,6 +2063,7 @@ export type Database = {
         Row: {
           billing_address: Json | null
           created_at: string
+          estimated_shipping_date: string | null
           external_reference: string | null
           has_shipping_file: boolean | null
           id: string
@@ -2081,6 +2082,7 @@ export type Database = {
           shipping_method_id: string | null
           shipping_method_name: string | null
           status: string
+          status_reason: string | null
           tax_amount: number | null
           total_amount: number
           tracking_number: string | null
@@ -2090,6 +2092,7 @@ export type Database = {
         Insert: {
           billing_address?: Json | null
           created_at?: string
+          estimated_shipping_date?: string | null
           external_reference?: string | null
           has_shipping_file?: boolean | null
           id?: string
@@ -2108,6 +2111,7 @@ export type Database = {
           shipping_method_id?: string | null
           shipping_method_name?: string | null
           status?: string
+          status_reason?: string | null
           tax_amount?: number | null
           total_amount: number
           tracking_number?: string | null
@@ -2117,6 +2121,7 @@ export type Database = {
         Update: {
           billing_address?: Json | null
           created_at?: string
+          estimated_shipping_date?: string | null
           external_reference?: string | null
           has_shipping_file?: boolean | null
           id?: string
@@ -2135,6 +2140,7 @@ export type Database = {
           shipping_method_id?: string | null
           shipping_method_name?: string | null
           status?: string
+          status_reason?: string | null
           tax_amount?: number | null
           total_amount?: number
           tracking_number?: string | null

@@ -12,6 +12,7 @@ import { Eye, Package, Search, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { ALL_STATUSES, ORDER_STATUS_CONFIG, getStatusConfig, getAvailableTransitions, type OrderStatus } from "@/constants/orderStatus";
 
 interface Order {
   id: string;
@@ -46,7 +47,6 @@ const AdminOrders = () => {
     try {
       setLoading(true);
       
-      // Get orders first
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('*')
@@ -54,17 +54,14 @@ const AdminOrders = () => {
 
       if (ordersError) throw ordersError;
 
-      // Early return if no orders found
       if (!ordersData || ordersData.length === 0) {
         setOrders([]);
         setLoading(false);
         return;
       }
 
-      // Get order IDs to check for shipping files
       const orderIds = ordersData.map(order => order.id);
       
-      // Get shipping files for these orders (only if we have orders)
       let shippingFilesData: Array<{ order_id: string }> = [];
       if (orderIds.length > 0) {
         try {
@@ -83,12 +80,10 @@ const AdminOrders = () => {
         }
       }
 
-      // Create a set of order IDs that have shipping files
       const ordersWithShippingFiles = new Set(
         shippingFilesData.map(file => file.order_id)
       );
 
-      // Get profiles for all unique user_ids (only if we have user IDs)
       const userIds = [...new Set(ordersData.map(order => order.user_id).filter(Boolean))];
       let profilesData: Array<{ user_id: string; first_name: string | null; last_name: string | null }> = [];
       if (userIds.length > 0) {
@@ -108,12 +103,10 @@ const AdminOrders = () => {
         }
       }
 
-      // Create a profiles map for quick lookup
       const profilesMap = new Map(
         profilesData.map(profile => [profile.user_id, profile])
       );
 
-      // Combine orders with profiles and shipping file status
       const ordersWithProfiles = ordersData.map(order => {
         const profile = profilesMap.get(order.user_id);
         return {
@@ -148,6 +141,13 @@ const AdminOrders = () => {
 
       if (error) throw error;
 
+      // Insert into status history
+      await supabase.from('order_status_history').insert({
+        order_id: orderId,
+        status: newStatus,
+        notes: `Status atualizado pelo admin`,
+      });
+
       setOrders(orders.map(order => 
         order.id === orderId ? { ...order, status: newStatus } : order
       ));
@@ -167,16 +167,7 @@ const AdminOrders = () => {
   };
 
   const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      pending: { label: "Pendente", variant: "secondary" as const },
-      processing: { label: "Em preparação", variant: "default" as const },
-      shipped: { label: "Despachado", variant: "default" as const },
-      delivered: { label: "Finalizado", variant: "default" as const },
-      cancelled: { label: "Cancelado", variant: "destructive" as const },
-      refunded: { label: "Reembolsado", variant: "secondary" as const },
-    };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+    const config = getStatusConfig(status);
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
@@ -186,7 +177,6 @@ const AdminOrders = () => {
       paid: { label: "Pago", variant: "default" as const },
       failed: { label: "Falhou", variant: "destructive" as const },
     };
-
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
@@ -198,12 +188,10 @@ const AdminOrders = () => {
     return matchesSearch && matchesStatus;
   });
 
-  // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter]);
 
-  // Calculate pagination
   const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
   const startIndex = (currentPage - 1) * ordersPerPage;
   const endIndex = startIndex + ordersPerPage;
@@ -254,12 +242,9 @@ const AdminOrders = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os status</SelectItem>
-                <SelectItem value="pending">Pendente</SelectItem>
-                <SelectItem value="processing">Em preparação</SelectItem>
-                <SelectItem value="shipped">Despachado</SelectItem>
-                <SelectItem value="delivered">Finalizado</SelectItem>
-                <SelectItem value="cancelled">Cancelado</SelectItem>
-                <SelectItem value="refunded">Reembolsado</SelectItem>
+                {ALL_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>{ORDER_STATUS_CONFIG[s].label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -331,16 +316,13 @@ const AdminOrders = () => {
                          value={order.status}
                          onValueChange={(value) => updateOrderStatus(order.id, value)}
                        >
-                         <SelectTrigger className="w-[140px]">
+                         <SelectTrigger className="w-[160px]">
                            <SelectValue />
                          </SelectTrigger>
                          <SelectContent>
-                           <SelectItem value="pending">Pendente</SelectItem>
-                           <SelectItem value="processing">Em preparação</SelectItem>
-                           <SelectItem value="shipped">Despachado</SelectItem>
-                           <SelectItem value="delivered">Finalizado</SelectItem>
-                           <SelectItem value="cancelled">Cancelado</SelectItem>
-                           <SelectItem value="refunded">Reembolsado</SelectItem>
+                           {ALL_STATUSES.map((s) => (
+                             <SelectItem key={s} value={s}>{ORDER_STATUS_CONFIG[s].label}</SelectItem>
+                           ))}
                          </SelectContent>
                        </Select>
                      </TableCell>

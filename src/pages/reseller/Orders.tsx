@@ -4,19 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useResellerOrders } from "@/hooks/useResellerOrders";
-import { Search, Package, Clock, Truck, CheckCircle, XCircle } from "lucide-react";
+import { Search, Package } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-
-const statusConfig = {
-  pending: { label: "Pendente", icon: Clock, color: "bg-yellow-100 text-yellow-800" },
-  processing: { label: "Em preparação", icon: Package, color: "bg-blue-100 text-blue-800" },
-  shipped: { label: "Despachado", icon: Truck, color: "bg-purple-100 text-purple-800" },
-  delivered: { label: "Finalizado", icon: CheckCircle, color: "bg-green-100 text-green-800" },
-  cancelled: { label: "Cancelado", icon: XCircle, color: "bg-red-100 text-red-800" },
-  refunded: { label: "Reembolsado", icon: CheckCircle, color: "bg-gray-100 text-gray-800" },
-};
+import { ALL_STATUSES, ORDER_STATUS_CONFIG, getStatusConfig, type OrderStatus } from "@/constants/orderStatus";
 
 function ResellerOrders() {
   const [statusFilter, setStatusFilter] = useState("all");
@@ -24,19 +16,19 @@ function ResellerOrders() {
   const { data: orders, isLoading } = useResellerOrders(statusFilter, searchTerm);
 
   const getStatusCounts = () => {
-    if (!orders) return { all: 0, pending: 0, processing: 0, shipped: 0, delivered: 0, cancelled: 0 };
+    if (!orders) return { all: 0 } as Record<string, number>;
     
-    return {
-      all: orders.length,
-      pending: orders.filter(o => o.status === "pending").length,
-      processing: orders.filter(o => o.status === "processing").length,
-      shipped: orders.filter(o => o.status === "shipped").length,
-      delivered: orders.filter(o => o.status === "delivered").length,
-      cancelled: orders.filter(o => o.status === "cancelled").length,
-    };
+    const counts: Record<string, number> = { all: orders.length };
+    ALL_STATUSES.forEach(s => {
+      counts[s] = orders.filter(o => o.status === s).length;
+    });
+    return counts;
   };
 
   const counts = getStatusCounts();
+
+  // Only show tabs for statuses that have orders or are common
+  const visibleTabs: (OrderStatus | "all")[] = ["all", "pendente", "recebido", "em_preparacao", "embalado", "enviado", "finalizado", "cancelado"];
 
   return (
     <div className="space-y-6">
@@ -58,19 +50,19 @@ function ResellerOrders() {
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>Pendentes</CardDescription>
-            <CardTitle className="text-3xl text-yellow-600">{counts.pending}</CardTitle>
+            <CardTitle className="text-3xl text-yellow-600">{counts.pendente || 0}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Em Processamento</CardDescription>
-            <CardTitle className="text-3xl text-blue-600">{counts.processing}</CardTitle>
+            <CardDescription>Em Preparação</CardDescription>
+            <CardTitle className="text-3xl text-blue-600">{(counts.recebido || 0) + (counts.em_preparacao || 0)}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>Enviados</CardDescription>
-            <CardTitle className="text-3xl text-purple-600">{counts.shipped}</CardTitle>
+            <CardTitle className="text-3xl text-purple-600">{counts.enviado || 0}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -88,13 +80,12 @@ function ResellerOrders() {
 
       {/* Tabs de Status */}
       <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-        <TabsList>
-          <TabsTrigger value="all">Todos ({counts.all})</TabsTrigger>
-          <TabsTrigger value="pending">Pendentes ({counts.pending})</TabsTrigger>
-          <TabsTrigger value="processing">Em preparação ({counts.processing})</TabsTrigger>
-          <TabsTrigger value="shipped">Despachados ({counts.shipped})</TabsTrigger>
-          <TabsTrigger value="delivered">Finalizados ({counts.delivered})</TabsTrigger>
-          <TabsTrigger value="cancelled">Cancelados ({counts.cancelled})</TabsTrigger>
+        <TabsList className="flex-wrap h-auto">
+          {visibleTabs.map((tab) => (
+            <TabsTrigger key={tab} value={tab}>
+              {tab === "all" ? "Todos" : ORDER_STATUS_CONFIG[tab].label} ({counts[tab] || 0})
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         <TabsContent value={statusFilter} className="mt-6">
@@ -111,8 +102,8 @@ function ResellerOrders() {
           ) : orders && orders.length > 0 ? (
             <div className="space-y-4">
               {orders.map((order) => {
-                const statusInfo = statusConfig[order.status as keyof typeof statusConfig];
-                const StatusIcon = statusInfo?.icon || Package;
+                const statusInfo = getStatusConfig(order.status);
+                const StatusIcon = statusInfo.icon;
 
                 return (
                   <Card key={order.id} className="hover:shadow-md transition-shadow">
@@ -121,9 +112,9 @@ function ResellerOrders() {
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <h3 className="font-semibold text-lg">#{order.order_number}</h3>
-                            <Badge className={statusInfo?.color}>
+                            <Badge className={statusInfo.color}>
                               <StatusIcon className="h-3 w-3 mr-1" />
-                              {statusInfo?.label}
+                              {statusInfo.label}
                             </Badge>
                             {order.payment_status === "approved" && (
                               <Badge variant="outline" className="bg-green-50 text-green-700">

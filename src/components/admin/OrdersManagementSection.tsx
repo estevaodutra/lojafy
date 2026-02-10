@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { ShoppingCart, Eye, Edit, Truck, Package, CheckCircle, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ALL_STATUSES, ORDER_STATUS_CONFIG, getStatusConfig } from '@/constants/orderStatus';
 
 interface AdminOrder {
   id: string;
@@ -66,7 +67,6 @@ export const OrdersManagementSection = () => {
 
       if (ordersError) throw ordersError;
 
-      // Fetch user profiles for orders
       let ordersWithProfiles: AdminOrder[] = [];
       if (ordersData) {
         const userIds = [...new Set(ordersData.map(order => order.user_id))];
@@ -113,6 +113,13 @@ export const OrdersManagementSection = () => {
 
       if (error) throw error;
 
+      // Insert status history
+      await supabase.from('order_status_history').insert({
+        order_id: selectedOrder.id,
+        status: newStatus,
+        notes: `Status atualizado pelo admin`,
+      });
+
       toast({
         title: "Sucesso",
         description: "Pedido atualizado com sucesso",
@@ -134,38 +141,12 @@ export const OrdersManagementSection = () => {
   };
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pending': return <Clock className="h-4 w-4" />;
-      case 'processing': return <Package className="h-4 w-4" />;
-      case 'shipped': return <Truck className="h-4 w-4" />;
-      case 'delivered': return <CheckCircle className="h-4 w-4" />;
-      case 'refunded': return <CheckCircle className="h-4 w-4" />;
-      default: return <Clock className="h-4 w-4" />;
-    }
+    const Icon = getStatusConfig(status).icon;
+    return <Icon className="h-4 w-4" />;
   };
 
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'delivered': return 'default';
-      case 'shipped': return 'secondary';
-      case 'processing': return 'outline';
-      case 'pending': return 'outline';
-      case 'refunded': return 'secondary';
-      default: return 'outline';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'pending': return 'Pendente';
-      case 'processing': return 'Em preparação';
-      case 'shipped': return 'Despachado';
-      case 'delivered': return 'Finalizado';
-      case 'cancelled': return 'Cancelado';
-      case 'refunded': return 'Reembolsado';
-      default: return 'Desconhecido';
-    }
-  };
+  const getStatusVariant = (status: string) => getStatusConfig(status).variant;
+  const getStatusLabel = (status: string) => getStatusConfig(status).label;
 
   const getPaymentStatusVariant = (status: string) => {
     switch (status) {
@@ -205,12 +186,9 @@ export const OrdersManagementSection = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os Status</SelectItem>
-              <SelectItem value="pending">Pendente</SelectItem>
-              <SelectItem value="processing">Em preparação</SelectItem>
-              <SelectItem value="shipped">Despachado</SelectItem>
-              <SelectItem value="delivered">Finalizado</SelectItem>
-              <SelectItem value="cancelled">Cancelado</SelectItem>
-              <SelectItem value="refunded">Reembolsado</SelectItem>
+              {ALL_STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>{ORDER_STATUS_CONFIG[s].label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -233,7 +211,7 @@ export const OrdersManagementSection = () => {
                     <h3 className="font-medium">
                       {order.profiles?.first_name} {order.profiles?.last_name}
                     </h3>
-                    <Badge variant={getPaymentStatusVariant(order.payment_status)} className="text-xs">
+                    <Badge variant={getPaymentStatusVariant(order.payment_status) as any} className="text-xs">
                       {getPaymentStatusLabel(order.payment_status)}
                     </Badge>
                   </div>
@@ -251,7 +229,7 @@ export const OrdersManagementSection = () => {
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  <Badge variant={getStatusVariant(order.status)} className="text-xs">
+                  <Badge variant={getStatusVariant(order.status) as any} className="text-xs">
                     {getStatusIcon(order.status)}
                     <span className="ml-1">{getStatusLabel(order.status)}</span>
                   </Badge>
@@ -296,12 +274,9 @@ export const OrdersManagementSection = () => {
                               <SelectValue placeholder="Selecione o status" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="pending">Pendente</SelectItem>
-                              <SelectItem value="processing">Em preparação</SelectItem>
-                              <SelectItem value="shipped">Despachado</SelectItem>
-                              <SelectItem value="delivered">Finalizado</SelectItem>
-                              <SelectItem value="cancelled">Cancelado</SelectItem>
-                              <SelectItem value="refunded">Reembolsado</SelectItem>
+                              {ALL_STATUSES.map((s) => (
+                                <SelectItem key={s} value={s}>{ORDER_STATUS_CONFIG[s].label}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>

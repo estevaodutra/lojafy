@@ -11,26 +11,28 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { useSupplierOrders } from "@/hooks/useSupplierOrders";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { ALL_STATUSES, ORDER_STATUS_CONFIG, getStatusConfig, SUPPLIER_QUICK_ACTIONS, type OrderStatus } from "@/constants/orderStatus";
+import { ReposicaoModal } from "@/components/supplier/ReposicaoModal";
+import { EmFaltaModal } from "@/components/supplier/EmFaltaModal";
+import { toast as sonnerToast } from "sonner";
 
 const SupplierOrderManagement = () => {
-  const { data: orders = [], isLoading } = useSupplierOrders();
+  const { data: orders = [], isLoading, refetch } = useSupplierOrders();
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 20;
+  const { toast } = useToast();
+
+  // Modal states
+  const [reposicaoOrder, setReposicaoOrder] = useState<any>(null);
+  const [emFaltaOrder, setEmFaltaOrder] = useState<any>(null);
 
   const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      pending: { label: "Pendente", variant: "secondary" as const },
-      processing: { label: "Em preparação", variant: "default" as const },
-      shipped: { label: "Despachado", variant: "default" as const },
-      delivered: { label: "Finalizado", variant: "default" as const },
-      cancelled: { label: "Cancelado", variant: "destructive" as const },
-      refunded: { label: "Reembolsado", variant: "secondary" as const },
-    };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+    const config = getStatusConfig(status);
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
@@ -40,9 +42,136 @@ const SupplierOrderManagement = () => {
       paid: { label: "Pago", variant: "default" as const },
       failed: { label: "Falhou", variant: "destructive" as const },
     };
-
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
     return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const updateOrderStatus = async (orderId: string, newStatus: string, extra?: { estimated_shipping_date?: string; status_reason?: string }) => {
+    try {
+      const updateData: Record<string, any> = { status: newStatus };
+      if (extra?.estimated_shipping_date) updateData.estimated_shipping_date = extra.estimated_shipping_date;
+      if (extra?.status_reason) updateData.status_reason = extra.status_reason;
+
+      const { error } = await supabase
+        .from('orders')
+        .update(updateData)
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      // Insert into status history
+      await supabase.from('order_status_history').insert({
+        order_id: orderId,
+        status: newStatus,
+        notes: extra?.status_reason || `Status atualizado pelo fornecedor`,
+      });
+
+      // If em_falta, deactivate products
+      if (newStatus === 'em_falta') {
+        await deactivateOrderProducts(orderId);
+      }
+
+      // Create notification for customer
+      await createStatusNotification(orderId, newStatus, extra);
+
+      toast({ title: "Sucesso", description: "Status do pedido atualizado" });
+      refetch();
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      toast({ title: "Erro", description: "Erro ao atualizar status", variant: "destructive" });
+    }
+  };
+
+  const deactivateOrderProducts = async (orderId: string) => {
+    try {
+      const { data: items } = await supabase
+        .from('order_items')
+        .select('product_id')
+        .eq('order_id', orderId);
+
+      if (!items || items.length === 0) return;
+
+      const productIds = items.map(i => i.product_id);
+      await supabase
+        .from('products')
+        .update({ active: false })
+        .in('id', productIds);
+
+      sonnerToast.warning(`${productIds.length} produto(s) indisponibilizado(s) por falta.`);
+
+      // Notify super admins
+      const { data: admins } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('role', 'super_admin');
+
+      if (admins) {
+        const notifications = admins.map(admin => ({
+          user_id: admin.user_id,
+          title: '⚠️ Produtos Indisponibilizados',
+          message: `${productIds.length} produto(s) foram indisponibilizados por falta no pedido.`,
+          type: 'product_unavailable',
+        }));
+        await supabase.from('notifications').insert(notifications);
+      }
+    } catch (error) {
+      console.error('Error deactivating products:', error);
+    }
+  };
+
+  const createStatusNotification = async (orderId: string, newStatus: string, extra?: { estimated_shipping_date?: string }) => {
+    try {
+      const { data: order } = await supabase
+        .from('orders')
+        .select('user_id, order_number, tracking_number, reseller_id')
+        .eq('id', orderId)
+        .single();
+
+      if (!order) return;
+
+      const { STATUS_NOTIFICATION_MESSAGES, RESELLER_NOTIFY_STATUSES } = await import('@/constants/orderStatus');
+      
+      let message = STATUS_NOTIFICATION_MESSAGES[newStatus as OrderStatus] || '';
+      message = message.replace('{numero}', order.order_number);
+      message = message.replace('{codigo}', order.tracking_number || 'Em breve');
+      if (extra?.estimated_shipping_date) {
+        message = message.replace('{data}', new Date(extra.estimated_shipping_date).toLocaleDateString('pt-BR'));
+      }
+
+      // Notify customer
+      if (order.user_id) {
+        await supabase.from('notifications').insert({
+          user_id: order.user_id,
+          title: `📦 Atualização do Pedido #${order.order_number}`,
+          message,
+          type: 'order_status',
+          action_url: '/minha-conta/pedidos',
+        });
+      }
+
+      // Notify reseller if applicable
+      if (order.reseller_id && RESELLER_NOTIFY_STATUSES.includes(newStatus as OrderStatus)) {
+        await supabase.from('notifications').insert({
+          user_id: order.reseller_id,
+          title: `📦 Pedido #${order.order_number} - ${getStatusConfig(newStatus).label}`,
+          message,
+          type: 'order_status',
+          action_url: '/reseller/pedidos',
+        });
+      }
+    } catch (error) {
+      console.error('Error creating notification:', error);
+    }
+  };
+
+  const handleQuickAction = (order: any, targetStatus: OrderStatus, requiresModal?: string) => {
+    if (requiresModal === 'reposicao') {
+      setReposicaoOrder(order);
+    } else if (requiresModal === 'em_falta') {
+      setEmFaltaOrder(order);
+    } else {
+      updateOrderStatus(order.id, targetStatus);
+    }
   };
 
   const filteredOrders = orders.filter(order => {
@@ -63,7 +192,6 @@ const SupplierOrderManagement = () => {
   const showingFrom = filteredOrders.length > 0 ? startIndex + 1 : 0;
   const showingTo = Math.min(endIndex, filteredOrders.length);
 
-  // Calculate total value of supplier's items in orders
   const calculateSupplierTotal = (order: any) => {
     return order.order_items?.reduce((sum: number, item: any) => 
       sum + parseFloat(item.total_price || 0), 0
@@ -113,12 +241,9 @@ const SupplierOrderManagement = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os status</SelectItem>
-                <SelectItem value="pending">Pendente</SelectItem>
-                <SelectItem value="processing">Em preparação</SelectItem>
-                <SelectItem value="shipped">Despachado</SelectItem>
-                <SelectItem value="delivered">Finalizado</SelectItem>
-                <SelectItem value="cancelled">Cancelado</SelectItem>
-                <SelectItem value="refunded">Reembolsado</SelectItem>
+                {ALL_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>{ORDER_STATUS_CONFIG[s].label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -154,34 +279,52 @@ const SupplierOrderManagement = () => {
                   </TableCell>
                 </TableRow>
               ) : (
-                currentOrders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium">{order.order_number}</TableCell>
-                    <TableCell>
-                      {order.profiles.first_name} {order.profiles.last_name}
-                    </TableCell>
-                    <TableCell>
-                      {format(new Date(order.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(order.status)}</TableCell>
-                    <TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {order.order_items?.length || 0} produto(s)
-                      </Badge>
-                    </TableCell>
-                    <TableCell>R$ {calculateSupplierTotal(order).toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedOrder(order)}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                currentOrders.map((order) => {
+                  const quickActions = SUPPLIER_QUICK_ACTIONS.filter(a => 
+                    a.showWhen.includes(order.status as OrderStatus)
+                  );
+                  
+                  return (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-medium">{order.order_number}</TableCell>
+                      <TableCell>
+                        {order.profiles.first_name} {order.profiles.last_name}
+                      </TableCell>
+                      <TableCell>
+                        {format(new Date(order.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(order.status)}</TableCell>
+                      <TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {order.order_items?.length || 0} produto(s)
+                        </Badge>
+                      </TableCell>
+                      <TableCell>R$ {calculateSupplierTotal(order).toFixed(2)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedOrder(order)}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          {quickActions.map((action) => (
+                            <Button
+                              key={action.targetStatus}
+                              variant={action.variant || "default"}
+                              size="sm"
+                              onClick={() => handleQuickAction(order, action.targetStatus, action.requiresModal)}
+                            >
+                              {action.label}
+                            </Button>
+                          ))}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -244,6 +387,29 @@ const SupplierOrderManagement = () => {
           onClose={() => setSelectedOrder(null)}
         />
       )}
+
+      {/* Modals */}
+      <ReposicaoModal
+        isOpen={!!reposicaoOrder}
+        onClose={() => setReposicaoOrder(null)}
+        orderNumber={reposicaoOrder?.order_number || ''}
+        onConfirm={(date, reason) => {
+          updateOrderStatus(reposicaoOrder.id, 'em_reposicao', {
+            estimated_shipping_date: date,
+            status_reason: reason,
+          });
+          setReposicaoOrder(null);
+        }}
+      />
+      <EmFaltaModal
+        isOpen={!!emFaltaOrder}
+        onClose={() => setEmFaltaOrder(null)}
+        orderNumber={emFaltaOrder?.order_number || ''}
+        onConfirm={(reason) => {
+          updateOrderStatus(emFaltaOrder.id, 'em_falta', { status_reason: reason });
+          setEmFaltaOrder(null);
+        }}
+      />
     </div>
   );
 };

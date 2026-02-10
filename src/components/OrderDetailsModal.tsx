@@ -154,7 +154,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         .from('order_status_history')
         .select('created_at')
         .eq('order_id', orderId)
-        .eq('status', 'delivered')
+        .eq('status', 'finalizado')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -499,58 +499,17 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
   const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return <Clock className="h-4 w-4" />;
-      case 'processing':
-        return <Package className="h-4 w-4" />;
-      case 'shipped':
-        return <Truck className="h-4 w-4" />;
-      case 'delivered':
-        return <CheckCircle className="h-4 w-4" />;
-      case 'cancelled':
-        return <XCircle className="h-4 w-4" />;
-      case 'refunded':
-        return <CheckCircle className="h-4 w-4" />;
-      default:
-        return <Package className="h-4 w-4" />;
-    }
+    const { getStatusConfig: gsc } = require('@/constants/orderStatus');
+    const Icon = gsc(status).icon;
+    return <Icon className="h-4 w-4" />;
   };
   const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'Pendente';
-      case 'processing':
-        return 'Em preparação';
-      case 'shipped':
-        return 'Despachado';
-      case 'delivered':
-        return 'Finalizado';
-      case 'cancelled':
-        return 'Cancelado';
-      case 'refunded':
-        return 'Reembolsado';
-      default:
-        return 'Desconhecido';
-    }
+    const { getStatusLabel: gsl } = require('@/constants/orderStatus');
+    return gsl(status);
   };
   const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return 'default';
-      case 'shipped':
-        return 'secondary';
-      case 'processing':
-        return 'outline';
-      case 'pending':
-        return 'outline';
-      case 'cancelled':
-        return 'destructive';
-      case 'refunded':
-        return 'secondary';
-      default:
-        return 'outline';
-    }
+    const { getStatusVariant: gsv } = require('@/constants/orderStatus');
+    return gsv(status);
   };
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -1197,7 +1156,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               </Card>}
 
             {/* Refund Documents - Only show if order is refunded or if admin */}
-            {(order.status === 'refunded' || isAdmin) && <Card>
+            {(order.status === 'reembolsado' || isAdmin) && <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm flex items-center justify-between">
                     <div className="flex items-center gap-2">
