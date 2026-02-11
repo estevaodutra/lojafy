@@ -1,245 +1,127 @@
 
 
-# Atualizar Status de Pedidos - Plano de Implementacao
+# Alterar Proporcoes de Banners e Logo
 
 ## Resumo
 
-Adicionar 4 novos status de pedido (recebido, embalado, enviado, em_reposicao, em_falta), renomear "despachado" para "enviado", implementar acoes rapidas no painel do fornecedor com modais especiais, notificacoes automaticas e indisponibilizacao de produtos em falta.
-
-## Decisao Arquitetural: Status Interno
-
-O banco de dados atualmente usa status em ingles (pending, processing, shipped, etc.) com mapeamento PT/EN na edge function da API. Os novos status nao tem equivalente em ingles natural, entao **os novos status serao armazenados diretamente em portugues** no banco (ex: `recebido`, `embalado`, `enviado`, `em_reposicao`, `em_falta`). Os status antigos serao migrados:
-
-- `shipped` -> `enviado`
-- `processing` -> `em_preparacao`
-- `pending` -> `pendente`
-- `delivered` -> `finalizado`
-- `cancelled` -> `cancelado`
-- `refunded` -> `reembolsado`
-
-Isso elimina a camada de traducao EN/PT e padroniza tudo em portugues.
+Atualizar as proporcoes de imagens em toda a plataforma:
+- **Banner Desktop**: de 2:1 (1200x600) para **16:9 (1920x1080)**
+- **Banner Mobile**: de 2:1 (768x384) para **4:5 (800x1000)**
+- **Logo**: de ~3.33:1 (200x60) para **3:1 (300x100)**
 
 ---
 
-## Fase 1: Banco de Dados
+## Arquivos a Alterar
 
-### 1.1 Migracao SQL
+### 1. Constantes centrais - `src/constants/imageDimensions.ts`
 
-```sql
--- 1. Migrar dados existentes de EN para PT
-UPDATE orders SET status = 'pendente' WHERE status = 'pending';
-UPDATE orders SET status = 'em_preparacao' WHERE status = 'processing';
-UPDATE orders SET status = 'enviado' WHERE status = 'shipped';
-UPDATE orders SET status = 'finalizado' WHERE status = 'delivered';
-UPDATE orders SET status = 'cancelado' WHERE status = 'cancelled';
-UPDATE orders SET status = 'reembolsado' WHERE status = 'refunded';
+Atualizar as dimensoes base:
 
--- 2. Migrar historico
-UPDATE order_status_history SET status = 'pendente' WHERE status = 'pending';
-UPDATE order_status_history SET status = 'em_preparacao' WHERE status = 'processing';
-UPDATE order_status_history SET status = 'enviado' WHERE status = 'shipped';
-UPDATE order_status_history SET status = 'finalizado' WHERE status = 'delivered';
-UPDATE order_status_history SET status = 'cancelado' WHERE status = 'cancelled';
-UPDATE order_status_history SET status = 'reembolsado' WHERE status = 'refunded';
+| Tipo | Antes | Depois |
+|------|-------|--------|
+| LOGO | 200x60 (3.33:1) | 300x100 (3:1) |
+| BANNER | 1200x600 (2:1) | 1920x1080 (16:9) |
 
--- 3. Remover constraint antiga e criar nova
-ALTER TABLE orders DROP CONSTRAINT orders_status_check;
-ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (
-  status = ANY (ARRAY[
-    'pendente', 'recebido', 'em_preparacao', 'embalado',
-    'enviado', 'em_reposicao', 'em_falta',
-    'finalizado', 'cancelado', 'reembolsado'
-  ])
-);
+### 2. Upload de Banners Desktop - `src/components/admin/BannerUpload.tsx`
 
--- 4. Adicionar coluna para previsao de envio (usado no status em_reposicao)
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS estimated_shipping_date date;
+Ja usa `IMAGE_DIMENSIONS.BANNER` - atualiza automaticamente.
 
--- 5. Adicionar coluna para motivo (usado em em_falta/cancelado)
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS status_reason text;
-```
+### 3. Upload de Banners Mobile - `src/components/admin/MobileBannerUpload.tsx`
 
-### 1.2 Migrar dados em producao (Live)
+Alterar de 768x432 (16:9) para **800x1000 (4:5)**.
 
-Antes de publicar, sera necessario executar os UPDATEs de dados no ambiente Live via Cloud View > Run SQL.
+### 4. Upload de Banners Revendedor - `src/components/reseller/ResellerBannerUpload.tsx`
+
+Alterar dimensoes hardcoded:
+- Desktop: 1200x600 (2:1) para **1920x1080 (16:9)**
+- Mobile: 768x384 (2:1) para **800x1000 (4:5)**
+
+### 5. Exibicao: Carrossel principal - `src/components/Hero.tsx`
+
+No mobile, usar `aspect-[4/5]` ao inves de viewport heights. No desktop, usar `aspect-[16/9]`.
+
+### 6. Exibicao: Carrossel loja publica - `src/components/public-store/PublicStoreBannerCarousel.tsx`
+
+Mesma logica: `aspect-[4/5]` mobile, `aspect-[16/9]` desktop.
+
+### 7. Exibicao: Hero loja publica - `src/components/public-store/PublicStoreHero.tsx`
+
+Atualizar proporcoes de exibicao do banner.
+
+### 8. Exibicao: Banners destaque - `src/components/FeaturedBanners.tsx`
+
+Alterar `aspect-[2/1]` para `aspect-[16/9]`.
+
+### 9. Exibicao: Banners destaque loja publica - `src/components/public-store/PublicStoreFeaturedBanners.tsx`
+
+Alterar `aspect-[2/1]` para `aspect-[16/9]`.
 
 ---
 
-## Fase 2: Arquivo Centralizado de Configuracao de Status
+## Detalhes Tecnicos
 
-### 2.1 Criar `src/constants/orderStatus.ts`
-
-Arquivo centralizado com toda a configuracao de status, eliminando duplicacao em ~10 arquivos:
+### imageDimensions.ts
 
 ```typescript
-export const ORDER_STATUS_CONFIG = {
-  pendente: { label: 'Pendente', icon: Clock, color: 'bg-gray-100 text-gray-800', variant: 'secondary' },
-  recebido: { label: 'Recebido', icon: Inbox, color: 'bg-blue-100 text-blue-800', variant: 'default' },
-  em_preparacao: { label: 'Em Preparacao', icon: Settings, color: 'bg-yellow-100 text-yellow-800', variant: 'outline' },
-  embalado: { label: 'Embalado', icon: Package, color: 'bg-orange-100 text-orange-800', variant: 'default' },
-  enviado: { label: 'Enviado', icon: Send, color: 'bg-purple-100 text-purple-800', variant: 'secondary' },
-  em_reposicao: { label: 'Em Reposicao', icon: AlertTriangle, color: 'bg-amber-100 text-amber-800', variant: 'warning' },
-  em_falta: { label: 'Em Falta', icon: XCircle, color: 'bg-red-100 text-red-800', variant: 'destructive' },
-  finalizado: { label: 'Finalizado', icon: CheckCircle, color: 'bg-green-100 text-green-800', variant: 'default' },
-  cancelado: { label: 'Cancelado', icon: Ban, color: 'bg-gray-100 text-gray-800', variant: 'destructive' },
-  reembolsado: { label: 'Reembolsado', icon: RefreshCw, color: 'bg-gray-100 text-gray-800', variant: 'secondary' },
-};
-
-export const STATUS_TRANSITIONS = {
-  pendente: ['recebido', 'cancelado'],
-  recebido: ['em_preparacao', 'em_falta', 'cancelado'],
-  em_preparacao: ['embalado', 'em_reposicao', 'em_falta', 'cancelado'],
-  embalado: ['enviado', 'em_reposicao', 'cancelado'],
-  enviado: ['finalizado', 'cancelado'],
-  em_reposicao: ['em_preparacao', 'embalado', 'enviado', 'cancelado'],
-  em_falta: ['cancelado', 'reembolsado'],
-  finalizado: ['reembolsado'],
-  cancelado: ['reembolsado'],
-  reembolsado: [],
-};
-
-// Status visiveis por papel para selecao
-export const SUPPLIER_STATUSES = ['recebido','em_preparacao','embalado','enviado','em_reposicao','em_falta'];
-export const ADMIN_STATUSES = Object.keys(ORDER_STATUS_CONFIG);
+LOGO: {
+  width: 300,
+  height: 100,
+  aspectRatio: 3,
+  description: "Logomarca da loja (proporcao 3:1)",
+  ...
+},
+BANNER: {
+  width: 1920,
+  height: 1080,
+  aspectRatio: 16 / 9,
+  description: "Banner promocional (proporcao 16:9)",
+  ...
+},
+MOBILE_BANNER: {  // Novo tipo
+  width: 800,
+  height: 1000,
+  aspectRatio: 4 / 5,
+  description: "Banner mobile (proporcao 4:5)",
+  ...
+}
 ```
 
----
+### CSS dos banners (Hero, PublicStoreBannerCarousel, PublicStoreHero)
 
-## Fase 3: Atualizar Interfaces (10 arquivos)
+Substituir alturas fixas com viewport por aspect-ratio responsivo:
 
-Todos os arquivos abaixo serao refatorados para importar de `orderStatus.ts` e usar status em portugues:
-
-| Arquivo | Alteracoes |
-|---------|-----------|
-| `src/pages/admin/Orders.tsx` | Status config, filtros, select de alteracao (todos os status para admin) |
-| `src/pages/supplier/OrderManagement.tsx` | Status config, filtros, adicionar botoes de acao rapida |
-| `src/pages/reseller/Orders.tsx` | Status config, tabs de filtro |
-| `src/pages/customer/Orders.tsx` | Status icon/label/variant |
-| `src/pages/customer/Dashboard.tsx` | Status icon/label |
-| `src/components/OrderDetailsModal.tsx` | Status icon/label/variant na timeline |
-| `src/components/admin/OrdersManagementSection.tsx` | Status config, filtros, select |
-| `src/pages/RastrearPedido.tsx` | Status badge |
-| `src/components/admin/SalesSection.tsx` (se usar status) | Verificar e atualizar |
-
----
-
-## Fase 4: Painel do Fornecedor - Acoes Rapidas
-
-### 4.1 Botoes de acao rapida em `OrderManagement.tsx`
-
-Adicionar botoes contextuais baseados no status atual do pedido, usando `STATUS_TRANSITIONS` para determinar quais acoes mostrar.
-
-### 4.2 Criar `src/components/supplier/ReposicaoModal.tsx`
-
-Modal para status "Em Reposicao" com:
-- Campo de data (previsao de envio) - obrigatorio
-- Campo de motivo - opcional
-- Salva `estimated_shipping_date` e `status_reason` no pedido
-
-### 4.3 Criar `src/components/supplier/EmFaltaModal.tsx`
-
-Modal para status "Em Falta" com:
-- Aviso de cancelamento e indisponibilizacao de produtos
-- Campo de motivo - obrigatorio
-- Ao confirmar:
-  1. Atualiza status do pedido para `em_falta`
-  2. Marca produtos do pedido como `active = false`
-  3. Registra no historico
-  4. Cria notificacoes
-
----
-
-## Fase 5: Indisponibilizacao Automatica de Produtos
-
-Quando pedido for marcado como `em_falta`:
-
-1. Buscar `order_items` do pedido
-2. Para cada produto, executar `UPDATE products SET active = false WHERE id = product_id`
-3. Registrar no historico de status: "Produtos indisponibilizados por falta no pedido #X"
-4. Criar notificacao para superadmin: "X produto(s) indisponibilizado(s) por falta"
-5. Exibir toast: "Pedido marcado em falta. X produto(s) indisponibilizado(s)."
-
----
-
-## Fase 6: Notificacoes
-
-### 6.1 Funcao de notificacao no frontend
-
-Criar funcao `createOrderStatusNotification` que ao atualizar status:
-
-1. Cria notificacao na tabela `notifications` para o cliente (user_id do pedido)
-2. Para status `em_reposicao`, `em_falta`, `cancelado`, `reembolsado`: tambem notifica o revendedor (reseller_id do pedido)
-
-### 6.2 Mensagens
-
-As mensagens seguem o mapeamento definido na spec do usuario, inseridas diretamente na tabela `notifications` via Supabase client.
-
----
-
-## Fase 7: Edge Function da API
-
-### 7.1 Atualizar `api-pedidos-atualizar-status/index.ts`
-
-- Remover mapeamento PT/EN (agora tudo e PT no banco)
-- Atualizar `VALID_STATUSES` com novos status
-- Adicionar validacao de transicoes permitidas
-- Suportar campos `previsao_envio` e `motivo` no body
-- Implementar indisponibilizacao de produtos quando status = `em_falta`
-
----
-
-## Fase 8: Documentacao da API
-
-### 8.1 Atualizar `src/data/apiEndpointsData.ts`
-
-- Novos status na lista
-- Remover mapeamento interno (nao ha mais)
-- Atualizar exemplos de request/response
-- Documentar campos opcionais `previsao_envio` e `motivo`
-- Documentar transicoes permitidas
-
----
-
-## Arquivos Modificados/Criados
-
-| Acao | Arquivo |
-|------|---------|
-| Criar | `src/constants/orderStatus.ts` |
-| Criar | `src/components/supplier/ReposicaoModal.tsx` |
-| Criar | `src/components/supplier/EmFaltaModal.tsx` |
-| Criar | Migracao SQL (schema) |
-| Editar | `src/pages/admin/Orders.tsx` |
-| Editar | `src/pages/supplier/OrderManagement.tsx` |
-| Editar | `src/pages/reseller/Orders.tsx` |
-| Editar | `src/pages/customer/Orders.tsx` |
-| Editar | `src/pages/customer/Dashboard.tsx` |
-| Editar | `src/components/OrderDetailsModal.tsx` |
-| Editar | `src/components/admin/OrdersManagementSection.tsx` |
-| Editar | `src/pages/RastrearPedido.tsx` |
-| Editar | `supabase/functions/api-pedidos-atualizar-status/index.ts` |
-| Editar | `src/data/apiEndpointsData.ts` |
-
-## Dados a Migrar no Live
-
-Antes de publicar, executar no Cloud View > Run SQL (com Live selecionado):
-
-```sql
-UPDATE orders SET status = 'pendente' WHERE status = 'pending';
-UPDATE orders SET status = 'em_preparacao' WHERE status = 'processing';
-UPDATE orders SET status = 'enviado' WHERE status = 'shipped';
-UPDATE orders SET status = 'finalizado' WHERE status = 'delivered';
-UPDATE orders SET status = 'cancelado' WHERE status = 'cancelled';
-UPDATE orders SET status = 'reembolsado' WHERE status = 'refunded';
-
-UPDATE order_status_history SET status = 'pendente' WHERE status = 'pending';
-UPDATE order_status_history SET status = 'em_preparacao' WHERE status = 'processing';
-UPDATE order_status_history SET status = 'enviado' WHERE status = 'shipped';
-UPDATE order_status_history SET status = 'finalizado' WHERE status = 'delivered';
-UPDATE order_status_history SET status = 'cancelado' WHERE status = 'cancelled';
-UPDATE order_status_history SET status = 'reembolsado' WHERE status = 'refunded';
+```html
+<!-- Mobile: 4:5, Desktop: 16:9 -->
+<div className="w-full aspect-[4/5] md:aspect-[16/9] relative overflow-hidden rounded-lg bg-muted">
+  <picture>
+    <source media="(max-width: 768px)" srcSet={mobileUrl} />
+    <img src={desktopUrl} className="w-full h-full object-cover" />
+  </picture>
+</div>
 ```
 
-## Observacao sobre Escopo
+### MobileBannerUpload.tsx
 
-Devido ao tamanho desta mudanca (~15 arquivos + banco + edge function), a implementacao sera feita em etapas dentro de uma unica execucao, priorizando: banco -> constantes -> interfaces -> fornecedor -> notificacoes -> API.
+Alterar dimensoes de 768x432 para 800x1000 com aspect ratio 4/5.
+
+### ResellerBannerUpload.tsx
+
+Desktop: 1920x1080 (16:9). Mobile: 800x1000 (4:5).
+
+---
+
+## Arquivos Modificados
+
+| Arquivo | Tipo |
+|---------|------|
+| `src/constants/imageDimensions.ts` | Editar |
+| `src/components/admin/MobileBannerUpload.tsx` | Editar |
+| `src/components/reseller/ResellerBannerUpload.tsx` | Editar |
+| `src/components/Hero.tsx` | Editar |
+| `src/components/public-store/PublicStoreBannerCarousel.tsx` | Editar |
+| `src/components/public-store/PublicStoreHero.tsx` | Editar |
+| `src/components/FeaturedBanners.tsx` | Editar |
+| `src/components/public-store/PublicStoreFeaturedBanners.tsx` | Editar |
+
+Os componentes `BannerUpload.tsx`, `LogoUpload.tsx` e `CourseBannerUpload.tsx` ja importam de `imageDimensions.ts` e atualizam automaticamente.
 
