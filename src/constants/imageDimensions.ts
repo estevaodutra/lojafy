@@ -9,9 +9,9 @@ export const IMAGE_DIMENSIONS = {
   },
   BANNER: {
     width: 1920,
-    height: 1080,
-    aspectRatio: 16 / 9,
-    description: "Banner promocional (proporção 16:9)",
+    height: 1440,
+    aspectRatio: 12 / 9,
+    description: "Banner promocional (proporção 12:9)",
     recommendedFormat: "JPG ou PNG"
   },
   MOBILE_BANNER: {

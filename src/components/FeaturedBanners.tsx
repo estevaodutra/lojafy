@@ -32,7 +32,7 @@ const FeaturedBanners = () => {
   if (banners.length === 0) return null;
 
   const BannerImage = ({ banner }: { banner: Banner }) => (
-    <div className="group relative overflow-hidden rounded-lg aspect-[16/9] bg-muted transition-transform hover:scale-105">
+    <div className="group relative overflow-hidden rounded-lg aspect-[12/9] bg-muted transition-transform hover:scale-105">
       <picture>
         {banner.mobile_image_url && (
           <source 
