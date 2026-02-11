@@ -17,8 +17,8 @@ export const ResellerBannerUpload: React.FC<ResellerBannerUploadProps> = ({
   bannerType,
 }) => {
   const dimensions = bannerType === 'carousel' 
-    ? { width: 1920, height: 1440, description: 'Banner Rotativo Desktop (12:9)', recommendedFormat: 'JPG, PNG ou WEBP' }
-    : { width: 1920, height: 1440, description: 'Banner Destaque Desktop (12:9)', recommendedFormat: 'JPG, PNG ou WEBP' };
+    ? { width: 1920, height: 720, description: 'Banner Rotativo Desktop (8:3)', recommendedFormat: 'JPG, PNG ou WEBP' }
+    : { width: 1920, height: 720, description: 'Banner Destaque Desktop (8:3)', recommendedFormat: 'JPG, PNG ou WEBP' };
 
   const mobileDimensions = { 
     width: 800, 

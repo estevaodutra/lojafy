@@ -10,7 +10,7 @@ const PublicStoreBannerCarousel = ({ banners }: PublicStoreBannerCarouselProps) 
   if (banners.length === 0) return null;
 
   const BannerImage = ({ banner }: { banner: ResellerBanner }) => (
-    <div className="w-full aspect-[4/5] md:aspect-[12/9] relative overflow-hidden rounded-lg bg-muted">
+    <div className="w-full aspect-[4/5] md:aspect-[8/3] relative overflow-hidden rounded-lg bg-muted">
       <picture>
         {banner.mobile_image_url && (
           <source 
