@@ -341,7 +341,7 @@ serve(async (req) => {
       total_amount: amount,
       payment_method: 'pix',
       payment_status: 'pending',
-      status: 'pending',
+      status: 'pendente',
       payment_id: pixData.paymentId || externalReference,
       pix_qr_code: pixData.qrCodeCopyPaste,
       pix_qr_code_base64: pixData.qrCodeBase64,
