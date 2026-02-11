@@ -1,49 +1,23 @@
 
+# Corrigir Erro ao Gerar PIX
 
-# Alterar Banner Desktop para 8:3
+## Causa Raiz
 
-## Resumo
+A Edge Function `create-pix-payment` insere o pedido com `status: 'pending'` (inglês), mas o banco de dados tem uma constraint (`orders_status_check`) que só aceita valores em **português**:
 
-Atualizar a proporção do banner desktop de **12:9** para **8:3** em toda a plataforma.
-
----
-
-## Alterações
-
-### 1. Constantes - `src/constants/imageDimensions.ts`
-
-- De: 1920x1440 (12:9)
-- Para: **1920x720 (8:3)**
-
-### 2. Upload Revendedor - `src/components/reseller/ResellerBannerUpload.tsx`
-
-Dimensões desktop de 1920x1440 para **1920x720**, descrição para "8:3".
-
-### 3. Exibição - 5 arquivos (aspect-[12/9] para aspect-[8/3])
-
-- `src/components/Hero.tsx`
-- `src/components/FeaturedBanners.tsx`
-- `src/components/public-store/PublicStoreBannerCarousel.tsx`
-- `src/components/public-store/PublicStoreHero.tsx`
-- `src/components/public-store/PublicStoreFeaturedBanners.tsx`
-
-### 4. Automáticos
-
-`BannerUpload.tsx` e `CourseBannerUpload.tsx` atualizam via `imageDimensions.ts`.
-
----
-
-## Detalhe Técnico
-
-```typescript
-BANNER: {
-  width: 1920,
-  height: 720,
-  aspectRatio: 8 / 3,
-  description: "Banner promocional (proporção 8:3)",
-  recommendedFormat: "JPG ou PNG"
-}
+```
+'pendente', 'recebido', 'em_preparacao', 'embalado', 'enviado',
+'em_reposicao', 'em_falta', 'finalizado', 'cancelado', 'reembolsado'
 ```
 
-Classes Tailwind: `aspect-[4/5] md:aspect-[8/3]`
+O `payment_status: 'pending'` está correto (aceito pela constraint `orders_payment_status_check`).
 
+## Correção
+
+### Arquivo: `supabase/functions/create-pix-payment/index.ts`
+
+Alterar linha 344:
+- De: `status: 'pending'`
+- Para: `status: 'pendente'`
+
+Essa é a única alteração necessária. O PIX está sendo gerado com sucesso pelo N8N (retorna QR Code), mas falha ao salvar o pedido no banco.
