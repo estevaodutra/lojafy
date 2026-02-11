@@ -11,10 +11,10 @@ export const MobileBannerUpload: React.FC<MobileBannerUploadProps> = ({
   currentImage,
 }) => {
   const mobileBannerDimensions = {
-    width: 768,
-    height: 432,
-    description: "Banner otimizado para mobile (768x432px)",
-    aspectRatio: 16 / 9,
+    width: 800,
+    height: 1000,
+    description: "Banner otimizado para mobile (800x1000px, proporção 4:5)",
+    aspectRatio: 4 / 5,
   };
 
   return (
