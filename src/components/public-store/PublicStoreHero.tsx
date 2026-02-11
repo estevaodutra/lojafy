@@ -23,7 +23,7 @@ const PublicStoreHero = ({ store }: PublicStoreHeroProps) => {
       return (
         <section className="relative overflow-hidden py-4">
           <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
-            <div className="w-full h-[37vh] md:h-[45vh] lg:h-[52vh] rounded-lg overflow-hidden bg-muted">
+            <div className="w-full aspect-[4/5] md:aspect-[16/9] rounded-lg overflow-hidden bg-muted">
               <img
                 src={store.banner_image_url}
                 alt="Banner da loja"
@@ -38,7 +38,7 @@ const PublicStoreHero = ({ store }: PublicStoreHeroProps) => {
     return (
       <section className="relative overflow-hidden py-4">
         <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
-          <div className="relative h-[37vh] md:h-[45vh] lg:h-[52vh] rounded-lg overflow-hidden bg-muted">
+          <div className="relative aspect-[4/5] md:aspect-[16/9] rounded-lg overflow-hidden bg-muted">
             <img
               src={store.banner_image_url}
               alt="Banner da loja"

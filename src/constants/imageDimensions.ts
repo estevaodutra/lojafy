@@ -1,17 +1,24 @@
 // Image dimension constants for different types
 export const IMAGE_DIMENSIONS = {
   LOGO: {
-    width: 200,
-    height: 60,
-    aspectRatio: 200 / 60,
-    description: "Logomarca da loja",
+    width: 300,
+    height: 100,
+    aspectRatio: 3,
+    description: "Logomarca da loja (proporção 3:1)",
     recommendedFormat: "PNG com fundo transparente"
   },
   BANNER: {
-    width: 1200,
-    height: 600,
-    aspectRatio: 2,
-    description: "Banner promocional (proporção 2:1)",
+    width: 1920,
+    height: 1080,
+    aspectRatio: 16 / 9,
+    description: "Banner promocional (proporção 16:9)",
+    recommendedFormat: "JPG ou PNG"
+  },
+  MOBILE_BANNER: {
+    width: 800,
+    height: 1000,
+    aspectRatio: 4 / 5,
+    description: "Banner mobile (proporção 4:5)",
     recommendedFormat: "JPG ou PNG"
   },
   PRODUCT: {
