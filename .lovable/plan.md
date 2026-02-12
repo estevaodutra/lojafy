@@ -1,89 +1,60 @@
 
 
-# Adicionar Template de Notificacao para Produto Desativado
+# Correcoes no Sistema de Notificacoes de Produto Desativado
 
-## Contexto
+## Problemas Identificados
 
-Atualmente, a funcao `notify_product_removed` insere notificacoes diretamente na tabela `notifications` com titulo e mensagem fixos no codigo SQL. Isso impede que o admin personalize o texto pelo painel de templates. Os demais triggers (preco, estoque, pedidos, aulas) ja usam o sistema de templates via `send_automatic_notification`.
+### 1. Notificacoes nao chegam para todos os usuarios
+O template `product_removed` esta configurado com `target_audience: all_customers`, que envia apenas para usuarios com `role = 'customer'`. Usuarios com outros papeis (revendedores, fornecedores, admins) nao recebem a notificacao. Existem 134 clientes ativos no banco.
+
+### 2. Log tab nao aparece
+O codigo da aba "Log" ja existe no componente, mas pode nao estar publicado na versao de producao. Alem disso, faltam labels para `product_removed` no mapa de tipos.
+
+### 3. Labels faltando
+- `TRIGGER_LABELS` (linha 177-187) nao inclui `product_removed`
+- `getAudienceLabel` (linha 164-175) nao inclui `all_customers`
 
 ## Alteracoes
 
-### 1. Migracao SQL
+### 1. Atualizar target_audience do template para enviar a TODOS
 
-**Inserir template na tabela `notification_templates`:**
-- `trigger_type`: `product_removed`
-- `title_template`: `⚠️ Produto Indisponível`
-- `message_template`: `O produto "{PRODUCT_NAME}" não está mais disponível.`
-- `target_audience`: `all_customers` (novo audience type para o `send_automatic_notification`)
-- `active`: true
+**Migracao SQL:**
+- Alterar o template `product_removed` para `target_audience = 'all'` na tabela `notification_templates`
+- Atualizar a funcao `send_automatic_notification` para suportar `target_audience = 'all'` - enviando para TODOS os perfis ativos independente do role
 
-**Atualizar funcao `notify_product_removed`** para usar `send_automatic_notification` em vez de INSERT direto, passando as variaveis `PRODUCT_ID` e `PRODUCT_NAME`.
+### 2. Adicionar labels faltantes no frontend
 
-**Atualizar funcao `send_automatic_notification`** para suportar o novo target_audience `all_customers` que envia para todos os perfis com `role = 'customer' AND is_active = true`.
+**Arquivo `src/pages/admin/NotificationsManagement.tsx`:**
 
-### 2. Frontend - Tipo no TypeScript
+Adicionar no `TRIGGER_LABELS` (linha 187):
+- `product_removed: 'Produto indisponivel'`
 
-**Arquivo `src/types/notifications.ts`:**
-- Adicionar `'product_removed'` ao tipo `AutomaticTriggerType`
+Adicionar no `getAudienceLabel` (linha 173):
+- `'all_customers': 'Todos os clientes'`
 
-### 3. Frontend - Variaveis do Template
+### Detalhes tecnicos
 
-**Arquivo `src/components/admin/TemplateVariableHelper.tsx`:**
-- Adicionar entrada `product_removed` no `VARIABLES_BY_TRIGGER` com variaveis `PRODUCT_ID` e `PRODUCT_NAME`
+**SQL - Atualizar `send_automatic_notification`:**
 
-### 4. Frontend - Exemplos no hook
-
-**Arquivo `src/hooks/useNotificationTemplates.ts`:**
-- Adicionar `product_removed` no objeto `examples` dentro de `getExampleVariablesForTrigger`
-
-## Detalhes tecnicos
-
-### SQL - Funcao `notify_product_removed` atualizada
+Adicionar novo branch para `target_audience = 'all'`:
 
 ```text
-CREATE OR REPLACE FUNCTION notify_product_removed()
-RETURNS trigger AS $$
-BEGIN
-  IF OLD.active = true AND NEW.active = false THEN
-    PERFORM send_automatic_notification(
-      'product_removed',
-      jsonb_build_object(
-        'PRODUCT_ID', NEW.id::text,
-        'PRODUCT_NAME', NEW.name
-      )
-    );
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+ELSIF v_template.target_audience = 'all' THEN
+  INSERT INTO notifications (...)
+  SELECT p.user_id, ...
+  FROM profiles p
+  WHERE p.is_active = true;
 ```
 
-### SQL - Novo branch em `send_automatic_notification`
-
-Adicionar `ELSIF v_template.target_audience = 'all_customers'` que faz:
+Tambem atualizar o template existente:
 
 ```text
-INSERT INTO notifications (...)
-SELECT p.user_id, ...
-FROM profiles p
-WHERE p.role = 'customer' AND p.is_active = true;
+UPDATE notification_templates 
+SET target_audience = 'all'
+WHERE trigger_type = 'product_removed';
 ```
 
-### TypeScript - Nova entrada no tipo
-
-```text
-export type AutomaticTriggerType =
-  | 'price_decrease'
-  | ...
-  | 'product_removed';   -- novo
-```
-
-### TypeScript - Variaveis do template
-
-```text
-product_removed: [
-  { key: 'PRODUCT_ID', description: 'ID do produto', example: 'abc123' },
-  { key: 'PRODUCT_NAME', description: 'Nome do produto', example: 'Smartphone XYZ' },
-],
-```
+**Frontend - Labels:**
+- Mapa `TRIGGER_LABELS`: adicionar `product_removed`
+- Mapa `getAudienceLabel`: adicionar `all_customers`
 
