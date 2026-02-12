@@ -1,91 +1,71 @@
 
-# Criar Categoria "Pagamentos" na Documentacao da API
 
-## Resumo
+# Corrigir Documentacao e Logica do Webhook de Pagamento
 
-Adicionar uma nova categoria **Pagamentos** na documentacao da API com o endpoint `POST /api/pagamentos/webhook` (webhook-n8n-payment). Inclui documentacao completa de request/response, tabela de mapeamento de status do gateway para status Lojafy, e exemplos de erro.
+## Problema
 
----
+A documentacao e o plano anterior confundem dois conceitos distintos:
+
+- **payment_status** (ingles): status do pagamento (pending, paid, failed, expired) - eh o que este webhook atualiza
+- **status** (portugues): status do pedido (pendente, recebido, cancelado, etc.) - NAO deve ser alterado diretamente por este webhook
+
+Alem disso, o campo principal para localizar o pedido eh `paymentId` (busca por `orders.payment_id`), nao `external_reference` (que eh apenas fallback).
 
 ## Alteracoes
 
-### 1. `src/data/apiEndpointsData.ts`
+### 1. `src/data/apiEndpointsData.ts` - Corrigir documentacao
 
-Criar o array `paymentsEndpoints` com um endpoint:
+Atualizar o endpoint de pagamentos para refletir a realidade:
 
-- **POST webhook-n8n-payment** - Recebe notificacao de pagamento e atualiza o status do pedido
-  - Headers: Content-Type application/json
-  - Request body: paymentId, status, amount, external_reference
-  - Query params: nenhum
-  - Response 200: success com dados do pedido atualizado (pedido_id, status_anterior, status_novo, payment_id)
-  - Erros: 400 (validacao), 404 (pedido nao encontrado), 500 (erro interno)
+- **Campo principal**: `paymentId` (obrigatorio) - usado para localizar o pedido via `orders.payment_id`
+- **Campo secundario**: `external_reference` (opcional) - fallback caso nao encontre por paymentId
+- **Descricao**: Deixar claro que atualiza o `payment_status` (ingles), nao o `status` do pedido
+- **Mapeamento de status**: Corrigir para mostrar apenas o mapeamento do payment_status
 
-Adicionar a categoria no array `apiEndpointsData`:
+Mapeamento correto:
+
+| Status Recebido | payment_status (atualizado) |
+|-----------------|---------------------------|
+| approved        | paid                      |
+| pending         | pending                   |
+| in_process      | pending                   |
+| rejected        | failed                    |
+| cancelled       | failed                    |
+
+- **Response exemplo**: Corrigir para mostrar payment_status anterior/novo em vez de status do pedido
+- **Campos obrigatorios**: `paymentId` e `status` (conforme validacao real do codigo)
+
+### 2. `supabase/functions/webhook-n8n-payment/index.ts` - Corrigir logica
+
+O switch case atual altera o campo `status` (do pedido) junto com `payment_status`. A correcao:
+
+- **Manter** a atualizacao do `payment_status` (em ingles, como ja esta: paid, pending, failed)
+- **NAO alterar** o campo `status` do pedido (remover `newStatus` do switch)
+- Excecao: quando `approved`, o status do pedido pode ir para `recebido` (em portugues) pois eh a transicao logica de pagamento confirmado
+
+Logica corrigida do switch:
+```text
+approved  -> payment_status = 'paid', status = 'recebido'
+pending   -> payment_status = 'pending' (nao altera status do pedido)
+rejected  -> payment_status = 'failed' (nao altera status do pedido)
+cancelled -> payment_status = 'failed' (nao altera status do pedido)
 ```
-{
-  id: 'payments',
-  title: 'Pagamentos',
-  endpoints: paymentsEndpoints
-}
-```
 
-### 2. `src/components/admin/ApiDocsSidebar.tsx`
-
-Adicionar icone para a nova categoria no mapa `categoryIcons`:
-```
-payments: CreditCard
-```
-
-Importar `CreditCard` do lucide-react.
-
-### 3. `src/components/admin/ApiDocsContent.tsx`
-
-Adicionar case `payments` na funcao `getCategoryTitle`:
-```
-case 'payments': return {
-  title: 'Endpoints de Pagamentos',
-  desc: 'Integracoes com gateways de pagamento para atualizacao automatica de status de pedidos'
-};
-```
-
-### 4. `src/components/admin/ApiDocsContent.tsx` - Secao Introducao
-
-Adicionar card de "Pagamentos" na grid de categorias da IntroSection, com icone de cartao e descricao "Webhooks de gateways de pagamento".
+O update no banco tambem precisa usar status em portugues quando alterar o campo `status`.
 
 ---
 
 ## Detalhes Tecnicos
 
-### Endpoint documentado
+### Validacao real do codigo (linha 43-48)
+O codigo valida `paymentId` e `status` como obrigatorios, nao `external_reference`.
 
-```
-POST /functions/v1/webhook-n8n-payment
-```
+### Busca do pedido (linha 54-57)
+Busca principal: `orders.payment_id = paymentId`
+Fallback (linha 73): `orders.external_reference = external_reference` (apenas se nao encontrar pelo payment_id)
 
-### Campos do request body
+### Campos que serao atualizados no banco
+- `payment_status`: paid, pending, failed (INGLES - constraint separada)
+- `status`: recebido (PORTUGUES - apenas quando approved, constraint orders_status_check)
+- `updated_at`: timestamp
 
-| Campo | Tipo | Obrigatorio | Descricao |
-|-------|------|-------------|-----------|
-| paymentId | string | Nao | ID do pagamento no gateway |
-| status | string | Sim | Status do pagamento (approved, pending, rejected, etc.) |
-| amount | number | Nao | Valor pago |
-| external_reference | string | Sim | Referencia do pedido na Lojafy |
-
-### Mapeamento de status
-
-| Status Recebido | Acao na Lojafy |
-|-----------------|----------------|
-| approved | Pedido -> recebido (pago) |
-| pending | Pedido permanece pendente |
-| in_process | Pedido permanece pendente |
-| rejected | Pedido -> cancelado |
-| refunded | Pedido -> reembolsado |
-| cancelled | Pedido -> cancelado |
-
-### Exemplos de erro documentados
-
-- 400: Campo external_reference obrigatorio
-- 404: Pedido nao encontrado
-- 500: Erro ao processar pagamento
-
-Nenhuma alteracao de banco de dados e necessaria - o endpoint webhook-n8n-payment ja existe e funciona. Esta e apenas uma alteracao de documentacao.
