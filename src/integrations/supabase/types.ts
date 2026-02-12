@@ -4009,6 +4009,18 @@ export type Database = {
           video_completed_count: number
         }[]
       }
+      get_notification_logs: {
+        Args: { p_limit?: number; p_type_filter?: string }
+        Returns: {
+          message: string
+          read_rate: number
+          sent_at: string
+          title: string
+          total_read: number
+          total_sent: number
+          type: string
+        }[]
+      }
       get_safe_demo_user_data: {
         Args: never
         Returns: {
