@@ -1,53 +1,60 @@
 
+# Log de Notificacoes Automaticas
 
-# Corrigir Notificacoes da Plataforma
+## Contexto
 
-## Problemas Encontrados
+As notificacoes automaticas (produto desativado, pedido enviado, etc.) estao funcionando corretamente. O produto desativado gerou 268 notificacoes. Porem, essas notificacoes nao aparecem na aba "Historico" porque ela so consulta a tabela `notification_campaigns` (envios manuais). As notificacoes automaticas sao inseridas diretamente na tabela `notifications` pelos triggers.
 
-1. **Notificacoes de pedidos nao disparam**: As funcoes de trigger comparam status em ingles (`confirmed`, `shipped`, etc.) mas o banco usa portugues (`recebido`, `enviado`, etc.).
-2. **Produto desativado nao notifica ninguem**: A funcao `notify_product_removed` so notifica quem favoritou o produto. Se ninguem favoritou, ninguem recebe.
+## Alteracao
 
-## Alteracoes
+### Adicionar aba "Log de Notificacoes" na pagina de Gerenciamento de Notificacoes
 
-### 1. Migracao SQL - Corrigir status nas funcoes de pedido
+Nova aba que consulta a tabela `notifications` agrupando por tipo + titulo + mensagem (nao por usuario), exibindo:
 
-Recriar 4 funcoes com os status corretos:
+- Tipo da notificacao (badge colorido)
+- Titulo
+- Mensagem (truncada)
+- Total enviado
+- Total lido
+- Taxa de leitura (%)
+- Data/hora do envio
 
-| Funcao | Status atual (errado) | Status correto |
-|--------|----------------------|----------------|
-| `notify_order_confirmed` | `confirmed` | `recebido` |
-| `notify_order_shipped` | `shipped` | `enviado` |
-| `notify_order_delivered` | `delivered` | `finalizado` |
-| `notify_order_expired` | `cancelled` / `expired` | `cancelado` / `expired` |
+### Arquivo: `src/pages/admin/NotificationsManagement.tsx`
 
-Recriar o trigger `trigger_notify_order_expired` com WHEN corrigido para `NEW.status = 'cancelado'`.
-
-### 2. Migracao SQL - Produto desativado notifica todos os clientes
-
-Atualizar `notify_product_removed` para enviar notificacao a **todos os clientes ativos** (tabela `profiles` com `role = 'customer' AND is_active = true`) em vez de consultar apenas a tabela `favorites`.
+1. Adicionar nova aba "Log" no `TabsList`
+2. Criar `TabsContent` com tabela agrupada
+3. Adicionar estado e funcao para buscar os dados agrupados da tabela `notifications`
+4. A consulta SQL agrupara por `type`, `title`, `message` e retornara contagens agregadas (total enviado, total lido)
+5. Adicionar filtro por tipo de notificacao (product_removed, order_shipped, new_lesson, etc.)
 
 ### Detalhes tecnicos
 
-**Funcoes de pedido** - cada uma sera recriada com `CREATE OR REPLACE FUNCTION` trocando a string de comparacao de status.
+A consulta usara o Supabase client com RPC ou query direta. Como o Supabase JS nao suporta GROUP BY nativamente, sera criada uma funcao RPC no banco:
 
-**Trigger de pedido expirado** - precisa ser dropado e recriado pois a clausula WHEN faz parte da definicao do trigger:
+**Nova funcao SQL `get_notification_logs`:**
+- Agrupa notificacoes por `type`, `title`, `message`
+- Retorna: type, title, message, total_sent (COUNT), total_read (COUNT WHERE is_read=true), read_rate (%), first_sent_at (MIN created_at)
+- Ordenado por data mais recente
+- Limite de 100 registros
 
-```text
-DROP TRIGGER IF EXISTS trigger_notify_order_expired ON public.orders;
-CREATE TRIGGER trigger_notify_order_expired 
-  AFTER UPDATE ON public.orders 
-  FOR EACH ROW 
-  WHEN (NEW.status = 'cancelado' AND NEW.payment_status = 'expired')
-  EXECUTE FUNCTION notify_order_expired();
-```
-
-**Produto desativado** - a funcao `notify_product_removed` deixa de filtrar por `favorites` e passa a inserir notificacoes para todos os clientes ativos:
+**Migracao SQL:**
 
 ```text
-INSERT INTO notifications (user_id, title, message, type, metadata)
-SELECT 
-  p.user_id, ...
-FROM profiles p
-WHERE p.role = 'customer' AND p.is_active = true;
+CREATE OR REPLACE FUNCTION get_notification_logs(p_limit integer DEFAULT 100)
+RETURNS TABLE(
+  type text,
+  title text, 
+  message text,
+  total_sent bigint,
+  total_read bigint,
+  read_rate numeric,
+  sent_at timestamptz
+)
 ```
 
+**Frontend:**
+- Nova aba "Log" com icone de lista
+- Tabela com colunas: Tipo | Titulo | Mensagem | Enviados | Lidos | Taxa | Data
+- Badges coloridos por tipo (product_removed = vermelho, order_shipped = azul, new_lesson = verde, etc.)
+- Filtro dropdown por tipo de notificacao
+- Botao de refresh
