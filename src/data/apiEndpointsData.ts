@@ -1261,7 +1261,7 @@ const paymentsEndpoints: EndpointData[] = [
     title: 'Atualizar Status de Pagamento',
     method: 'POST',
     url: '/functions/v1/webhook-n8n-payment',
-    description: 'Recebe notificação de pagamento do gateway e atualiza o status do pedido correspondente. Mapeia automaticamente o status do gateway (approved, rejected, refunded, etc.) para o status interno da Lojafy. Quando o pagamento é aprovado, dispara notificações para cliente e fornecedor.',
+    description: 'Recebe notificação de pagamento do gateway e atualiza o payment_status do pedido. O campo paymentId é usado para localizar o pedido via orders.payment_id. O campo external_reference é um fallback opcional. Quando o pagamento é aprovado (payment_status = paid), o status do pedido muda para "recebido" e o webhook order.paid é disparado.',
     headers: [
       { name: 'Content-Type', description: 'Tipo do conteúdo', example: 'application/json', required: true }
     ],
@@ -1271,34 +1271,30 @@ const paymentsEndpoints: EndpointData[] = [
       amount: 19.98,
       external_reference: 'order_1770861871469_2931ba56',
       _campos: {
-        paymentId: 'string (opcional) - ID do pagamento no gateway',
-        status: 'string (obrigatório) - approved, pending, in_process, rejected, refunded, cancelled',
+        paymentId: 'string (obrigatório) - ID do pagamento no gateway. Usado para buscar o pedido via orders.payment_id',
+        status: 'string (obrigatório) - Status do pagamento: approved, pending, in_process, rejected, cancelled',
         amount: 'number (opcional) - Valor pago',
-        external_reference: 'string (obrigatório) - Referência do pedido na Lojafy'
+        external_reference: 'string (opcional) - Referência externa. Usado como fallback se não encontrar por paymentId'
       },
-      _mapeamento_status: {
-        approved: 'Pedido → recebido (pago)',
-        pending: 'Pedido permanece pendente',
-        in_process: 'Pedido permanece pendente',
-        rejected: 'Pedido → cancelado',
-        refunded: 'Pedido → reembolsado',
-        cancelled: 'Pedido → cancelado'
+      _mapeamento_payment_status: {
+        approved: 'payment_status → paid (status do pedido → recebido)',
+        pending: 'payment_status → pending (status do pedido não muda)',
+        in_process: 'payment_status → pending (status do pedido não muda)',
+        rejected: 'payment_status → failed (status do pedido não muda)',
+        cancelled: 'payment_status → failed (status do pedido não muda)'
       }
     },
     responseExample: {
       success: true,
-      message: 'Pagamento processado com sucesso',
-      data: {
-        pedido_id: 'uuid-do-pedido',
-        status_anterior: 'pendente',
-        status_novo: 'recebido',
-        payment_id: '145209389269'
-      }
+      order_id: 'uuid-do-pedido',
+      order_number: 'ORD-20250212-000001',
+      new_status: 'recebido',
+      payment_status: 'paid'
     },
     errorExamples: [
-      { code: 400, title: 'Erro de Validação', description: 'Campo obrigatório não informado', example: { success: false, error: 'Campo external_reference é obrigatório' } },
-      { code: 404, title: 'Pedido Não Encontrado', description: 'external_reference não corresponde a nenhum pedido', example: { success: false, error: 'Pedido não encontrado', external_reference: 'order_1770861871469_2931ba56' } },
-      { code: 500, title: 'Erro Interno', description: 'Falha ao processar o pagamento', example: { success: false, error: 'Erro ao processar pagamento' } }
+      { code: 400, title: 'Erro de Validação', description: 'Campos obrigatórios não informados', example: { error: 'Missing required fields: paymentId and status are required' } },
+      { code: 404, title: 'Pedido Não Encontrado', description: 'paymentId não corresponde a nenhum pedido', example: { error: 'Order not found for payment ID: 145209389269' } },
+      { code: 500, title: 'Erro Interno', description: 'Falha ao processar o pagamento', example: { error: 'Failed to update order status' } }
     ]
   }
 ];
