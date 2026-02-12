@@ -5,6 +5,7 @@ export interface EndpointData {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   url: string;
   description: string;
+  isWebhookEvent?: boolean;
   headers?: Array<{
     name: string;
     description: string;
@@ -1130,6 +1131,7 @@ const webhookEventsEndpoints: EndpointData[] = [
     title: 'Evento: order.paid',
     method: 'POST',
     url: 'URL configurada pelo usuário',
+    isWebhookEvent: true,
     description: 'Disparado quando um pedido é confirmado como pago. Inclui dados completos do pedido, itens, cliente, revendedor e URL da etiqueta de envio (válida por 7 dias).',
     headers: [
       { name: 'X-Webhook-Signature', description: 'HMAC-SHA256 do payload usando secret_token', example: 'sha256=a1b2c3d4...', required: true },
@@ -1166,6 +1168,7 @@ const webhookEventsEndpoints: EndpointData[] = [
     title: 'Evento: user.created',
     method: 'POST',
     url: 'URL configurada pelo usuário',
+    isWebhookEvent: true,
     description: 'Disparado quando um novo usuário é criado na plataforma via API ou painel.',
     headers: [
       { name: 'X-Webhook-Signature', description: 'HMAC-SHA256 do payload usando secret_token', example: 'sha256=a1b2c3d4...', required: true },
@@ -1188,6 +1191,7 @@ const webhookEventsEndpoints: EndpointData[] = [
     title: 'Evento: user.inactive (7/15/30 dias)',
     method: 'POST',
     url: 'URL configurada pelo usuário',
+    isWebhookEvent: true,
     description: 'Disparado automaticamente quando um usuário fica inativo por 7, 15 ou 30 dias. Eventos separados: user.inactive.7days, user.inactive.15days, user.inactive.30days.',
     headers: [
       { name: 'X-Webhook-Signature', description: 'HMAC-SHA256 do payload usando secret_token', example: 'sha256=a1b2c3d4...', required: true },

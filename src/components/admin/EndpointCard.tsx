@@ -34,6 +34,7 @@ interface EndpointData {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   url: string;
   description: string;
+  isWebhookEvent?: boolean;
   headers?: HeaderParam[];
   requestBody?: any;
   queryParams?: QueryParam[];
@@ -66,7 +67,8 @@ export const EndpointCard: React.FC<EndpointCardProps> = ({ endpoint }) => {
     }
   };
 
-  const fullUrl = `https://bbrmjrjorcgsgeztzbsr.supabase.co${endpoint.url}`;
+  const isWebhook = endpoint.isWebhookEvent;
+  const fullUrl = isWebhook ? 'https://sua-url-de-webhook.com/endpoint' : `https://bbrmjrjorcgsgeztzbsr.supabase.co${endpoint.url}`;
 
   return (
     <Card>
@@ -78,16 +80,18 @@ export const EndpointCard: React.FC<EndpointCardProps> = ({ endpoint }) => {
             </Badge>
             <CardTitle className="text-xl">{endpoint.title}</CardTitle>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => copyToClipboard(fullUrl, 'URL do endpoint')}
-            >
-              <Copy className="h-4 w-4 mr-2" />
-              Copiar URL
-            </Button>
-          </div>
+          {!isWebhook && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => copyToClipboard(fullUrl, 'URL do endpoint')}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Copiar URL
+              </Button>
+            </div>
+          )}
         </div>
         <CardDescription>{endpoint.description}</CardDescription>
       </CardHeader>
@@ -97,10 +101,16 @@ export const EndpointCard: React.FC<EndpointCardProps> = ({ endpoint }) => {
         <div>
           <div className="flex items-center gap-2 mb-2">
             <Code className="h-4 w-4" />
-            <span className="font-medium">Endpoint</span>
+            <span className="font-medium">{isWebhook ? 'Destino' : 'Endpoint'}</span>
           </div>
           <div className="bg-muted p-3 rounded-lg">
-            <code className="text-sm break-all">{fullUrl}</code>
+            {isWebhook ? (
+              <span className="text-sm text-muted-foreground">
+                ↳ URL configurada pelo usuário na seção <strong>Webhooks</strong> abaixo. O sistema Lojafy envia o POST para essa URL quando o evento ocorre.
+              </span>
+            ) : (
+              <code className="text-sm break-all">{fullUrl}</code>
+            )}
           </div>
         </div>
 
@@ -191,10 +201,14 @@ export const EndpointCard: React.FC<EndpointCardProps> = ({ endpoint }) => {
               variant="ghost"
               size="sm"
               onClick={() => {
-                const queryString = endpoint.queryParams && endpoint.queryParams.length > 0
+                const targetUrl = isWebhook ? 'https://sua-url-de-webhook.com/endpoint' : fullUrl;
+                const queryString = !isWebhook && endpoint.queryParams && endpoint.queryParams.length > 0
                   ? '?' + endpoint.queryParams.map(p => `${p.name}=${p.example}`).join('&')
                   : '';
-                const curlCommand = `curl -X ${endpoint.method} "${fullUrl}${queryString}" \\\n  -H "X-API-Key: sua_chave_aqui" \\\n  -H "Content-Type: application/json"${
+                const headers = isWebhook
+                  ? `  -H "X-Webhook-Signature: sha256=a1b2c3d4..." \\\n  -H "X-Webhook-Event: ${endpoint.title.replace('Evento: ', '')}" \\\n  -H "Content-Type: application/json"`
+                  : `  -H "X-API-Key: sua_chave_aqui" \\\n  -H "Content-Type: application/json"`;
+                const curlCommand = `curl -X ${endpoint.method} "${targetUrl}${queryString}" \\\n${headers}${
                   endpoint.requestBody
                     ? ` \\\n  -d '${JSON.stringify(endpoint.requestBody, null, 2)}'`
                     : ''
@@ -209,17 +223,20 @@ export const EndpointCard: React.FC<EndpointCardProps> = ({ endpoint }) => {
           <div className="bg-muted p-3 rounded-lg">
             <pre className="text-xs overflow-x-auto">
               <code>
-{`curl -X ${endpoint.method} "${fullUrl}${
-  endpoint.queryParams && endpoint.queryParams.length > 0
+{(() => {
+  const targetUrl = isWebhook ? 'https://sua-url-de-webhook.com/endpoint' : fullUrl;
+  const queryString = !isWebhook && endpoint.queryParams && endpoint.queryParams.length > 0
     ? '?' + endpoint.queryParams.map(p => `${p.name}=${p.example}`).join('&')
-    : ''
-}" \\
-  -H "X-API-Key: sua_chave_aqui" \\
-  -H "Content-Type: application/json"${
-  endpoint.requestBody
-    ? `\n  -d '${JSON.stringify(endpoint.requestBody, null, 2)}'`
-    : ''
-}`}
+    : '';
+  const headers = isWebhook
+    ? `  -H "X-Webhook-Signature: sha256=a1b2c3d4..." \\\n  -H "X-Webhook-Event: ${endpoint.title.replace('Evento: ', '')}" \\\n  -H "Content-Type: application/json"`
+    : `  -H "X-API-Key: sua_chave_aqui" \\\n  -H "Content-Type: application/json"`;
+  return `curl -X ${endpoint.method} "${targetUrl}${queryString}" \\\n${headers}${
+    endpoint.requestBody
+      ? `\n  -d '${JSON.stringify(endpoint.requestBody, null, 2)}'`
+      : ''
+  }`;
+})()}
               </code>
             </pre>
           </div>
