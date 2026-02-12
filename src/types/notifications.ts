@@ -53,7 +53,8 @@ export type AutomaticTriggerType =
   | 'order_shipped'
   | 'order_delivered'
   | 'new_lesson'
-  | 'course_completed';
+  | 'course_completed'
+  | 'product_removed';
 
 export interface NotificationTemplate {
   id: string;
