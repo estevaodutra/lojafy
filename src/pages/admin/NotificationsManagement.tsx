@@ -170,6 +170,7 @@ export default function NotificationsManagement() {
       'favorites_only': '⭐ Usuários com produto favoritado',
       'enrolled_only': '🎓 Alunos matriculados',
       'customer_only': '👤 Cliente específico',
+      'all_customers': '👥 Todos os clientes',
     };
     return labels[audience] || audience;
   };
@@ -184,6 +185,7 @@ export default function NotificationsManagement() {
     order_delivered: 'Pedido entregue',
     new_lesson: 'Nova aula',
     course_completed: 'Curso concluído',
+    product_removed: 'Produto indisponível',
   };
 
   return (
