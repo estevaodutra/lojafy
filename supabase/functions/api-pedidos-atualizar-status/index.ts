@@ -19,20 +19,6 @@ const VALID_STATUSES = [
   'reembolsado'
 ];
 
-// Transições permitidas
-const STATUS_TRANSITIONS: Record<string, string[]> = {
-  pendente: ['recebido', 'cancelado'],
-  recebido: ['em_preparacao', 'em_falta', 'cancelado'],
-  em_preparacao: ['embalado', 'em_reposicao', 'em_falta', 'cancelado'],
-  embalado: ['enviado', 'em_reposicao', 'cancelado'],
-  enviado: ['finalizado', 'cancelado'],
-  em_reposicao: ['em_preparacao', 'embalado', 'enviado', 'cancelado'],
-  em_falta: ['cancelado', 'reembolsado'],
-  finalizado: ['reembolsado'],
-  cancelado: ['reembolsado'],
-  reembolsado: [],
-};
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -124,18 +110,6 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ success: false, error: 'Pedido não encontrado' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Validate transition
-    const allowedTransitions = STATUS_TRANSITIONS[order.status] || [];
-    if (!allowedTransitions.includes(status)) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: `Transição não permitida: ${order.status} → ${status}. Transições válidas: ${allowedTransitions.join(', ')}` 
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
