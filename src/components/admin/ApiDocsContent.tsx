@@ -161,6 +161,13 @@ const IntroSection: React.FC = () => (
               <p className="text-xs text-muted-foreground">Produtos para marketplaces</p>
             </div>
           </div>
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+            <span className="text-2xl">💳</span>
+            <div>
+              <p className="font-medium">Pagamentos</p>
+              <p className="text-xs text-muted-foreground">Webhooks de gateways de pagamento</p>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -393,6 +400,7 @@ const isValid = crypto.timingSafeEqual(
       case 'ranking': return { title: 'Endpoints de Ranking & Demo', desc: 'Gerencie dados de demonstração e ranking de produtos' };
       case 'academy': return { title: 'Endpoints da Academy', desc: 'API completa para gestão de cursos, matrículas e progresso' };
       case 'integra': return { title: 'Endpoints Lojafy Integra', desc: 'API para gestão de produtos em marketplaces (Mercado Livre, Shopee, Amazon, etc.)' };
+      case 'payments': return { title: 'Endpoints de Pagamentos', desc: 'Integrações com gateways de pagamento para atualização automática de status de pedidos' };
       default: return { title: 'Endpoints', desc: '' };
     }
   };

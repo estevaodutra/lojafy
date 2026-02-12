@@ -1255,6 +1255,54 @@ const logsEndpoints: EndpointData[] = [
   }
 ];
 
+// Payments Endpoints
+const paymentsEndpoints: EndpointData[] = [
+  {
+    title: 'Atualizar Status de Pagamento',
+    method: 'POST',
+    url: '/functions/v1/webhook-n8n-payment',
+    description: 'Recebe notificação de pagamento do gateway e atualiza o status do pedido correspondente. Mapeia automaticamente o status do gateway (approved, rejected, refunded, etc.) para o status interno da Lojafy. Quando o pagamento é aprovado, dispara notificações para cliente e fornecedor.',
+    headers: [
+      { name: 'Content-Type', description: 'Tipo do conteúdo', example: 'application/json', required: true }
+    ],
+    requestBody: {
+      paymentId: '145209389269',
+      status: 'approved',
+      amount: 19.98,
+      external_reference: 'order_1770861871469_2931ba56',
+      _campos: {
+        paymentId: 'string (opcional) - ID do pagamento no gateway',
+        status: 'string (obrigatório) - approved, pending, in_process, rejected, refunded, cancelled',
+        amount: 'number (opcional) - Valor pago',
+        external_reference: 'string (obrigatório) - Referência do pedido na Lojafy'
+      },
+      _mapeamento_status: {
+        approved: 'Pedido → recebido (pago)',
+        pending: 'Pedido permanece pendente',
+        in_process: 'Pedido permanece pendente',
+        rejected: 'Pedido → cancelado',
+        refunded: 'Pedido → reembolsado',
+        cancelled: 'Pedido → cancelado'
+      }
+    },
+    responseExample: {
+      success: true,
+      message: 'Pagamento processado com sucesso',
+      data: {
+        pedido_id: 'uuid-do-pedido',
+        status_anterior: 'pendente',
+        status_novo: 'recebido',
+        payment_id: '145209389269'
+      }
+    },
+    errorExamples: [
+      { code: 400, title: 'Erro de Validação', description: 'Campo obrigatório não informado', example: { success: false, error: 'Campo external_reference é obrigatório' } },
+      { code: 404, title: 'Pedido Não Encontrado', description: 'external_reference não corresponde a nenhum pedido', example: { success: false, error: 'Pedido não encontrado', external_reference: 'order_1770861871469_2931ba56' } },
+      { code: 500, title: 'Erro Interno', description: 'Falha ao processar o pagamento', example: { success: false, error: 'Erro ao processar pagamento' } }
+    ]
+  }
+];
+
 // Export organized data structure
 export const apiEndpointsData: EndpointCategory[] = [
   {
@@ -1290,6 +1338,11 @@ export const apiEndpointsData: EndpointCategory[] = [
       { id: 'academy-enrollments', title: 'Matrículas', endpoints: academyEnrollmentEndpoints },
       { id: 'academy-progress', title: 'Progresso', endpoints: academyProgressEndpoints }
     ]
+  },
+  {
+    id: 'payments',
+    title: 'Pagamentos',
+    endpoints: paymentsEndpoints
   },
   {
     id: 'integra',
