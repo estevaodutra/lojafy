@@ -276,11 +276,113 @@ export const ApiDocsContent: React.FC<ApiDocsContentProps> = ({
   }
 
   if (selectedSection === 'webhooks') {
-    return <WebhooksSection />;
+    return (
+      <div className="space-y-8">
+        <div>
+          <h2 className="text-2xl font-bold mb-2">Webhooks</h2>
+          <p className="text-muted-foreground">
+            Configure URLs para receber notificações automáticas quando eventos ocorrem na plataforma.
+            Todos os payloads são assinados com HMAC-SHA256 para validação de autenticidade.
+          </p>
+        </div>
+
+        {/* Validation info */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Validação HMAC-SHA256
+            </CardTitle>
+            <CardDescription>
+              Todos os webhooks incluem headers de segurança para validação
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid gap-2">
+              <div className="flex items-start gap-3 p-2 rounded bg-muted/50">
+                <Badge variant="secondary" className="shrink-0 mt-0.5 font-mono text-xs">X-Webhook-Signature</Badge>
+                <p className="text-sm text-muted-foreground">HMAC-SHA256(payload_json, secret_token)</p>
+              </div>
+              <div className="flex items-start gap-3 p-2 rounded bg-muted/50">
+                <Badge variant="secondary" className="shrink-0 mt-0.5 font-mono text-xs">X-Webhook-Event</Badge>
+                <p className="text-sm text-muted-foreground">Tipo do evento (ex: order.paid)</p>
+              </div>
+              <div className="flex items-start gap-3 p-2 rounded bg-muted/50">
+                <Badge variant="secondary" className="shrink-0 mt-0.5 font-mono text-xs">X-Webhook-Timestamp</Badge>
+                <p className="text-sm text-muted-foreground">Timestamp ISO-8601 do disparo</p>
+              </div>
+            </div>
+            <CodeBlock
+              code={`// Exemplo de validação em Node.js
+const crypto = require('crypto');
+const signature = req.headers['x-webhook-signature'];
+const expected = 'sha256=' + crypto
+  .createHmac('sha256', SECRET_TOKEN)
+  .update(JSON.stringify(req.body))
+  .digest('hex');
+const isValid = crypto.timingSafeEqual(
+  Buffer.from(signature), Buffer.from(expected)
+);`}
+              language="javascript"
+            />
+          </CardContent>
+        </Card>
+
+        {/* Events documentation */}
+        <div>
+          <h3 className="text-xl font-semibold mb-4">📡 Eventos Disponíveis</h3>
+          <div className="grid gap-6">
+            {endpoints.length > 0 ? (
+              endpoints.map((endpoint, index) => (
+                <EndpointCard key={`evt-${index}`} endpoint={endpoint} />
+              ))
+            ) : null}
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Interactive management */}
+        <div>
+          <h3 className="text-xl font-semibold mb-4">⚙️ Gerenciamento de Webhooks</h3>
+          <WebhooksSection />
+        </div>
+      </div>
+    );
   }
 
   if (selectedSection === 'logs') {
-    return <ApiLogsSection />;
+    return (
+      <div className="space-y-8">
+        <div>
+          <h2 className="text-2xl font-bold mb-2">Logs</h2>
+          <p className="text-muted-foreground">
+            Sistema de monitoramento centralizado com retenção automática de 7 dias. 
+            Registra todas as chamadas de API e disparos de webhook para debugging e auditoria.
+          </p>
+        </div>
+
+        {/* Logs schema documentation */}
+        <div>
+          <h3 className="text-xl font-semibold mb-4">📋 Estrutura dos Logs</h3>
+          <div className="grid gap-6">
+            {endpoints.length > 0 ? (
+              endpoints.map((endpoint, index) => (
+                <EndpointCard key={`log-${index}`} endpoint={endpoint} />
+              ))
+            ) : null}
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Interactive logs viewer */}
+        <div>
+          <h3 className="text-xl font-semibold mb-4">🔍 Visualizador de Logs</h3>
+          <ApiLogsSection />
+        </div>
+      </div>
+    );
   }
 
   // Endpoint sections
