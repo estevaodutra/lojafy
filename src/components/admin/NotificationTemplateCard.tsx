@@ -24,6 +24,7 @@ const TRIGGER_ICONS = {
   new_lesson: BookOpen,
   course_completed: GraduationCap,
   product_removed: AlertCircle,
+  product_reactivated: Package,
 };
 
 const TRIGGER_LABELS = {
@@ -37,6 +38,7 @@ const TRIGGER_LABELS = {
   new_lesson: 'Nova aula',
   course_completed: 'Curso concluído',
   product_removed: 'Produto indisponível',
+  product_reactivated: 'Produto reativado',
 };
 
 export const NotificationTemplateCard = ({ template, onToggle, onEdit, onManualTrigger }: NotificationTemplateCardProps) => {
