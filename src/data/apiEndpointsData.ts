@@ -156,7 +156,7 @@ const ordersEndpoints: EndpointData[] = [
     title: 'Atualizar Status do Pedido',
     method: 'PUT',
     url: '/functions/v1/api-pedidos-atualizar-status',
-    description: 'Atualiza o status de um pedido pelo número do pedido. Aceita qualquer um dos 10 status válidos do sistema, sem restrição de transição. Suporta campos opcionais previsao_envio (obrigatório para em_reposicao) e motivo.',
+    description: 'Atualiza o status de um pedido pelo número do pedido. Valida transições permitidas entre status. Suporta campos opcionais previsao_envio (obrigatório para em_reposicao) e motivo.',
     headers: [
       { name: 'X-API-Key', description: 'Chave de API com permissão pedidos.write', example: 'sk_...', required: true }
     ],
@@ -179,11 +179,23 @@ const ordersEndpoints: EndpointData[] = [
         tracking_number: 'BR123456789BR',
         updated_at: '2026-02-02T12:30:00Z'
       },
-      _status_disponiveis: 'pendente, recebido, em_preparacao, embalado, enviado, em_reposicao, em_falta, finalizado, cancelado, reembolsado'
+      _status_disponiveis: 'pendente, recebido, em_preparacao, embalado, enviado, em_reposicao, em_falta, finalizado, cancelado, reembolsado',
+      _transicoes: {
+        pendente: ['recebido', 'cancelado'],
+        recebido: ['em_preparacao', 'em_falta', 'cancelado'],
+        em_preparacao: ['embalado', 'em_reposicao', 'em_falta', 'cancelado'],
+        embalado: ['enviado', 'em_reposicao', 'cancelado'],
+        enviado: ['finalizado', 'cancelado'],
+        em_reposicao: ['em_preparacao', 'embalado', 'enviado', 'cancelado'],
+        em_falta: ['cancelado', 'reembolsado'],
+        finalizado: ['reembolsado'],
+        cancelado: ['reembolsado'],
+      }
     },
     errorExamples: [
       { code: 400, title: 'Campos obrigatórios', description: 'order_number ou status não informados', example: { success: false, error: 'order_number e status são obrigatórios' } },
       { code: 400, title: 'Status inválido', description: 'Status não está na lista permitida', example: { success: false, error: 'Status inválido. Use: pendente, recebido, em_preparacao, embalado, enviado, em_reposicao, em_falta, finalizado, cancelado, reembolsado' } },
+      { code: 400, title: 'Transição inválida', description: 'Transição de status não permitida', example: { success: false, error: 'Transição não permitida: pendente → finalizado. Transições válidas: recebido, cancelado' } },
       { code: 401, title: 'API Key inválida', description: 'Chave não fornecida ou inativa', example: { success: false, error: 'API Key inválida ou inativa' } },
       { code: 403, title: 'Sem permissão', description: 'API Key sem permissão pedidos.write', example: { success: false, error: 'Permissão pedidos.write não concedida' } },
       { code: 404, title: 'Pedido não encontrado', description: 'Número do pedido não existe', example: { success: false, error: 'Pedido não encontrado' } }

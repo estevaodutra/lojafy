@@ -1,52 +1,71 @@
 
 
-# Remover Validacao de Transicao da API de Status
+# Corrigir Documentacao e Logica do Webhook de Pagamento
 
 ## Problema
 
-A API `api-pedidos-atualizar-status` valida transicoes de status (ex: `recebido` so pode ir para `em_preparacao`, `em_falta` ou `cancelado`), enquanto o painel admin na pagina de pedidos permite selecionar **qualquer** status diretamente sem restricao.
+A documentacao e o plano anterior confundem dois conceitos distintos:
 
-Isso causa confusao: o fornecedor/integrador usando a API recebe erros ao tentar colocar um status que no painel funciona normalmente.
+- **payment_status** (ingles): status do pagamento (pending, paid, failed, expired) - eh o que este webhook atualiza
+- **status** (portugues): status do pedido (pendente, recebido, cancelado, etc.) - NAO deve ser alterado diretamente por este webhook
 
-## Solucao
+Alem disso, o campo principal para localizar o pedido eh `paymentId` (busca por `orders.payment_id`), nao `external_reference` (que eh apenas fallback).
 
-Remover a validacao de transicao da Edge Function `api-pedidos-atualizar-status`, mantendo apenas a validacao de que o status informado eh um dos 10 status validos do sistema.
+## Alteracoes
 
-## Alteracao
+### 1. `src/data/apiEndpointsData.ts` - Corrigir documentacao
 
-### `supabase/functions/api-pedidos-atualizar-status/index.ts`
+Atualizar o endpoint de pagamentos para refletir a realidade:
 
-Remover o bloco de validacao de transicao (linhas 130-139):
+- **Campo principal**: `paymentId` (obrigatorio) - usado para localizar o pedido via `orders.payment_id`
+- **Campo secundario**: `external_reference` (opcional) - fallback caso nao encontre por paymentId
+- **Descricao**: Deixar claro que atualiza o `payment_status` (ingles), nao o `status` do pedido
+- **Mapeamento de status**: Corrigir para mostrar apenas o mapeamento do payment_status
 
+Mapeamento correto:
+
+| Status Recebido | payment_status (atualizado) |
+|-----------------|---------------------------|
+| approved        | paid                      |
+| pending         | pending                   |
+| in_process      | pending                   |
+| rejected        | failed                    |
+| cancelled       | failed                    |
+
+- **Response exemplo**: Corrigir para mostrar payment_status anterior/novo em vez de status do pedido
+- **Campos obrigatorios**: `paymentId` e `status` (conforme validacao real do codigo)
+
+### 2. `supabase/functions/webhook-n8n-payment/index.ts` - Corrigir logica
+
+O switch case atual altera o campo `status` (do pedido) junto com `payment_status`. A correcao:
+
+- **Manter** a atualizacao do `payment_status` (em ingles, como ja esta: paid, pending, failed)
+- **NAO alterar** o campo `status` do pedido (remover `newStatus` do switch)
+- Excecao: quando `approved`, o status do pedido pode ir para `recebido` (em portugues) pois eh a transicao logica de pagamento confirmado
+
+Logica corrigida do switch:
 ```text
-// REMOVER este bloco:
-const allowedTransitions = STATUS_TRANSITIONS[order.status] || [];
-if (!allowedTransitions.includes(status)) {
-  return new Response(
-    JSON.stringify({ 
-      success: false, 
-      error: `Transição não permitida: ${order.status} → ${status}...` 
-    }),
-    { status: 400, ... }
-  );
-}
+approved  -> payment_status = 'paid', status = 'recebido'
+pending   -> payment_status = 'pending' (nao altera status do pedido)
+rejected  -> payment_status = 'failed' (nao altera status do pedido)
+cancelled -> payment_status = 'failed' (nao altera status do pedido)
 ```
 
-Tambem remover a constante `STATUS_TRANSITIONS` (linhas 22-33) que nao sera mais utilizada.
+O update no banco tambem precisa usar status em portugues quando alterar o campo `status`.
 
-A validacao que **permanece** eh a de status valido (linhas 106-113), que verifica se o status esta na lista `VALID_STATUSES`.
+---
 
-### Logica especial mantida
+## Detalhes Tecnicos
 
-- Se status = `em_reposicao`, continua exigindo `previsao_envio`
-- Se status = `em_falta`, continua desativando produtos vinculados
-- Historico de status continua sendo registrado
+### Validacao real do codigo (linha 43-48)
+O codigo valida `paymentId` e `status` como obrigatorios, nao `external_reference`.
 
-### Documentacao (`src/data/apiEndpointsData.ts`)
+### Busca do pedido (linha 54-57)
+Busca principal: `orders.payment_id = paymentId`
+Fallback (linha 73): `orders.external_reference = external_reference` (apenas se nao encontrar pelo payment_id)
 
-Atualizar a documentacao do endpoint para remover qualquer mencao a transicoes obrigatorias, deixando claro que qualquer status valido pode ser informado.
-
-## Resultado
-
-A API passa a funcionar igual ao painel: aceita qualquer status valido dos 10 disponiveis, sem restricao de transicao.
+### Campos que serao atualizados no banco
+- `payment_status`: paid, pending, failed (INGLES - constraint separada)
+- `status`: recebido (PORTUGUES - apenas quando approved, constraint orders_status_check)
+- `updated_at`: timestamp
 
