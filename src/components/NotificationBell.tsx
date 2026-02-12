@@ -29,8 +29,14 @@ const typeColors: Record<string, string> = {
 };
 
 export const NotificationBell = () => {
-  const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, unreadCount, loading, markAsRead, markAllAsReadSilent } = useNotifications();
   const navigate = useNavigate();
+
+  const handleOpenChange = (open: boolean) => {
+    if (open && unreadCount > 0) {
+      markAllAsReadSilent();
+    }
+  };
 
   const handleNotificationClick = (notification: any) => {
     if (!notification.is_read) {
@@ -44,7 +50,7 @@ export const NotificationBell = () => {
   const recentNotifications = notifications.slice(0, 10);
 
   return (
-    <Popover>
+    <Popover onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
@@ -60,19 +66,8 @@ export const NotificationBell = () => {
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-96 p-0" align="end">
-        <div className="flex items-center justify-between p-4 border-b">
+        <div className="p-4 border-b">
           <h3 className="font-semibold">Notificações</h3>
-          {unreadCount > 0 && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={markAllAsRead}
-              className="h-auto p-1 text-xs text-muted-foreground hover:text-primary"
-            >
-              <Check className="h-3 w-3 mr-1" />
-              Marcar todas como lidas
-            </Button>
-          )}
         </div>
 
         <ScrollArea className="h-[400px]">
