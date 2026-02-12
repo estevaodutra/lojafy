@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Bell, Send, History, TrendingUp, AlertCircle, BookOpen } from 'lucide-react';
+import { Bell, Send, History, TrendingUp, AlertCircle, BookOpen, List, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { useAdminNotifications } from '@/hooks/useAdminNotifications';
 import { useNotificationTemplates } from '@/hooks/useNotificationTemplates';
 import { useAllLessons } from '@/hooks/useAllLessons';
@@ -51,6 +52,9 @@ export default function NotificationsManagement() {
     total_unread: 0,
     sent_today: 0,
   });
+  const [notificationLogs, setNotificationLogs] = useState<any[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logTypeFilter, setLogTypeFilter] = useState<string>('all');
 
   const selectedTemplateData = templates.find(t => t.id === selectedDispatchTemplate);
   const { data: allLessons, isLoading: lessonsLoading } = useAllLessons();
@@ -71,6 +75,23 @@ export default function NotificationsManagement() {
     loadData();
   }, []);
 
+  const fetchNotificationLogs = useCallback(async (typeFilter?: string) => {
+    setLogsLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('get_notification_logs', {
+        p_type_filter: typeFilter === 'all' ? null : (typeFilter || null),
+        p_limit: 100,
+      });
+      if (error) throw error;
+      setNotificationLogs(data || []);
+    } catch (error) {
+      console.error('Error fetching notification logs:', error);
+      toast.error('Erro ao carregar log de notificações');
+    } finally {
+      setLogsLoading(false);
+    }
+  }, []);
+
   const loadData = async () => {
     const [historyData, statsData] = await Promise.all([
       fetchNotificationHistory(),
@@ -78,6 +99,7 @@ export default function NotificationsManagement() {
     ]);
     setHistory(historyData);
     setStats(statsData);
+    fetchNotificationLogs(logTypeFilter);
   };
 
   const onSubmit = async (data: NotificationFormData) => {
@@ -220,11 +242,15 @@ export default function NotificationsManagement() {
       </div>
 
       <Tabs defaultValue="send" className="space-y-6">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="send">Enviar Notificação</TabsTrigger>
           <TabsTrigger value="dispatcher">Disparador de Notificações</TabsTrigger>
           <TabsTrigger value="templates">Templates Automáticos</TabsTrigger>
           <TabsTrigger value="mandatory">Notificações Obrigatórias</TabsTrigger>
+          <TabsTrigger value="log">
+            <List className="h-4 w-4 mr-1" />
+            Log
+          </TabsTrigger>
           <TabsTrigger value="history">Histórico</TabsTrigger>
         </TabsList>
 
@@ -570,6 +596,142 @@ export default function NotificationsManagement() {
               </div>
             </>
           )}
+        </TabsContent>
+
+        {/* Log Tab */}
+        <TabsContent value="log" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <List className="h-5 w-5" />
+                    Log de Notificações
+                  </CardTitle>
+                  <CardDescription>
+                    Todas as notificações automáticas e manuais agrupadas por tipo
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={logTypeFilter}
+                    onValueChange={(value) => {
+                      setLogTypeFilter(value);
+                      fetchNotificationLogs(value);
+                    }}
+                  >
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Filtrar por tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os tipos</SelectItem>
+                      <SelectItem value="product_removed">🔴 Produto indisponível</SelectItem>
+                      <SelectItem value="new_product">🟢 Novo produto</SelectItem>
+                      <SelectItem value="order_confirmed">🔵 Pedido confirmado</SelectItem>
+                      <SelectItem value="order_shipped">📦 Pedido enviado</SelectItem>
+                      <SelectItem value="order_delivered">✅ Pedido entregue</SelectItem>
+                      <SelectItem value="order_expired">⏰ Pedido expirado</SelectItem>
+                      <SelectItem value="price_decrease">💰 Preço reduzido</SelectItem>
+                      <SelectItem value="price_increase">📈 Preço aumentado</SelectItem>
+                      <SelectItem value="back_in_stock">🔄 Voltou ao estoque</SelectItem>
+                      <SelectItem value="low_stock">⚠️ Estoque baixo</SelectItem>
+                      <SelectItem value="new_lesson">📚 Nova aula</SelectItem>
+                      <SelectItem value="custom">✏️ Personalizado</SelectItem>
+                      <SelectItem value="system">⚙️ Sistema</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => fetchNotificationLogs(logTypeFilter)}
+                    disabled={logsLoading}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${logsLoading ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {logsLoading ? (
+                <div className="text-center py-12">
+                  <RefreshCw className="h-8 w-8 mx-auto mb-4 text-muted-foreground animate-spin" />
+                  <p className="text-muted-foreground">Carregando log...</p>
+                </div>
+              ) : notificationLogs.length === 0 ? (
+                <div className="text-center py-12">
+                  <List className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground">Nenhuma notificação encontrada</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Título</TableHead>
+                      <TableHead className="hidden md:table-cell">Mensagem</TableHead>
+                      <TableHead className="text-center">Enviados</TableHead>
+                      <TableHead className="text-center">Lidos</TableHead>
+                      <TableHead className="text-center">Taxa</TableHead>
+                      <TableHead>Data</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {notificationLogs.map((log, index) => {
+                      const typeBadgeMap: Record<string, { label: string; variant: 'default' | 'destructive' | 'secondary' | 'outline' | 'success' | 'warning' }> = {
+                        product_removed: { label: 'Produto indisponível', variant: 'destructive' },
+                        new_product: { label: 'Novo produto', variant: 'success' },
+                        order_confirmed: { label: 'Pedido confirmado', variant: 'default' },
+                        order_shipped: { label: 'Pedido enviado', variant: 'default' },
+                        order_delivered: { label: 'Pedido entregue', variant: 'success' },
+                        order_expired: { label: 'Pedido expirado', variant: 'warning' },
+                        price_decrease: { label: 'Preço reduzido', variant: 'success' },
+                        price_increase: { label: 'Preço aumentado', variant: 'warning' },
+                        back_in_stock: { label: 'Voltou estoque', variant: 'default' },
+                        low_stock: { label: 'Estoque baixo', variant: 'warning' },
+                        new_lesson: { label: 'Nova aula', variant: 'default' },
+                        custom: { label: 'Personalizado', variant: 'secondary' },
+                        system: { label: 'Sistema', variant: 'secondary' },
+                      };
+                      const badge = typeBadgeMap[log.type] || { label: log.type, variant: 'outline' as const };
+                      
+                      return (
+                        <TableRow key={index}>
+                          <TableCell>
+                            <Badge variant={badge.variant} className="text-xs whitespace-nowrap">
+                              {badge.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="font-medium max-w-[200px] truncate">
+                            {log.title}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell max-w-[250px] truncate text-muted-foreground">
+                            {log.message}
+                          </TableCell>
+                          <TableCell className="text-center font-bold">
+                            {log.total_sent}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {log.total_read}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant={Number(log.read_rate) > 50 ? 'success' : 'outline'} className="text-xs">
+                              {log.read_rate}%
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground whitespace-nowrap">
+                            {formatDistanceToNow(new Date(log.sent_at), {
+                              addSuffix: true,
+                              locale: ptBR,
+                            })}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* History Tab */}
