@@ -121,45 +121,52 @@ serve(async (req) => {
       );
     }
 
-    // Map N8N status to our system status
-    let newStatus = orderData.status; // Keep current status as default
+    // Map N8N status to payment_status (English) and optionally order status (Portuguese)
+    let newStatus = orderData.status; // Keep current order status as default
     let paymentStatus = orderData.payment_status; // Keep current payment status as default
 
     switch (webhookData.status.toLowerCase()) {
       case 'approved':
-        newStatus = 'pending';
+        newStatus = 'recebido'; // Order status in Portuguese
         paymentStatus = 'paid';
-        console.log('Payment approved - order ready for shipping preparation');
+        console.log('Payment approved - order status → recebido, payment_status → paid');
         break;
       case 'pending':
-        newStatus = 'pending';
+      case 'in_process':
+        // Only update payment_status, don't change order status
         paymentStatus = 'pending';
-        console.log('Payment still pending');
+        console.log('Payment still pending - payment_status → pending');
         break;
       case 'rejected':
       case 'cancelled':
-        newStatus = 'cancelled';
+        // Only update payment_status, don't change order status
         paymentStatus = 'failed';
-        console.log('Payment rejected/cancelled');
+        console.log('Payment rejected/cancelled - payment_status → failed');
         break;
       default:
         console.log('Unknown payment status:', webhookData.status, '- keeping current status');
     }
 
-    console.log('Updating order status:', { 
+    console.log('Updating order:', { 
       orderId: orderData.id,
       from: { status: orderData.status, payment_status: orderData.payment_status },
       to: { status: newStatus, payment_status: paymentStatus }
     });
 
-    // Update order status - atomic update to prevent race conditions
+    // Update order - atomic update to prevent race conditions
+    const updateData: Record<string, string> = {
+      payment_status: paymentStatus,
+      updated_at: new Date().toISOString()
+    };
+    
+    // Only update order status if it changed (approved → recebido)
+    if (newStatus !== orderData.status) {
+      updateData.status = newStatus;
+    }
+
     const { data: updatedOrder, error: updateError } = await supabase
       .from('orders')
-      .update({
-        status: newStatus,
-        payment_status: paymentStatus,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', orderData.id)
       .neq('payment_status', 'paid')
       .select('id')
