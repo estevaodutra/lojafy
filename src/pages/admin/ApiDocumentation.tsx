@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { ApiDocsSidebar } from '@/components/admin/ApiDocsSidebar';
 import { ApiDocsContent } from '@/components/admin/ApiDocsContent';
 import { ApiDocsPagination } from '@/components/admin/ApiDocsPagination';
-import { apiEndpointsData } from '@/data/apiEndpointsData';
+import { apiEndpointsData, webhookEventsData, webhookEndpointsData, logsEndpointsData } from '@/data/apiEndpointsData';
 
 const ITEMS_PER_PAGE = 5;
 
@@ -13,12 +13,19 @@ const ApiDocumentation: React.FC = () => {
 
   // Get endpoints for the selected section
   const currentEndpoints = useMemo(() => {
+    // Special sections: webhooks shows events + endpoints, logs shows log schemas
+    if (selectedSection === 'webhooks') {
+      return [...webhookEventsData, ...webhookEndpointsData];
+    }
+    if (selectedSection === 'logs') {
+      return logsEndpointsData;
+    }
+
     const category = apiEndpointsData.find(cat => cat.id === selectedSection);
     if (category?.endpoints) {
       return category.endpoints;
     }
     if (category?.subcategories) {
-      // Flatten all subcategory endpoints
       return category.subcategories.flatMap(sub => sub.endpoints);
     }
     return [];

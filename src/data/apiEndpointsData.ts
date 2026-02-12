@@ -1069,6 +1069,188 @@ const integraProductsEndpoints: EndpointData[] = [
   }
 ];
 
+// Webhook Endpoints
+const webhookEndpoints: EndpointData[] = [
+  {
+    title: 'Disparar Webhook',
+    method: 'POST',
+    url: '/functions/v1/dispatch-webhook',
+    description: 'Dispara um webhook manualmente para a URL configurada do evento. Pode usar dados reais do banco ou payload customizado. Útil para testes e integrações.',
+    headers: [
+      { name: 'Authorization', description: 'Bearer token do usuário autenticado', example: 'Bearer eyJhbGciOiJIUz...', required: true }
+    ],
+    requestBody: {
+      event_type: 'order.paid',
+      payload: null,
+      is_test: true,
+      use_real_data: true,
+      _nota: 'Se use_real_data=true e payload=null, busca dados reais do banco'
+    },
+    responseExample: {
+      success: true,
+      status_code: 200,
+      response_body: '{"received": true}',
+      event_type: 'order.paid',
+      is_test: true
+    },
+    errorExamples: [
+      { code: 400, title: 'Evento obrigatório', description: 'event_type não informado', example: { success: false, error: 'event_type é obrigatório' } },
+      { code: 404, title: 'Webhook não configurado', description: 'Nenhuma URL configurada para o evento', example: { success: false, error: 'Webhook não configurado ou inativo para este evento' } }
+    ]
+  },
+  {
+    title: 'Receber Pagamento N8N',
+    method: 'POST',
+    url: '/functions/v1/webhook-n8n-payment',
+    description: 'Endpoint público (sem JWT) para receber notificações de pagamento do N8N. Atualiza o status do pedido e dispara o webhook order.paid automaticamente. Possui verificação de idempotência para evitar duplicações.',
+    requestBody: {
+      paymentId: '145209389269',
+      status: 'approved',
+      amount: 199.90,
+      external_reference: 'ORD-1769828426038_865529AC',
+      _nota: 'status aceitos: approved, rejected, pending, cancelled'
+    },
+    responseExample: {
+      success: true,
+      message: 'Payment processed successfully',
+      order_id: 'c40b90a5-bed9-4a11-bd34-358909574b57',
+      payment_status: 'paid'
+    },
+    errorExamples: [
+      { code: 400, title: 'Campos obrigatórios', description: 'paymentId e status são obrigatórios', example: { success: false, error: 'paymentId and status are required' } },
+      { code: 404, title: 'Pedido não encontrado', description: 'external_reference não encontrado', example: { success: false, error: 'Order not found' } },
+      { code: 200, title: 'Já processado', description: 'Pedido já estava pago (idempotência)', example: { success: true, message: 'Order already paid, skipping' } }
+    ]
+  }
+];
+
+// Webhook Events Documentation (used for docs display, not as real endpoints)
+const webhookEventsEndpoints: EndpointData[] = [
+  {
+    title: 'Evento: order.paid',
+    method: 'POST',
+    url: 'URL configurada pelo usuário',
+    description: 'Disparado quando um pedido é confirmado como pago. Inclui dados completos do pedido, itens, cliente, revendedor e URL da etiqueta de envio (válida por 7 dias).',
+    headers: [
+      { name: 'X-Webhook-Signature', description: 'HMAC-SHA256 do payload usando secret_token', example: 'sha256=a1b2c3d4...', required: true },
+      { name: 'X-Webhook-Event', description: 'Tipo do evento', example: 'order.paid', required: true },
+      { name: 'X-Webhook-Timestamp', description: 'Timestamp ISO-8601 do disparo', example: '2026-02-12T14:45:44Z', required: true },
+      { name: 'Content-Type', description: 'Tipo do conteúdo', example: 'application/json', required: true }
+    ],
+    responseExample: {
+      event: 'order.paid',
+      timestamp: '2026-02-12T14:45:44Z',
+      data: {
+        order_id: 'c40b90a5-bed9-4a11-bd34-358909574b57',
+        order_number: 'ORD-1769828426038_865529AC',
+        total_amount: 199.90,
+        payment_id: '145209389269',
+        customer: {
+          name: 'Maria Santos',
+          email: 'maria@email.com',
+          phone: '11999999999'
+        },
+        items: [
+          { name: 'Colete Postural', sku: 'SKU-001', quantity: 2, unit_price: 99.95, image_url: 'https://...' }
+        ],
+        reseller: {
+          name: 'João Revendedor',
+          email: 'joao@email.com',
+          store_slug: 'joao-store'
+        },
+        shipping_label_url: 'https://...signed-url (válida por 7 dias)'
+      }
+    }
+  },
+  {
+    title: 'Evento: user.created',
+    method: 'POST',
+    url: 'URL configurada pelo usuário',
+    description: 'Disparado quando um novo usuário é criado na plataforma via API ou painel.',
+    headers: [
+      { name: 'X-Webhook-Signature', description: 'HMAC-SHA256 do payload usando secret_token', example: 'sha256=a1b2c3d4...', required: true },
+      { name: 'X-Webhook-Event', description: 'Tipo do evento', example: 'user.created', required: true },
+      { name: 'X-Webhook-Timestamp', description: 'Timestamp ISO-8601 do disparo', example: '2026-02-12T14:45:44Z', required: true }
+    ],
+    responseExample: {
+      event: 'user.created',
+      timestamp: '2026-02-12T14:45:44Z',
+      data: {
+        user_id: 'uuid',
+        email: 'novo@email.com',
+        full_name: 'Novo Usuário',
+        role: 'reseller',
+        created_at: '2026-02-12T14:45:44Z'
+      }
+    }
+  },
+  {
+    title: 'Evento: user.inactive (7/15/30 dias)',
+    method: 'POST',
+    url: 'URL configurada pelo usuário',
+    description: 'Disparado automaticamente quando um usuário fica inativo por 7, 15 ou 30 dias. Eventos separados: user.inactive.7days, user.inactive.15days, user.inactive.30days.',
+    headers: [
+      { name: 'X-Webhook-Signature', description: 'HMAC-SHA256 do payload usando secret_token', example: 'sha256=a1b2c3d4...', required: true },
+      { name: 'X-Webhook-Event', description: 'Tipo do evento', example: 'user.inactive.7days', required: true },
+      { name: 'X-Webhook-Timestamp', description: 'Timestamp ISO-8601 do disparo', example: '2026-02-12T14:45:44Z', required: true }
+    ],
+    responseExample: {
+      event: 'user.inactive.7days',
+      timestamp: '2026-02-12T14:45:44Z',
+      data: {
+        user_id: 'uuid',
+        email: 'usuario@email.com',
+        full_name: 'Usuário Inativo',
+        last_sign_in_at: '2026-02-05T10:00:00Z',
+        inactive_days: 7
+      }
+    }
+  }
+];
+
+// Logs Documentation Endpoints (for docs display)
+const logsEndpoints: EndpointData[] = [
+  {
+    title: 'Logs de Requisições API',
+    method: 'GET',
+    url: 'Tabela: api_request_logs',
+    description: 'Registra automaticamente todas as chamadas às Edge Functions da API. Retenção automática de 7 dias via cron job diário às 04:00 UTC. Cada registro inclui dados de performance e rastreabilidade.',
+    responseExample: {
+      id: 'uuid',
+      function_name: 'api-produtos-listar',
+      method: 'GET',
+      path: '/functions/v1/api-produtos-listar',
+      api_key_id: 'uuid (referência à api_keys)',
+      user_id: 'uuid (opcional)',
+      ip_address: '192.168.1.1',
+      status_code: 200,
+      duration_ms: 145,
+      query_params: { page: '1', limit: '20' },
+      request_body: null,
+      response_summary: { success: true, total: 50 },
+      error_message: null,
+      created_at: '2026-02-12T14:45:44Z'
+    }
+  },
+  {
+    title: 'Logs de Webhooks Disparados',
+    method: 'GET',
+    url: 'Tabela: webhook_dispatch_logs',
+    description: 'Registra todos os disparos de webhook com payload enviado, resposta recebida e erros. Retenção automática de 7 dias. Útil para debugging de integrações externas.',
+    responseExample: {
+      id: 'uuid',
+      webhook_setting_id: 'uuid (referência ao webhook_settings)',
+      event_type: 'order.paid',
+      payload: { event: 'order.paid', data: { order_id: 'uuid' } },
+      status_code: 200,
+      response_body: '{"received": true}',
+      error_message: null,
+      dispatched_at: '2026-02-12T14:45:44Z',
+      duration_ms: 320
+    }
+  }
+];
+
 // Export organized data structure
 export const apiEndpointsData: EndpointCategory[] = [
   {
@@ -1114,3 +1296,8 @@ export const apiEndpointsData: EndpointCategory[] = [
     ]
   }
 ];
+
+// Export webhook and logs endpoint data for use in ApiDocsContent
+export const webhookEventsData = webhookEventsEndpoints;
+export const webhookEndpointsData = webhookEndpoints;
+export const logsEndpointsData = logsEndpoints;
