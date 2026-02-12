@@ -133,6 +133,12 @@ const AdminOrders = () => {
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    // Optimistic update: save previous state and update UI immediately
+    const previousOrders = orders;
+    setOrders(prev => prev.map(order => 
+      order.id === orderId ? { ...order, status: newStatus } : order
+    ));
+
     try {
       const { error } = await supabase
         .from('orders')
@@ -141,23 +147,25 @@ const AdminOrders = () => {
 
       if (error) throw error;
 
-      // Insert into status history
-      await supabase.from('order_status_history').insert({
+      // Insert into status history (non-blocking, log errors)
+      const { error: historyError } = await supabase.from('order_status_history').insert({
         order_id: orderId,
         status: newStatus,
         notes: `Status atualizado pelo admin`,
       });
 
-      setOrders(orders.map(order => 
-        order.id === orderId ? { ...order, status: newStatus } : order
-      ));
+      if (historyError) {
+        console.error('Error inserting status history:', historyError);
+      }
 
       toast({
         title: "Sucesso",
         description: "Status do pedido atualizado",
       });
     } catch (error) {
+      // Rollback on failure
       console.error('Error updating order status:', error);
+      setOrders(previousOrders);
       toast({
         title: "Erro",
         description: "Erro ao atualizar status do pedido",
