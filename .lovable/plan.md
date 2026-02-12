@@ -1,52 +1,55 @@
 
+# Corrigir Dropdown "Status de Envio" que Reverte ao Valor Anterior
 
-# Remover Validacao de Transicao da API de Status
+## Problema Identificado
 
-## Problema
+O dropdown de "Status de Envio" na pagina de pedidos (`/super-admin/pedidos`) mostra os 10 status validos, mas ao selecionar um novo status, ele reverte para o valor anterior.
 
-A API `api-pedidos-atualizar-status` valida transicoes de status (ex: `recebido` so pode ir para `em_preparacao`, `em_falta` ou `cancelado`), enquanto o painel admin na pagina de pedidos permite selecionar **qualquer** status diretamente sem restricao.
+## Causa Raiz
 
-Isso causa confusao: o fornecedor/integrador usando a API recebe erros ao tentar colocar um status que no painel funciona normalmente.
-
-## Solucao
-
-Remover a validacao de transicao da Edge Function `api-pedidos-atualizar-status`, mantendo apenas a validacao de que o status informado eh um dos 10 status validos do sistema.
-
-## Alteracao
-
-### `supabase/functions/api-pedidos-atualizar-status/index.ts`
-
-Remover o bloco de validacao de transicao (linhas 130-139):
+Na funcao `updateOrderStatus` em `src/pages/admin/Orders.tsx` (linha 151), a atualizacao do estado local usa uma referencia "stale" (desatualizada) do array `orders`:
 
 ```text
-// REMOVER este bloco:
-const allowedTransitions = STATUS_TRANSITIONS[order.status] || [];
-if (!allowedTransitions.includes(status)) {
-  return new Response(
-    JSON.stringify({ 
-      success: false, 
-      error: `Transição não permitida: ${order.status} → ${status}...` 
-    }),
-    { status: 400, ... }
-  );
-}
+setOrders(orders.map(order => 
+  order.id === orderId ? { ...order, status: newStatus } : order
+));
 ```
 
-Tambem remover a constante `STATUS_TRANSITIONS` (linhas 22-33) que nao sera mais utilizada.
+O `orders` capturado no closure pode estar desatualizado se o componente re-renderizou entre o clique e a resposta do Supabase. Isso faz com que o `setOrders` sobrescreva o estado atual com uma versao antiga, revertendo a mudanca.
 
-A validacao que **permanece** eh a de status valido (linhas 106-113), que verifica se o status esta na lista `VALID_STATUSES`.
+Alem disso, a insercao no `order_status_history` pode estar falhando silenciosamente por falta de politica RLS de INSERT para admins/super_admins nessa tabela.
 
-### Logica especial mantida
+## Alteracoes
 
-- Se status = `em_reposicao`, continua exigindo `previsao_envio`
-- Se status = `em_falta`, continua desativando produtos vinculados
-- Historico de status continua sendo registrado
+### 1. `src/pages/admin/Orders.tsx` - Corrigir atualizacao de estado
 
-### Documentacao (`src/data/apiEndpointsData.ts`)
+- Trocar `setOrders(orders.map(...))` por `setOrders(prev => prev.map(...))` (functional update)
+- Adicionar tratamento de erro na insercao do historico de status
+- Aplicar atualizacao otimista: atualizar a UI imediatamente e reverter se a operacao falhar
 
-Atualizar a documentacao do endpoint para remover qualquer mencao a transicoes obrigatorias, deixando claro que qualquer status valido pode ser informado.
+### 2. Politica RLS para `order_status_history`
 
-## Resultado
+Adicionar politica de INSERT para admins/super_admins na tabela `order_status_history`, que atualmente so tem politica de SELECT. Sem essa politica, o registro de historico nao eh salvo.
 
-A API passa a funcionar igual ao painel: aceita qualquer status valido dos 10 disponiveis, sem restricao de transicao.
+## Detalhes Tecnicos
 
+### Correcao do estado (principal)
+
+```text
+// ANTES (bugado - closure stale):
+setOrders(orders.map(order => ...))
+
+// DEPOIS (correto - functional update):
+setOrders(prev => prev.map(order => ...))
+```
+
+### Atualizacao otimista com rollback
+
+1. Salvar estado anterior
+2. Atualizar UI imediatamente  
+3. Chamar Supabase
+4. Se falhar, reverter para estado anterior e mostrar toast de erro
+
+### Politica RLS
+
+Criar politica INSERT na tabela `order_status_history` para perfis com role `admin` ou `super_admin`.
