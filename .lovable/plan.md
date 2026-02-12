@@ -1,60 +1,89 @@
 
-# Log de Notificacoes Automaticas
+
+# Adicionar Template de Notificacao para Produto Desativado
 
 ## Contexto
 
-As notificacoes automaticas (produto desativado, pedido enviado, etc.) estao funcionando corretamente. O produto desativado gerou 268 notificacoes. Porem, essas notificacoes nao aparecem na aba "Historico" porque ela so consulta a tabela `notification_campaigns` (envios manuais). As notificacoes automaticas sao inseridas diretamente na tabela `notifications` pelos triggers.
+Atualmente, a funcao `notify_product_removed` insere notificacoes diretamente na tabela `notifications` com titulo e mensagem fixos no codigo SQL. Isso impede que o admin personalize o texto pelo painel de templates. Os demais triggers (preco, estoque, pedidos, aulas) ja usam o sistema de templates via `send_automatic_notification`.
 
-## Alteracao
+## Alteracoes
 
-### Adicionar aba "Log de Notificacoes" na pagina de Gerenciamento de Notificacoes
+### 1. Migracao SQL
 
-Nova aba que consulta a tabela `notifications` agrupando por tipo + titulo + mensagem (nao por usuario), exibindo:
+**Inserir template na tabela `notification_templates`:**
+- `trigger_type`: `product_removed`
+- `title_template`: `⚠️ Produto Indisponível`
+- `message_template`: `O produto "{PRODUCT_NAME}" não está mais disponível.`
+- `target_audience`: `all_customers` (novo audience type para o `send_automatic_notification`)
+- `active`: true
 
-- Tipo da notificacao (badge colorido)
-- Titulo
-- Mensagem (truncada)
-- Total enviado
-- Total lido
-- Taxa de leitura (%)
-- Data/hora do envio
+**Atualizar funcao `notify_product_removed`** para usar `send_automatic_notification` em vez de INSERT direto, passando as variaveis `PRODUCT_ID` e `PRODUCT_NAME`.
 
-### Arquivo: `src/pages/admin/NotificationsManagement.tsx`
+**Atualizar funcao `send_automatic_notification`** para suportar o novo target_audience `all_customers` que envia para todos os perfis com `role = 'customer' AND is_active = true`.
 
-1. Adicionar nova aba "Log" no `TabsList`
-2. Criar `TabsContent` com tabela agrupada
-3. Adicionar estado e funcao para buscar os dados agrupados da tabela `notifications`
-4. A consulta SQL agrupara por `type`, `title`, `message` e retornara contagens agregadas (total enviado, total lido)
-5. Adicionar filtro por tipo de notificacao (product_removed, order_shipped, new_lesson, etc.)
+### 2. Frontend - Tipo no TypeScript
 
-### Detalhes tecnicos
+**Arquivo `src/types/notifications.ts`:**
+- Adicionar `'product_removed'` ao tipo `AutomaticTriggerType`
 
-A consulta usara o Supabase client com RPC ou query direta. Como o Supabase JS nao suporta GROUP BY nativamente, sera criada uma funcao RPC no banco:
+### 3. Frontend - Variaveis do Template
 
-**Nova funcao SQL `get_notification_logs`:**
-- Agrupa notificacoes por `type`, `title`, `message`
-- Retorna: type, title, message, total_sent (COUNT), total_read (COUNT WHERE is_read=true), read_rate (%), first_sent_at (MIN created_at)
-- Ordenado por data mais recente
-- Limite de 100 registros
+**Arquivo `src/components/admin/TemplateVariableHelper.tsx`:**
+- Adicionar entrada `product_removed` no `VARIABLES_BY_TRIGGER` com variaveis `PRODUCT_ID` e `PRODUCT_NAME`
 
-**Migracao SQL:**
+### 4. Frontend - Exemplos no hook
+
+**Arquivo `src/hooks/useNotificationTemplates.ts`:**
+- Adicionar `product_removed` no objeto `examples` dentro de `getExampleVariablesForTrigger`
+
+## Detalhes tecnicos
+
+### SQL - Funcao `notify_product_removed` atualizada
 
 ```text
-CREATE OR REPLACE FUNCTION get_notification_logs(p_limit integer DEFAULT 100)
-RETURNS TABLE(
-  type text,
-  title text, 
-  message text,
-  total_sent bigint,
-  total_read bigint,
-  read_rate numeric,
-  sent_at timestamptz
-)
+CREATE OR REPLACE FUNCTION notify_product_removed()
+RETURNS trigger AS $$
+BEGIN
+  IF OLD.active = true AND NEW.active = false THEN
+    PERFORM send_automatic_notification(
+      'product_removed',
+      jsonb_build_object(
+        'PRODUCT_ID', NEW.id::text,
+        'PRODUCT_NAME', NEW.name
+      )
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
 
-**Frontend:**
-- Nova aba "Log" com icone de lista
-- Tabela com colunas: Tipo | Titulo | Mensagem | Enviados | Lidos | Taxa | Data
-- Badges coloridos por tipo (product_removed = vermelho, order_shipped = azul, new_lesson = verde, etc.)
-- Filtro dropdown por tipo de notificacao
-- Botao de refresh
+### SQL - Novo branch em `send_automatic_notification`
+
+Adicionar `ELSIF v_template.target_audience = 'all_customers'` que faz:
+
+```text
+INSERT INTO notifications (...)
+SELECT p.user_id, ...
+FROM profiles p
+WHERE p.role = 'customer' AND p.is_active = true;
+```
+
+### TypeScript - Nova entrada no tipo
+
+```text
+export type AutomaticTriggerType =
+  | 'price_decrease'
+  | ...
+  | 'product_removed';   -- novo
+```
+
+### TypeScript - Variaveis do template
+
+```text
+product_removed: [
+  { key: 'PRODUCT_ID', description: 'ID do produto', example: 'abc123' },
+  { key: 'PRODUCT_NAME', description: 'Nome do produto', example: 'Smartphone XYZ' },
+],
+```
+
