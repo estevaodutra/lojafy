@@ -96,6 +96,10 @@ export const useNotificationTemplates = () => {
         COURSE_ID: '00000000-0000-0000-0000-000000000000',
         COURSE_NAME: 'Curso de Exemplo',
       },
+      product_removed: {
+        PRODUCT_ID: '00000000-0000-0000-0000-000000000000',
+        PRODUCT_NAME: 'Produto de Exemplo',
+      },
     };
     
     return examples[triggerType] || {};

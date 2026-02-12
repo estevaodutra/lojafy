@@ -54,6 +54,10 @@ const VARIABLES_BY_TRIGGER: Record<AutomaticTriggerType, TemplateVariable[]> = {
     { key: 'COURSE_ID', description: 'ID do curso', example: 'abc123' },
     { key: 'COURSE_NAME', description: 'Nome do curso', example: 'React Avançado' },
   ],
+  product_removed: [
+    { key: 'PRODUCT_ID', description: 'ID do produto', example: 'abc123' },
+    { key: 'PRODUCT_NAME', description: 'Nome do produto', example: 'Smartphone XYZ' },
+  ],
 };
 
 export const TemplateVariableHelper = ({ triggerType }: TemplateVariableHelperProps) => {
