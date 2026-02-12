@@ -1,35 +1,91 @@
 
+# Criar Categoria "Pagamentos" na Documentacao da API
 
-# Corrigir Exibicao de URL nos Eventos de Webhook
+## Resumo
 
-## Problema
+Adicionar uma nova categoria **Pagamentos** na documentacao da API com o endpoint `POST /api/pagamentos/webhook` (webhook-n8n-payment). Inclui documentacao completa de request/response, tabela de mapeamento de status do gateway para status Lojafy, e exemplos de erro.
 
-O componente `EndpointCard` concatena a base URL do Supabase com `endpoint.url`, gerando URLs sem sentido para eventos de webhook (ex: `https://bbrmjrjorcgsgeztzbsr.supabase.coURL configurada pelo usuario`).
+---
 
-Eventos de webhook nao sao endpoints da API — sao payloads enviados para a URL que o usuario configura na secao de Webhooks (tabela `webhook_settings`).
-
-## Correcao
+## Alteracoes
 
 ### 1. `src/data/apiEndpointsData.ts`
 
-Adicionar uma propriedade `isWebhookEvent: true` nos 3 endpoints de eventos (order.paid, user.created, user.inactive) para distingui-los dos endpoints normais da API.
+Criar o array `paymentsEndpoints` com um endpoint:
 
-### 2. `src/components/admin/EndpointCard.tsx`
+- **POST webhook-n8n-payment** - Recebe notificacao de pagamento e atualiza o status do pedido
+  - Headers: Content-Type application/json
+  - Request body: paymentId, status, amount, external_reference
+  - Query params: nenhum
+  - Response 200: success com dados do pedido atualizado (pedido_id, status_anterior, status_novo, payment_id)
+  - Erros: 400 (validacao), 404 (pedido nao encontrado), 500 (erro interno)
 
-Verificar se o endpoint tem `isWebhookEvent: true`. Se sim:
-- Exibir o campo URL como texto informativo ("URL configurada pelo usuario na secao Webhooks") em vez de concatenar com a base URL do Supabase
-- Ocultar o botao "Copiar URL" (nao faz sentido copiar uma URL generica)
-- Ajustar o exemplo cURL para usar um placeholder como `https://sua-url-de-webhook.com/endpoint` em vez da URL concatenada errada
-
-### 3. Ajuste no cURL e na secao de URL
-
-Para eventos de webhook, o exemplo cURL mostrara:
+Adicionar a categoria no array `apiEndpointsData`:
 ```
-curl -X POST "https://sua-url-de-webhook.com/endpoint" \
-  -H "X-Webhook-Signature: hmac_sha256_hash" \
-  -H "Content-Type: application/json" \
-  -d '{ ... payload ... }'
+{
+  id: 'payments',
+  title: 'Pagamentos',
+  endpoints: paymentsEndpoints
+}
 ```
 
-Isso deixa claro que o sistema Lojafy envia o POST para a URL do usuario, e nao o contrario.
+### 2. `src/components/admin/ApiDocsSidebar.tsx`
 
+Adicionar icone para a nova categoria no mapa `categoryIcons`:
+```
+payments: CreditCard
+```
+
+Importar `CreditCard` do lucide-react.
+
+### 3. `src/components/admin/ApiDocsContent.tsx`
+
+Adicionar case `payments` na funcao `getCategoryTitle`:
+```
+case 'payments': return {
+  title: 'Endpoints de Pagamentos',
+  desc: 'Integracoes com gateways de pagamento para atualizacao automatica de status de pedidos'
+};
+```
+
+### 4. `src/components/admin/ApiDocsContent.tsx` - Secao Introducao
+
+Adicionar card de "Pagamentos" na grid de categorias da IntroSection, com icone de cartao e descricao "Webhooks de gateways de pagamento".
+
+---
+
+## Detalhes Tecnicos
+
+### Endpoint documentado
+
+```
+POST /functions/v1/webhook-n8n-payment
+```
+
+### Campos do request body
+
+| Campo | Tipo | Obrigatorio | Descricao |
+|-------|------|-------------|-----------|
+| paymentId | string | Nao | ID do pagamento no gateway |
+| status | string | Sim | Status do pagamento (approved, pending, rejected, etc.) |
+| amount | number | Nao | Valor pago |
+| external_reference | string | Sim | Referencia do pedido na Lojafy |
+
+### Mapeamento de status
+
+| Status Recebido | Acao na Lojafy |
+|-----------------|----------------|
+| approved | Pedido -> recebido (pago) |
+| pending | Pedido permanece pendente |
+| in_process | Pedido permanece pendente |
+| rejected | Pedido -> cancelado |
+| refunded | Pedido -> reembolsado |
+| cancelled | Pedido -> cancelado |
+
+### Exemplos de erro documentados
+
+- 400: Campo external_reference obrigatorio
+- 404: Pedido nao encontrado
+- 500: Erro ao processar pagamento
+
+Nenhuma alteracao de banco de dados e necessaria - o endpoint webhook-n8n-payment ja existe e funciona. Esta e apenas uma alteracao de documentacao.
