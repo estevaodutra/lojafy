@@ -93,6 +93,16 @@ export const useNotifications = () => {
     }
   };
 
+  const markAllAsReadSilent = async () => {
+    if (!user) return;
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('user_id', user.id)
+      .eq('is_read', false);
+  };
+
   const markAllAsRead = async () => {
     if (!user) return;
 
@@ -148,6 +158,7 @@ export const useNotifications = () => {
     loading,
     markAsRead,
     markAllAsRead,
+    markAllAsReadSilent,
     deleteNotification,
     deleteAllNotifications,
     refetch: fetchNotifications
