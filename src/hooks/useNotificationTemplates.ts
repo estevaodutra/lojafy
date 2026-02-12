@@ -100,6 +100,10 @@ export const useNotificationTemplates = () => {
         PRODUCT_ID: '00000000-0000-0000-0000-000000000000',
         PRODUCT_NAME: 'Produto de Exemplo',
       },
+      product_reactivated: {
+        PRODUCT_ID: '00000000-0000-0000-0000-000000000000',
+        PRODUCT_NAME: 'Produto de Exemplo',
+      },
     };
     
     return examples[triggerType] || {};
