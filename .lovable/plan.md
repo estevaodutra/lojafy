@@ -1,60 +1,58 @@
 
 
-# Correcoes no Sistema de Notificacoes de Produto Desativado
+# Auto-marcar notificacoes como lidas ao abrir o menu
 
-## Problemas Identificados
+## Contexto
 
-### 1. Notificacoes nao chegam para todos os usuarios
-O template `product_removed` esta configurado com `target_audience: all_customers`, que envia apenas para usuarios com `role = 'customer'`. Usuarios com outros papeis (revendedores, fornecedores, admins) nao recebem a notificacao. Existem 134 clientes ativos no banco.
+Sobre a notificacao ao **ativar** um produto: o trigger `on_product_deactivated` so dispara quando o produto muda de ativo para inativo. Ativar um produto nao gera notificacao, e esse e o comportamento esperado (nao faz sentido notificar que um produto voltou).
 
-### 2. Log tab nao aparece
-O codigo da aba "Log" ja existe no componente, mas pode nao estar publicado na versao de producao. Alem disso, faltam labels para `product_removed` no mapa de tipos.
-
-### 3. Labels faltando
-- `TRIGGER_LABELS` (linha 177-187) nao inclui `product_removed`
-- `getAudienceLabel` (linha 164-175) nao inclui `all_customers`
+A alteracao principal e fazer com que ao abrir o menu do sino, todas as notificacoes sejam marcadas como lidas automaticamente.
 
 ## Alteracoes
 
-### 1. Atualizar target_audience do template para enviar a TODOS
+### 1. `src/hooks/useNotifications.ts`
 
-**Migracao SQL:**
-- Alterar o template `product_removed` para `target_audience = 'all'` na tabela `notification_templates`
-- Atualizar a funcao `send_automatic_notification` para suportar `target_audience = 'all'` - enviando para TODOS os perfis ativos independente do role
+Adicionar nova funcao `markAllAsReadSilent`:
+- Faz update otimista no estado local (todas as notificacoes ficam `is_read: true` imediatamente)
+- Envia UPDATE para o Supabase em background
+- Sem toast de sucesso para nao poluir a experiencia
+- Exportar a nova funcao no retorno do hook
 
-### 2. Adicionar labels faltantes no frontend
+### 2. `src/components/NotificationBell.tsx`
 
-**Arquivo `src/pages/admin/NotificationsManagement.tsx`:**
+- Importar `markAllAsReadSilent` do hook
+- Adicionar `onOpenChange` no componente `Popover`
+- Quando o popover abrir e houver notificacoes nao lidas, chamar `markAllAsReadSilent()`
+- Remover o botao manual "Marcar todas como lidas" do header do popover (fica redundante)
 
-Adicionar no `TRIGGER_LABELS` (linha 187):
-- `product_removed: 'Produto indisponivel'`
+## Detalhes tecnicos
 
-Adicionar no `getAudienceLabel` (linha 173):
-- `'all_customers': 'Todos os clientes'`
-
-### Detalhes tecnicos
-
-**SQL - Atualizar `send_automatic_notification`:**
-
-Adicionar novo branch para `target_audience = 'all'`:
+**useNotifications.ts - nova funcao:**
 
 ```text
-ELSIF v_template.target_audience = 'all' THEN
-  INSERT INTO notifications (...)
-  SELECT p.user_id, ...
-  FROM profiles p
-  WHERE p.is_active = true;
+const markAllAsReadSilent = async () => {
+  if (!user) return;
+  setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+  await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('user_id', user.id)
+    .eq('is_read', false);
+};
 ```
 
-Tambem atualizar o template existente:
+**NotificationBell.tsx - onOpenChange:**
 
 ```text
-UPDATE notification_templates 
-SET target_audience = 'all'
-WHERE trigger_type = 'product_removed';
+const { notifications, unreadCount, loading, markAllAsReadSilent } = useNotifications();
+
+const handleOpenChange = (open: boolean) => {
+  if (open && unreadCount > 0) {
+    markAllAsReadSilent();
+  }
+};
+
+<Popover onOpenChange={handleOpenChange}>
 ```
 
-**Frontend - Labels:**
-- Mapa `TRIGGER_LABELS`: adicionar `product_removed`
-- Mapa `getAudienceLabel`: adicionar `all_customers`
-
+O header do popover ficara apenas com o titulo "Notificacoes", sem o botao de marcar como lidas.
