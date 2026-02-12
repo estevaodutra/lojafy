@@ -15,7 +15,8 @@ import {
   ChevronDown,
   Zap,
   ScrollText,
-  Plug
+  Plug,
+  CreditCard
 } from 'lucide-react';
 import { apiEndpointsData } from '@/data/apiEndpointsData';
 
@@ -40,6 +41,7 @@ const categoryIcons: Record<string, React.ElementType> = {
   ranking: BarChart3,
   academy: GraduationCap,
   integra: Plug,
+  payments: CreditCard,
 };
 
 const getMethodColor = (method: string) => {
