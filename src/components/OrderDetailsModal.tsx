@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { OpenTicketButton } from '@/components/order-tickets/OpenTicketButton';
 import { getAvailableTicketTypes } from '@/types/orderTickets';
+import { getStatusConfig, getStatusLabel as gslFn, getStatusVariant as gsvFn } from '@/constants/orderStatus';
 interface OrderItem {
   id: string;
   product_id: string;
@@ -499,17 +500,14 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
   const getStatusIcon = (status: string) => {
-    const { getStatusConfig: gsc } = require('@/constants/orderStatus');
-    const Icon = gsc(status).icon;
+    const Icon = getStatusConfig(status).icon;
     return <Icon className="h-4 w-4" />;
   };
   const getStatusLabel = (status: string) => {
-    const { getStatusLabel: gsl } = require('@/constants/orderStatus');
-    return gsl(status);
+    return gslFn(status);
   };
   const getStatusVariant = (status: string) => {
-    const { getStatusVariant: gsv } = require('@/constants/orderStatus');
-    return gsv(status);
+    return gsvFn(status);
   };
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
