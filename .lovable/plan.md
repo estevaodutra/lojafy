@@ -1,75 +1,93 @@
 
-
-# Enriquecimento da Estrutura de Produtos
+# Atualizar Edge Functions e Documentacao da API
 
 ## Resumo
 
-Migração não-destrutiva para enriquecer a tabela `products` com atributos estruturados, variações reais, domínios internos e condição do produto. Inclui criação de tabelas auxiliares, dados iniciais, migração de dados existentes, views e funções auxiliares.
+Atualizar as Edge Functions de produtos e a documentacao da API para refletir os novos campos de atributos estruturados, variacoes e dominios adicionados na tabela `products`.
 
-## O que será feito
+## O que sera feito
 
-### 1. Alterações na tabela `products` (8 novos campos)
-- `attributes` (JSONB) - Atributos estruturados do produto
-- `variations` (JSONB) - Variações com estoque/preço individual
-- `domain_id` (TEXT) - Referência ao domínio interno
-- `condition` (TEXT) - Condição: new, used, refurbished, not_specified
-- `catalog_source` (TEXT) - Fonte do enriquecimento
-- `catalog_source_id` (TEXT) - ID na fonte original
-- `enriched_at` (TIMESTAMPTZ) - Data do enriquecimento
-- `has_variations` (BOOLEAN) - Flag de variações ativas
+### 1. Atualizar Edge Function `api-produtos-cadastrar`
+Adicionar suporte aos novos campos no endpoint de criacao de produtos:
+- `attributes` (JSONB array) - com validacao de tipo
+- `variations` (JSONB array) - com validacao de tipo
+- `domain_id` (TEXT)
+- `condition` (TEXT) - com validacao de valores permitidos
+- `catalog_source`, `catalog_source_id` (TEXT)
+- `has_variations` (calculado automaticamente)
+- `enriched_at` (calculado automaticamente quando attributes preenchido)
 
-### 2. Nova tabela `product_domains`
-Categorias/tipos de produto padronizados internos com atributos obrigatórios, recomendados e de variação por domínio.
+O response tambem incluira os novos campos traduzidos para portugues (atributos, variacoes, dominio_id, condicao, etc.).
 
-### 3. Nova tabela `attribute_definitions`
-Definição dos atributos disponíveis no sistema com tipos de valor, valores permitidos, unidades e agrupamento.
+### 2. Atualizar Edge Function `api-produtos-listar`
+Incluir novos campos no SELECT e no mapeamento de resposta:
+- `attributes`, `variations`, `domain_id`, `condition`, `has_variations`, `enriched_at`
+- Adicionar filtros opcionais: `domain_id`, `condition`, `has_variations`
 
-### 4. Dados iniciais
-- 18 atributos padrão (marca, cor, tamanho, voltagem, material, etc.)
-- Valores pré-definidos para COLOR (13 cores), SIZE (9 tamanhos), VOLTAGE (3 opções)
-- 7 domínios de exemplo (Máquinas de Waffle, Corretores Posturais, etc.)
+### 3. Criar Edge Function `api-produtos-atributos`
+Endpoint dedicado para gerenciar atributos de um produto individual:
+- **PUT** - Adicionar/atualizar um atributo (valida contra `attribute_definitions`)
+- Busca definicao do atributo, monta objeto estruturado, atualiza JSONB
 
-### 5. Migração automática de dados
-Função que migra dados do campo `specifications` existente para o novo campo `attributes`, preservando cor, tamanho, material, garantia, tecnologia, marca e GTIN.
+### 4. Criar Edge Function `api-produtos-variacoes`
+Endpoint dedicado para gerenciar variacoes de um produto:
+- **POST** - Adicionar variacao (SKU, attributes, stock, price, gtin)
+- **DELETE** (query param `sku`) - Remover variacao por SKU
+- Atualiza automaticamente `has_variations` e `enriched_at`
 
-### 6. Views
-- `v_products_with_attributes` - Produtos com atributos expandidos
-- `v_products_needs_enrichment` - Produtos que precisam de enriquecimento
+### 5. Criar Edge Function `api-dominios-listar`
+Endpoint para listar dominios de produto:
+- **GET** - Lista dominios com filtros opcionais (category_id, active)
 
-### 7. Funções auxiliares
-- `add_product_attribute()` - Adicionar/atualizar atributo de um produto
-- `add_product_variation()` - Adicionar variação com SKU, estoque e preço
-- `get_product_total_stock()` - Calcular estoque total considerando variações
+### 6. Criar Edge Function `api-atributos-listar`
+Endpoint para listar definicoes de atributos:
+- **GET** - Lista atributos com filtros (group, allows_variations)
 
-### 8. RLS Policies
-- `product_domains`: leitura pública, escrita para admins
-- `attribute_definitions`: leitura pública, escrita para admins
+### 7. Atualizar Documentacao da API (`apiEndpointsData.ts`)
+Adicionar novos endpoints na categoria Catalogo:
+- Atualizar exemplos de "Cadastrar Produto" e "Listar Produtos" com novos campos
+- Adicionar endpoints: Gerenciar Atributos, Gerenciar Variacoes, Listar Dominios, Listar Atributos
 
-## Detalhes técnicos
+### 8. Registrar novas funcoes no `config.toml`
+Adicionar entradas `verify_jwt = false` para as 4 novas Edge Functions.
 
-### Ordem de execução (tudo em uma única migração)
-1. ALTER TABLE products (novos campos + índices)
-2. CREATE TABLE product_domains (com trigger updated_at)
-3. CREATE TABLE attribute_definitions (com trigger updated_at)
-4. INSERT dados iniciais de atributos e domínios
-5. Função de migração + execução
-6. CREATE VIEWS
-7. CREATE funções auxiliares
-8. RLS policies
+## Detalhes tecnicos
 
-### Impacto
-- **Zero breaking changes** - todos os campos novos são opcionais com defaults
-- **Dados existentes preservados** - campo `specifications` continua funcionando
-- **Migração automática** - dados de `specifications` copiados para `attributes`
-- **Nenhuma alteração de código frontend necessária** nesta etapa (só banco)
+### Estrutura das novas Edge Functions
 
-### Validação com CHECK constraint
-- `condition IN ('new', 'used', 'refurbished', 'not_specified')` - usando trigger de validação ao invés de CHECK para evitar problemas com restauração
+Todas seguem o padrao existente do projeto:
+- Import `@supabase/supabase-js@2.57.4` (versao fixa)
+- Autenticacao via `X-API-Key` header
+- Validacao de permissoes (`produtos.read` / `produtos.write`)
+- Logging via `logApiRequest` com campos `snake_case`
+- CORS headers padrao
+- Tratamento de erros consistente
 
-### Índices criados
-- `idx_products_domain_id` - Busca por domínio
-- `idx_products_condition` - Busca por condição
-- `idx_products_has_variations` - Filtro de produtos com variações
-- `idx_products_attributes` - Busca GIN em atributos JSONB
-- Índices em `product_domains` e `attribute_definitions`
+### Mapeamento portugues nos campos do cadastrar/listar
 
+Novos campos no request (portugues):
+- `atributos` -> `attributes`
+- `variacoes` -> `variations`
+- `dominio_id` -> `domain_id`
+- `condicao` -> `condition`
+- `fonte_catalogo` -> `catalog_source`
+- `fonte_catalogo_id` -> `catalog_source_id`
+
+### Validacoes implementadas
+- `atributos` deve ser array (se fornecido)
+- `variacoes` deve ser array (se fornecido)
+- `condicao` deve ser: new, used, refurbished, not_specified
+- `has_variations` calculado automaticamente
+- `enriched_at` setado quando attributes tem conteudo
+- Endpoint de atributos valida existencia em `attribute_definitions`
+- Endpoint de variacoes valida campos obrigatorios (sku, attributes, stock)
+
+### Arquivos modificados
+- `supabase/functions/api-produtos-cadastrar/index.ts` (atualizar)
+- `supabase/functions/api-produtos-listar/index.ts` (atualizar)
+- `supabase/functions/api-produtos-atributos/index.ts` (novo)
+- `supabase/functions/api-produtos-variacoes/index.ts` (novo)
+- `supabase/functions/api-dominios-listar/index.ts` (novo)
+- `supabase/functions/api-atributos-listar/index.ts` (novo)
+- `supabase/config.toml` (adicionar 4 novas funcoes)
+- `src/data/apiEndpointsData.ts` (atualizar documentacao)
