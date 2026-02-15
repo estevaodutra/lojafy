@@ -47,34 +47,179 @@ const catalogEndpoints: EndpointData[] = [
     title: 'Cadastrar Produto',
     method: 'POST',
     url: '/functions/v1/api-produtos-cadastrar',
-    description: 'Cria um novo produto no sistema com suporte completo a preços promocionais, controle de estoque e dimensões.',
+    description: 'Cria um novo produto com suporte a atributos estruturados, variações com estoque/preço individual e domínios de catálogo.',
     requestBody: {
-      nome: 'Colete Postural',
-      descricao: 'Colete para correção de postura',
-      preco: 15.49,
+      nome: 'Mini Máquina de Waffles 110V',
+      descricao: 'Máquina elétrica portátil para waffles',
+      preco: 29.90,
+      preco_custo: 20.00,
       estoque: 50,
-      categoria_id: 'uuid-categoria'
+      categoria_id: 'uuid-categoria',
+      sku: 'WAFFLE-001',
+      gtin: '7893066213848',
+      dominio_id: 'LJF-WAFFLE_MAKERS',
+      condicao: 'new',
+      atributos: [
+        { id: 'BRAND', name: 'Marca', value: 'Generic' },
+        { id: 'VOLTAGE', name: 'Voltagem', value: '110V', value_id: '110v' },
+        { id: 'POWER', name: 'Potência', value: '750W' }
+      ],
+      variacoes: [
+        { sku: 'WAFFLE-001-VERM', attributes: { COLOR: 'Vermelho' }, stock: 25, price: 29.90 },
+        { sku: 'WAFFLE-001-AZUL', attributes: { COLOR: 'Azul' }, stock: 25, price: 29.90 }
+      ],
+      fonte_catalogo: 'amazon_scraping',
+      fonte_catalogo_id: 'B08XYZ123'
     },
     responseExample: {
       success: true,
       message: 'Produto criado com sucesso',
-      data: { id: 'prod123', nome: 'Colete Postural' }
+      data: {
+        id: 'prod123',
+        nome: 'Mini Máquina de Waffles 110V',
+        atributos: [{ id: 'BRAND', name: 'Marca', value: 'Generic' }],
+        variacoes: [{ sku: 'WAFFLE-001-VERM', attributes: { COLOR: 'Vermelho' }, stock: 25 }],
+        tem_variacoes: true,
+        condicao: 'new',
+        dominio_id: 'LJF-WAFFLE_MAKERS',
+        enriquecido_em: '2026-02-15T10:00:00Z'
+      }
     }
   },
   {
     title: 'Listar Produtos',
     method: 'GET',
     url: '/functions/v1/api-produtos-listar',
-    description: 'Retorna a lista de produtos com paginação e filtros opcionais.',
+    description: 'Retorna lista de produtos com paginação, filtros e dados de atributos/variações.',
     queryParams: [
       { name: 'page', description: 'Página (padrão: 1)', example: '1' },
       { name: 'limit', description: 'Itens por página (máx: 100)', example: '20' },
-      { name: 'search', description: 'Buscar por nome ou SKU', example: 'tênis' }
+      { name: 'search', description: 'Buscar por nome ou SKU', example: 'waffle' },
+      { name: 'domain_id', description: 'Filtrar por domínio', example: 'LJF-WAFFLE_MAKERS' },
+      { name: 'condition', description: 'Filtrar por condição', example: 'new' },
+      { name: 'has_variations', description: 'Filtrar por variações', example: 'true' }
     ],
     responseExample: {
       success: true,
-      data: [{ id: 'prod123', nome: 'Tênis Esportivo', preco: 199.90 }],
+      data: [{
+        id: 'prod123',
+        nome: 'Mini Máquina de Waffles',
+        preco: 29.90,
+        atributos: [{ id: 'BRAND', name: 'Marca', value: 'Generic' }],
+        variacoes: [],
+        tem_variacoes: false,
+        condicao: 'new',
+        dominio_id: 'LJF-WAFFLE_MAKERS'
+      }],
       pagination: { page: 1, limit: 50, total: 1, totalPages: 1 }
+    }
+  },
+  {
+    title: 'Gerenciar Atributos do Produto',
+    method: 'PUT',
+    url: '/functions/v1/api-produtos-atributos',
+    description: 'Adiciona ou atualiza um atributo individual de um produto. Valida o atributo contra attribute_definitions.',
+    requestBody: {
+      product_id: 'uuid-do-produto',
+      attribute_id: 'MATERIAL',
+      value: 'Plástico ABS',
+      value_id: null
+    },
+    responseExample: {
+      success: true,
+      message: 'Atributo MATERIAL atualizado com sucesso',
+      data: {
+        id: 'uuid-do-produto',
+        nome: 'Mini Máquina de Waffles',
+        atributos: [
+          { id: 'BRAND', name: 'Marca', value: 'Generic' },
+          { id: 'MATERIAL', name: 'Material', value: 'Plástico ABS' }
+        ],
+        enriquecido_em: '2026-02-15T10:00:00Z'
+      }
+    }
+  },
+  {
+    title: 'Adicionar Variação',
+    method: 'POST',
+    url: '/functions/v1/api-produtos-variacoes?product_id=uuid',
+    description: 'Adiciona uma variação (SKU, atributos, estoque, preço) a um produto existente.',
+    queryParams: [
+      { name: 'product_id', description: 'ID do produto', example: 'uuid-do-produto', required: true }
+    ],
+    requestBody: {
+      sku: 'CINTA-GG-PRETO',
+      attributes: { SIZE: 'GG', COLOR: 'Preto' },
+      stock: 5,
+      price: 59.90,
+      gtin: '7891234567004'
+    },
+    responseExample: {
+      success: true,
+      message: 'Variação adicionada com sucesso',
+      data: { id: 'uuid', nome: 'Cinta Modeladora', tem_variacoes: true },
+      variacao: { sku: 'CINTA-GG-PRETO', attributes: { SIZE: 'GG', COLOR: 'Preto' }, stock: 5 }
+    }
+  },
+  {
+    title: 'Remover Variação',
+    method: 'DELETE',
+    url: '/functions/v1/api-produtos-variacoes?product_id=uuid&sku=SKU',
+    description: 'Remove uma variação de um produto pelo SKU.',
+    queryParams: [
+      { name: 'product_id', description: 'ID do produto', example: 'uuid-do-produto', required: true },
+      { name: 'sku', description: 'SKU da variação', example: 'CINTA-GG-PRETO', required: true }
+    ],
+    responseExample: {
+      success: true,
+      message: 'Variação removida com sucesso',
+      data: { id: 'uuid', nome: 'Cinta Modeladora', tem_variacoes: false }
+    }
+  },
+  {
+    title: 'Listar Domínios de Produto',
+    method: 'GET',
+    url: '/functions/v1/api-dominios-listar',
+    description: 'Lista domínios/categorias padronizadas com atributos obrigatórios e recomendados.',
+    queryParams: [
+      { name: 'category_id', description: 'Filtrar por categoria', example: 'uuid-categoria' },
+      { name: 'active', description: 'Filtrar por status ativo', example: 'true' }
+    ],
+    responseExample: {
+      success: true,
+      data: [{
+        id: 'LJF-WAFFLE_MAKERS',
+        name: 'Máquinas de Waffle',
+        category_id: 'uuid',
+        required_attributes: ['BRAND', 'VOLTAGE'],
+        recommended_attributes: ['MODEL', 'POWER', 'MATERIAL'],
+        variation_attributes: ['VOLTAGE', 'COLOR']
+      }]
+    }
+  },
+  {
+    title: 'Listar Definições de Atributos',
+    method: 'GET',
+    url: '/functions/v1/api-atributos-listar',
+    description: 'Lista todas as definições de atributos disponíveis para produtos.',
+    queryParams: [
+      { name: 'group', description: 'Filtrar por grupo', example: 'variations' },
+      { name: 'allows_variations', description: 'Atributos que permitem variações', example: 'true' }
+    ],
+    responseExample: {
+      success: true,
+      data: [{
+        id: 'COLOR',
+        name: 'Cor',
+        value_type: 'list',
+        attribute_group: 'variations',
+        allows_variations: true,
+        allowed_values: [
+          { id: 'red', name: 'Vermelho' },
+          { id: 'blue', name: 'Azul' }
+        ],
+        display_order: 10
+      }]
     }
   },
   {
