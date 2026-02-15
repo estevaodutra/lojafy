@@ -537,6 +537,51 @@ export type Database = {
           },
         ]
       }
+      attribute_definitions: {
+        Row: {
+          active: boolean | null
+          allowed_values: Json | null
+          allows_variations: boolean | null
+          attribute_group: string | null
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          id: string
+          name: string
+          unit: string | null
+          updated_at: string | null
+          value_type: string
+        }
+        Insert: {
+          active?: boolean | null
+          allowed_values?: Json | null
+          allows_variations?: boolean | null
+          attribute_group?: string | null
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id: string
+          name: string
+          unit?: string | null
+          updated_at?: string | null
+          value_type?: string
+        }
+        Update: {
+          active?: boolean | null
+          allowed_values?: Json | null
+          allows_variations?: boolean | null
+          attribute_group?: string | null
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          name?: string
+          unit?: string | null
+          updated_at?: string | null
+          value_type?: string
+        }
+        Relationships: []
+      }
       banners: {
         Row: {
           active: boolean
@@ -919,6 +964,20 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "demo_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_needs_enrichment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demo_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_attributes"
+            referencedColumns: ["id"]
+          },
         ]
       }
       demo_orders: {
@@ -1020,6 +1079,20 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "favorites_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_needs_enrichment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "favorites_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_attributes"
             referencedColumns: ["id"]
           },
         ]
@@ -1514,6 +1587,20 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "mercadolivre_published_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_needs_enrichment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercadolivre_published_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_attributes"
+            referencedColumns: ["id"]
+          },
         ]
       }
       newsletter_config: {
@@ -1790,6 +1877,20 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_needs_enrichment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_attributes"
             referencedColumns: ["id"]
           },
         ]
@@ -2292,6 +2393,70 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "product_approval_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_needs_enrichment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_approval_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_attributes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_domains: {
+        Row: {
+          active: boolean | null
+          category_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          recommended_attributes: string[] | null
+          required_attributes: string[] | null
+          settings: Json | null
+          updated_at: string | null
+          variation_attributes: string[] | null
+        }
+        Insert: {
+          active?: boolean | null
+          category_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id: string
+          name: string
+          recommended_attributes?: string[] | null
+          required_attributes?: string[] | null
+          settings?: Json | null
+          updated_at?: string | null
+          variation_attributes?: string[] | null
+        }
+        Update: {
+          active?: boolean | null
+          category_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          recommended_attributes?: string[] | null
+          required_attributes?: string[] | null
+          settings?: Json | null
+          updated_at?: string | null
+          variation_attributes?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_domains_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
         ]
       }
       product_marketplace_data: {
@@ -2384,6 +2549,20 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "product_marketplace_data_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_needs_enrichment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_marketplace_data_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_attributes"
+            referencedColumns: ["id"]
+          },
         ]
       }
       product_ranking: {
@@ -2426,6 +2605,20 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_ranking_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_needs_enrichment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_ranking_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_attributes"
             referencedColumns: ["id"]
           },
         ]
@@ -2481,6 +2674,20 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_product_variants_product"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_needs_enrichment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_product_variants_product"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_attributes"
+            referencedColumns: ["id"]
+          },
         ]
       }
       products: {
@@ -2489,15 +2696,22 @@ export type Database = {
           approval_status: string | null
           approved_at: string | null
           approved_by: string | null
+          attributes: Json | null
           badge: string | null
           brand: string | null
+          catalog_source: string | null
+          catalog_source_id: string | null
           category_id: string | null
+          condition: string | null
           cost_price: number | null
           created_at: string
           created_by: string | null
           description: string | null
+          domain_id: string | null
+          enriched_at: string | null
           featured: boolean | null
           gtin_ean13: string | null
+          has_variations: boolean | null
           height: number | null
           high_rotation: boolean | null
           id: string
@@ -2523,6 +2737,7 @@ export type Database = {
           supplier_id: string | null
           updated_at: string
           use_auto_pricing: boolean | null
+          variations: Json | null
           weight: number | null
           width: number | null
         }
@@ -2531,15 +2746,22 @@ export type Database = {
           approval_status?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          attributes?: Json | null
           badge?: string | null
           brand?: string | null
+          catalog_source?: string | null
+          catalog_source_id?: string | null
           category_id?: string | null
+          condition?: string | null
           cost_price?: number | null
           created_at?: string
           created_by?: string | null
           description?: string | null
+          domain_id?: string | null
+          enriched_at?: string | null
           featured?: boolean | null
           gtin_ean13?: string | null
+          has_variations?: boolean | null
           height?: number | null
           high_rotation?: boolean | null
           id?: string
@@ -2565,6 +2787,7 @@ export type Database = {
           supplier_id?: string | null
           updated_at?: string
           use_auto_pricing?: boolean | null
+          variations?: Json | null
           weight?: number | null
           width?: number | null
         }
@@ -2573,15 +2796,22 @@ export type Database = {
           approval_status?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          attributes?: Json | null
           badge?: string | null
           brand?: string | null
+          catalog_source?: string | null
+          catalog_source_id?: string | null
           category_id?: string | null
+          condition?: string | null
           cost_price?: number | null
           created_at?: string
           created_by?: string | null
           description?: string | null
+          domain_id?: string | null
+          enriched_at?: string | null
           featured?: boolean | null
           gtin_ean13?: string | null
+          has_variations?: boolean | null
           height?: number | null
           high_rotation?: boolean | null
           id?: string
@@ -2607,6 +2837,7 @@ export type Database = {
           supplier_id?: string | null
           updated_at?: string
           use_auto_pricing?: boolean | null
+          variations?: Json | null
           weight?: number | null
           width?: number | null
         }
@@ -2933,6 +3164,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "reseller_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_needs_enrichment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reseller_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_attributes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "reseller_products_reseller_id_fkey"
             columns: ["reseller_id"]
             isOneToOne: false
@@ -3185,6 +3430,20 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_needs_enrichment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_attributes"
             referencedColumns: ["id"]
           },
         ]
@@ -3901,9 +4160,71 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_products_needs_enrichment: {
+        Row: {
+          attributes: Json | null
+          brand: string | null
+          category_id: string | null
+          category_name: string | null
+          enriched_at: string | null
+          gtin_ean13: string | null
+          id: string | null
+          name: string | null
+          specifications: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_products_with_attributes: {
+        Row: {
+          attributes: Json | null
+          brand_value: string | null
+          catalog_source: string | null
+          color_value: string | null
+          condition: string | null
+          domain_id: string | null
+          domain_name: string | null
+          enriched_at: string | null
+          has_variations: boolean | null
+          id: string | null
+          name: string | null
+          price: number | null
+          size_value: string | null
+          stock_quantity: number | null
+          variation_count: number | null
+          variations: Json | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      add_product_attribute: {
+        Args: {
+          p_attribute_id: string
+          p_product_id: string
+          p_value: string
+          p_value_id?: string
+        }
+        Returns: Json
+      }
+      add_product_variation: {
+        Args: {
+          p_attributes: Json
+          p_gtin?: string
+          p_price?: number
+          p_product_id: string
+          p_sku: string
+          p_stock: number
+        }
+        Returns: Json
+      }
       approve_withdrawal: {
         Args: { p_admin_id: string; p_withdrawal_id: string }
         Returns: undefined
@@ -4021,6 +4342,10 @@ export type Database = {
           type: string
         }[]
       }
+      get_product_total_stock: {
+        Args: { p_product_id: string }
+        Returns: number
+      }
       get_safe_demo_user_data: {
         Args: never
         Returns: {
@@ -4130,6 +4455,7 @@ export type Database = {
         Args: { _order_id: string; _user_id: string }
         Returns: boolean
       }
+      migrate_specifications_to_attributes: { Args: never; Returns: undefined }
       reject_withdrawal: {
         Args: { p_admin_id: string; p_reason: string; p_withdrawal_id: string }
         Returns: undefined
