@@ -82,6 +82,9 @@ Deno.serve(async (req) => {
     const search = url.searchParams.get('search');
     const category_id = url.searchParams.get('category_id');
     const active = url.searchParams.get('active');
+    const domain_id = url.searchParams.get('domain_id');
+    const condition = url.searchParams.get('condition');
+    const has_variations = url.searchParams.get('has_variations');
 
     const offset = (page - 1) * limit;
 
@@ -102,6 +105,14 @@ Deno.serve(async (req) => {
         high_rotation,
         created_at,
         updated_at,
+        attributes,
+        variations,
+        domain_id,
+        condition,
+        has_variations,
+        enriched_at,
+        catalog_source,
+        catalog_source_id,
         categories:category_id(id, name, slug)
       `);
 
@@ -114,6 +125,15 @@ Deno.serve(async (req) => {
     }
     if (active !== null && active !== undefined) {
       query = query.eq('active', active === 'true');
+    }
+    if (domain_id) {
+      query = query.eq('domain_id', domain_id);
+    }
+    if (condition) {
+      query = query.eq('condition', condition);
+    }
+    if (has_variations !== null && has_variations !== undefined) {
+      query = query.eq('has_variations', has_variations === 'true');
     }
 
     // Apply pagination and ordering
@@ -159,6 +179,14 @@ Deno.serve(async (req) => {
           ativo: product.active,
           alta_rotatividade: product.high_rotation,
           categoria: product.categories,
+          atributos: product.attributes,
+          variacoes: product.variations,
+          dominio_id: product.domain_id,
+          condicao: product.condition,
+          tem_variacoes: product.has_variations,
+          enriquecido_em: product.enriched_at,
+          fonte_catalogo: product.catalog_source,
+          fonte_catalogo_id: product.catalog_source_id,
           criado_em: product.created_at,
           atualizado_em: product.updated_at
         })) || [],
