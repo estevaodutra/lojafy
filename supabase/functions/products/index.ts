@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
 
@@ -17,35 +17,69 @@ function errorResponse(error: string, status = 400) {
   return jsonResponse({ error }, status);
 }
 
+async function logApiRequest(supabase: any, data: any) {
+  try {
+    await supabase.from('api_request_logs').insert(data);
+  } catch (e) { console.error('[LOG_ERROR]', e); }
+}
+
 const VALID_CONDITIONS = ['new', 'used', 'refurbished', 'not_specified'];
 
 Deno.serve(async (req) => {
+  const startTime = Date.now();
+  const url = new URL(req.url);
+  let statusCode = 200;
+  let errorMessage: string | null = null;
+  let apiKeyId: string | null = null;
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return errorResponse('Não autorizado', 401);
+    // ── Autenticação via X-API-Key ──
+    const apiKey = req.headers.get('x-api-key');
+    if (!apiKey) {
+      statusCode = 401;
+      errorMessage = 'API key required';
+      return errorResponse('API key required in X-API-Key header', 401);
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const { data: apiKeyData, error: apiKeyError } = await supabase
+      .from('api_keys')
+      .select('id, user_id, permissions, active')
+      .eq('api_key', apiKey)
+      .eq('active', true)
+      .maybeSingle();
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return errorResponse('Não autorizado', 401);
+    if (apiKeyError || !apiKeyData) {
+      statusCode = 401;
+      errorMessage = 'Invalid or inactive API key';
+      return errorResponse('Invalid or inactive API key', 401);
     }
 
-    const url = new URL(req.url);
-    const pathParts = url.pathname.split('/').filter(Boolean);
-    // pathParts: ["products"] or ["products", id] or ["products", id, "variations", sku]
-
+    apiKeyId = apiKeyData.id;
+    const permissions = apiKeyData.permissions as any;
     const method = req.method;
+
+    // ── Verificar permissões ──
+    const requiredPermission = method === 'GET' ? 'read' : 'write';
+    if (!permissions?.produtos?.[requiredPermission]) {
+      statusCode = 403;
+      errorMessage = `Insufficient permissions: produtos.${requiredPermission} required`;
+      return errorResponse(`Permissão produtos.${requiredPermission} não concedida`, 403);
+    }
+
+    // Atualizar last_used
+    await supabase.from('api_keys').update({ last_used: new Date().toISOString() }).eq('api_key', apiKey);
+
+    // ── Roteamento ──
+    const pathParts = url.pathname.split('/').filter(Boolean);
     const segment1 = pathParts[1]; // id or "pending"
     const productId = segment1 && segment1 !== 'pending' ? segment1 : null;
     const subResource = pathParts[2]; // "attributes", "variations", "approve", "reject"
@@ -53,7 +87,7 @@ Deno.serve(async (req) => {
 
     // ── POST /products ──
     if (method === 'POST' && !productId) {
-      return await handleCreateProduct(supabase, req, user.id);
+      return await handleCreateProduct(supabase, req, apiKeyData.user_id);
     }
 
     // ── GET /products ──
@@ -103,7 +137,7 @@ Deno.serve(async (req) => {
 
     // ── POST /products/:id/approve ──
     if (method === 'POST' && productId && subResource === 'approve') {
-      return await handleApprove(supabase, productId, user.id);
+      return await handleApprove(supabase, productId, apiKeyData.user_id);
     }
 
     // ── POST /products/:id/reject ──
@@ -111,10 +145,25 @@ Deno.serve(async (req) => {
       return await handleReject(supabase, req, productId);
     }
 
+    statusCode = 404;
+    errorMessage = 'Endpoint não encontrado';
     return errorResponse('Endpoint não encontrado', 404);
   } catch (error) {
     console.error('Erro na API de produtos:', error);
+    statusCode = 500;
+    errorMessage = error instanceof Error ? error.message : 'Erro interno do servidor';
     return jsonResponse({ error: 'Erro interno do servidor', details: error.message }, 500);
+  } finally {
+    logApiRequest(supabase, {
+      function_name: 'products',
+      method: req.method,
+      path: url.pathname,
+      api_key_id: apiKeyId,
+      query_params: Object.fromEntries(url.searchParams),
+      status_code: statusCode,
+      error_message: errorMessage,
+      duration_ms: Date.now() - startTime,
+    });
   }
 });
 
@@ -297,7 +346,6 @@ async function handleGetProduct(supabase: any, productId: string) {
 async function handleUpdateProduct(supabase: any, req: Request, productId: string) {
   const body = await req.json();
 
-  // Remove immutable fields
   delete body.id;
   delete body.created_at;
   delete body.created_by;
@@ -321,7 +369,6 @@ async function handleUpdateProduct(supabase: any, req: Request, productId: strin
     return errorResponse(`condition deve ser: ${VALID_CONDITIONS.join(', ')}`);
   }
 
-  // Auto-compute derived fields
   if (body.variations !== undefined) {
     body.has_variations = body.variations.length > 0;
   }
@@ -375,7 +422,6 @@ async function handleUpdateAttribute(supabase: any, req: Request, productId: str
   if (!body.attribute_id) return errorResponse('attribute_id é obrigatório');
   if (body.value === undefined) return errorResponse('value é obrigatório');
 
-  // Validate attribute definition exists
   const { data: attrDef, error: attrError } = await supabase
     .from('attribute_definitions')
     .select('*')
@@ -386,7 +432,6 @@ async function handleUpdateAttribute(supabase: any, req: Request, productId: str
     return errorResponse(`Atributo ${body.attribute_id} não encontrado`, 404);
   }
 
-  // Get current product attributes
   const { data: product, error: productError } = await supabase
     .from('products')
     .select('attributes')
@@ -499,7 +544,7 @@ async function handleUpdateVariation(supabase: any, req: Request, productId: str
   const idx = variations.findIndex((v: any) => v.sku === sku);
   if (idx === -1) return errorResponse('Variação não encontrada', 404);
 
-  variations[idx] = { ...variations[idx], ...body, sku }; // SKU immutable
+  variations[idx] = { ...variations[idx], ...body, sku };
 
   const { data, error } = await supabase
     .from('products')
