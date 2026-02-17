@@ -1444,15 +1444,14 @@ const paymentsEndpoints: EndpointData[] = [
   }
 ];
 
-// Export organized data structure
-// Products JWT Endpoints (unified)
-const productsJwtEndpoints: EndpointData[] = [
+// Products REST Endpoints (unified - X-API-Key auth)
+const productsRestEndpoints: EndpointData[] = [
   {
     title: 'Criar Produto',
     method: 'POST',
     url: '/functions/v1/products',
-    description: 'Cria um novo produto com atributos estruturados e variações. Autenticação via JWT.',
-    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    description: 'Cria um novo produto com atributos estruturados e variações.',
+    headers: [{ name: 'X-API-Key', description: 'Chave de API com permissão produtos.write', example: 'sk_sua_chave', required: true }],
     requestBody: { name: 'Produto', price: 29.90, attributes: [], variations: [], condition: 'new' },
     responseExample: { success: true, data: { id: 'uuid', name: 'Produto', has_variations: false } }
   },
@@ -1460,8 +1459,8 @@ const productsJwtEndpoints: EndpointData[] = [
     title: 'Listar Produtos',
     method: 'GET',
     url: '/functions/v1/products',
-    description: 'Lista produtos com filtros e paginação via JWT.',
-    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    description: 'Lista produtos com filtros e paginação.',
+    headers: [{ name: 'X-API-Key', description: 'Chave de API com permissão produtos.read', example: 'sk_sua_chave', required: true }],
     queryParams: [
       { name: 'search', description: 'Buscar por nome ou SKU', example: 'waffle' },
       { name: 'category_id', description: 'Filtrar por categoria', example: 'uuid' },
@@ -1476,24 +1475,24 @@ const productsJwtEndpoints: EndpointData[] = [
     title: 'Produtos Pendentes',
     method: 'GET',
     url: '/functions/v1/products/pending',
-    description: 'Lista produtos aguardando aprovação via JWT.',
-    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    description: 'Lista produtos aguardando aprovação.',
+    headers: [{ name: 'X-API-Key', description: 'Chave de API com permissão produtos.read', example: 'sk_sua_chave', required: true }],
     responseExample: { success: true, data: [], total: 0 }
   },
   {
     title: 'Buscar Produto',
     method: 'GET',
     url: '/functions/v1/products/:id',
-    description: 'Dados completos de um produto via JWT.',
-    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    description: 'Dados completos de um produto.',
+    headers: [{ name: 'X-API-Key', description: 'Chave de API com permissão produtos.read', example: 'sk_sua_chave', required: true }],
     responseExample: { success: true, data: { id: 'uuid', name: 'Produto' } }
   },
   {
     title: 'Atualizar Produto',
     method: 'PUT',
     url: '/functions/v1/products/:id',
-    description: 'Atualização parcial do produto. Envie apenas os campos que deseja alterar — nome, descrição, foto, preço, atributos, variações, etc. Campos não enviados permanecem inalterados.',
-    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    description: 'Atualização parcial do produto. Envie apenas os campos que deseja alterar.',
+    headers: [{ name: 'X-API-Key', description: 'Chave de API com permissão produtos.write', example: 'sk_sua_chave', required: true }],
     requestBody: {
       name: 'Novo Nome do Produto',
       description: 'Nova descrição detalhada do produto',
@@ -1530,7 +1529,7 @@ const productsJwtEndpoints: EndpointData[] = [
     method: 'DELETE',
     url: '/functions/v1/products/:id',
     description: 'Remove um produto permanentemente.',
-    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    headers: [{ name: 'X-API-Key', description: 'Chave de API com permissão produtos.write', example: 'sk_sua_chave', required: true }],
     responseExample: { success: true, message: 'Produto removido com sucesso' }
   },
   {
@@ -1538,7 +1537,7 @@ const productsJwtEndpoints: EndpointData[] = [
     method: 'PUT',
     url: '/functions/v1/products/:id/attributes',
     description: 'Adiciona/atualiza atributo individual validado contra attribute_definitions.',
-    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    headers: [{ name: 'X-API-Key', description: 'Chave de API com permissão produtos.write', example: 'sk_sua_chave', required: true }],
     requestBody: { attribute_id: 'MATERIAL', value: 'Plástico ABS' },
     responseExample: { success: true, data: { id: 'uuid' } }
   },
@@ -1547,7 +1546,7 @@ const productsJwtEndpoints: EndpointData[] = [
     method: 'POST',
     url: '/functions/v1/products/:id/variations',
     description: 'Adiciona variação com SKU, atributos, estoque e preço.',
-    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    headers: [{ name: 'X-API-Key', description: 'Chave de API com permissão produtos.write', example: 'sk_sua_chave', required: true }],
     requestBody: { sku: 'PROD-GG', attributes: { SIZE: 'GG' }, stock: 10, price: 59.90 },
     responseExample: { success: true, data: { id: 'uuid', has_variations: true } }
   },
@@ -1556,7 +1555,7 @@ const productsJwtEndpoints: EndpointData[] = [
     method: 'PUT',
     url: '/functions/v1/products/:id/variations/:sku',
     description: 'Atualiza variação por SKU (SKU imutável).',
-    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    headers: [{ name: 'X-API-Key', description: 'Chave de API com permissão produtos.write', example: 'sk_sua_chave', required: true }],
     requestBody: { stock: 15 },
     responseExample: { success: true, data: { id: 'uuid' } }
   },
@@ -1565,7 +1564,7 @@ const productsJwtEndpoints: EndpointData[] = [
     method: 'DELETE',
     url: '/functions/v1/products/:id/variations/:sku',
     description: 'Remove variação pelo SKU.',
-    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    headers: [{ name: 'X-API-Key', description: 'Chave de API com permissão produtos.write', example: 'sk_sua_chave', required: true }],
     responseExample: { success: true, message: 'Variação removida' }
   },
   {
@@ -1573,7 +1572,7 @@ const productsJwtEndpoints: EndpointData[] = [
     method: 'POST',
     url: '/functions/v1/products/:id/approve',
     description: 'Aprova produto pendente.',
-    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    headers: [{ name: 'X-API-Key', description: 'Chave de API com permissão produtos.write', example: 'sk_sua_chave', required: true }],
     responseExample: { success: true, data: { approval_status: 'approved' } }
   },
   {
@@ -1581,7 +1580,7 @@ const productsJwtEndpoints: EndpointData[] = [
     method: 'POST',
     url: '/functions/v1/products/:id/reject',
     description: 'Rejeita produto com motivo opcional.',
-    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    headers: [{ name: 'X-API-Key', description: 'Chave de API com permissão produtos.write', example: 'sk_sua_chave', required: true }],
     requestBody: { reason: 'Preço incorreto' },
     responseExample: { success: true, data: { approval_status: 'rejected' } }
   }
@@ -1636,9 +1635,9 @@ export const apiEndpointsData: EndpointCategory[] = [
     ]
   },
   {
-    id: 'products-jwt',
-    title: 'Produtos (JWT)',
-    endpoints: productsJwtEndpoints
+    id: 'products-rest',
+    title: 'Produtos (REST)',
+    endpoints: productsRestEndpoints
   }
 ];
 
