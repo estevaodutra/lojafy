@@ -1,54 +1,37 @@
 
 
-# Unificar Endpoints de Produtos em uma Categoria
+# Scroll Direto ao Endpoint ao Clicar no Sidebar
 
 ## Problema
-Existem duas categorias separadas no menu lateral que documentam endpoints de produtos:
-- **Catalogo** -- endpoints antigos (`api-produtos-*`) misturados com categorias, subcategorias e dominios
-- **Produtos (REST)** -- endpoints novos (`/products`) com a mesma finalidade
-
-Isso gera confusao na documentacao.
+Ao clicar em um endpoint especifico no menu lateral, a pagina navega para a categoria mas nao rola ate o endpoint clicado. O usuario precisa procurar manualmente entre os cards.
 
 ## Solucao
 
-Reorganizar a categoria **Catalogo** em subcategorias e absorver os endpoints "Produtos (REST)", eliminando a duplicidade.
-
-### Nova estrutura:
-
-```text
-Catalogo
-  +-- Produtos (API Key)       [6 endpoints: api-produtos-*]
-  +-- Produtos (REST)          [12 endpoints: /products]
-  +-- Categorias               [2 endpoints]
-  +-- Subcategorias            [2 endpoints]
-  +-- Dominios e Atributos     [2 endpoints]
-```
+Ao clicar num endpoint no sidebar, calcular em qual pagina ele esta (paginacao de 5 por pagina), navegar para essa pagina, e fazer scroll automatico ate o card correspondente.
 
 ## Alteracoes
 
-### 1. `src/data/apiEndpointsData.ts`
-- Separar o array `catalogEndpoints` (atualmente 14 endpoints em lista plana) em 4 arrays menores:
-  - `catalogProductsApiKey` (6): Cadastrar, Listar, Aguardando Aprovacao, Atributos, Add Variacao, Del Variacao
-  - `catalogCategories` (2): Listar Categorias, Cadastrar Categoria
-  - `catalogSubcategories` (2): Listar Subcategorias, Cadastrar Subcategoria
-  - `catalogDomains` (2): Listar Dominios, Listar Definicoes de Atributos
-- Manter o array `productsRestEndpoints` existente (12 endpoints) como esta
-- Atualizar a entrada `catalog` no `apiEndpointsData` para usar `subcategories` em vez de `endpoints`:
-  - Subcategoria "Produtos (API Key)" com `catalogProductsApiKey`
-  - Subcategoria "Produtos (REST)" com `productsRestEndpoints`
-  - Subcategoria "Categorias" com `catalogCategories`
-  - Subcategoria "Subcategorias" com `catalogSubcategories`
-  - Subcategoria "Dominios e Atributos" com `catalogDomains`
-- Remover a entrada `products-rest` do array `apiEndpointsData` (linha 1637-1641)
+### 1. `src/pages/admin/ApiDocumentation.tsx`
+- Adicionar estado `scrollToEndpointIndex` (indice do endpoint dentro da lista completa da categoria)
+- Criar handler `handleEndpointClick(categoryId, globalIndex)`:
+  - Seta a secao para `categoryId`
+  - Calcula a pagina correta: `Math.floor(globalIndex / ITEMS_PER_PAGE) + 1`
+  - Armazena o indice local na pagina para scroll: `globalIndex % ITEMS_PER_PAGE`
+- Passar `onEndpointClick` para o `ApiDocsSidebar`
+- Passar `scrollToIndex` para o `ApiDocsContent`
 
 ### 2. `src/components/admin/ApiDocsSidebar.tsx`
-- Nenhuma alteracao necessaria -- o sidebar ja suporta `subcategories` (usado por Academy e Integra)
+- Adicionar prop `onEndpointClick?: (categoryId: string, endpointIndex: number) => void`
+- Nos botoes de endpoint direto: chamar `onEndpointClick(category.id, index)` em vez de `onSectionChange(category.id)`
+- Nos botoes de subcategoria: calcular o indice global somando os endpoints das subcategorias anteriores e chamar `onEndpointClick(category.id, globalIndex)`
 
 ### 3. `src/components/admin/ApiDocsContent.tsx`
-- Adicionar "catalog" ao `getCategoryTitle()` se necessario (ja existe)
-- Nenhuma outra alteracao necessaria -- o componente ja renderiza subcategorias via `flatMap`
+- Adicionar prop `scrollToIndex?: number | null`
+- Adicionar `id={`endpoint-card-${index}`}` em cada `EndpointCard` renderizado
+- Usar `useEffect` que, quando `scrollToIndex` muda, executa `document.getElementById(`endpoint-card-${scrollToIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })` com um pequeno delay para aguardar a renderizacao
 
 ### Resultado
-- Uma unica categoria "Catalogo" com 5 subcategorias claras
-- Total de 24 endpoints organizados
-- Sem duplicidade na documentacao
+- Clicar em qualquer endpoint no sidebar navega direto para a pagina e card correto
+- Scroll suave ate o endpoint
+- Funciona com a paginacao existente (calcula a pagina automaticamente)
+
