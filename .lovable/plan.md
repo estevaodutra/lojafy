@@ -1,93 +1,69 @@
 
-# Atualizar Edge Functions e Documentacao da API
+
+# Criar Edge Function Unificada `products`
 
 ## Resumo
 
-Atualizar as Edge Functions de produtos e a documentacao da API para refletir os novos campos de atributos estruturados, variacoes e dominios adicionados na tabela `products`.
+Criar uma nova Edge Function `products/index.ts` que consolida todos os endpoints de produtos em uma unica funcao com roteamento baseado em path e autenticacao JWT. Esta funcao opera em paralelo com as funcoes existentes baseadas em X-API-Key (que continuam funcionando para integracao externa).
 
 ## O que sera feito
 
-### 1. Atualizar Edge Function `api-produtos-cadastrar`
-Adicionar suporte aos novos campos no endpoint de criacao de produtos:
-- `attributes` (JSONB array) - com validacao de tipo
-- `variations` (JSONB array) - com validacao de tipo
-- `domain_id` (TEXT)
-- `condition` (TEXT) - com validacao de valores permitidos
-- `catalog_source`, `catalog_source_id` (TEXT)
-- `has_variations` (calculado automaticamente)
-- `enriched_at` (calculado automaticamente quando attributes preenchido)
+### 1. Criar `supabase/functions/products/index.ts`
+Uma Edge Function unificada com 12 endpoints, usando autenticacao JWT (via `Authorization: Bearer` header) e roteamento por path/method:
 
-O response tambem incluira os novos campos traduzidos para portugues (atributos, variacoes, dominio_id, condicao, etc.).
+| Metodo | Path | Descricao |
+|--------|------|-----------|
+| POST | `/products` | Criar produto |
+| GET | `/products` | Listar produtos (filtros + paginacao) |
+| GET | `/products/pending` | Produtos aguardando aprovacao |
+| GET | `/products/:id` | Buscar produto por ID |
+| PUT | `/products/:id` | Atualizar produto (completo) |
+| DELETE | `/products/:id` | Remover produto |
+| PUT | `/products/:id/attributes` | Adicionar/atualizar atributo |
+| POST | `/products/:id/variations` | Adicionar variacao |
+| PUT | `/products/:id/variations/:sku` | Atualizar variacao |
+| DELETE | `/products/:id/variations/:sku` | Remover variacao |
+| POST | `/products/:id/approve` | Aprovar produto |
+| POST | `/products/:id/reject` | Rejeitar produto |
 
-### 2. Atualizar Edge Function `api-produtos-listar`
-Incluir novos campos no SELECT e no mapeamento de resposta:
-- `attributes`, `variations`, `domain_id`, `condition`, `has_variations`, `enriched_at`
-- Adicionar filtros opcionais: `domain_id`, `condition`, `has_variations`
+### 2. Registrar em `supabase/config.toml`
+Adicionar entrada `[functions.products]` com `verify_jwt = false` (validacao no codigo).
 
-### 3. Criar Edge Function `api-produtos-atributos`
-Endpoint dedicado para gerenciar atributos de um produto individual:
-- **PUT** - Adicionar/atualizar um atributo (valida contra `attribute_definitions`)
-- Busca definicao do atributo, monta objeto estruturado, atualiza JSONB
-
-### 4. Criar Edge Function `api-produtos-variacoes`
-Endpoint dedicado para gerenciar variacoes de um produto:
-- **POST** - Adicionar variacao (SKU, attributes, stock, price, gtin)
-- **DELETE** (query param `sku`) - Remover variacao por SKU
-- Atualiza automaticamente `has_variations` e `enriched_at`
-
-### 5. Criar Edge Function `api-dominios-listar`
-Endpoint para listar dominios de produto:
-- **GET** - Lista dominios com filtros opcionais (category_id, active)
-
-### 6. Criar Edge Function `api-atributos-listar`
-Endpoint para listar definicoes de atributos:
-- **GET** - Lista atributos com filtros (group, allows_variations)
-
-### 7. Atualizar Documentacao da API (`apiEndpointsData.ts`)
-Adicionar novos endpoints na categoria Catalogo:
-- Atualizar exemplos de "Cadastrar Produto" e "Listar Produtos" com novos campos
-- Adicionar endpoints: Gerenciar Atributos, Gerenciar Variacoes, Listar Dominios, Listar Atributos
-
-### 8. Registrar novas funcoes no `config.toml`
-Adicionar entradas `verify_jwt = false` para as 4 novas Edge Functions.
+### 3. Atualizar documentacao em `src/data/apiEndpointsData.ts`
+Adicionar nova secao "API REST Produtos (JWT)" documentando os novos endpoints unificados.
 
 ## Detalhes tecnicos
 
-### Estrutura das novas Edge Functions
+### Autenticacao
+- Usa `supabase.auth.getUser()` com token JWT do header Authorization
+- Diferente das funcoes `api-*` que usam X-API-Key + service role
+- Ambos os sistemas coexistem: X-API-Key para integracao externa, JWT para uso interno do app
 
-Todas seguem o padrao existente do projeto:
-- Import `@supabase/supabase-js@2.57.4` (versao fixa)
-- Autenticacao via `X-API-Key` header
-- Validacao de permissoes (`produtos.read` / `produtos.write`)
-- Logging via `logApiRequest` com campos `snake_case`
+### Padrao do projeto
+- Import fixo: `@supabase/supabase-js@2.57.4`
 - CORS headers padrao
-- Tratamento de erros consistente
+- Criacao do client com `SUPABASE_URL` e `SUPABASE_ANON_KEY` (nao service role, pois respeita RLS)
+- Roteamento manual via `url.pathname.split("/")`
 
-### Mapeamento portugues nos campos do cadastrar/listar
+### Campos suportados no POST/PUT
+Todos os campos da tabela `products` incluindo os novos:
+- `attributes` (JSONB array), `variations` (JSONB array), `domain_id`, `condition`, `has_variations` (auto), `catalog_source`, `catalog_source_id`, `enriched_at` (auto)
 
-Novos campos no request (portugues):
-- `atributos` -> `attributes`
-- `variacoes` -> `variations`
-- `dominio_id` -> `domain_id`
-- `condicao` -> `condition`
-- `fonte_catalogo` -> `catalog_source`
-- `fonte_catalogo_id` -> `catalog_source_id`
-
-### Validacoes implementadas
-- `atributos` deve ser array (se fornecido)
-- `variacoes` deve ser array (se fornecido)
-- `condicao` deve ser: new, used, refurbished, not_specified
+### Validacoes
+- `name` obrigatorio e nao vazio (POST)
+- `price` obrigatorio e > 0 (POST)
+- `attributes` deve ser array
+- `variations` deve ser array
+- `condition` deve ser: new, used, refurbished, not_specified
 - `has_variations` calculado automaticamente
-- `enriched_at` setado quando attributes tem conteudo
-- Endpoint de atributos valida existencia em `attribute_definitions`
-- Endpoint de variacoes valida campos obrigatorios (sku, attributes, stock)
+- `enriched_at` atualizado automaticamente quando attributes modificado
+- Variacao: `sku`, `attributes` (objeto), `stock >= 0` obrigatorios
+- Atributo: valida existencia em `attribute_definitions`
 
 ### Arquivos modificados
-- `supabase/functions/api-produtos-cadastrar/index.ts` (atualizar)
-- `supabase/functions/api-produtos-listar/index.ts` (atualizar)
-- `supabase/functions/api-produtos-atributos/index.ts` (novo)
-- `supabase/functions/api-produtos-variacoes/index.ts` (novo)
-- `supabase/functions/api-dominios-listar/index.ts` (novo)
-- `supabase/functions/api-atributos-listar/index.ts` (novo)
-- `supabase/config.toml` (adicionar 4 novas funcoes)
-- `src/data/apiEndpointsData.ts` (atualizar documentacao)
+- `supabase/functions/products/index.ts` (novo)
+- `supabase/config.toml` (adicionar products)
+- `src/data/apiEndpointsData.ts` (documentacao)
+
+### Funcoes existentes mantidas
+As funcoes `api-produtos-cadastrar`, `api-produtos-listar`, `api-produtos-atributos`, `api-produtos-variacoes` e `api-produtos-aguardando-aprovacao` continuam funcionando normalmente para integracao via X-API-Key.
