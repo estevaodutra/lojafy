@@ -1,43 +1,46 @@
 
-# Melhorar Documentacao do Endpoint PUT /products/:id
+
+# Migrar Edge Function `products` de JWT para X-API-Key
 
 ## Problema
-O endpoint "Atualizar Produto" (PUT /products/:id) esta documentado com um exemplo muito simples (`{ name: 'Atualizado', price: 39.90 }`), sem deixar claro quais campos podem ser atualizados -- especialmente nome, descricao e imagem.
+A Edge Function `products/index.ts` usa autenticacao JWT (Bearer token), mas o padrao do projeto e autenticacao via X-API-Key com service role key -- igual as demais funcoes `api-produtos-*`.
 
 ## O que sera feito
 
-### 1. Atualizar documentacao em `src/data/apiEndpointsData.ts`
-Expandir o endpoint "Atualizar Produto" (linha ~1491) para incluir:
-- Descricao mais clara explicando que todos os campos podem ser atualizados parcialmente
-- Exemplo de requestBody completo mostrando nome, descricao, foto e outros campos comuns
-- Lista dos campos aceitos como referencia
+### 1. Atualizar `supabase/functions/products/index.ts`
+Trocar a autenticacao de JWT para X-API-Key, seguindo o mesmo padrao das funcoes existentes (`api-produtos-listar`, `api-produtos-cadastrar`, etc.):
 
-### Exemplo do requestBody atualizado:
+- Substituir criacao do client de `SUPABASE_ANON_KEY` para `SUPABASE_SERVICE_ROLE_KEY`
+- Remover logica de Bearer token e `supabase.auth.getUser()`
+- Adicionar validacao de `X-API-Key` header contra tabela `api_keys`
+- Verificar permissao `produtos.read` (GET) ou `produtos.write` (POST/PUT/DELETE)
+- Atualizar `last_used` da chave
+- Adicionar header `x-api-key` no CORS `Access-Control-Allow-Headers`
+- Adicionar log de requisicao via `logApiRequest` no `finally` block
+- Ajustar `handleApprove` para nao depender de `user.id` (usar `apiKeyData.user_id` no lugar)
+
+### 2. Atualizar documentacao em `src/data/apiEndpointsData.ts`
+- Renomear categoria de "Produtos (JWT)" para "Produtos (REST)"
+- Trocar todos os headers de `Authorization: Bearer eyJ...` para `X-API-Key: sk_sua_chave`
+- Atualizar id de `products-jwt` para `products-rest`
+
+## Detalhes tecnicos
+
+### Padrao de autenticacao (copiado das funcoes existentes)
+
 ```text
-{
-  name: "Novo Nome do Produto",
-  description: "Nova descrição detalhada do produto",
-  short_description: "Descrição curta atualizada",
-  main_image_url: "https://exemplo.com/nova-foto.jpg",
-  images: ["https://exemplo.com/foto1.jpg", "https://exemplo.com/foto2.jpg"],
-  price: 39.90,
-  original_price: 49.90,
-  cost_price: 25.00,
-  brand: "Nova Marca",
-  sku: "SKU-ATUALIZADO",
-  category_id: "uuid-categoria",
-  stock_quantity: 100,
-  active: true,
-  condition: "new",
-  attributes: [
-    { id: "BRAND", name: "Marca", value: "Nova Marca" }
-  ]
-}
+1. Ler header X-API-Key
+2. Buscar em api_keys WHERE api_key = key AND active = true
+3. Verificar permissoes: permissions.produtos.read ou .write
+4. Atualizar last_used
+5. Criar client com SUPABASE_SERVICE_ROLE_KEY (acesso total, sem RLS)
 ```
 
-### Detalhes tecnicos
-- Arquivo modificado: `src/data/apiEndpointsData.ts` (linhas ~1491-1498)
-- Expandir o campo `description` para explicar que e uma atualizacao parcial (envie apenas os campos que deseja alterar)
-- Expandir o `requestBody` com exemplo completo
-- Expandir o `responseExample` para refletir os campos atualizados
-- Nenhum outro arquivo precisa ser alterado
+### Permissoes por metodo
+- GET: requer `produtos.read`
+- POST, PUT, DELETE: requer `produtos.write`
+
+### Arquivos modificados
+- `supabase/functions/products/index.ts` -- autenticacao e logging
+- `src/data/apiEndpointsData.ts` -- documentacao (headers e titulo)
+
