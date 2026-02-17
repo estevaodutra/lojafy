@@ -1492,10 +1492,38 @@ const productsJwtEndpoints: EndpointData[] = [
     title: 'Atualizar Produto',
     method: 'PUT',
     url: '/functions/v1/products/:id',
-    description: 'Atualização completa do produto incluindo atributos e variações.',
+    description: 'Atualização parcial do produto. Envie apenas os campos que deseja alterar — nome, descrição, foto, preço, atributos, variações, etc. Campos não enviados permanecem inalterados.',
     headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
-    requestBody: { name: 'Atualizado', price: 39.90 },
-    responseExample: { success: true, data: { id: 'uuid' } }
+    requestBody: {
+      name: 'Novo Nome do Produto',
+      description: 'Nova descrição detalhada do produto',
+      short_description: 'Descrição curta atualizada',
+      main_image_url: 'https://exemplo.com/nova-foto.jpg',
+      images: ['https://exemplo.com/foto1.jpg', 'https://exemplo.com/foto2.jpg'],
+      price: 39.90,
+      original_price: 49.90,
+      cost_price: 25.00,
+      brand: 'Nova Marca',
+      sku: 'SKU-ATUALIZADO',
+      category_id: 'uuid-categoria',
+      stock_quantity: 100,
+      active: true,
+      condition: 'new',
+      attributes: [
+        { id: 'BRAND', name: 'Marca', value: 'Nova Marca' }
+      ]
+    },
+    responseExample: {
+      success: true,
+      data: {
+        id: 'uuid',
+        name: 'Novo Nome do Produto',
+        description: 'Nova descrição detalhada do produto',
+        main_image_url: 'https://exemplo.com/nova-foto.jpg',
+        price: 39.90,
+        updated_at: '2025-01-01T00:00:00.000Z'
+      }
+    }
   },
   {
     title: 'Remover Produto',
