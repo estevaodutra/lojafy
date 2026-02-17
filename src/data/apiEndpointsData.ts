@@ -41,8 +41,8 @@ export interface EndpointCategory {
   subcategories?: EndpointSubcategory[];
 }
 
-// Catalog Endpoints
-const catalogEndpoints: EndpointData[] = [
+// Catalog - Produtos (API Key)
+const catalogProductsApiKey: EndpointData[] = [
   {
     title: 'Cadastrar Produto',
     method: 'POST',
@@ -115,6 +115,21 @@ const catalogEndpoints: EndpointData[] = [
     }
   },
   {
+    title: 'Produtos Aguardando Aprovação',
+    method: 'GET',
+    url: '/functions/v1/api-produtos-aguardando-aprovacao',
+    description: 'Retorna todos os produtos com status "pending_approval" para gestão de aprovação.',
+    queryParams: [
+      { name: 'page', description: 'Número da página', example: '1' },
+      { name: 'supplier_id', description: 'Filtrar por fornecedor', example: 'uuid' }
+    ],
+    responseExample: {
+      success: true,
+      data: [],
+      summary: { total_aguardando: 0 }
+    }
+  },
+  {
     title: 'Gerenciar Atributos do Produto',
     method: 'PUT',
     url: '/functions/v1/api-produtos-atributos',
@@ -175,7 +190,75 @@ const catalogEndpoints: EndpointData[] = [
       message: 'Variação removida com sucesso',
       data: { id: 'uuid', nome: 'Cinta Modeladora', tem_variacoes: false }
     }
+  }
+];
+
+// Catalog - Categorias
+const catalogCategories: EndpointData[] = [
+  {
+    title: 'Listar Categorias',
+    method: 'GET',
+    url: '/functions/v1/api-categorias-listar',
+    description: 'Retorna a lista de categorias disponíveis.',
+    queryParams: [
+      { name: 'active', description: 'Filtrar por status ativo', example: 'true' }
+    ],
+    responseExample: {
+      success: true,
+      data: [{ id: 'cat123', nome: 'Calçados', slug: 'calcados' }]
+    }
   },
+  {
+    title: 'Cadastrar Categoria',
+    method: 'POST',
+    url: '/functions/v1/api-categorias-cadastrar',
+    description: 'Cria uma nova categoria no sistema.',
+    requestBody: {
+      nome: 'Eletrônicos',
+      icone: 'Smartphone',
+      cor: '#10B981'
+    },
+    responseExample: {
+      success: true,
+      message: 'Categoria criada com sucesso',
+      data: { id: 'cat456', nome: 'Eletrônicos' }
+    }
+  }
+];
+
+// Catalog - Subcategorias
+const catalogSubcategories: EndpointData[] = [
+  {
+    title: 'Listar Subcategorias',
+    method: 'GET',
+    url: '/functions/v1/api-subcategorias-listar',
+    description: 'Retorna todas as subcategorias ou de uma categoria específica.',
+    queryParams: [
+      { name: 'category_id', description: 'ID da categoria pai', example: 'cat123' }
+    ],
+    responseExample: {
+      success: true,
+      data: [{ id: 'subcat123', nome: 'Tênis Esportivo' }]
+    }
+  },
+  {
+    title: 'Cadastrar Subcategoria',
+    method: 'POST',
+    url: '/functions/v1/api-subcategorias-cadastrar',
+    description: 'Cria uma nova subcategoria dentro de uma categoria.',
+    requestBody: {
+      nome: 'Tênis Esportivo',
+      category_id: 'cat123'
+    },
+    responseExample: {
+      success: true,
+      message: 'Subcategoria criada com sucesso'
+    }
+  }
+];
+
+// Catalog - Domínios e Atributos
+const catalogDomains: EndpointData[] = [
   {
     title: 'Listar Domínios de Produto',
     method: 'GET',
@@ -220,77 +303,6 @@ const catalogEndpoints: EndpointData[] = [
         ],
         display_order: 10
       }]
-    }
-  },
-  {
-    title: 'Produtos Aguardando Aprovação',
-    method: 'GET',
-    url: '/functions/v1/api-produtos-aguardando-aprovacao',
-    description: 'Retorna todos os produtos com status "pending_approval" para gestão de aprovação.',
-    queryParams: [
-      { name: 'page', description: 'Número da página', example: '1' },
-      { name: 'supplier_id', description: 'Filtrar por fornecedor', example: 'uuid' }
-    ],
-    responseExample: {
-      success: true,
-      data: [],
-      summary: { total_aguardando: 0 }
-    }
-  },
-  {
-    title: 'Listar Categorias',
-    method: 'GET',
-    url: '/functions/v1/api-categorias-listar',
-    description: 'Retorna a lista de categorias disponíveis.',
-    queryParams: [
-      { name: 'active', description: 'Filtrar por status ativo', example: 'true' }
-    ],
-    responseExample: {
-      success: true,
-      data: [{ id: 'cat123', nome: 'Calçados', slug: 'calcados' }]
-    }
-  },
-  {
-    title: 'Cadastrar Categoria',
-    method: 'POST',
-    url: '/functions/v1/api-categorias-cadastrar',
-    description: 'Cria uma nova categoria no sistema.',
-    requestBody: {
-      nome: 'Eletrônicos',
-      icone: 'Smartphone',
-      cor: '#10B981'
-    },
-    responseExample: {
-      success: true,
-      message: 'Categoria criada com sucesso',
-      data: { id: 'cat456', nome: 'Eletrônicos' }
-    }
-  },
-  {
-    title: 'Listar Subcategorias',
-    method: 'GET',
-    url: '/functions/v1/api-subcategorias-listar',
-    description: 'Retorna todas as subcategorias ou de uma categoria específica.',
-    queryParams: [
-      { name: 'category_id', description: 'ID da categoria pai', example: 'cat123' }
-    ],
-    responseExample: {
-      success: true,
-      data: [{ id: 'subcat123', nome: 'Tênis Esportivo' }]
-    }
-  },
-  {
-    title: 'Cadastrar Subcategoria',
-    method: 'POST',
-    url: '/functions/v1/api-subcategorias-cadastrar',
-    description: 'Cria uma nova subcategoria dentro de uma categoria.',
-    requestBody: {
-      nome: 'Tênis Esportivo',
-      category_id: 'cat123'
-    },
-    responseExample: {
-      success: true,
-      message: 'Subcategoria criada com sucesso'
     }
   }
 ];
@@ -1590,7 +1602,13 @@ export const apiEndpointsData: EndpointCategory[] = [
   {
     id: 'catalog',
     title: 'Catálogo',
-    endpoints: catalogEndpoints
+    subcategories: [
+      { id: 'catalog-products-apikey', title: 'Produtos (API Key)', endpoints: catalogProductsApiKey },
+      { id: 'catalog-products-rest', title: 'Produtos (REST)', endpoints: productsRestEndpoints },
+      { id: 'catalog-categories', title: 'Categorias', endpoints: catalogCategories },
+      { id: 'catalog-subcategories', title: 'Subcategorias', endpoints: catalogSubcategories },
+      { id: 'catalog-domains', title: 'Domínios e Atributos', endpoints: catalogDomains }
+    ]
   },
   {
     id: 'orders',
@@ -1634,11 +1652,6 @@ export const apiEndpointsData: EndpointCategory[] = [
       { id: 'integra-products', title: 'Produtos Marketplace', endpoints: integraProductsEndpoints }
     ]
   },
-  {
-    id: 'products-rest',
-    title: 'Produtos (REST)',
-    endpoints: productsRestEndpoints
-  }
 ];
 
 // Export webhook and logs endpoint data for use in ApiDocsContent
