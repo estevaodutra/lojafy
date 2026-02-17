@@ -23,6 +23,7 @@ import { apiEndpointsData } from '@/data/apiEndpointsData';
 interface ApiDocsSidebarProps {
   selectedSection: string;
   onSectionChange: (sectionId: string) => void;
+  onEndpointClick?: (categoryId: string, endpointIndex: number) => void;
   expandedCategories: Set<string>;
   onCategoryToggle: (categoryId: string) => void;
 }
@@ -57,6 +58,7 @@ const getMethodColor = (method: string) => {
 export const ApiDocsSidebar: React.FC<ApiDocsSidebarProps> = ({
   selectedSection,
   onSectionChange,
+  onEndpointClick,
   expandedCategories,
   onCategoryToggle,
 }) => {
@@ -134,7 +136,7 @@ export const ApiDocsSidebar: React.FC<ApiDocsSidebarProps> = ({
                     {category.endpoints?.map((endpoint, index) => (
                       <button
                         key={`${category.id}-${index}`}
-                        onClick={() => onSectionChange(category.id)}
+                        onClick={() => onEndpointClick ? onEndpointClick(category.id, index) : onSectionChange(category.id)}
                         className="w-full flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted rounded text-left"
                       >
                         <Badge className={cn('text-[10px] px-1 py-0 font-mono', getMethodColor(endpoint.method))}>
@@ -147,27 +149,34 @@ export const ApiDocsSidebar: React.FC<ApiDocsSidebarProps> = ({
                     ))}
                     
                     {/* Subcategories */}
-                    {category.subcategories?.map((sub) => (
-                      <div key={sub.id} className="mt-2">
-                        <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
-                          {sub.title}
-                        </div>
-                        {sub.endpoints.map((endpoint, index) => (
-                          <button
-                            key={`${sub.id}-${index}`}
-                            onClick={() => onSectionChange(category.id)}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted rounded text-left"
-                          >
-                            <Badge className={cn('text-[10px] px-1 py-0 font-mono', getMethodColor(endpoint.method))}>
-                              {endpoint.method}
-                            </Badge>
-                            <span className="truncate text-muted-foreground">
-                              {endpoint.title}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    ))}
+                    {(() => {
+                      let runningIndex = category.endpoints?.length || 0;
+                      return category.subcategories?.map((sub) => {
+                        const subStartIndex = runningIndex;
+                        runningIndex += sub.endpoints.length;
+                        return (
+                          <div key={sub.id} className="mt-2">
+                            <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                              {sub.title}
+                            </div>
+                            {sub.endpoints.map((endpoint, index) => (
+                              <button
+                                key={`${sub.id}-${index}`}
+                                onClick={() => onEndpointClick ? onEndpointClick(category.id, subStartIndex + index) : onSectionChange(category.id)}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted rounded text-left"
+                              >
+                                <Badge className={cn('text-[10px] px-1 py-0 font-mono', getMethodColor(endpoint.method))}>
+                                  {endpoint.method}
+                                </Badge>
+                                <span className="truncate text-muted-foreground">
+                                  {endpoint.title}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 </CollapsibleContent>
               </Collapsible>
