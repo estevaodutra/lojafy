@@ -188,3 +188,6 @@ verify_jwt = false
 
 [functions.api-atributos-listar]
 verify_jwt = false
+
+[functions.products]
+verify_jwt = false

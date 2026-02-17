@@ -1445,6 +1445,120 @@ const paymentsEndpoints: EndpointData[] = [
 ];
 
 // Export organized data structure
+// Products JWT Endpoints (unified)
+const productsJwtEndpoints: EndpointData[] = [
+  {
+    title: 'Criar Produto',
+    method: 'POST',
+    url: '/functions/v1/products',
+    description: 'Cria um novo produto com atributos estruturados e variações. Autenticação via JWT.',
+    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    requestBody: { name: 'Produto', price: 29.90, attributes: [], variations: [], condition: 'new' },
+    responseExample: { success: true, data: { id: 'uuid', name: 'Produto', has_variations: false } }
+  },
+  {
+    title: 'Listar Produtos',
+    method: 'GET',
+    url: '/functions/v1/products',
+    description: 'Lista produtos com filtros e paginação via JWT.',
+    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    queryParams: [
+      { name: 'search', description: 'Buscar por nome ou SKU', example: 'waffle' },
+      { name: 'category_id', description: 'Filtrar por categoria', example: 'uuid' },
+      { name: 'condition', description: 'Condição do produto', example: 'new' },
+      { name: 'has_variations', description: 'Com variações', example: 'true' },
+      { name: 'limit', description: 'Máx 100', example: '50' },
+      { name: 'offset', description: 'Paginação', example: '0' }
+    ],
+    responseExample: { success: true, data: [], pagination: { total: 0, limit: 50, offset: 0, has_more: false } }
+  },
+  {
+    title: 'Produtos Pendentes',
+    method: 'GET',
+    url: '/functions/v1/products/pending',
+    description: 'Lista produtos aguardando aprovação via JWT.',
+    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    responseExample: { success: true, data: [], total: 0 }
+  },
+  {
+    title: 'Buscar Produto',
+    method: 'GET',
+    url: '/functions/v1/products/:id',
+    description: 'Dados completos de um produto via JWT.',
+    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    responseExample: { success: true, data: { id: 'uuid', name: 'Produto' } }
+  },
+  {
+    title: 'Atualizar Produto',
+    method: 'PUT',
+    url: '/functions/v1/products/:id',
+    description: 'Atualização completa do produto incluindo atributos e variações.',
+    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    requestBody: { name: 'Atualizado', price: 39.90 },
+    responseExample: { success: true, data: { id: 'uuid' } }
+  },
+  {
+    title: 'Remover Produto',
+    method: 'DELETE',
+    url: '/functions/v1/products/:id',
+    description: 'Remove um produto permanentemente.',
+    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    responseExample: { success: true, message: 'Produto removido com sucesso' }
+  },
+  {
+    title: 'Atualizar Atributo',
+    method: 'PUT',
+    url: '/functions/v1/products/:id/attributes',
+    description: 'Adiciona/atualiza atributo individual validado contra attribute_definitions.',
+    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    requestBody: { attribute_id: 'MATERIAL', value: 'Plástico ABS' },
+    responseExample: { success: true, data: { id: 'uuid' } }
+  },
+  {
+    title: 'Adicionar Variação',
+    method: 'POST',
+    url: '/functions/v1/products/:id/variations',
+    description: 'Adiciona variação com SKU, atributos, estoque e preço.',
+    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    requestBody: { sku: 'PROD-GG', attributes: { SIZE: 'GG' }, stock: 10, price: 59.90 },
+    responseExample: { success: true, data: { id: 'uuid', has_variations: true } }
+  },
+  {
+    title: 'Atualizar Variação',
+    method: 'PUT',
+    url: '/functions/v1/products/:id/variations/:sku',
+    description: 'Atualiza variação por SKU (SKU imutável).',
+    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    requestBody: { stock: 15 },
+    responseExample: { success: true, data: { id: 'uuid' } }
+  },
+  {
+    title: 'Remover Variação',
+    method: 'DELETE',
+    url: '/functions/v1/products/:id/variations/:sku',
+    description: 'Remove variação pelo SKU.',
+    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    responseExample: { success: true, message: 'Variação removida' }
+  },
+  {
+    title: 'Aprovar Produto',
+    method: 'POST',
+    url: '/functions/v1/products/:id/approve',
+    description: 'Aprova produto pendente.',
+    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    responseExample: { success: true, data: { approval_status: 'approved' } }
+  },
+  {
+    title: 'Rejeitar Produto',
+    method: 'POST',
+    url: '/functions/v1/products/:id/reject',
+    description: 'Rejeita produto com motivo opcional.',
+    headers: [{ name: 'Authorization', description: 'Bearer token JWT', example: 'Bearer eyJ...', required: true }],
+    requestBody: { reason: 'Preço incorreto' },
+    responseExample: { success: true, data: { approval_status: 'rejected' } }
+  }
+];
+
 export const apiEndpointsData: EndpointCategory[] = [
   {
     id: 'catalog',
@@ -1492,6 +1606,11 @@ export const apiEndpointsData: EndpointCategory[] = [
       { id: 'integra-ml', title: 'Mercado Livre', endpoints: integraMLEndpoints },
       { id: 'integra-products', title: 'Produtos Marketplace', endpoints: integraProductsEndpoints }
     ]
+  },
+  {
+    id: 'products-jwt',
+    title: 'Produtos (JWT)',
+    endpoints: productsJwtEndpoints
   }
 ];
 
