@@ -1,46 +1,54 @@
 
 
-# Migrar Edge Function `products` de JWT para X-API-Key
+# Unificar Endpoints de Produtos em uma Categoria
 
 ## Problema
-A Edge Function `products/index.ts` usa autenticacao JWT (Bearer token), mas o padrao do projeto e autenticacao via X-API-Key com service role key -- igual as demais funcoes `api-produtos-*`.
+Existem duas categorias separadas no menu lateral que documentam endpoints de produtos:
+- **Catalogo** -- endpoints antigos (`api-produtos-*`) misturados com categorias, subcategorias e dominios
+- **Produtos (REST)** -- endpoints novos (`/products`) com a mesma finalidade
 
-## O que sera feito
+Isso gera confusao na documentacao.
 
-### 1. Atualizar `supabase/functions/products/index.ts`
-Trocar a autenticacao de JWT para X-API-Key, seguindo o mesmo padrao das funcoes existentes (`api-produtos-listar`, `api-produtos-cadastrar`, etc.):
+## Solucao
 
-- Substituir criacao do client de `SUPABASE_ANON_KEY` para `SUPABASE_SERVICE_ROLE_KEY`
-- Remover logica de Bearer token e `supabase.auth.getUser()`
-- Adicionar validacao de `X-API-Key` header contra tabela `api_keys`
-- Verificar permissao `produtos.read` (GET) ou `produtos.write` (POST/PUT/DELETE)
-- Atualizar `last_used` da chave
-- Adicionar header `x-api-key` no CORS `Access-Control-Allow-Headers`
-- Adicionar log de requisicao via `logApiRequest` no `finally` block
-- Ajustar `handleApprove` para nao depender de `user.id` (usar `apiKeyData.user_id` no lugar)
+Reorganizar a categoria **Catalogo** em subcategorias e absorver os endpoints "Produtos (REST)", eliminando a duplicidade.
 
-### 2. Atualizar documentacao em `src/data/apiEndpointsData.ts`
-- Renomear categoria de "Produtos (JWT)" para "Produtos (REST)"
-- Trocar todos os headers de `Authorization: Bearer eyJ...` para `X-API-Key: sk_sua_chave`
-- Atualizar id de `products-jwt` para `products-rest`
-
-## Detalhes tecnicos
-
-### Padrao de autenticacao (copiado das funcoes existentes)
+### Nova estrutura:
 
 ```text
-1. Ler header X-API-Key
-2. Buscar em api_keys WHERE api_key = key AND active = true
-3. Verificar permissoes: permissions.produtos.read ou .write
-4. Atualizar last_used
-5. Criar client com SUPABASE_SERVICE_ROLE_KEY (acesso total, sem RLS)
+Catalogo
+  +-- Produtos (API Key)       [6 endpoints: api-produtos-*]
+  +-- Produtos (REST)          [12 endpoints: /products]
+  +-- Categorias               [2 endpoints]
+  +-- Subcategorias            [2 endpoints]
+  +-- Dominios e Atributos     [2 endpoints]
 ```
 
-### Permissoes por metodo
-- GET: requer `produtos.read`
-- POST, PUT, DELETE: requer `produtos.write`
+## Alteracoes
 
-### Arquivos modificados
-- `supabase/functions/products/index.ts` -- autenticacao e logging
-- `src/data/apiEndpointsData.ts` -- documentacao (headers e titulo)
+### 1. `src/data/apiEndpointsData.ts`
+- Separar o array `catalogEndpoints` (atualmente 14 endpoints em lista plana) em 4 arrays menores:
+  - `catalogProductsApiKey` (6): Cadastrar, Listar, Aguardando Aprovacao, Atributos, Add Variacao, Del Variacao
+  - `catalogCategories` (2): Listar Categorias, Cadastrar Categoria
+  - `catalogSubcategories` (2): Listar Subcategorias, Cadastrar Subcategoria
+  - `catalogDomains` (2): Listar Dominios, Listar Definicoes de Atributos
+- Manter o array `productsRestEndpoints` existente (12 endpoints) como esta
+- Atualizar a entrada `catalog` no `apiEndpointsData` para usar `subcategories` em vez de `endpoints`:
+  - Subcategoria "Produtos (API Key)" com `catalogProductsApiKey`
+  - Subcategoria "Produtos (REST)" com `productsRestEndpoints`
+  - Subcategoria "Categorias" com `catalogCategories`
+  - Subcategoria "Subcategorias" com `catalogSubcategories`
+  - Subcategoria "Dominios e Atributos" com `catalogDomains`
+- Remover a entrada `products-rest` do array `apiEndpointsData` (linha 1637-1641)
 
+### 2. `src/components/admin/ApiDocsSidebar.tsx`
+- Nenhuma alteracao necessaria -- o sidebar ja suporta `subcategories` (usado por Academy e Integra)
+
+### 3. `src/components/admin/ApiDocsContent.tsx`
+- Adicionar "catalog" ao `getCategoryTitle()` se necessario (ja existe)
+- Nenhuma outra alteracao necessaria -- o componente ja renderiza subcategorias via `flatMap`
+
+### Resultado
+- Uma unica categoria "Catalogo" com 5 subcategorias claras
+- Total de 24 endpoints organizados
+- Sem duplicidade na documentacao
