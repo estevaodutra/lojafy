@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -24,6 +24,8 @@ interface EndpointData {
 interface ApiDocsContentProps {
   selectedSection: string;
   endpoints: EndpointData[];
+  scrollToIndex?: number | null;
+  onScrollComplete?: () => void;
 }
 
 const IntroSection: React.FC = () => (
@@ -268,7 +270,19 @@ const KeysSection: React.FC = () => (
 export const ApiDocsContent: React.FC<ApiDocsContentProps> = ({
   selectedSection,
   endpoints,
+  scrollToIndex,
+  onScrollComplete,
 }) => {
+  useEffect(() => {
+    if (scrollToIndex !== null && scrollToIndex !== undefined) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById(`endpoint-card-${scrollToIndex}`);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        onScrollComplete?.();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [scrollToIndex, onScrollComplete]);
   // Static sections
   if (selectedSection === 'intro') {
     return <IntroSection />;
@@ -416,7 +430,9 @@ const isValid = crypto.timingSafeEqual(
 
       <div className="grid gap-6">
         {endpoints.map((endpoint, index) => (
-          <EndpointCard key={index} endpoint={endpoint} />
+          <div key={index} id={`endpoint-card-${index}`}>
+            <EndpointCard endpoint={endpoint} />
+          </div>
         ))}
       </div>
     </div>

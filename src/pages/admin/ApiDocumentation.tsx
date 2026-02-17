@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { ApiDocsSidebar } from '@/components/admin/ApiDocsSidebar';
 import { ApiDocsContent } from '@/components/admin/ApiDocsContent';
 import { ApiDocsPagination } from '@/components/admin/ApiDocsPagination';
@@ -10,6 +10,7 @@ const ApiDocumentation: React.FC = () => {
   const [selectedSection, setSelectedSection] = useState<string>('intro');
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['catalog']));
+  const [scrollToIndex, setScrollToIndex] = useState<number | null>(null);
 
   // Get endpoints for the selected section
   const currentEndpoints = useMemo(() => {
@@ -55,8 +56,17 @@ const ApiDocumentation: React.FC = () => {
   // Handle section change
   const handleSectionChange = (sectionId: string) => {
     setSelectedSection(sectionId);
-    setCurrentPage(1); // Reset pagination on section change
+    setCurrentPage(1);
+    setScrollToIndex(null);
   };
+
+  // Handle endpoint click — jump to correct page and scroll
+  const handleEndpointClick = useCallback((categoryId: string, globalIndex: number) => {
+    setSelectedSection(categoryId);
+    const targetPage = Math.floor(globalIndex / ITEMS_PER_PAGE) + 1;
+    setCurrentPage(targetPage);
+    setScrollToIndex(globalIndex % ITEMS_PER_PAGE);
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -77,6 +87,7 @@ const ApiDocumentation: React.FC = () => {
           <ApiDocsSidebar
             selectedSection={selectedSection}
             onSectionChange={handleSectionChange}
+            onEndpointClick={handleEndpointClick}
             expandedCategories={expandedCategories}
             onCategoryToggle={handleCategoryToggle}
           />
@@ -87,6 +98,8 @@ const ApiDocumentation: React.FC = () => {
           <ApiDocsContent
             selectedSection={selectedSection}
             endpoints={paginatedEndpoints}
+            scrollToIndex={scrollToIndex}
+            onScrollComplete={() => setScrollToIndex(null)}
           />
 
           {/* Pagination */}
