@@ -8,12 +8,38 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Edit, Copy, Trash2, Eye, Search, Filter, ExternalLink, Check, X, TrendingUp } from 'lucide-react';
+import { MoreHorizontal, Edit, Copy, Trash2, Eye, Search, Filter, ExternalLink, Check, X, TrendingUp, Store } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import ProductDeleteDialog from './ProductDeleteDialog';
+
+const MARKETPLACE_LABELS: Record<string, string> = {
+  mercadolivre: 'ML',
+  shopee: 'Shopee',
+  amazon: 'Amazon',
+  magalu: 'Magalu',
+};
+
+const STATUS_CLASSES: Record<string, string> = {
+  active: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  draft: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400',
+  pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+  paused: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+  error: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  closed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+};
+
+const MarketplaceBadge = ({ marketplace, status }: { marketplace: string; status: string }) => (
+  <span
+    className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${STATUS_CLASSES[status] || STATUS_CLASSES.draft}`}
+    title={`${marketplace} - ${status}`}
+  >
+    <Store className="h-2.5 w-2.5" />
+    {MARKETPLACE_LABELS[marketplace] || marketplace}
+  </span>
+);
 
 interface ProductTableProps {
   products: any[];
@@ -36,6 +62,7 @@ const ProductTable: React.FC<ProductTableProps> = ({
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [rotationFilter, setRotationFilter] = useState('all');
+  const [marketplaceFilter, setMarketplaceFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [isSelectAllChecked, setIsSelectAllChecked] = useState(false);
@@ -56,10 +83,16 @@ const ProductTable: React.FC<ProductTableProps> = ({
                          (statusFilter === 'inactive' && !product.active);
     
     const matchesRotation = rotationFilter === 'all' || 
-                           (rotationFilter === 'high' && product.high_rotation) ||
-                           (rotationFilter === 'normal' && !product.high_rotation);
+                            (rotationFilter === 'high' && product.high_rotation) ||
+                            (rotationFilter === 'normal' && !product.high_rotation);
+
+    const marketplaceData = product.product_marketplace_data || [];
+    const matchesMarketplace = marketplaceFilter === 'all' ||
+                               (marketplaceFilter === 'with' && marketplaceData.length > 0) ||
+                               (marketplaceFilter === 'without' && marketplaceData.length === 0) ||
+                               marketplaceData.some((m: any) => m.marketplace === marketplaceFilter);
     
-    return matchesSearch && matchesCategory && matchesStatus && matchesRotation;
+    return matchesSearch && matchesCategory && matchesStatus && matchesRotation && matchesMarketplace;
   });
 
   // Pagination
@@ -430,6 +463,20 @@ const ProductTable: React.FC<ProductTableProps> = ({
                 <SelectItem value="normal">Normal</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={marketplaceFilter} onValueChange={setMarketplaceFilter}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Marketplace" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="with">Com marketplace</SelectItem>
+                <SelectItem value="without">Sem marketplace</SelectItem>
+                <SelectItem value="mercadolivre">Mercado Livre</SelectItem>
+                <SelectItem value="shopee">Shopee</SelectItem>
+                <SelectItem value="amazon">Amazon</SelectItem>
+                <SelectItem value="magalu">Magalu</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -585,6 +632,13 @@ const ProductTable: React.FC<ProductTableProps> = ({
                             <p className="text-sm text-muted-foreground">
                               {product.brand || 'Marca não informada'}
                             </p>
+                            {product.product_marketplace_data && product.product_marketplace_data.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {product.product_marketplace_data.map((mp: any) => (
+                                  <MarketplaceBadge key={mp.id} marketplace={mp.marketplace} status={mp.listing_status} />
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
