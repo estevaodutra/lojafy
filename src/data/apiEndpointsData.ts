@@ -1550,8 +1550,8 @@ const productsRestEndpoints: EndpointData[] = [
     url: '/functions/v1/products/:id/attributes',
     description: 'Adiciona/atualiza atributo individual validado contra attribute_definitions.',
     headers: [{ name: 'X-API-Key', description: 'Chave de API com permissão produtos.write', example: 'sk_sua_chave', required: true }],
-    requestBody: { attribute_id: 'MATERIAL', value: 'Plástico ABS' },
-    responseExample: { success: true, data: { id: 'uuid' } }
+    requestBody: { attribute_id: 'MATERIAL', value_name: 'Plástico ABS', value_id: '12345' },
+    responseExample: { success: true, data: { id: 'uuid', attributes: [{ id: 'MATERIAL', name: 'Material', value_id: '12345', value_name: 'Plástico ABS', values: [{ id: '12345', name: 'Plástico ABS' }] }] } }
   },
   {
     title: 'Adicionar Variação',

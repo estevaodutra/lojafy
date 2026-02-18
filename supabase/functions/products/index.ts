@@ -420,7 +420,8 @@ async function handleUpdateAttribute(supabase: any, req: Request, productId: str
   const body = await req.json();
 
   if (!body.attribute_id) return errorResponse('attribute_id é obrigatório');
-  if (body.value === undefined) return errorResponse('value é obrigatório');
+  const valueName = body.value_name ?? body.value;
+  if (valueName === undefined || valueName === null) return errorResponse('value_name (ou value) é obrigatório');
 
   const { data: attrDef, error: attrError } = await supabase
     .from('attribute_definitions')
@@ -442,11 +443,13 @@ async function handleUpdateAttribute(supabase: any, req: Request, productId: str
     return errorResponse('Produto não encontrado', 404);
   }
 
+  const vid = body.value_id || null;
   const newAttribute = {
     id: body.attribute_id,
     name: attrDef.name,
-    value: body.value,
-    value_id: body.value_id || null,
+    value_id: vid,
+    value_name: valueName,
+    values: [{ id: vid, name: valueName }],
   };
 
   let currentAttributes = (product.attributes || []).filter(
