@@ -438,18 +438,22 @@ async function handleDeleteProduct(supabase: any, productId: string) {
 async function handleUpdateAttribute(supabase: any, req: Request, productId: string) {
   const body = await req.json();
 
-  if (!body.attribute_id) return errorResponse('attribute_id é obrigatório');
+  // Retrocompatibilidade: aceitar "id" (novo) ou "attribute_id" (legado)
+  const attributeId = body.id ?? body.attribute_id;
+  if (!attributeId) return errorResponse('id (ou attribute_id) é obrigatório');
+
   const valueName = body.value_name ?? body.value;
   if (valueName === undefined || valueName === null) return errorResponse('value_name (ou value) é obrigatório');
 
-  const { data: attrDef, error: attrError } = await supabase
-    .from('attribute_definitions')
-    .select('*')
-    .eq('id', body.attribute_id)
-    .single();
-
-  if (attrError || !attrDef) {
-    return errorResponse(`Atributo ${body.attribute_id} não encontrado`, 404);
+  // Se "name" não foi enviado no body, buscar na tabela attribute_definitions como fallback
+  let attrName = body.name;
+  if (!attrName) {
+    const { data: attrDef } = await supabase
+      .from('attribute_definitions')
+      .select('name')
+      .eq('id', attributeId)
+      .maybeSingle();
+    attrName = attrDef?.name || attributeId;
   }
 
   const { data: product, error: productError } = await supabase
@@ -463,16 +467,19 @@ async function handleUpdateAttribute(supabase: any, req: Request, productId: str
   }
 
   const vid = body.value_id || null;
+  // Usar "values" do body se fornecido, senão montar automaticamente
+  const values = body.values || [{ id: vid, name: valueName }];
+
   const newAttribute = {
-    id: body.attribute_id,
-    name: attrDef.name,
+    id: attributeId,
+    name: attrName,
     value_id: vid,
     value_name: valueName,
-    values: [{ id: vid, name: valueName }],
+    values,
   };
 
   let currentAttributes = (product.attributes || []).filter(
-    (attr: any) => attr.id !== body.attribute_id
+    (attr: any) => attr.id !== attributeId
   );
   currentAttributes.push(newAttribute);
 

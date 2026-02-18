@@ -79,7 +79,10 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { product_id, attribute_id, value, value_id } = body;
+    const { product_id, value } = body;
+
+    // Retrocompatibilidade: aceitar "id" (novo) ou "attribute_id" (legado)
+    const attribute_id = body.id ?? body.attribute_id;
 
     if (!product_id) {
       statusCode = 400;
@@ -92,9 +95,9 @@ Deno.serve(async (req) => {
 
     if (!attribute_id) {
       statusCode = 400;
-      errorMessage = 'attribute_id required';
+      errorMessage = 'id/attribute_id required';
       return new Response(
-        JSON.stringify({ error: 'attribute_id é obrigatório' }),
+        JSON.stringify({ error: 'id (ou attribute_id) é obrigatório' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -109,20 +112,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Buscar definição do atributo
-    const { data: attrDef, error: attrError } = await supabase
-      .from('attribute_definitions')
-      .select('*')
-      .eq('id', attribute_id)
-      .single();
-
-    if (attrError || !attrDef) {
-      statusCode = 404;
-      errorMessage = `Atributo ${attribute_id} não encontrado`;
-      return new Response(
-        JSON.stringify({ error: `Atributo ${attribute_id} não encontrado` }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Se "name" não foi enviado, buscar na tabela attribute_definitions como fallback
+    let attrName = body.name;
+    if (!attrName) {
+      const { data: attrDef } = await supabase
+        .from('attribute_definitions')
+        .select('name')
+        .eq('id', attribute_id)
+        .maybeSingle();
+      attrName = attrDef?.name || attribute_id;
     }
 
     // Buscar produto atual
@@ -142,13 +140,14 @@ Deno.serve(async (req) => {
     }
 
     // Montar novo atributo no formato Mercado Livre
-    const vid = value_id || null;
+    const vid = body.value_id || null;
+    const values = body.values || [{ id: vid, name: valueName }];
     const newAttribute = {
       id: attribute_id,
-      name: attrDef.name,
+      name: attrName,
       value_id: vid,
       value_name: valueName,
-      values: [{ id: vid, name: valueName }],
+      values,
     };
 
     // Remover existente e adicionar novo
