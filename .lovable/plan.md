@@ -1,66 +1,49 @@
 
+## Atualizar formato do body do endpoint PUT /products/{id}/attributes
 
-# Corrigir Roteamento da Edge Function `products`
+### Objetivo
+Alterar o endpoint para aceitar o payload no formato nativo do Mercado Livre, facilitando a integracão direta com n8n e outros sistemas.
 
-## Problema
-A URL chamada e:
-```
-/functions/v1/products/c53a75c2-41c3-42ec-98e7-ba0e78ba83e1
-```
-
-O codigo atual faz `url.pathname.split('/').filter(Boolean)` que resulta em:
-```
-['functions', 'v1', 'products', 'c53a75c2-...']
-```
-
-Porem o roteamento usa indices fixos:
-- `pathParts[1]` como ID do produto (que na verdade e `'v1'`)
-- `pathParts[2]` como sub-recurso (que na verdade e `'products'`)
-
-Nenhuma rota bate e o resultado e "Endpoint nao encontrado".
-
-## Solucao
-
-Alterar o parsing do path para encontrar o indice de `'products'` no array e usar os segmentos relativos a ele:
-
-```text
-pathParts = ['functions', 'v1', 'products', 'c53a75c2-...', 'attributes']
-                                     ^idx       ^idx+1           ^idx+2
-
-segment1    = pathParts[idx + 1]  // product ID ou "pending"
-subResource = pathParts[idx + 2]  // "attributes", "variations", etc.
-subResourceId = pathParts[idx + 3] // SKU para variacoes
+### Formato atual (sera removido)
+```json
+{
+  "attribute_id": "BRAND",
+  "value_name": "Archy",
+  "value_id": "3266931"
+}
 ```
 
-## Alteracao
-
-### `supabase/functions/products/index.ts` (linhas 99-104)
-
-De:
-```typescript
-const pathParts = url.pathname.split('/').filter(Boolean);
-const segment1 = pathParts[1];
-const productId = segment1 && segment1 !== 'pending' ? segment1 : null;
-const subResource = pathParts[2];
-const subResourceId = pathParts[3];
+### Novo formato aceito
+```json
+{
+  "id": "BRAND",
+  "name": "Marca",
+  "value_id": "3266931",
+  "value_name": "Archy",
+  "values": [
+    {
+      "id": "3266931",
+      "name": "Archy"
+    }
+  ]
+}
 ```
 
-Para:
-```typescript
-const pathParts = url.pathname.split('/').filter(Boolean);
-const productsIndex = pathParts.indexOf('products');
-const segment1 = productsIndex >= 0 ? pathParts[productsIndex + 1] : undefined;
-const productId = segment1 && segment1 !== 'pending' ? segment1 : null;
-const subResource = productsIndex >= 0 ? pathParts[productsIndex + 2] : undefined;
-const subResourceId = productsIndex >= 0 ? pathParts[productsIndex + 3] : undefined;
-```
+### Alteracoes tecnicas
 
-### Resultado
-- `GET /functions/v1/products` -> lista produtos
-- `GET /functions/v1/products/{id}` -> busca produto por ID
-- `PUT /functions/v1/products/{id}/attributes` -> atualiza atributos
-- Todas as rotas passam a funcionar corretamente
+**Arquivo:** `supabase/functions/products/index.ts` - funcao `handleUpdateAttribute`
 
-### Arquivo modificado
-- `supabase/functions/products/index.ts`
+1. Alterar validacao para aceitar `id` em vez de `attribute_id` (manter retrocompatibilidade aceitando ambos)
+2. Usar `name` do body diretamente (se fornecido), sem precisar buscar na tabela `attribute_definitions`
+3. Usar `value_name` e `value_id` do body diretamente
+4. Usar `values` do body se fornecido, senao montar automaticamente
+5. Remover a busca obrigatoria na tabela `attribute_definitions` (tornar opcional como fallback quando `name` nao for enviado)
 
+### Retrocompatibilidade
+- O campo `id` sera o principal, mas `attribute_id` continuara funcionando como alias
+- O campo `value` continuara funcionando como alias de `value_name`
+- Se `name` nao for enviado, o sistema buscara na tabela `attribute_definitions`
+- Se `values` nao for enviado, sera montado automaticamente a partir de `value_id` e `value_name`
+
+### Funcao tambem atualizada
+- `api-produtos-atributos/index.ts` - mesma logica para manter consistencia entre os dois endpoints
