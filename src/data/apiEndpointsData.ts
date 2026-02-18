@@ -60,9 +60,9 @@ const catalogProductsApiKey: EndpointData[] = [
       dominio_id: 'LJF-WAFFLE_MAKERS',
       condicao: 'new',
       atributos: [
-        { id: 'BRAND', name: 'Marca', value: 'Generic' },
-        { id: 'VOLTAGE', name: 'Voltagem', value: '110V', value_id: '110v' },
-        { id: 'POWER', name: 'Potência', value: '750W' }
+        { id: 'BRAND', name: 'Marca', value_name: 'Generic', values: [{ id: null, name: 'Generic' }] },
+        { id: 'VOLTAGE', name: 'Voltagem', value_name: '110V', value_id: '110v', values: [{ id: '110v', name: '110V' }] },
+        { id: 'POWER', name: 'Potência', value_name: '750W', values: [{ id: null, name: '750W' }] }
       ],
       variacoes: [
         { sku: 'WAFFLE-001-VERM', attributes: { COLOR: 'Vermelho' }, stock: 25, price: 29.90 },
@@ -77,7 +77,7 @@ const catalogProductsApiKey: EndpointData[] = [
       data: {
         id: 'prod123',
         nome: 'Mini Máquina de Waffles 110V',
-        atributos: [{ id: 'BRAND', name: 'Marca', value: 'Generic' }],
+        atributos: [{ id: 'BRAND', name: 'Marca', value_name: 'Generic', values: [{ id: null, name: 'Generic' }] }],
         variacoes: [{ sku: 'WAFFLE-001-VERM', attributes: { COLOR: 'Vermelho' }, stock: 25 }],
         tem_variacoes: true,
         condicao: 'new',
@@ -105,7 +105,7 @@ const catalogProductsApiKey: EndpointData[] = [
         id: 'prod123',
         nome: 'Mini Máquina de Waffles',
         preco: 29.90,
-        atributos: [{ id: 'BRAND', name: 'Marca', value: 'Generic' }],
+        atributos: [{ id: 'BRAND', name: 'Marca', value_name: 'Generic', values: [{ id: null, name: 'Generic' }] }],
         variacoes: [],
         tem_variacoes: false,
         condicao: 'new',
@@ -137,7 +137,7 @@ const catalogProductsApiKey: EndpointData[] = [
     requestBody: {
       product_id: 'uuid-do-produto',
       attribute_id: 'MATERIAL',
-      value: 'Plástico ABS',
+      value_name: 'Plástico ABS',
       value_id: null
     },
     responseExample: {
@@ -147,8 +147,8 @@ const catalogProductsApiKey: EndpointData[] = [
         id: 'uuid-do-produto',
         nome: 'Mini Máquina de Waffles',
         atributos: [
-          { id: 'BRAND', name: 'Marca', value: 'Generic' },
-          { id: 'MATERIAL', name: 'Material', value: 'Plástico ABS' }
+          { id: 'BRAND', name: 'Marca', value_name: 'Generic', values: [{ id: null, name: 'Generic' }] },
+          { id: 'MATERIAL', name: 'Material', value_name: 'Plástico ABS', values: [{ id: null, name: 'Plástico ABS' }] }
         ],
         enriquecido_em: '2026-02-15T10:00:00Z'
       }
