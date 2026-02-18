@@ -1,46 +1,47 @@
 
 
-## Incluir dados de marketplace na publicacao do Mercado Livre
+## Corrigir erro "Failed to fetch" na publicacao do Mercado Livre
 
 ### Problema
-Ao clicar em "Publicar", o hook `useMercadoLivreIntegration.ts` envia ao webhook apenas os dados da tabela `products` e os tokens de integracao. Os dados especificos do marketplace salvos em `product_marketplace_data` (category_id, domain_id, listing_type, condition, title customizado, pictures, variations, shipping, sale_terms) sao ignorados.
+O navegador tenta chamar o webhook do n8n (`https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Advertise`) diretamente do frontend. Isso causa erro "Failed to fetch" por CORS -- o servidor n8n nao permite requisicoes vindas do dominio do app.
 
-### Alteracao
+### Solucao
+Criar uma Edge Function proxy no Supabase (`ml-publish-proxy`) que recebe o payload do frontend e encaminha ao webhook do n8n. O frontend passa a chamar a Edge Function (mesmo dominio Supabase, sem CORS).
 
-**Arquivo: `src/hooks/useMercadoLivreIntegration.ts`**
+### Alteracoes
 
-No `publishProductMutation` (mutationFn), apos buscar o produto e a integracao, adicionar uma terceira query:
+**1. Nova Edge Function: `supabase/functions/ml-publish-proxy/index.ts`**
 
-1. Buscar dados do marketplace:
+- Recebe o payload via POST (requer autenticacao JWT do usuario logado)
+- Valida que o usuario autenticado corresponde ao `user_id` do payload
+- Encaminha a requisicao ao webhook n8n: `https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Advertise`
+- Retorna a resposta do webhook ao frontend
+- Inclui tratamento de erros e timeout
+
+Estrutura da funcao:
 ```text
-supabase
-  .from('product_marketplace_data')
-  .select('*')
-  .eq('product_id', productId)
-  .eq('marketplace', 'mercadolivre')
-  .maybeSingle()
+1. Validar autenticacao (JWT)
+2. Ler body do request
+3. Verificar user_id == usuario autenticado
+4. POST para o webhook n8n com o mesmo body
+5. Retornar status + resposta do webhook
 ```
 
-2. Incluir os dados no payload enviado ao webhook, adicionando um campo `marketplace_data` ao JSON:
+**2. Atualizar `src/hooks/useMercadoLivreIntegration.ts`**
 
+Trocar a URL do fetch de:
 ```text
-body: JSON.stringify({
-  product: productData,
-  marketplace_data: marketplaceData?.data || null,   // <-- NOVO
-  marketplace_listing: {                              // <-- NOVO (campos de controle)
-    listing_id: marketplaceData?.listing_id,
-    listing_status: marketplaceData?.listing_status,
-  },
-  integration: { access_token, refresh_token, ... },
-  user_id: user.id
-})
+https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Advertise
+```
+Para:
+```text
+supabase.functions.invoke('ml-publish-proxy', { body: payload })
 ```
 
-3. Se nao houver dados de marketplace (`marketplaceData` for null), a publicacao continua normalmente -- o webhook/n8n usa os dados do produto como fallback.
+Usar o metodo `supabase.functions.invoke()` que ja inclui o token JWT automaticamente e nao tem problemas de CORS.
 
 ### Resultado
-O webhook recebe o payload completo com:
-- `product`: dados do produto Lojafy (price, stock_quantity, attributes, images, etc.)
-- `marketplace_data`: dados especificos do ML (category_id, domain_id, listing_type, condition, title customizado, pictures, shipping, sale_terms)
-- `marketplace_listing`: campos de controle (listing_id existente, status)
-- `integration`: tokens OAuth do ML
+- Sem problemas de CORS (a chamada vai para o mesmo dominio Supabase)
+- O token JWT do usuario e enviado automaticamente
+- Os dados sensiveis (access_token do ML) trafegam pelo backend, nao ficam expostos no console do navegador
+- A Edge Function pode ser monitorada nos logs do Supabase
