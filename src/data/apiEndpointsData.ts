@@ -969,7 +969,7 @@ const integraProductsEndpoints: EndpointData[] = [
     title: 'Criar/Atualizar Dados de Marketplace',
     method: 'POST',
     url: '/functions/v1/lojafy-integra/products',
-    description: 'Cria ou atualiza (upsert) dados específicos de um marketplace para um produto. Os campos product_id, marketplace, listing_id, listing_url e listing_status são campos de controle. Todo o restante do body é armazenado automaticamente no campo data (JSONB).',
+    description: 'Cria ou atualiza (upsert) dados específicos de um marketplace para um produto. Os campos product_id, marketplace, listing_id, listing_url e listing_status são campos de controle. Todo o restante do body é armazenado no campo data (JSONB). Campos como price, stock_quantity e attributes vêm do produto Lojafy na hora da publicação e são removidos automaticamente do payload.',
     headers: [
       { name: 'X-API-Key', description: 'Chave de API com permissão integracoes.write', example: 'sk_...', required: true }
     ],
@@ -980,17 +980,9 @@ const integraProductsEndpoints: EndpointData[] = [
       category_id: 'MLB281603',
       category_name: 'Corretores de Postura',
       domain_id: 'MLB-POSTURE_CORRECTORS',
-      listing_type_id: 'gold_special',
+      listing_type: 'classic',
       condition: 'new',
-      buying_mode: 'buy_it_now',
-      currency_id: 'BRL',
-      title: 'Título customizado pro ML',
-      price: 19.90,
-      available_quantity: 50,
-      attributes: [
-        { id: 'BRAND', value_id: '3266931', value_name: 'Archy' },
-        { id: 'GTIN', value_name: '7895209917207' }
-      ],
+      title: 'Título customizado pro ML (opcional)',
       shipping: { mode: 'me2', free_shipping: false }
     },
     responseExample: {
@@ -1001,9 +993,12 @@ const integraProductsEndpoints: EndpointData[] = [
         marketplace: 'mercadolivre',
         data: {
           category_id: 'MLB281603',
-          title: 'Título customizado pro ML',
-          price: 19.90,
-          attributes: [{ id: 'BRAND', value_name: 'Archy' }]
+          category_name: 'Corretores de Postura',
+          domain_id: 'MLB-POSTURE_CORRECTORS',
+          listing_type: 'classic',
+          condition: 'new',
+          title: 'Título customizado pro ML (opcional)',
+          shipping: { mode: 'me2', free_shipping: false }
         },
         listing_status: 'draft',
         listing_id: null,
@@ -1012,6 +1007,7 @@ const integraProductsEndpoints: EndpointData[] = [
     },
     errorExamples: [
       { code: 400, title: 'Campos obrigatórios', description: 'product_id ou marketplace ausentes', example: { success: false, error: 'product_id é obrigatório' } },
+      { code: 400, title: 'listing_type inválido', description: 'Valor não é classic ou premium', example: { success: false, error: 'listing_type deve ser: classic, premium' } },
       { code: 404, title: 'Produto não encontrado', description: 'product_id não existe na tabela products', example: { success: false, error: 'Produto não encontrado na tabela products' } }
     ]
   },
@@ -1037,7 +1033,7 @@ const integraProductsEndpoints: EndpointData[] = [
           id: 'uuid',
           product_id: 'uuid-produto',
           marketplace: 'mercadolivre',
-          data: { category_id: 'MLB281603', title: 'Título ML', price: 19.90 },
+          data: { category_id: 'MLB281603', listing_type: 'classic', condition: 'new', title: 'Título ML' },
           listing_id: 'MLB-123456789',
           listing_status: 'active',
           products: { id: 'uuid-produto', name: 'Produto Base', sku: 'SKU-001' }
@@ -1065,9 +1061,9 @@ const integraProductsEndpoints: EndpointData[] = [
         marketplace: 'mercadolivre',
         data: {
           category_id: 'MLB281603',
-          title: 'Título ML',
-          price: 19.90,
-          attributes: [{ id: 'BRAND', value_name: 'Archy' }]
+          listing_type: 'classic',
+          condition: 'new',
+          title: 'Título ML'
         },
         listing_id: 'MLB-123456789',
         listing_url: 'https://www.mercadolivre.com.br/...',
@@ -1090,8 +1086,8 @@ const integraProductsEndpoints: EndpointData[] = [
     responseExample: {
       success: true,
       data: [
-        { id: 'uuid-1', marketplace: 'mercadolivre', listing_status: 'active', listing_id: 'MLB-123', data: { price: 29.90 } },
-        { id: 'uuid-2', marketplace: 'shopee', listing_status: 'draft', listing_id: null, data: { price: 27.90 } }
+        { id: 'uuid-1', marketplace: 'mercadolivre', listing_status: 'active', listing_id: 'MLB-123', data: { category_id: 'MLB281603', listing_type: 'classic' } },
+        { id: 'uuid-2', marketplace: 'shopee', listing_status: 'draft', listing_id: null, data: { listing_type: 'classic' } }
       ]
     },
     errorExamples: [
@@ -1113,8 +1109,8 @@ const integraProductsEndpoints: EndpointData[] = [
       published_at: '2026-02-18T15:00:00Z',
       data: {
         category_id: 'MLB281603',
-        title: 'Título Atualizado',
-        price: 24.90
+        listing_type: 'premium',
+        title: 'Título Atualizado'
       }
     },
     responseExample: {
@@ -1123,7 +1119,7 @@ const integraProductsEndpoints: EndpointData[] = [
         id: 'uuid-marketplace-data',
         listing_id: 'MLB123456789',
         listing_status: 'active',
-        data: { category_id: 'MLB281603', title: 'Título Atualizado', price: 24.90 },
+        data: { category_id: 'MLB281603', listing_type: 'premium', title: 'Título Atualizado' },
         updated_at: '2026-02-18T16:00:00Z'
       }
     },
