@@ -1,37 +1,74 @@
 
 
-# Scroll Direto ao Endpoint ao Clicar no Sidebar
+# Alterar Formato de Atributos para Padrao Mercado Livre
 
 ## Problema
-Ao clicar em um endpoint especifico no menu lateral, a pagina navega para a categoria mas nao rola ate o endpoint clicado. O usuario precisa procurar manualmente entre os cards.
+O formato atual dos atributos armazenados no produto e:
+```json
+{ "id": "BRAND", "name": "Marca", "value": "Nobelium", "value_id": "59134419" }
+```
 
-## Solucao
-
-Ao clicar num endpoint no sidebar, calcular em qual pagina ele esta (paginacao de 5 por pagina), navegar para essa pagina, e fazer scroll automatico ate o card correspondente.
+O Mercado Livre usa um formato diferente com `value_name` e um array `values`:
+```json
+{
+  "id": "BRAND",
+  "name": "Marca",
+  "value_id": "59134419",
+  "value_name": "Nobelium",
+  "values": [{ "id": "59134419", "name": "Nobelium" }]
+}
+```
 
 ## Alteracoes
 
-### 1. `src/pages/admin/ApiDocumentation.tsx`
-- Adicionar estado `scrollToEndpointIndex` (indice do endpoint dentro da lista completa da categoria)
-- Criar handler `handleEndpointClick(categoryId, globalIndex)`:
-  - Seta a secao para `categoryId`
-  - Calcula a pagina correta: `Math.floor(globalIndex / ITEMS_PER_PAGE) + 1`
-  - Armazena o indice local na pagina para scroll: `globalIndex % ITEMS_PER_PAGE`
-- Passar `onEndpointClick` para o `ApiDocsSidebar`
-- Passar `scrollToIndex` para o `ApiDocsContent`
+### 1. `supabase/functions/products/index.ts` (handler `handleUpdateAttribute`)
+Alterar a montagem do `newAttribute` (linhas 445-450) de:
+```
+{ id, name, value, value_id }
+```
+Para:
+```
+{ id, name, value_id, value_name, values: [{ id: value_id, name: value_name }] }
+```
+- `value_name` vem do campo `value` do body (renomear semanticamente)
+- `value_id` vem do campo `value_id` do body
+- `values` e um array com um objeto contendo `id` e `name`
+- Aceitar tambem `value_name` diretamente no body como alternativa a `value`
 
-### 2. `src/components/admin/ApiDocsSidebar.tsx`
-- Adicionar prop `onEndpointClick?: (categoryId: string, endpointIndex: number) => void`
-- Nos botoes de endpoint direto: chamar `onEndpointClick(category.id, index)` em vez de `onSectionChange(category.id)`
-- Nos botoes de subcategoria: calcular o indice global somando os endpoints das subcategorias anteriores e chamar `onEndpointClick(category.id, globalIndex)`
+### 2. `supabase/functions/api-produtos-atributos/index.ts`
+Mesma alteracao na montagem do `newAttribute` (linhas 144-149):
+- Trocar `value` por `value_name`
+- Adicionar array `values`
 
-### 3. `src/components/admin/ApiDocsContent.tsx`
-- Adicionar prop `scrollToIndex?: number | null`
-- Adicionar `id={`endpoint-card-${index}`}` em cada `EndpointCard` renderizado
-- Usar `useEffect` que, quando `scrollToIndex` muda, executa `document.getElementById(`endpoint-card-${scrollToIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })` com um pequeno delay para aguardar a renderizacao
+### 3. `src/data/apiEndpointsData.ts`
+Atualizar os exemplos de request body e response dos endpoints de atributos para refletir o novo formato:
+- Trocar `value: "Plastico ABS"` por `value_name: "Plastico ABS"`
+- Adicionar `values` nos exemplos de resposta
 
-### Resultado
-- Clicar em qualquer endpoint no sidebar navega direto para a pagina e card correto
-- Scroll suave ate o endpoint
-- Funciona com a paginacao existente (calcula a pagina automaticamente)
+### 4. Validacao no body
+- O campo obrigatorio passa de `value` para `value_name` (aceitar ambos para retrocompatibilidade)
+- `value_id` continua opcional
 
+## Detalhes tecnicos
+
+### Novo formato do atributo armazenado
+```json
+{
+  "id": "BRAND",
+  "name": "Marca",
+  "value_id": "59134419",
+  "value_name": "Nobelium",
+  "values": [
+    { "id": "59134419", "name": "Nobelium" }
+  ]
+}
+```
+
+### Retrocompatibilidade
+- Se o body enviar `value` em vez de `value_name`, aceitar como alias
+- Se `value_id` for null, o array `values` tera `id` como null
+
+### Arquivos modificados
+- `supabase/functions/products/index.ts`
+- `supabase/functions/api-produtos-atributos/index.ts`
+- `src/data/apiEndpointsData.ts`
