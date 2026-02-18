@@ -1,49 +1,46 @@
 
-## Atualizar formato do body do endpoint PUT /products/{id}/attributes
+## Atualizar documentacao da API para novo formato de atributos
 
 ### Objetivo
-Alterar o endpoint para aceitar o payload no formato nativo do Mercado Livre, facilitando a integracão direta com n8n e outros sistemas.
+Atualizar os exemplos de request body nos dois endpoints de atributos para refletir o novo formato nativo do Mercado Livre, com retrocompatibilidade documentada.
 
-### Formato atual (sera removido)
+### Alteracoes no arquivo `src/data/apiEndpointsData.ts`
+
+**1. Endpoint `api-produtos-atributos` (linha ~132-155)**
+- Atualizar `description`: remover "Valida o atributo contra attribute_definitions" e mencionar formato Mercado Livre
+- Atualizar `requestBody` de:
+```json
+{ "product_id": "uuid", "attribute_id": "MATERIAL", "value_name": "Plastico ABS", "value_id": null }
+```
+Para:
 ```json
 {
-  "attribute_id": "BRAND",
-  "value_name": "Archy",
-  "value_id": "3266931"
+  "product_id": "uuid-do-produto",
+  "id": "MATERIAL",
+  "name": "Material",
+  "value_id": null,
+  "value_name": "Plastico ABS",
+  "values": [{ "id": null, "name": "Plastico ABS" }]
 }
 ```
 
-### Novo formato aceito
+**2. Endpoint `products/:id/attributes` (linha ~1547-1555)**
+- Atualizar `description`: mencionar formato Mercado Livre e retrocompatibilidade
+- Atualizar `requestBody` de:
+```json
+{ "attribute_id": "MATERIAL", "value_name": "Plastico ABS", "value_id": "12345" }
+```
+Para:
 ```json
 {
-  "id": "BRAND",
-  "name": "Marca",
-  "value_id": "3266931",
-  "value_name": "Archy",
-  "values": [
-    {
-      "id": "3266931",
-      "name": "Archy"
-    }
-  ]
+  "id": "MATERIAL",
+  "name": "Material",
+  "value_id": "12345",
+  "value_name": "Plastico ABS",
+  "values": [{ "id": "12345", "name": "Plastico ABS" }]
 }
 ```
 
-### Alteracoes tecnicas
-
-**Arquivo:** `supabase/functions/products/index.ts` - funcao `handleUpdateAttribute`
-
-1. Alterar validacao para aceitar `id` em vez de `attribute_id` (manter retrocompatibilidade aceitando ambos)
-2. Usar `name` do body diretamente (se fornecido), sem precisar buscar na tabela `attribute_definitions`
-3. Usar `value_name` e `value_id` do body diretamente
-4. Usar `values` do body se fornecido, senao montar automaticamente
-5. Remover a busca obrigatoria na tabela `attribute_definitions` (tornar opcional como fallback quando `name` nao for enviado)
-
-### Retrocompatibilidade
-- O campo `id` sera o principal, mas `attribute_id` continuara funcionando como alias
-- O campo `value` continuara funcionando como alias de `value_name`
-- Se `name` nao for enviado, o sistema buscara na tabela `attribute_definitions`
-- Se `values` nao for enviado, sera montado automaticamente a partir de `value_id` e `value_name`
-
-### Funcao tambem atualizada
-- `api-produtos-atributos/index.ts` - mesma logica para manter consistencia entre os dois endpoints
+### Notas
+- Os campos `name` e `values` serao documentados como opcionais (gerados automaticamente se omitidos)
+- Sera mencionado que `attribute_id` e `value` continuam funcionando como alias para retrocompatibilidade
