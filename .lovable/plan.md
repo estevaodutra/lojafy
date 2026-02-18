@@ -1,47 +1,33 @@
 
 
-## Corrigir erro "Failed to fetch" na publicacao do Mercado Livre
+## Remover autenticacao da Edge Function ml-publish-proxy
 
 ### Problema
-O navegador tenta chamar o webhook do n8n (`https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Advertise`) diretamente do frontend. Isso causa erro "Failed to fetch" por CORS -- o servidor n8n nao permite requisicoes vindas do dominio do app.
+A Edge Function `ml-publish-proxy` exige autenticacao JWT, mas o usuario quer que ela apenas repasse os dados ao webhook n8n sem validar tokens.
 
-### Solucao
-Criar uma Edge Function proxy no Supabase (`ml-publish-proxy`) que recebe o payload do frontend e encaminha ao webhook do n8n. O frontend passa a chamar a Edge Function (mesmo dominio Supabase, sem CORS).
+### Alteracao
 
-### Alteracoes
+**Arquivo: `supabase/functions/ml-publish-proxy/index.ts`**
 
-**1. Nova Edge Function: `supabase/functions/ml-publish-proxy/index.ts`**
+Simplificar a funcao removendo toda a logica de autenticacao (getClaims, validacao de user_id, createClient). A funcao apenas:
+1. Recebe o payload via POST
+2. Encaminha ao webhook n8n
+3. Retorna a resposta
 
-- Recebe o payload via POST (requer autenticacao JWT do usuario logado)
-- Valida que o usuario autenticado corresponde ao `user_id` do payload
-- Encaminha a requisicao ao webhook n8n: `https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Advertise`
-- Retorna a resposta do webhook ao frontend
-- Inclui tratamento de erros e timeout
-
-Estrutura da funcao:
 ```text
-1. Validar autenticacao (JWT)
-2. Ler body do request
-3. Verificar user_id == usuario autenticado
-4. POST para o webhook n8n com o mesmo body
-5. Retornar status + resposta do webhook
+Deno.serve(async (req) => {
+  // CORS preflight
+  // Ler body
+  // POST para WEBHOOK_URL com o body
+  // Retornar resposta
+})
 ```
 
-**2. Atualizar `src/hooks/useMercadoLivreIntegration.ts`**
+Remove: import do supabase-js, createClient, authHeader, getClaims, validacao de user_id.
 
-Trocar a URL do fetch de:
-```text
-https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Advertise
-```
-Para:
-```text
-supabase.functions.invoke('ml-publish-proxy', { body: payload })
-```
+**Arquivo: `src/hooks/useMercadoLivreIntegration.ts`**
 
-Usar o metodo `supabase.functions.invoke()` que ja inclui o token JWT automaticamente e nao tem problemas de CORS.
+Nenhuma alteracao necessaria - o hook ja usa `supabase.functions.invoke()` que envia o token automaticamente, mas a funcao simplesmente vai ignorar. O payload continua o mesmo.
 
 ### Resultado
-- Sem problemas de CORS (a chamada vai para o mesmo dominio Supabase)
-- O token JWT do usuario e enviado automaticamente
-- Os dados sensiveis (access_token do ML) trafegam pelo backend, nao ficam expostos no console do navegador
-- A Edge Function pode ser monitorada nos logs do Supabase
+A Edge Function funciona como um proxy puro - recebe e encaminha sem verificar autenticacao.
