@@ -133,12 +133,14 @@ const catalogProductsApiKey: EndpointData[] = [
     title: 'Gerenciar Atributos do Produto',
     method: 'PUT',
     url: '/functions/v1/api-produtos-atributos',
-    description: 'Adiciona ou atualiza um atributo individual de um produto. Valida o atributo contra attribute_definitions.',
+    description: 'Adiciona ou atualiza um atributo individual de um produto. Aceita formato nativo do Mercado Livre. Campos "name" e "values" são opcionais (gerados automaticamente). Retrocompatível com "attribute_id" e "value" como alias.',
     requestBody: {
       product_id: 'uuid-do-produto',
-      attribute_id: 'MATERIAL',
+      id: 'MATERIAL',
+      name: 'Material',
+      value_id: null,
       value_name: 'Plástico ABS',
-      value_id: null
+      values: [{ id: null, name: 'Plástico ABS' }]
     },
     responseExample: {
       success: true,
@@ -1548,9 +1550,9 @@ const productsRestEndpoints: EndpointData[] = [
     title: 'Atualizar Atributo',
     method: 'PUT',
     url: '/functions/v1/products/:id/attributes',
-    description: 'Adiciona/atualiza atributo individual validado contra attribute_definitions.',
+    description: 'Adiciona/atualiza atributo individual no formato nativo do Mercado Livre. Campos "name" e "values" são opcionais. Retrocompatível com "attribute_id" e "value" como alias.',
     headers: [{ name: 'X-API-Key', description: 'Chave de API com permissão produtos.write', example: 'sk_sua_chave', required: true }],
-    requestBody: { attribute_id: 'MATERIAL', value_name: 'Plástico ABS', value_id: '12345' },
+    requestBody: { id: 'MATERIAL', name: 'Material', value_id: '12345', value_name: 'Plástico ABS', values: [{ id: '12345', name: 'Plástico ABS' }] },
     responseExample: { success: true, data: { id: 'uuid', attributes: [{ id: 'MATERIAL', name: 'Material', value_id: '12345', value_name: 'Plástico ABS', values: [{ id: '12345', name: 'Plástico ABS' }] }] } }
   },
   {
