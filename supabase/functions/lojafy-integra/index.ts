@@ -17,6 +17,21 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
 // Control fields that are extracted from body (not stored in data JSONB)
 const CONTROL_FIELDS = ['product_id', 'marketplace', 'listing_id', 'listing_url', 'listing_status'];
 
+// Fields that should NOT be stored in data JSONB (they come from the Lojafy product at publish time)
+const FORBIDDEN_DATA_FIELDS = ['price', 'available_quantity', 'attributes', 'listing_type_id', 'buying_mode', 'currency_id'];
+
+// Valid listing_type values
+const VALID_LISTING_TYPES = ['classic', 'premium'];
+
+// Helper: Convert Lojafy listing_type to Mercado Livre listing_type_id
+export function getMLListingType(lojafyType: string): string {
+  const map: Record<string, string> = {
+    classic: 'gold_special',
+    premium: 'gold_pro',
+  };
+  return map[lojafyType] || 'gold_special';
+}
+
 Deno.serve(async (req) => {
   const startTime = Date.now();
 
@@ -91,9 +106,19 @@ Deno.serve(async (req) => {
         return jsonResponse({ success: false, error: 'Produto não encontrado na tabela products' }, 404);
       }
 
+      // Validate listing_type if provided
+      if (body.listing_type && !VALID_LISTING_TYPES.includes(body.listing_type)) {
+        return jsonResponse({ success: false, error: `listing_type deve ser: ${VALID_LISTING_TYPES.join(', ')}` }, 400);
+      }
+
+      // Default listing_type to classic
+      if (!body.listing_type) {
+        body.listing_type = 'classic';
+      }
+
       // Extract control fields, everything else goes into data JSONB
       const dataPayload = { ...body };
-      for (const field of CONTROL_FIELDS) {
+      for (const field of [...CONTROL_FIELDS, ...FORBIDDEN_DATA_FIELDS]) {
         delete dataPayload[field];
       }
 
