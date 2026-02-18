@@ -63,9 +63,20 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { isSuperAdmin } = useUserRole();
   const { settings } = usePlatformSettings();
-  const [specifications, setSpecifications] = useState<{ key: string; value: string }[]>(
-    product?.specifications ? Object.entries(product.specifications).map(([key, value]) => ({ key, value: value as string })) : []
-  );
+  const [specifications, setSpecifications] = useState<{ key: string; value: string }[]>(() => {
+    // First try to load from specifications (legacy format: {key: value})
+    if (product?.specifications && typeof product.specifications === 'object' && Object.keys(product.specifications).length > 0) {
+      return Object.entries(product.specifications).map(([key, value]) => ({ key, value: value as string }));
+    }
+    // Then try to load from attributes (new ML format: [{id, name, value_name, ...}])
+    if (product?.attributes && Array.isArray(product.attributes) && product.attributes.length > 0) {
+      return (product.attributes as any[]).map((attr: any) => ({
+        key: attr.name || attr.id || '',
+        value: attr.value_name || attr.value || '',
+      }));
+    }
+    return [];
+  });
   const [images, setImages] = useState<any[]>(() => {
     // Collect all image URLs from different sources
     const imageUrls: string[] = [];
