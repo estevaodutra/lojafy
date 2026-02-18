@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { X, Upload, Star, StarOff, Image as ImageIcon } from 'lucide-react';
+import { X, Upload, Star, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -132,20 +132,6 @@ export const ImageUploadArea: React.FC<ImageUploadAreaProps> = ({
     onImagesChange(updatedImages);
   }, [images, onImagesChange]);
 
-  const setMainImage = useCallback((imageId: string) => {
-    const updatedImages = images.map(img => ({
-      ...img,
-      isMain: img.id === imageId
-    }));
-    
-    // Validate that only one image is marked as main
-    const mainCount = updatedImages.filter(img => img.isMain).length;
-    if (mainCount !== 1) {
-      console.warn('Multiple or no main images detected, correcting...');
-    }
-    
-    onImagesChange(updatedImages);
-  }, [images, onImagesChange]);
 
   return (
     <div className="space-y-4">
@@ -205,7 +191,7 @@ export const ImageUploadArea: React.FC<ImageUploadAreaProps> = ({
                     </div>
                   )}
                   
-                  {image.isMain && (
+                  {images.indexOf(image) === 0 && (
                     <Badge className="absolute top-2 left-2" variant="default">
                       <Star className="h-3 w-3 mr-1" />
                       Principal
@@ -214,15 +200,6 @@ export const ImageUploadArea: React.FC<ImageUploadAreaProps> = ({
                 </div>
 
                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setMainImage(image.id)}
-                    disabled={image.isMain || image.isUploading}
-                  >
-                    {image.isMain ? <Star className="h-3 w-3" /> : <StarOff className="h-3 w-3" />}
-                  </Button>
-                  
                   <Button
                     size="sm"
                     variant="destructive"

@@ -394,7 +394,11 @@ async function handleUpdateProduct(supabase: any, req: Request, productId: strin
   if (body.attributes !== undefined && body.attributes.length > 0) {
     body.enriched_at = new Date().toISOString();
   }
-  if (body.main_image_url !== undefined) {
+  // First image is always the main image
+  if (body.images && Array.isArray(body.images) && body.images.length > 0) {
+    body.main_image_url = body.images[0];
+    body.image_url = body.images[0];
+  } else if (body.main_image_url !== undefined) {
     body.image_url = body.main_image_url;
   }
   if (body.name) {
