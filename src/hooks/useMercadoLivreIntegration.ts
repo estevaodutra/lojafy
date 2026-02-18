@@ -107,6 +107,14 @@ export const useMercadoLivreIntegration = () => {
         throw new Error('Produto não encontrado');
       }
 
+      // 1.5. Buscar preço customizado do revendedor (Seu Preço)
+      const { data: resellerProduct } = await supabase
+        .from('reseller_products')
+        .select('custom_price')
+        .eq('reseller_id', user.id)
+        .eq('product_id', productId)
+        .maybeSingle();
+
       // 2. Buscar dados da integração (incluindo access_token)
       const { data: integrationData, error: integrationError } = await supabase
         .from('mercadolivre_integrations')
@@ -130,6 +138,7 @@ export const useMercadoLivreIntegration = () => {
       // 4. Enviar payload via Edge Function proxy
       const webhookPayload = {
         product: productData,
+        reseller_price: resellerProduct?.custom_price || null,
         marketplace_data: marketplaceData?.data || null,
         marketplace_listing: {
           listing_id: marketplaceData?.listing_id ?? null,
