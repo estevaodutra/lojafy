@@ -14,6 +14,9 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
   });
 }
 
+// Control fields that are extracted from body (not stored in data JSONB)
+const CONTROL_FIELDS = ['product_id', 'marketplace', 'listing_id', 'listing_url', 'listing_status'];
+
 Deno.serve(async (req) => {
   const startTime = Date.now();
 
@@ -28,13 +31,11 @@ Deno.serve(async (req) => {
 
   const url = new URL(req.url);
   const pathParts = url.pathname.split('/').filter(Boolean);
-  // pathParts: ["lojafy-integra", "products", ...]
-
 
   const method = req.method;
-  const endpoint = pathParts[1]; // "products"
-  const subEndpoint = pathParts[2]; // id, "by-product", "bulk"
-  const subId = pathParts[3]; // productId (quando by-product)
+  const endpoint = pathParts[1]; // "products" or "mercadolivre"
+  const subEndpoint = pathParts[2]; // id, "by-product", "unpublished"
+  const subId = pathParts[3]; // productId (when by-product)
 
   const ipAddress = getClientIp(req);
 
@@ -66,24 +67,20 @@ Deno.serve(async (req) => {
     apiKeyId = keyData.id;
     userId = keyData.user_id;
 
-    // Update last_used
     await supabase.from('api_keys').update({ last_used: new Date().toISOString() }).eq('id', keyData.id);
   }
 
   try {
     // ============================================
-    // POST /products - Criar produto
+    // POST /products - Criar/Atualizar dados marketplace (upsert)
     // ============================================
     if (method === 'POST' && endpoint === 'products' && !subEndpoint) {
       const body = await req.json();
 
-      // Validações
       if (!body.product_id) return jsonResponse({ success: false, error: 'product_id é obrigatório' }, 400);
       if (!body.marketplace) return jsonResponse({ success: false, error: 'marketplace é obrigatório' }, 400);
-      if (!body.title) return jsonResponse({ success: false, error: 'title é obrigatório' }, 400);
-      if (!body.price || body.price <= 0) return jsonResponse({ success: false, error: 'price é obrigatório e deve ser maior que zero' }, 400);
 
-      // Verificar se produto original existe
+      // Verify product exists
       const { data: productExists, error: productError } = await supabase
         .from('products')
         .select('id, name')
@@ -91,41 +88,34 @@ Deno.serve(async (req) => {
         .single();
 
       if (productError || !productExists) {
-        console.error('[lojafy-integra] Product not found:', body.product_id);
         return jsonResponse({ success: false, error: 'Produto não encontrado na tabela products' }, 404);
+      }
+
+      // Extract control fields, everything else goes into data JSONB
+      const dataPayload = { ...body };
+      for (const field of CONTROL_FIELDS) {
+        delete dataPayload[field];
       }
 
       const { data, error } = await supabase
         .from('product_marketplace_data')
-        .insert({
-          product_id: body.product_id,
-          user_id: body.user_id || userId,
-          marketplace: body.marketplace,
-          title: body.title,
-          description: body.description,
-          price: body.price,
-          promotional_price: body.promotional_price,
-          category_id: body.category_id,
-          category_name: body.category_name,
-          attributes: body.attributes || {},
-          variations: body.variations || [],
-          stock_quantity: body.stock_quantity || 0,
-          images: body.images || [],
-          status: body.status || 'draft',
-          listing_type: body.listing_type,
-          marketplace_metadata: body.marketplace_metadata || {},
-        })
+        .upsert(
+          {
+            product_id: body.product_id,
+            marketplace: body.marketplace,
+            data: dataPayload,
+            listing_id: body.listing_id || null,
+            listing_url: body.listing_url || null,
+            listing_status: body.listing_status || 'draft',
+          },
+          { onConflict: 'product_id,marketplace' }
+        )
         .select()
         .single();
 
-      if (error) {
-        if (error.code === '23505') {
-          return jsonResponse({ success: false, error: 'Este produto já existe para este marketplace' }, 409);
-        }
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log(`[lojafy-integra] Product created: ${data.id} for marketplace ${body.marketplace}`);
+      console.log(`[lojafy-integra] Product upserted: ${data.id} for marketplace ${body.marketplace}`);
 
       await logApiRequest({
         function_name: 'lojafy-integra',
@@ -144,53 +134,12 @@ Deno.serve(async (req) => {
     }
 
     // ============================================
-    // POST /products/bulk - Criar múltiplos
-    // ============================================
-    if (method === 'POST' && endpoint === 'products' && subEndpoint === 'bulk') {
-      const body = await req.json();
-
-      if (!Array.isArray(body.products) || body.products.length === 0) {
-        return jsonResponse({ success: false, error: 'products deve ser um array não vazio' }, 400);
-      }
-
-      // Set user_id on each product if not provided
-      const productsWithUser = body.products.map((p: Record<string, unknown>) => ({
-        ...p,
-        user_id: p.user_id || userId,
-      }));
-
-      const { data, error } = await supabase
-        .from('product_marketplace_data')
-        .insert(productsWithUser)
-        .select();
-
-      if (error) throw error;
-
-      console.log(`[lojafy-integra] Bulk created: ${data.length} products`);
-
-      await logApiRequest({
-        function_name: 'lojafy-integra',
-        method,
-        path: url.pathname,
-        api_key_id: apiKeyId || undefined,
-        user_id: userId || undefined,
-        ip_address: ipAddress,
-        status_code: 201,
-        duration_ms: Date.now() - startTime,
-        request_body: { count: body.products.length },
-        response_summary: { success: true, count: data.length },
-      });
-
-      return jsonResponse({ success: true, data, count: data.length }, 201);
-    }
-
-    // ============================================
-    // GET /products - Listar produtos
+    // GET /products - Listar com filtros
     // ============================================
     if (method === 'GET' && endpoint === 'products' && !subEndpoint) {
       const marketplace = url.searchParams.get('marketplace');
-      const status = url.searchParams.get('status');
-      const filterUserId = url.searchParams.get('user_id');
+      const listingStatus = url.searchParams.get('listing_status');
+      const productId = url.searchParams.get('product_id');
       const page = parseInt(url.searchParams.get('page') || '1');
       const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
       const offset = (page - 1) * limit;
@@ -200,23 +149,18 @@ Deno.serve(async (req) => {
         .select(`
           *,
           products:product_id (
-            id,
-            name,
-            main_image_url,
-            sku,
-            gtin_ean13
+            id, name, main_image_url, sku, gtin_ean13, price, stock_quantity
           )
         `, { count: 'exact' });
 
       if (marketplace) query = query.eq('marketplace', marketplace);
-      if (status) query = query.eq('status', status);
-      if (filterUserId) query = query.eq('user_id', filterUserId);
+      if (listingStatus) query = query.eq('listing_status', listingStatus);
+      if (productId) query = query.eq('product_id', productId);
 
       query = query.order('created_at', { ascending: false });
       query = query.range(offset, offset + limit - 1);
 
       const { data, error, count } = await query;
-
       if (error) throw error;
 
       await logApiRequest({
@@ -228,7 +172,7 @@ Deno.serve(async (req) => {
         ip_address: ipAddress,
         status_code: 200,
         duration_ms: Date.now() - startTime,
-        query_params: { marketplace, status, page, limit } as Record<string, unknown>,
+        query_params: { marketplace, listing_status: listingStatus, product_id: productId, page, limit } as Record<string, unknown>,
         response_summary: { success: true, count },
       });
 
@@ -255,16 +199,15 @@ Deno.serve(async (req) => {
 
       const filterUserId = url.searchParams.get('user_id');
 
-      // Buscar IDs de produtos já cadastrados neste marketplace
+      // Get product IDs already registered for this marketplace
       let existingQuery = supabase
         .from('product_marketplace_data')
         .select('product_id')
         .eq('marketplace', marketplace);
-      if (filterUserId) existingQuery = existingQuery.eq('user_id', filterUserId);
       const { data: existing } = await existingQuery;
       const existingIds = (existing || []).map((e: { product_id: string }) => e.product_id);
 
-      // Buscar 1 produto ativo que NAO esta na lista
+      // Find 1 active product NOT in the list
       let productQuery = supabase
         .from('products')
         .select('*')
@@ -279,7 +222,7 @@ Deno.serve(async (req) => {
       const { data: product, error } = await productQuery.maybeSingle();
       if (error) throw error;
 
-      // Buscar credenciais OAuth ativas
+      // Get active OAuth credentials
       let oauthQuery = supabase
         .from('mercadolivre_integrations')
         .select('user_id, access_token, token_type, refresh_token, expires_at, ml_user_id')
@@ -293,8 +236,6 @@ Deno.serve(async (req) => {
       if (oauthError) {
         console.error('[lojafy-integra] OAuth lookup error:', oauthError);
       }
-
-      console.log(`[lojafy-integra] Unpublished product lookup for ${marketplace}: ${product ? product.id : 'none found'}, oauth: ${oauth ? 'found' : 'not found'}`);
 
       await logApiRequest({
         function_name: 'lojafy-integra',
@@ -348,7 +289,7 @@ Deno.serve(async (req) => {
     // ============================================
     // GET /products/:id - Buscar por ID
     // ============================================
-    if (method === 'GET' && endpoint === 'products' && subEndpoint && subEndpoint !== 'by-product' && subEndpoint !== 'bulk') {
+    if (method === 'GET' && endpoint === 'products' && subEndpoint && subEndpoint !== 'by-product' && subEndpoint !== 'unpublished') {
       const { data, error } = await supabase
         .from('product_marketplace_data')
         .select(`
@@ -386,14 +327,21 @@ Deno.serve(async (req) => {
     if (method === 'PUT' && endpoint === 'products' && subEndpoint) {
       const body = await req.json();
 
-      // Proteger campos imutáveis
-      delete body.id;
-      delete body.product_id;
-      delete body.created_at;
+      const updateFields: Record<string, unknown> = {};
+
+      // Update control fields if provided
+      if (body.listing_id !== undefined) updateFields.listing_id = body.listing_id;
+      if (body.listing_url !== undefined) updateFields.listing_url = body.listing_url;
+      if (body.listing_status !== undefined) updateFields.listing_status = body.listing_status;
+      if (body.published_at !== undefined) updateFields.published_at = body.published_at;
+      if (body.last_sync_at !== undefined) updateFields.last_sync_at = body.last_sync_at;
+
+      // Update data JSONB if provided
+      if (body.data !== undefined) updateFields.data = body.data;
 
       const { data, error } = await supabase
         .from('product_marketplace_data')
-        .update(body)
+        .update(updateFields)
         .eq('id', subEndpoint)
         .select()
         .single();
@@ -416,7 +364,7 @@ Deno.serve(async (req) => {
         ip_address: ipAddress,
         status_code: 200,
         duration_ms: Date.now() - startTime,
-        request_body: { updated_fields: Object.keys(body) },
+        request_body: { updated_fields: Object.keys(updateFields) },
         response_summary: { success: true, id: data.id },
       });
 
@@ -460,7 +408,6 @@ Deno.serve(async (req) => {
 
     // ============================================
     // GET /mercadolivre/expiring-tokens
-    // Lista integrações com tokens próximos de expirar
     // ============================================
     if (method === 'GET' && endpoint === 'mercadolivre' && subEndpoint === 'expiring-tokens') {
       const minutes = parseInt(url.searchParams.get('minutes') || '60');
@@ -480,7 +427,6 @@ Deno.serve(async (req) => {
       }
 
       const { data, error } = await query;
-
       if (error) throw error;
 
       const enrichedData = (data || []).map((integration: Record<string, unknown>) => {
@@ -492,8 +438,6 @@ Deno.serve(async (req) => {
           is_expired: minutesUntilExpiration < 0,
         };
       });
-
-      console.log(`[lojafy-integra] Expiring tokens check: ${enrichedData.length} found (threshold: ${minutes}min, include_expired: ${includeExpired})`);
 
       await logApiRequest({
         function_name: 'lojafy-integra',
@@ -517,7 +461,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Endpoint não encontrado
     return jsonResponse({ success: false, error: 'Endpoint não encontrado' }, 404);
   } catch (error) {
     console.error('[lojafy-integra] Error:', error);
