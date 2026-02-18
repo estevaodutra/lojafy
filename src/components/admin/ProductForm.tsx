@@ -65,8 +65,12 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
   const { settings } = usePlatformSettings();
   const [specifications, setSpecifications] = useState<{ key: string; value: string }[]>(() => {
     // First try to load from specifications (legacy format: {key: value})
-    if (product?.specifications && typeof product.specifications === 'object' && Object.keys(product.specifications).length > 0) {
-      return Object.entries(product.specifications).map(([key, value]) => ({ key, value: value as string }));
+    // Filter out null/empty values to avoid using empty legacy data over real attributes
+    if (product?.specifications && typeof product.specifications === 'object') {
+      const specEntries = Object.entries(product.specifications).filter(([_, v]) => v != null && v !== '');
+      if (specEntries.length > 0) {
+        return specEntries.map(([key, value]) => ({ key, value: value as string }));
+      }
     }
     // Then try to load from attributes (new ML format: [{id, name, value_name, ...}])
     if (product?.attributes && Array.isArray(product.attributes) && product.attributes.length > 0) {
