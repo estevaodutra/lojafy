@@ -1,74 +1,49 @@
 
 
-# Alterar Formato de Atributos para Padrao Mercado Livre
+# Atualizar Documentacao dos Endpoints Legados para Formato Mercado Livre
 
 ## Problema
-O formato atual dos atributos armazenados no produto e:
-```json
-{ "id": "BRAND", "name": "Marca", "value": "Nobelium", "value_id": "59134419" }
+Os endpoints REST (`/products`) ja foram atualizados para o novo formato de atributos, mas os endpoints legados (`api-produtos-*`) ainda mostram o formato antigo com `value` em vez de `value_name` + `values`.
+
+## Alteracoes em `src/data/apiEndpointsData.ts`
+
+### 1. Endpoint "Cadastrar Produto" (api-produtos-cadastrar)
+**Request body** (linhas 62-65) - atualizar `atributos`:
+```
+De: { id: 'BRAND', name: 'Marca', value: 'Generic' }
+Para: { id: 'BRAND', name: 'Marca', value_name: 'Generic', values: [{ id: null, name: 'Generic' }] }
+```
+Mesmo para os outros atributos do array (VOLTAGE, POWER).
+
+**Response** (linha 80) - atualizar `atributos`:
+```
+De: { id: 'BRAND', name: 'Marca', value: 'Generic' }
+Para: { id: 'BRAND', name: 'Marca', value_name: 'Generic', values: [{ id: null, name: 'Generic' }] }
 ```
 
-O Mercado Livre usa um formato diferente com `value_name` e um array `values`:
-```json
-{
-  "id": "BRAND",
-  "name": "Marca",
-  "value_id": "59134419",
-  "value_name": "Nobelium",
-  "values": [{ "id": "59134419", "name": "Nobelium" }]
-}
+### 2. Endpoint "Listar Produtos" (api-produtos-listar)
+**Response** (linha 108) - atualizar `atributos`:
+```
+De: { id: 'BRAND', name: 'Marca', value: 'Generic' }
+Para: { id: 'BRAND', name: 'Marca', value_name: 'Generic', values: [{ id: null, name: 'Generic' }] }
 ```
 
-## Alteracoes
-
-### 1. `supabase/functions/products/index.ts` (handler `handleUpdateAttribute`)
-Alterar a montagem do `newAttribute` (linhas 445-450) de:
+### 3. Endpoint "Gerenciar Atributos" (api-produtos-atributos)
+**Request body** (linhas 137-141):
 ```
-{ id, name, value, value_id }
-```
-Para:
-```
-{ id, name, value_id, value_name, values: [{ id: value_id, name: value_name }] }
-```
-- `value_name` vem do campo `value` do body (renomear semanticamente)
-- `value_id` vem do campo `value_id` do body
-- `values` e um array com um objeto contendo `id` e `name`
-- Aceitar tambem `value_name` diretamente no body como alternativa a `value`
-
-### 2. `supabase/functions/api-produtos-atributos/index.ts`
-Mesma alteracao na montagem do `newAttribute` (linhas 144-149):
-- Trocar `value` por `value_name`
-- Adicionar array `values`
-
-### 3. `src/data/apiEndpointsData.ts`
-Atualizar os exemplos de request body e response dos endpoints de atributos para refletir o novo formato:
-- Trocar `value: "Plastico ABS"` por `value_name: "Plastico ABS"`
-- Adicionar `values` nos exemplos de resposta
-
-### 4. Validacao no body
-- O campo obrigatorio passa de `value` para `value_name` (aceitar ambos para retrocompatibilidade)
-- `value_id` continua opcional
-
-## Detalhes tecnicos
-
-### Novo formato do atributo armazenado
-```json
-{
-  "id": "BRAND",
-  "name": "Marca",
-  "value_id": "59134419",
-  "value_name": "Nobelium",
-  "values": [
-    { "id": "59134419", "name": "Nobelium" }
-  ]
-}
+De: { value: 'Plastico ABS', value_id: null }
+Para: { value_name: 'Plastico ABS', value_id: null }
 ```
 
-### Retrocompatibilidade
-- Se o body enviar `value` em vez de `value_name`, aceitar como alias
-- Se `value_id` for null, o array `values` tera `id` como null
+**Response** (linhas 149-152) - atualizar array `atributos`:
+```
+De: { id: 'BRAND', name: 'Marca', value: 'Generic' }
+Para: { id: 'BRAND', name: 'Marca', value_name: 'Generic', values: [{ id: null, name: 'Generic' }] }
 
-### Arquivos modificados
-- `supabase/functions/products/index.ts`
-- `supabase/functions/api-produtos-atributos/index.ts`
-- `src/data/apiEndpointsData.ts`
+De: { id: 'MATERIAL', name: 'Material', value: 'Plastico ABS' }
+Para: { id: 'MATERIAL', name: 'Material', value_name: 'Plastico ABS', values: [{ id: null, name: 'Plastico ABS' }] }
+```
+
+### Resumo
+Todos os exemplos de atributos na documentacao passam a usar `value_name` + array `values` consistentemente, alinhados com o formato Mercado Livre e com as Edge Functions ja atualizadas.
+
