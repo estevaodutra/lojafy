@@ -1,46 +1,29 @@
 
-## Atualizar documentacao da API para novo formato de atributos
 
-### Objetivo
-Atualizar os exemplos de request body nos dois endpoints de atributos para refletir o novo formato nativo do Mercado Livre, com retrocompatibilidade documentada.
+## Corrigir exibicao de atributos no formulario de produto
 
-### Alteracoes no arquivo `src/data/apiEndpointsData.ts`
+### Problema
+A coluna `specifications` dos produtos contem chaves com valores `null` (ex: `{"cor": null, "tamanho": null, "material": null}`). O codigo atual verifica apenas se `Object.keys(specifications).length > 0`, o que retorna `true` porque as chaves existem, mesmo com todos os valores nulos. Isso faz o sistema usar o formato legado (com valores vazios) em vez de carregar os dados do campo `attributes` que contem os valores reais.
 
-**1. Endpoint `api-produtos-atributos` (linha ~132-155)**
-- Atualizar `description`: remover "Valida o atributo contra attribute_definitions" e mencionar formato Mercado Livre
-- Atualizar `requestBody` de:
-```json
-{ "product_id": "uuid", "attribute_id": "MATERIAL", "value_name": "Plastico ABS", "value_id": null }
+### Solucao
+Alterar a logica de inicializacao do estado `specifications` em `ProductForm.tsx` para verificar se ha pelo menos um valor nao-nulo antes de usar o formato legado.
+
+### Alteracao tecnica
+
+**Arquivo:** `src/components/admin/ProductForm.tsx` (linhas 66-78)
+
+Trocar a verificacao de:
+```typescript
+if (product?.specifications && typeof product.specifications === 'object' && Object.keys(product.specifications).length > 0) {
 ```
+
 Para:
-```json
-{
-  "product_id": "uuid-do-produto",
-  "id": "MATERIAL",
-  "name": "Material",
-  "value_id": null,
-  "value_name": "Plastico ABS",
-  "values": [{ "id": null, "name": "Plastico ABS" }]
+```typescript
+const specEntries = Object.entries(product.specifications).filter(([_, v]) => v != null && v !== '');
+if (product?.specifications && typeof product.specifications === 'object' && specEntries.length > 0) {
+  return specEntries.map(([key, value]) => ({ key, value: value as string }));
 }
 ```
 
-**2. Endpoint `products/:id/attributes` (linha ~1547-1555)**
-- Atualizar `description`: mencionar formato Mercado Livre e retrocompatibilidade
-- Atualizar `requestBody` de:
-```json
-{ "attribute_id": "MATERIAL", "value_name": "Plastico ABS", "value_id": "12345" }
-```
-Para:
-```json
-{
-  "id": "MATERIAL",
-  "name": "Material",
-  "value_id": "12345",
-  "value_name": "Plastico ABS",
-  "values": [{ "id": "12345", "name": "Plastico ABS" }]
-}
-```
+Isso filtra as chaves com valor `null` ou vazio antes de decidir qual fonte de dados usar. Se todas as chaves forem nulas, o sistema cai no fallback para `attributes`.
 
-### Notas
-- Os campos `name` e `values` serao documentados como opcionais (gerados automaticamente se omitidos)
-- Sera mencionado que `attribute_id` e `value` continuam funcionando como alias para retrocompatibilidade
