@@ -968,6 +968,13 @@ export type Database = {
             foreignKeyName: "demo_order_items_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "v_products_mercadolivre"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "demo_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "v_products_needs_enrichment"
             referencedColumns: ["id"]
           },
@@ -977,6 +984,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_products_with_attributes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demo_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_marketplace"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -1085,6 +1099,13 @@ export type Database = {
             foreignKeyName: "favorites_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "v_products_mercadolivre"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "favorites_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "v_products_needs_enrichment"
             referencedColumns: ["id"]
           },
@@ -1094,6 +1115,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_products_with_attributes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "favorites_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_marketplace"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -1591,6 +1619,13 @@ export type Database = {
             foreignKeyName: "mercadolivre_published_products_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "v_products_mercadolivre"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "mercadolivre_published_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "v_products_needs_enrichment"
             referencedColumns: ["id"]
           },
@@ -1600,6 +1635,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_products_with_attributes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercadolivre_published_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_marketplace"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -1883,6 +1925,13 @@ export type Database = {
             foreignKeyName: "order_items_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "v_products_mercadolivre"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "v_products_needs_enrichment"
             referencedColumns: ["id"]
           },
@@ -1892,6 +1941,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_products_with_attributes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_marketplace"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -2397,6 +2453,13 @@ export type Database = {
             foreignKeyName: "product_approval_history_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "v_products_mercadolivre"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "product_approval_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "v_products_needs_enrichment"
             referencedColumns: ["id"]
           },
@@ -2406,6 +2469,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_products_with_attributes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_approval_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_marketplace"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -2461,85 +2531,43 @@ export type Database = {
       }
       product_marketplace_data: {
         Row: {
-          attributes: Json | null
-          category_id: string | null
-          category_name: string | null
           created_at: string | null
-          description: string | null
+          data: Json
           id: string
-          images: Json | null
           last_sync_at: string | null
-          last_sync_status: string | null
           listing_id: string | null
-          listing_type: string | null
+          listing_status: string | null
           listing_url: string | null
           marketplace: string
-          marketplace_metadata: Json | null
-          price: number
           product_id: string
-          promotional_price: number | null
           published_at: string | null
-          status: string
-          stock_quantity: number | null
-          sync_error_log: string | null
-          title: string
           updated_at: string | null
-          user_id: string | null
-          variations: Json | null
         }
         Insert: {
-          attributes?: Json | null
-          category_id?: string | null
-          category_name?: string | null
           created_at?: string | null
-          description?: string | null
+          data?: Json
           id?: string
-          images?: Json | null
           last_sync_at?: string | null
-          last_sync_status?: string | null
           listing_id?: string | null
-          listing_type?: string | null
-          listing_url?: string | null
-          marketplace: string
-          marketplace_metadata?: Json | null
-          price: number
-          product_id: string
-          promotional_price?: number | null
-          published_at?: string | null
-          status?: string
-          stock_quantity?: number | null
-          sync_error_log?: string | null
-          title: string
-          updated_at?: string | null
-          user_id?: string | null
-          variations?: Json | null
-        }
-        Update: {
-          attributes?: Json | null
-          category_id?: string | null
-          category_name?: string | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          images?: Json | null
-          last_sync_at?: string | null
-          last_sync_status?: string | null
-          listing_id?: string | null
-          listing_type?: string | null
+          listing_status?: string | null
           listing_url?: string | null
           marketplace?: string
-          marketplace_metadata?: Json | null
-          price?: number
-          product_id?: string
-          promotional_price?: number | null
+          product_id: string
           published_at?: string | null
-          status?: string
-          stock_quantity?: number | null
-          sync_error_log?: string | null
-          title?: string
           updated_at?: string | null
-          user_id?: string | null
-          variations?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          data?: Json
+          id?: string
+          last_sync_at?: string | null
+          listing_id?: string | null
+          listing_status?: string | null
+          listing_url?: string | null
+          marketplace?: string
+          product_id?: string
+          published_at?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -2548,6 +2576,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_marketplace_data_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_mercadolivre"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "product_marketplace_data_product_id_fkey"
@@ -2562,6 +2597,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_products_with_attributes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_marketplace_data_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_marketplace"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -2611,6 +2653,13 @@ export type Database = {
             foreignKeyName: "product_ranking_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "v_products_mercadolivre"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "product_ranking_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "v_products_needs_enrichment"
             referencedColumns: ["id"]
           },
@@ -2620,6 +2669,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_products_with_attributes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_ranking_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_marketplace"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -2678,6 +2734,13 @@ export type Database = {
             foreignKeyName: "fk_product_variants_product"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "v_products_mercadolivre"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "fk_product_variants_product"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "v_products_needs_enrichment"
             referencedColumns: ["id"]
           },
@@ -2687,6 +2750,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_products_with_attributes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_product_variants_product"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_marketplace"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -3167,6 +3237,13 @@ export type Database = {
             foreignKeyName: "reseller_products_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "v_products_mercadolivre"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "reseller_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "v_products_needs_enrichment"
             referencedColumns: ["id"]
           },
@@ -3176,6 +3253,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_products_with_attributes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reseller_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_marketplace"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "reseller_products_reseller_id_fkey"
@@ -3436,6 +3520,13 @@ export type Database = {
             foreignKeyName: "reviews_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "v_products_mercadolivre"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "reviews_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "v_products_needs_enrichment"
             referencedColumns: ["id"]
           },
@@ -3445,6 +3536,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_products_with_attributes"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_marketplace"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -4160,6 +4258,29 @@ export type Database = {
       }
     }
     Views: {
+      v_products_mercadolivre: {
+        Row: {
+          data: Json | null
+          last_sync_at: string | null
+          listing_id: string | null
+          listing_status: string | null
+          listing_url: string | null
+          lojafy_attributes: Json | null
+          lojafy_images: string[] | null
+          lojafy_price: number | null
+          lojafy_stock: number | null
+          marketplace: string | null
+          marketplace_data_id: string | null
+          ml_category_id: string | null
+          ml_category_name: string | null
+          ml_domain_id: string | null
+          ml_price: number | null
+          product_id: string | null
+          product_name: string | null
+          published_at: string | null
+        }
+        Relationships: []
+      }
       v_products_needs_enrichment: {
         Row: {
           attributes: Json | null
@@ -4200,6 +4321,29 @@ export type Database = {
           stock_quantity: number | null
           variation_count: number | null
           variations: Json | null
+        }
+        Relationships: []
+      }
+      v_products_with_marketplace: {
+        Row: {
+          data: Json | null
+          last_sync_at: string | null
+          listing_id: string | null
+          listing_status: string | null
+          listing_url: string | null
+          lojafy_attributes: Json | null
+          lojafy_images: string[] | null
+          lojafy_price: number | null
+          lojafy_stock: number | null
+          marketplace: string | null
+          marketplace_data_id: string | null
+          ml_category_id: string | null
+          ml_category_name: string | null
+          ml_domain_id: string | null
+          ml_price: number | null
+          product_id: string | null
+          product_name: string | null
+          published_at: string | null
         }
         Relationships: []
       }
