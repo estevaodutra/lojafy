@@ -99,11 +99,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (value === undefined || value === null) {
+    const valueName = body.value_name ?? value;
+    if (valueName === undefined || valueName === null) {
       statusCode = 400;
-      errorMessage = 'value required';
+      errorMessage = 'value_name required';
       return new Response(
-        JSON.stringify({ error: 'value é obrigatório' }),
+        JSON.stringify({ error: 'value_name (ou value) é obrigatório' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -140,12 +141,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Montar novo atributo
+    // Montar novo atributo no formato Mercado Livre
+    const vid = value_id || null;
     const newAttribute = {
       id: attribute_id,
       name: attrDef.name,
-      value: value,
-      value_id: value_id || null
+      value_id: vid,
+      value_name: valueName,
+      values: [{ id: vid, name: valueName }],
     };
 
     // Remover existente e adicionar novo
