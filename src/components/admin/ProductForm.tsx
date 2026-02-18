@@ -112,24 +112,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         file: null,
         preview: url,
         url: url,
-        isMain: product.main_image_url ? url === product.main_image_url : index === 0,
+        isMain: index === 0,
         isUploading: false
       }));
       
-      // Ensure only one image is marked as main
-      const mainCount = initialImages.filter(img => img.isMain).length;
-      if (mainCount === 0 && initialImages.length > 0) {
-        initialImages[0].isMain = true;
-      } else if (mainCount > 1) {
-        let foundMain = false;
-        initialImages.forEach(img => {
-          if (img.isMain && foundMain) {
-            img.isMain = false;
-          } else if (img.isMain) {
-            foundMain = true;
-          }
-        });
-      }
       
       return initialImages;
     }
@@ -388,9 +374,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         return acc;
       }, {} as Record<string, string>);
 
-      // Get main image URL from uploaded images
-      const mainImage = images.find(img => img.isMain);
+      // First image is always the main image
       const imageUrls = images.map(img => img.url || img.preview).filter(Boolean);
+      const mainImageUrl = imageUrls.length > 0 ? imageUrls[0] : null;
 
       // Prepare product data
       const productData: any = {
@@ -413,8 +399,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         width: dimensions.width || null,
         length: dimensions.length || null,
         weight: dimensions.weight || null,
-        main_image_url: mainImage?.url || mainImage?.preview || null,
-        image_url: mainImage?.url || mainImage?.preview || null, // Backward compatibility
+        main_image_url: mainImageUrl,
+        image_url: mainImageUrl, // Backward compatibility
         active: data.active,
         featured: data.reference_ad_url && data.reference_ad_url.trim() !== '' ? true : data.featured,
         badge: data.badge || null,
