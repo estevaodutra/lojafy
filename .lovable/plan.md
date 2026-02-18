@@ -1,56 +1,66 @@
 
-# Normalizar Formato de Atributos em Todos os Pontos de Entrada
+
+# Corrigir Roteamento da Edge Function `products`
 
 ## Problema
-Os endpoints de **atualizar atributo** (`PUT /products/:id/attributes` e `api-produtos-atributos`) ja usam o formato ML correto (`value_name` + `values`), mas os endpoints de **criacao** de produto simplesmente armazenam os atributos como foram enviados, sem normalizar. Isso faz com que atributos criados pelo cadastro fiquem no formato antigo `{ id, name, value }`.
-
-## Pontos afetados
-
-1. **`supabase/functions/products/index.ts`** - `handleCreateProduct` (linha 222): passa `attrs` direto sem transformar
-2. **`supabase/functions/api-produtos-cadastrar/index.ts`** (linha 307): passa `normalizedAtributos` direto
-3. **Funcao SQL `add_product_attribute`**: constroi atributo com `value` em vez de `value_name`
-4. **Funcao SQL `migrate_specifications_to_attributes`**: usa formato antigo
-
-## Alteracoes
-
-### 1. Funcao auxiliar de normalizacao (em ambas Edge Functions)
-
-Criar uma funcao `normalizeAttributes` que transforma qualquer array de atributos para o formato ML:
-
-```text
-Entrada aceita:
-  { id, name, value, value_id? }        (formato antigo)
-  { id, name, value_name, value_id? }   (formato novo sem values)
-  { id, name, value_name, values, ... } (formato completo)
-
-Saida sempre:
-  { id, name, value_id, value_name, values: [{ id, name }] }
+A URL chamada e:
+```
+/functions/v1/products/c53a75c2-41c3-42ec-98e7-ba0e78ba83e1
 ```
 
-### 2. `supabase/functions/products/index.ts`
-- Adicionar funcao `normalizeAttributes(attrs)` antes do `handleCreateProduct`
-- Na linha 222, trocar `attributes: attrs` por `attributes: normalizeAttributes(attrs)`
-
-### 3. `supabase/functions/api-produtos-cadastrar/index.ts`
-- Adicionar a mesma funcao `normalizeAttributes`
-- Na linha 307, trocar `attributes: normalizedAtributos` por `attributes: normalizeAttributes(normalizedAtributos)`
-
-### 4. Funcao SQL `add_product_attribute`
-- Alterar via migracao para usar `value_name` e `values` array:
-```text
-De: jsonb_build_object('id', p_attribute_id, 'name', attr_def.name, 'value', p_value, 'value_id', p_value_id)
-Para: jsonb_build_object('id', p_attribute_id, 'name', attr_def.name, 'value_name', p_value, 'value_id', p_value_id, 'values', jsonb_build_array(jsonb_build_object('id', p_value_id, 'name', p_value)))
+O codigo atual faz `url.pathname.split('/').filter(Boolean)` que resulta em:
+```
+['functions', 'v1', 'products', 'c53a75c2-...']
 ```
 
-### 5. Funcao SQL `migrate_specifications_to_attributes`
-- Mesma alteracao: trocar `'value'` por `'value_name'` e adicionar campo `values`
+Porem o roteamento usa indices fixos:
+- `pathParts[1]` como ID do produto (que na verdade e `'v1'`)
+- `pathParts[2]` como sub-recurso (que na verdade e `'products'`)
+
+Nenhuma rota bate e o resultado e "Endpoint nao encontrado".
+
+## Solucao
+
+Alterar o parsing do path para encontrar o indice de `'products'` no array e usar os segmentos relativos a ele:
+
+```text
+pathParts = ['functions', 'v1', 'products', 'c53a75c2-...', 'attributes']
+                                     ^idx       ^idx+1           ^idx+2
+
+segment1    = pathParts[idx + 1]  // product ID ou "pending"
+subResource = pathParts[idx + 2]  // "attributes", "variations", etc.
+subResourceId = pathParts[idx + 3] // SKU para variacoes
+```
+
+## Alteracao
+
+### `supabase/functions/products/index.ts` (linhas 99-104)
+
+De:
+```typescript
+const pathParts = url.pathname.split('/').filter(Boolean);
+const segment1 = pathParts[1];
+const productId = segment1 && segment1 !== 'pending' ? segment1 : null;
+const subResource = pathParts[2];
+const subResourceId = pathParts[3];
+```
+
+Para:
+```typescript
+const pathParts = url.pathname.split('/').filter(Boolean);
+const productsIndex = pathParts.indexOf('products');
+const segment1 = productsIndex >= 0 ? pathParts[productsIndex + 1] : undefined;
+const productId = segment1 && segment1 !== 'pending' ? segment1 : null;
+const subResource = productsIndex >= 0 ? pathParts[productsIndex + 2] : undefined;
+const subResourceId = productsIndex >= 0 ? pathParts[productsIndex + 3] : undefined;
+```
 
 ### Resultado
-- Qualquer atributo criado por qualquer endpoint sera sempre armazenado no formato ML
-- Retrocompatibilidade mantida: aceita tanto `value` quanto `value_name` na entrada
-- Funcoes SQL de banco tambem passam a usar o formato correto
+- `GET /functions/v1/products` -> lista produtos
+- `GET /functions/v1/products/{id}` -> busca produto por ID
+- `PUT /functions/v1/products/{id}/attributes` -> atualiza atributos
+- Todas as rotas passam a funcionar corretamente
 
-### Arquivos modificados
+### Arquivo modificado
 - `supabase/functions/products/index.ts`
-- `supabase/functions/api-produtos-cadastrar/index.ts`
-- Nova migracao SQL para `add_product_attribute` e `migrate_specifications_to_attributes`
+
