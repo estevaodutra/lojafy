@@ -1,29 +1,31 @@
 
+## Primeira imagem sempre sera a principal
 
-## Corrigir exibicao de atributos no formulario de produto
+### Resumo
+Simplificar a logica de imagem principal: a primeira imagem do array `images` sera sempre considerada a principal. Isso remove a necessidade do botao "marcar como principal" e garante consistencia em todo o sistema.
 
-### Problema
-A coluna `specifications` dos produtos contem chaves com valores `null` (ex: `{"cor": null, "tamanho": null, "material": null}`). O codigo atual verifica apenas se `Object.keys(specifications).length > 0`, o que retorna `true` porque as chaves existem, mesmo com todos os valores nulos. Isso faz o sistema usar o formato legado (com valores vazios) em vez de carregar os dados do campo `attributes` que contem os valores reais.
+### Alteracoes
 
-### Solucao
-Alterar a logica de inicializacao do estado `specifications` em `ProductForm.tsx` para verificar se ha pelo menos um valor nao-nulo antes de usar o formato legado.
+**1. `src/components/admin/ProductForm.tsx` - Salvamento**
+- Na funcao `onSubmit` (linha ~392-416): em vez de buscar `images.find(img => img.isMain)`, usar sempre `images[0]` como imagem principal
+- Na inicializacao do estado `images` (linha ~84-130): marcar sempre o primeiro item como `isMain: true`, independente do valor de `main_image_url`
 
-### Alteracao tecnica
+**2. `src/components/admin/ImageUploadArea.tsx` - Upload e gerenciamento**
+- Remover o botao "marcar como principal" (StarOff) da UI
+- Remover a funcao `setMainImage`
+- Ao remover ou reordenar imagens, a primeira sempre sera a principal automaticamente
+- Simplificar a logica: `isMain` sera derivado de `index === 0`
+- Manter o badge "Principal" apenas na primeira imagem
 
-**Arquivo:** `src/components/admin/ProductForm.tsx` (linhas 66-78)
+**3. `supabase/functions/api-produtos-cadastrar/index.ts` - API de cadastro**
+- Se `imagem_principal` nao for enviada mas `imagens` tiver itens, usar `imagens[0]` como `main_image_url`
+- Garantir que `main_image_url` sempre seja `images[0]` ao salvar
 
-Trocar a verificacao de:
-```typescript
-if (product?.specifications && typeof product.specifications === 'object' && Object.keys(product.specifications).length > 0) {
-```
+**4. `supabase/functions/products/index.ts` - API de update**
+- Na logica de update (linha ~395-399): se `images` for enviado e tiver itens, definir `main_image_url = images[0]` e `image_url = images[0]` automaticamente
 
-Para:
-```typescript
-const specEntries = Object.entries(product.specifications).filter(([_, v]) => v != null && v !== '');
-if (product?.specifications && typeof product.specifications === 'object' && specEntries.length > 0) {
-  return specEntries.map(([key, value]) => ({ key, value: value as string }));
-}
-```
-
-Isso filtra as chaves com valor `null` ou vazio antes de decidir qual fonte de dados usar. Se todas as chaves forem nulas, o sistema cai no fallback para `attributes`.
-
+### Comportamento resultante
+- Ao adicionar imagens, a primeira e automaticamente a principal
+- Para trocar a imagem principal, basta arrastar/reordenar (ou remover a primeira)
+- Todas as APIs garantem que `main_image_url = images[0]`
+- O badge "Principal" aparece apenas na primeira imagem, sem botao de selecao manual
