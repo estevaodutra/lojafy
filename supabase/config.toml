@@ -191,3 +191,6 @@ verify_jwt = false
 
 [functions.products]
 verify_jwt = false
+
+[functions.ml-publish-proxy]
+verify_jwt = false
