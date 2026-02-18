@@ -127,35 +127,31 @@ export const useMercadoLivreIntegration = () => {
         .eq('marketplace', 'mercadolivre')
         .maybeSingle();
 
-      // 4. Enviar payload completo ao webhook
-      const response = await fetch(
-        'https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Advertise',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            product: productData,
-            marketplace_data: marketplaceData?.data || null,
-            marketplace_listing: {
-              listing_id: marketplaceData?.listing_id ?? null,
-              listing_status: marketplaceData?.listing_status ?? null,
-            },
-            integration: {
-              access_token: integrationData.access_token,
-              refresh_token: integrationData.refresh_token,
-              token_type: integrationData.token_type,
-              expires_at: integrationData.expires_at,
-              ml_user_id: integrationData.ml_user_id,
-              scope: integrationData.scope
-            },
-            user_id: user.id
-          })
-        }
-      );
+      // 4. Enviar payload via Edge Function proxy
+      const webhookPayload = {
+        product: productData,
+        marketplace_data: marketplaceData?.data || null,
+        marketplace_listing: {
+          listing_id: marketplaceData?.listing_id ?? null,
+          listing_status: marketplaceData?.listing_status ?? null,
+        },
+        integration: {
+          access_token: integrationData.access_token,
+          refresh_token: integrationData.refresh_token,
+          token_type: integrationData.token_type,
+          expires_at: integrationData.expires_at,
+          ml_user_id: integrationData.ml_user_id,
+          scope: integrationData.scope
+        },
+        user_id: user.id
+      };
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Erro ao publicar: ${errorText}`);
+      const { data: webhookResponse, error: webhookError } = await supabase.functions.invoke('ml-publish-proxy', {
+        body: webhookPayload,
+      });
+
+      if (webhookError) {
+        throw new Error(`Erro ao publicar: ${webhookError.message}`);
       }
 
       // Save the published record
