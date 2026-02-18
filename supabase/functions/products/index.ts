@@ -98,10 +98,11 @@ Deno.serve(async (req) => {
 
     // ── Roteamento ──
     const pathParts = url.pathname.split('/').filter(Boolean);
-    const segment1 = pathParts[1]; // id or "pending"
+    const productsIndex = pathParts.indexOf('products');
+    const segment1 = productsIndex >= 0 ? pathParts[productsIndex + 1] : undefined;
     const productId = segment1 && segment1 !== 'pending' ? segment1 : null;
-    const subResource = pathParts[2]; // "attributes", "variations", "approve", "reject"
-    const subResourceId = pathParts[3]; // SKU for variations
+    const subResource = productsIndex >= 0 ? pathParts[productsIndex + 2] : undefined;
+    const subResourceId = productsIndex >= 0 ? pathParts[productsIndex + 3] : undefined;
 
     // ── POST /products ──
     if (method === 'POST' && !productId) {
