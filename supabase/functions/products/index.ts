@@ -25,6 +25,24 @@ async function logApiRequest(supabase: any, data: any) {
 
 const VALID_CONDITIONS = ['new', 'used', 'refurbished', 'not_specified'];
 
+// Normaliza atributos para o formato ML: { id, name, value_id, value_name, values: [{ id, name }] }
+function normalizeAttributes(attrs: any[]): any[] {
+  if (!Array.isArray(attrs)) return [];
+  return attrs.map((attr: any) => {
+    const valueName = attr.value_name ?? attr.value ?? null;
+    const valueId = attr.value_id ?? null;
+    return {
+      id: attr.id,
+      name: attr.name,
+      value_id: valueId,
+      value_name: valueName,
+      values: attr.values && Array.isArray(attr.values) && attr.values.length > 0
+        ? attr.values
+        : valueName != null ? [{ id: valueId, name: valueName }] : [],
+    };
+  });
+}
+
 Deno.serve(async (req) => {
   const startTime = Date.now();
   const url = new URL(req.url);
@@ -219,7 +237,7 @@ async function handleCreateProduct(supabase: any, req: Request, userId: string) 
       width: body.width,
       length: body.length,
       weight: body.weight,
-      attributes: attrs,
+      attributes: normalizeAttributes(attrs),
       variations: body.variations || [],
       has_variations: hasVariations,
       specifications: body.specifications || {},

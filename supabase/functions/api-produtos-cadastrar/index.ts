@@ -23,6 +23,24 @@ function normalizeUuid(value: any): string | null {
   return stringValue;
 }
 
+// Normaliza atributos para o formato ML: { id, name, value_id, value_name, values: [{ id, name }] }
+function normalizeAttributes(attrs: any[]): any[] {
+  if (!Array.isArray(attrs)) return [];
+  return attrs.map((attr: any) => {
+    const valueName = attr.value_name ?? attr.value ?? null;
+    const valueId = attr.value_id ?? null;
+    return {
+      id: attr.id,
+      name: attr.name,
+      value_id: valueId,
+      value_name: valueName,
+      values: attr.values && Array.isArray(attr.values) && attr.values.length > 0
+        ? attr.values
+        : valueName != null ? [{ id: valueId, name: valueName }] : [],
+    };
+  });
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -304,7 +322,7 @@ Deno.serve(async (req) => {
       created_by: apiKeyData.user_id,
       active: (normalizedFornecedorId && requer_aprovacao) ? false : true,
       // Novos campos de catálogo enriquecido
-      attributes: normalizedAtributos,
+      attributes: normalizeAttributes(normalizedAtributos),
       variations: normalizedVariacoes,
       domain_id: dominio_id || null,
       condition: condicao || 'new',
