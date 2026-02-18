@@ -1,57 +1,46 @@
 
-## Adicionar indicador de marketplace na tabela admin de produtos
 
-### Resumo
-Mostrar um indicador visual (badges com icones dos marketplaces) na tabela de produtos do admin quando o produto tiver dados vinculados na tabela `product_marketplace_data`. O indicador aparecera na coluna "Produto", abaixo do nome/marca.
+## Incluir dados de marketplace na publicacao do Mercado Livre
 
-### Alteracoes
+### Problema
+Ao clicar em "Publicar", o hook `useMercadoLivreIntegration.ts` envia ao webhook apenas os dados da tabela `products` e os tokens de integracao. Os dados especificos do marketplace salvos em `product_marketplace_data` (category_id, domain_id, listing_type, condition, title customizado, pictures, variations, shipping, sale_terms) sao ignorados.
 
-**1. `src/pages/admin/Products.tsx` - Query de produtos**
-- Alterar a query que busca produtos para incluir um left join com `product_marketplace_data`
-- Usar a sintaxe do Supabase: `product_marketplace_data(id, marketplace, listing_status)` no select
-- Isso traz os marketplaces vinculados junto com cada produto, sem query adicional
+### Alteracao
 
-**2. `src/components/admin/ProductTable.tsx` - Exibicao do indicador**
-- Na celula "Produto" (linhas 572-588), apos a marca, adicionar uma linha com badges dos marketplaces vinculados
-- Cada badge mostra o nome do marketplace com cor baseada no `listing_status`:
-  - `active` = badge verde
-  - `draft` = badge cinza
-  - `pending` = badge amarela
-  - `paused`/`error`/`closed` = badge vermelha
-- Formato do badge: icone de loja + "ML" (Mercado Livre), "Shopee", "Amazon", etc.
-- Se nao houver marketplaces vinculados, nada aparece (sem mudanca visual)
+**Arquivo: `src/hooks/useMercadoLivreIntegration.ts`**
 
-**3. Filtro opcional de marketplace**
-- Adicionar um filtro dropdown na area de filtros para filtrar por marketplace vinculado
-- Opcoes: "Todos", "Com marketplace", "Sem marketplace", "Mercado Livre", "Shopee", "Amazon"
+No `publishProductMutation` (mutationFn), apos buscar o produto e a integracao, adicionar uma terceira query:
 
-### Detalhes tecnicos
-
-**Query atualizada no Products.tsx:**
+1. Buscar dados do marketplace:
 ```text
-supabase.from('products').select(`
-  *,
-  categories(name),
-  product_marketplace_data(id, marketplace, listing_status)
-`)
+supabase
+  .from('product_marketplace_data')
+  .select('*')
+  .eq('product_id', productId)
+  .eq('marketplace', 'mercadolivre')
+  .maybeSingle()
 ```
 
-**Mapeamento de nomes de marketplace para exibicao:**
+2. Incluir os dados no payload enviado ao webhook, adicionando um campo `marketplace_data` ao JSON:
+
 ```text
-mercadolivre -> ML
-shopee -> Shopee
-amazon -> Amazon
-magalu -> Magalu
+body: JSON.stringify({
+  product: productData,
+  marketplace_data: marketplaceData?.data || null,   // <-- NOVO
+  marketplace_listing: {                              // <-- NOVO (campos de controle)
+    listing_id: marketplaceData?.listing_id,
+    listing_status: marketplaceData?.listing_status,
+  },
+  integration: { access_token, refresh_token, ... },
+  user_id: user.id
+})
 ```
 
-**Cores dos badges por status:**
-```text
-active   -> bg-green-100 text-green-800
-draft    -> bg-gray-100 text-gray-800
-pending  -> bg-yellow-100 text-yellow-800
-paused   -> bg-orange-100 text-orange-800
-error    -> bg-red-100 text-red-800
-closed   -> bg-red-100 text-red-800
-```
+3. Se nao houver dados de marketplace (`marketplaceData` for null), a publicacao continua normalmente -- o webhook/n8n usa os dados do produto como fallback.
 
-**Posicao na tabela:** Na coluna "Produto", abaixo da linha da marca, como uma terceira linha com badges pequenos inline.
+### Resultado
+O webhook recebe o payload completo com:
+- `product`: dados do produto Lojafy (price, stock_quantity, attributes, images, etc.)
+- `marketplace_data`: dados especificos do ML (category_id, domain_id, listing_type, condition, title customizado, pictures, shipping, sale_terms)
+- `marketplace_listing`: campos de controle (listing_id existente, status)
+- `integration`: tokens OAuth do ML
