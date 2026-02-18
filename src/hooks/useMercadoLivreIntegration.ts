@@ -119,7 +119,15 @@ export const useMercadoLivreIntegration = () => {
         throw new Error('Integração Mercado Livre não encontrada');
       }
 
-      // 3. Enviar payload completo ao webhook
+      // 3. Buscar dados específicos do marketplace
+      const { data: marketplaceData } = await supabase
+        .from('product_marketplace_data')
+        .select('*')
+        .eq('product_id', productId)
+        .eq('marketplace', 'mercadolivre')
+        .maybeSingle();
+
+      // 4. Enviar payload completo ao webhook
       const response = await fetch(
         'https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Advertise',
         {
@@ -127,6 +135,11 @@ export const useMercadoLivreIntegration = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             product: productData,
+            marketplace_data: marketplaceData?.data || null,
+            marketplace_listing: {
+              listing_id: marketplaceData?.listing_id ?? null,
+              listing_status: marketplaceData?.listing_status ?? null,
+            },
             integration: {
               access_token: integrationData.access_token,
               refresh_token: integrationData.refresh_token,
