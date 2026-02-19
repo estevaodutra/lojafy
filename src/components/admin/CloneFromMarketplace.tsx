@@ -110,22 +110,7 @@ export function CloneFromMarketplace({ product, onCloneSuccess }: CloneFromMarke
       // Buscar token de integração (só ML por enquanto)
       const integration = await getMarketplaceIntegration();
 
-      if (marketplace === "mercadolivre" && !integration) {
-        toast.error(`Nenhuma integração ativa encontrada para ${selectedMarketplace?.label}`, {
-          description: "Configure a integração nas configurações do marketplace.",
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // Verificar se token não expirou (só ML)
-      if (integration?.expires_at && new Date(integration.expires_at) < new Date()) {
-        toast.error("Token de integração expirado", {
-          description: "Reconecte sua conta do marketplace nas configurações.",
-        });
-        setIsLoading(false);
-        return;
-      }
+      // Token de integração é opcional - webhook pode buscar dados públicos
 
       const payload = {
         product: {
