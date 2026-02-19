@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Package, AlertTriangle, TrendingUp, Download, Upload, ArrowUp, ArrowDown, Edit, Trash2, Loader2, Star } from 'lucide-react';
 import ProductTable from '@/components/admin/ProductTable';
 import ProductForm from '@/components/admin/ProductForm';
+import { ProductComparisonView } from '@/components/admin/ProductComparisonView';
+import { RestoreOriginalButton } from '@/components/admin/RestoreOriginalButton';
 import StockAlert from '@/components/admin/StockAlert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -296,6 +298,20 @@ const Products = () => {
             onSuccess={handleFormSuccess}
             onCancel={() => setShowProductForm(false)}
           />
+          {editingProduct?.id && editingProduct?.original_name && (
+            <div className="mt-4 space-y-3">
+              <div className="flex justify-end">
+                <RestoreOriginalButton
+                  productId={editingProduct.id}
+                  originalName={editingProduct.original_name}
+                  originalDescription={editingProduct.original_description}
+                  originalImages={editingProduct.original_images}
+                  onRestore={handleFormSuccess}
+                />
+              </div>
+              <ProductComparisonView product={editingProduct} />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
