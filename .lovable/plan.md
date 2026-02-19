@@ -1,94 +1,61 @@
 
-## Adicionar Campos Originais do Produto + Comparacao + Restauracao
+
+## Clonar Dados de Marketplace - Plano de Implementacao
 
 ### Resumo
 
-Adicionar campos `original_name`, `original_description`, `original_images` e `original_saved_at` na tabela `products` para preservar a versao original do produto antes de otimizacoes. Inclui componente de comparacao, botao de restauracao e protecao nos endpoints de criacao/edicao.
+Criar componente `CloneFromMarketplace` que permite colar a URL de um anuncio de marketplace (Mercado Livre, Amazon, Shopee, Magalu) e enviar para o webhook n8n para importar os dados do anuncio para o produto atual.
 
 ---
 
-### 1. Migracao - Adicionar Colunas e Popular Dados Existentes
+### 1. Criar Componente CloneFromMarketplace
 
-Uma unica migracao SQL que:
-- Adiciona as 4 colunas na tabela `products`
-- Popula os dados existentes copiando `name`, `description`, `images` e `created_at` para os campos `original_*`
-- Cria indice para consultas
+**Novo arquivo: `src/components/admin/CloneFromMarketplace.tsx`**
 
-```text
-ALTER TABLE products ADD COLUMN IF NOT EXISTS original_name TEXT;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS original_description TEXT;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS original_images JSONB;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS original_saved_at TIMESTAMPTZ;
+- Select para escolher marketplace (Mercado Livre, Amazon, Shopee, Magazine Luiza)
+- Input para colar URL do anuncio com validacao por regex
+- Checkbox "Aguardar resposta" (resultado imediato vs assincrono)
+- Botao "Clonar Dados do Anuncio"
+- Exibicao de resultado (sucesso/erro) com icones
+- Aviso sobre substituicao dos dados atuais
 
-UPDATE products SET original_name = name, original_description = description, 
-  original_images = images, original_saved_at = created_at 
-WHERE original_name IS NULL;
+**Fluxo:**
+1. Usuario seleciona marketplace e cola URL
+2. Validacao da URL pelo padrao do marketplace
+3. Busca token de integracao ativo na tabela `mercadolivre_integrations` (por enquanto so ML tem integracao)
+4. Verifica se token nao expirou
+5. Envia payload completo para webhook `https://n8n-n8n.nuwfic.easypanel.host/webhook/clone_advertise`
+6. Exibe resultado (toast + badge inline)
 
-CREATE INDEX IF NOT EXISTS idx_products_has_original ON products((original_name IS NOT NULL));
-```
-
----
-
-### 2. Proteger Campos no ProductForm (Frontend)
-
-**Arquivo: `src/components/admin/ProductForm.tsx`**
-
-- Na criacao (INSERT): incluir `original_name`, `original_description`, `original_images` e `original_saved_at` no `productData`
-- Na atualizacao (UPDATE): NAO incluir campos `original_*` (ja estao protegidos pois nao sao adicionados ao objeto de update)
+**Payload enviado ao webhook:**
+- Dados do produto atual (id, name, description, price, images, attributes, sku, gtin, etc.)
+- Marketplace e URL do anuncio
+- Token de integracao (access_token, refresh_token, ml_user_id)
+- user_id e timestamp
 
 ---
 
-### 3. Proteger Campos na Edge Function de Cadastro
+### 2. Integrar na Pagina de Edicao
 
-**Arquivo: `supabase/functions/api-produtos-cadastrar/index.ts`**
+**Arquivo modificado: `src/pages/admin/Products.tsx`**
 
-- Adicionar `original_name: nome`, `original_description: descricao`, `original_images: normalizedImagens`, `original_saved_at: new Date().toISOString()` no objeto `productData`
-
----
-
-### 4. Componente de Comparacao
-
-**Novo arquivo: `src/components/admin/ProductComparisonView.tsx`**
-
-Componente com Tabs (Nome, Descricao, Fotos) mostrando lado a lado:
-- Coluna esquerda: dados originais
-- Coluna direita: dados atuais (otimizados)
-- Badge "Alterado" quando houver diferenca
-- Badge "Modificado" no header quando qualquer campo foi alterado
-
----
-
-### 5. Botao de Restauracao
-
-**Novo arquivo: `src/components/admin/RestoreOriginalButton.tsx`**
-
-- Botao "Restaurar Original" com AlertDialog de confirmacao
-- Ao confirmar, faz UPDATE via Supabase client copiando `original_*` de volta para `name`, `description`, `images`
-- Recarrega o formulario apos restauracao
-
----
-
-### 6. Integrar na Pagina de Edicao
-
-**Arquivo: `src/pages/admin/Products.tsx`** (ou no ProductForm)
-
-- Quando editando um produto (`product?.id` existe), renderizar `ProductComparisonView` e `RestoreOriginalButton` abaixo do formulario
-- Passar os dados do produto com campos `original_*`
+- Importar `CloneFromMarketplace`
+- Renderizar abaixo do `ProductComparisonView` dentro do Dialog de edicao
+- Visivel apenas quando editando produto existente (`editingProduct?.id`)
+- Callback `onCloneSuccess` chama `refetchProducts` para recarregar dados
 
 ---
 
 ### Secao Tecnica
 
 **Arquivos criados:**
-1. Nova migracao SQL (colunas + dados + indice)
-2. `src/components/admin/ProductComparisonView.tsx`
-3. `src/components/admin/RestoreOriginalButton.tsx`
+1. `src/components/admin/CloneFromMarketplace.tsx`
 
 **Arquivos modificados:**
-1. `src/components/admin/ProductForm.tsx` - salvar `original_*` na criacao
-2. `supabase/functions/api-produtos-cadastrar/index.ts` - salvar `original_*` na criacao via API
+1. `src/pages/admin/Products.tsx` - adicionar import e renderizacao do componente
 
-**Regra de negocio:**
-- `original_*` sao salvos UMA VEZ na criacao e NUNCA sobrescritos em updates
-- Restauracao copia `original_*` de volta para os campos editaveis (`name`, `description`, `images`)
-- Os campos `original_*` em si nunca sao alterados (nem na restauracao)
+**Nenhuma alteracao de banco de dados necessaria** - o componente usa tabelas existentes (`mercadolivre_integrations`) e envia dados para webhook externo (n8n).
+
+**Dependencias utilizadas:** Todos os componentes UI ja existem no projeto (Card, Select, Input, Button, Checkbox, toast/sonner).
+
+**Auth:** Usa `useAuth` de `@/contexts/AuthContext` para obter `user.id`.
