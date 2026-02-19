@@ -69,19 +69,27 @@ export function CloneFromMarketplace({ product, onCloneSuccess }: CloneFromMarke
     // Por enquanto só ML tem integração
     if (marketplace !== "mercadolivre") return null;
 
-    const { data, error } = await supabase
-      .from("mercadolivre_integrations")
-      .select("access_token, refresh_token, ml_user_id, expires_at")
-      .eq("user_id", "b21170cb-2872-45df-b31b-bf977d93dc14")
-      .eq("is_active", true)
-      .single();
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        console.error("Sessão não encontrada");
+        return null;
+      }
 
-    if (error) {
-      console.error("Erro ao buscar integração:", error);
+      const { data, error } = await supabase.functions.invoke("get-ml-integration", {
+        body: { user_id: "b21170cb-2872-45df-b31b-bf977d93dc14" },
+      });
+
+      if (error) {
+        console.error("Erro ao buscar integração via edge function:", error);
+        return null;
+      }
+
+      return data;
+    } catch (err) {
+      console.error("Erro ao buscar integração:", err);
       return null;
     }
-
-    return data;
   };
 
   const handleClone = async () => {
