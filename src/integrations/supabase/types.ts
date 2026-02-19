@@ -2801,7 +2801,11 @@ export type Database = {
           main_image_url: string | null
           min_stock_level: number | null
           name: string
+          original_description: string | null
+          original_images: Json | null
+          original_name: string | null
           original_price: number | null
+          original_saved_at: string | null
           price: number
           rating: number | null
           reference_ad_url: string | null
@@ -2851,7 +2855,11 @@ export type Database = {
           main_image_url?: string | null
           min_stock_level?: number | null
           name: string
+          original_description?: string | null
+          original_images?: Json | null
+          original_name?: string | null
           original_price?: number | null
+          original_saved_at?: string | null
           price: number
           rating?: number | null
           reference_ad_url?: string | null
@@ -2901,7 +2909,11 @@ export type Database = {
           main_image_url?: string | null
           min_stock_level?: number | null
           name?: string
+          original_description?: string | null
+          original_images?: Json | null
+          original_name?: string | null
           original_price?: number | null
+          original_saved_at?: string | null
           price?: number
           rating?: number | null
           reference_ad_url?: string | null

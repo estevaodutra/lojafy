@@ -451,10 +451,16 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
           description: "As informações do produto foram atualizadas com sucesso.",
         });
       } else {
-        // Create new product
+        // Create new product - save original_* fields once
         const { data: created, error } = await supabase
           .from('products')
-          .insert(productData)
+          .insert({
+            ...productData,
+            original_name: data.name,
+            original_description: data.description || null,
+            original_images: imageUrls,
+            original_saved_at: new Date().toISOString(),
+          })
           .select()
           .single();
 
