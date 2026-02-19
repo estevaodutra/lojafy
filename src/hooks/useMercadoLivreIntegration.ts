@@ -3,11 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
+import React from 'react';
 
 interface PublishedProduct {
   id: string;
   product_id: string;
   ml_item_id: string | null;
+  permalink: string | null;
   status: string;
   published_at: string;
 }
@@ -81,6 +84,11 @@ export const useMercadoLivreIntegration = () => {
   const isProductUnpublishing = useCallback((productId: string): boolean => {
     return unpublishingProducts.has(productId);
   }, [unpublishingProducts]);
+
+  const getProductPermalink = useCallback((productId: string): string | null => {
+    const published = publishedProducts.find(p => p.product_id === productId && p.status === 'published');
+    return published?.permalink || null;
+  }, [publishedProducts]);
 
   // Mutation to publish product
   const publishProductMutation = useMutation({
@@ -164,14 +172,31 @@ export const useMercadoLivreIntegration = () => {
         throw new Error(`Erro ao publicar: ${webhookError.message}`);
       }
 
-      // Save the published record
+      // Parse response to extract permalink and ml_item_id
+      let permalink: string | null = null;
+      let mlItemId: string | null = null;
+
+      try {
+        const responseData = Array.isArray(webhookResponse) ? webhookResponse : [webhookResponse];
+        const advertise = responseData[0]?.advertise;
+        if (advertise) {
+          permalink = advertise.permalink || null;
+          mlItemId = advertise.id || null;
+        }
+      } catch (e) {
+        console.warn('Could not parse webhook response for permalink:', e);
+      }
+
+      // Save the published record with permalink and ml_item_id
       const { error: insertError } = await supabase
         .from('mercadolivre_published_products')
         .upsert({
           user_id: user.id,
           product_id: productId,
           status: 'published',
-          published_at: new Date().toISOString()
+          published_at: new Date().toISOString(),
+          ml_item_id: mlItemId,
+          permalink: permalink,
         }, {
           onConflict: 'user_id,product_id'
         });
@@ -181,16 +206,27 @@ export const useMercadoLivreIntegration = () => {
         throw new Error('Erro ao salvar registro de publicação');
       }
 
-      return { productId };
+      return { productId, permalink };
     },
-    onMutate: async ({ productId }) => {
-      setPublishingProducts(prev => new Set(prev).add(productId));
-    },
-    onSuccess: ({ productId }) => {
-      toast({
-        title: 'Produto publicado!',
-        description: 'O produto foi enviado para o Mercado Livre com sucesso.',
-      });
+    onSuccess: ({ productId, permalink }) => {
+      const toastOptions: any = {
+        title: 'Seu Produto foi Publicado no Mercado Livre',
+        description: 'Obs: o anúncio ainda pode não estar público por verificação do marketplace. Esse processo pode levar até 30min.',
+        duration: 15000,
+      };
+
+      if (permalink) {
+        toastOptions.action = React.createElement(
+          ToastAction,
+          {
+            altText: 'Ver Anúncio',
+            onClick: () => window.open(permalink, '_blank'),
+          },
+          'Ver Anúncio'
+        );
+      }
+
+      toast(toastOptions);
       queryClient.invalidateQueries({ queryKey: ['ml-published-products'] });
     },
     onError: (error, { productId }) => {
@@ -210,8 +246,18 @@ export const useMercadoLivreIntegration = () => {
   });
 
   const publishProduct = useCallback(async (productId: string, addToStoreFirst?: () => Promise<void>) => {
-    return publishProductMutation.mutateAsync({ productId, addToStoreFirst });
-  }, [publishProductMutation]);
+    // Fire-and-forget: add to publishing set, show quick toast, don't await
+    setPublishingProducts(prev => new Set(prev).add(productId));
+    
+    toast({
+      title: 'Publicando em segundo plano...',
+      description: 'Você será notificado quando o anúncio estiver pronto.',
+      duration: 3000,
+    });
+
+    // Fire mutation without awaiting
+    publishProductMutation.mutate({ productId, addToStoreFirst });
+  }, [publishProductMutation, toast]);
 
   // Mutation to unpublish product
   const unpublishProductMutation = useMutation({
@@ -268,6 +314,7 @@ export const useMercadoLivreIntegration = () => {
     isProductPublished,
     isProductPublishing,
     isProductUnpublishing,
+    getProductPermalink,
     publishProduct,
     unpublishProduct,
   };

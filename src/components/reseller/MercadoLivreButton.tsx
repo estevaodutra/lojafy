@@ -80,7 +80,7 @@ export const MercadoLivreButton: React.FC<MercadoLivreButtonProps> = ({
     );
   }
 
-  // Publishing state
+  // Publishing state - just show a subtle indicator, doesn't block
   if (isPublishing) {
     return (
       <Button
@@ -88,7 +88,7 @@ export const MercadoLivreButton: React.FC<MercadoLivreButtonProps> = ({
         disabled
       >
         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-        Publicando...
+        Enviando...
       </Button>
     );
   }

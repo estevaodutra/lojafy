@@ -1,0 +1,1 @@
+ALTER TABLE mercadolivre_published_products ADD COLUMN IF NOT EXISTS permalink TEXT;
