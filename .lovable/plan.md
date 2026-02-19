@@ -1,109 +1,82 @@
 
-
-## Reestruturar `product_marketplace_data` para Body Validado Completo
+## Publicacao em Segundo Plano + Notificacao + Menu "Ver na Loja"
 
 ### Resumo
 
-Substituir o campo `data` (JSONB generico) por `validated_body` (body completo ja validado pelo ML), adicionando campos de controle de validacao (`is_validated`, `validated_at`). Atualizar a Edge Function, o hook de publicacao e a documentacao da API.
+Tres mudancas principais:
+1. Publicacao no ML roda em segundo plano (sem bloquear a tela)
+2. Ao receber resposta, mostra toast com link "Ver Anuncio" (permalink) e aviso de verificacao
+3. Botao "Ver na Loja" vira dropdown com "Ver na Minha Loja" e "Ver no Mercado Livre"
 
-### 1. Migracao SQL
+---
 
-Alterar a tabela `product_marketplace_data`:
-- Renomear coluna `data` para `validated_body`
-- Adicionar coluna `is_validated` (BOOLEAN, default false)
-- Adicionar coluna `validated_at` (TIMESTAMPTZ)
-- Adicionar indice em `is_validated`
-- Atualizar as views `v_products_with_marketplace` e `v_products_mercadolivre`
+### 1. Publicacao em Segundo Plano
+
+**Arquivo: `src/hooks/useMercadoLivreIntegration.ts`**
+
+Atualmente o `publishProduct` usa `mutateAsync` que bloqueia com await. Mudar para `mutate` (fire-and-forget) para que o clique retorne imediatamente e o processo rode em segundo plano.
+
+Alem disso, processar a resposta do webhook para:
+- Extrair `permalink` e `ml_item_id` do campo `advertise` da resposta
+- Salvar `ml_item_id` e `permalink` na tabela `mercadolivre_published_products`
+- Mostrar toast com botao "Ver Anuncio" apontando para o `permalink`
+
+### 2. Adicionar coluna `permalink` na tabela
+
+**Migracao SQL:**
+
+Adicionar coluna `permalink` na tabela `mercadolivre_published_products` para salvar o link do anuncio.
 
 ```text
--- Renomear data -> validated_body
-ALTER TABLE product_marketplace_data RENAME COLUMN data TO validated_body;
-
--- Novos campos de validacao
-ALTER TABLE product_marketplace_data ADD COLUMN is_validated BOOLEAN DEFAULT false;
-ALTER TABLE product_marketplace_data ADD COLUMN validated_at TIMESTAMPTZ;
-
--- Indice
-CREATE INDEX IF NOT EXISTS idx_pmd_is_validated ON product_marketplace_data(is_validated);
-
--- Atualizar views
-CREATE OR REPLACE VIEW v_products_with_marketplace AS
-SELECT 
-  p.id AS product_id,
-  p.name AS product_name,
-  p.price AS lojafy_price,
-  p.stock_quantity AS lojafy_stock,
-  p.images AS lojafy_images,
-  p.attributes AS lojafy_attributes,
-  pmd.id AS marketplace_data_id,
-  pmd.marketplace,
-  pmd.validated_body,
-  pmd.is_validated,
-  pmd.validated_at,
-  pmd.validated_body->>'category_id' AS ml_category_id,
-  pmd.validated_body->>'title' AS ml_title,
-  pmd.listing_id,
-  pmd.listing_url,
-  pmd.listing_status,
-  pmd.published_at,
-  pmd.last_sync_at
-FROM products p
-LEFT JOIN product_marketplace_data pmd ON p.id = pmd.product_id;
-
-CREATE OR REPLACE VIEW v_products_mercadolivre AS
-SELECT * FROM v_products_with_marketplace
-WHERE marketplace = 'mercadolivre' OR marketplace IS NULL;
+ALTER TABLE mercadolivre_published_products 
+ADD COLUMN IF NOT EXISTS permalink TEXT;
 ```
 
-### 2. Edge Function `lojafy-integra/index.ts`
+### 3. Toast com Notificacao de Sucesso
 
-Reescrever os endpoints de products para a nova estrutura:
+**Arquivo: `src/hooks/useMercadoLivreIntegration.ts`**
 
-**POST /products** - Recebe `validated_body` diretamente (body completo validado):
-- Campos obrigatorios: `product_id`, `marketplace`, `validated_body`
-- Upsert com `is_validated` e `validated_at`
-- Remove constantes `CONTROL_FIELDS`, `FORBIDDEN_DATA_FIELDS`, `VALID_LISTING_TYPES`
+No `onSuccess` da mutation, mostrar toast com:
+- Titulo: "Seu Produto foi Publicado no Mercado Livre"
+- Descricao com aviso: "O anuncio pode levar ate 30min para ficar publico por verificacao do marketplace."
+- Botao "Ver Anuncio" com link para o `permalink` retornado
 
-**GET /products/:id/publish-body** - Novo endpoint:
-- Recebe `?price=X&quantity=Y` como query params
-- Retorna o `validated_body` com `price` e `available_quantity` substituidos
-- Valida que `is_validated = true`
+O toast usara `action` do componente shadcn para incluir o botao clicavel.
 
-**GET /products** - Atualizado:
-- Adiciona filtro `is_validated`
-- Troca `data` por `validated_body` nos selects
+### 4. Dropdown "Ver na Loja" em Meus Produtos
 
-**PUT /products/:id** - Atualizado:
-- Aceita `validated_body` (atualiza `is_validated` e `validated_at` junto)
-- Troca referencia de `data` por `validated_body`
+**Arquivo: `src/pages/reseller/Products.tsx`**
 
-**Endpoints mantidos sem alteracao significativa:** GET /:id, GET /by-product/:productId, GET /unpublished, DELETE /:id, GET /mercadolivre/expiring-tokens
+Substituir o botao simples "Ver na Loja" por um `DropdownMenu` com as opcoes:
+- "Ver na Minha Loja" - link para `/loja/{slug}/produto/{id}` (sempre visivel quando ativo)
+- "Ver no Mercado Livre" - link para o `permalink` salvo (visivel apenas quando publicado no ML)
 
-### 3. Hook `useMercadoLivreIntegration.ts`
+O hook `useMercadoLivreIntegration` expora uma nova funcao `getProductPermalink(productId)` para obter o permalink salvo.
 
-Atualizar o payload de publicacao:
-- Trocar `marketplace_data: marketplaceData?.data` por `marketplace_data: marketplaceData?.validated_body`
-- Adicionar `is_validated: marketplaceData?.is_validated` no payload
+### 5. Atualizar MercadoLivreButton
 
-### 4. Documentacao API `src/data/apiEndpointsData.ts`
+**Arquivo: `src/components/reseller/MercadoLivreButton.tsx`**
 
-Atualizar os endpoints da secao `integraProductsEndpoints`:
-- POST /products: mudar body de campos dispersos para `validated_body`
-- GET /products: trocar `data` por `validated_body` nos exemplos
-- GET /:id: idem
-- GET /by-product/:productId: idem
-- PUT /:id: adicionar `validated_body` como campo atualizavel
-- Adicionar novo endpoint GET /:id/publish-body
+Remover o estado "Publicando..." que bloqueava o botao. Ao clicar em publicar:
+- Mostrar toast rapido "Publicando em segundo plano..."
+- O botao volta ao estado normal imediatamente
+- Quando a resposta chegar, o toast de sucesso aparece automaticamente
+
+---
 
 ### Secao Tecnica
 
 **Arquivos modificados:**
-1. Nova migracao SQL (via migration tool)
-2. `supabase/functions/lojafy-integra/index.ts` - Edge Function completa
-3. `src/hooks/useMercadoLivreIntegration.ts` - Troca `data` por `validated_body`
-4. `src/data/apiEndpointsData.ts` - Documentacao da API
+1. Nova migracao SQL - adicionar coluna `permalink` em `mercadolivre_published_products`
+2. `src/hooks/useMercadoLivreIntegration.ts` - publicacao async fire-and-forget, parsear resposta, salvar permalink, toast com botao, expor `getProductPermalink`
+3. `src/pages/reseller/Products.tsx` - trocar botao "Ver na Loja" por DropdownMenu com opcoes
+4. `src/components/reseller/MercadoLivreButton.tsx` - ajustar estados para publicacao em segundo plano
 
-**Dados existentes:** A coluna `data` sera renomeada para `validated_body`, preservando todos os dados ja salvos. Registros existentes terao `is_validated = false` por padrao (podem ser marcados como validados via PUT).
-
-**Compatibilidade:** O n8n devera ser atualizado para enviar `validated_body` ao inves de campos soltos. O novo endpoint `publish-body` facilita a obtencao do body pronto com preco/quantidade substituidos.
-
+**Fluxo da publicacao:**
+1. Usuario clica "Publicar no Mercado Livre"
+2. Toast rapido: "Publicando em segundo plano..."
+3. Botao volta ao normal, usuario pode navegar
+4. Webhook processa e retorna resposta com `advertise.id` e `advertise.permalink`
+5. Hook salva `ml_item_id` e `permalink` no banco
+6. Toast aparece: "Seu Produto foi Publicado no Mercado Livre" com botao "Ver Anuncio"
+7. Botao muda para verde "Publicado" e dropdown "Ver na Loja" ganha opcao "Ver no Mercado Livre"
