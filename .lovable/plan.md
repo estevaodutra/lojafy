@@ -1,61 +1,24 @@
 
 
-## Clonar Dados de Marketplace - Plano de Implementacao
+## Corrigir Clonagem de Marketplace sem Integracao Obrigatoria
 
-### Resumo
+### Problema
 
-Criar componente `CloneFromMarketplace` que permite colar a URL de um anuncio de marketplace (Mercado Livre, Amazon, Shopee, Magalu) e enviar para o webhook n8n para importar os dados do anuncio para o produto atual.
+O componente `CloneFromMarketplace` exige uma integracao OAuth ativa do Mercado Livre para clonar dados de um anuncio. Porem, clonar dados de uma URL publica nao deveria exigir tokens de autenticacao - o webhook no n8n pode buscar os dados da pagina publica diretamente.
 
----
+### Solucao
 
-### 1. Criar Componente CloneFromMarketplace
+Remover a exigencia de integracao ativa para o fluxo de clonagem. O token de integracao sera enviado como opcional (se disponivel), mas sua ausencia nao bloqueara o processo.
 
-**Novo arquivo: `src/components/admin/CloneFromMarketplace.tsx`**
+### Alteracoes
 
-- Select para escolher marketplace (Mercado Livre, Amazon, Shopee, Magazine Luiza)
-- Input para colar URL do anuncio com validacao por regex
-- Checkbox "Aguardar resposta" (resultado imediato vs assincrono)
-- Botao "Clonar Dados do Anuncio"
-- Exibicao de resultado (sucesso/erro) com icones
-- Aviso sobre substituicao dos dados atuais
+**Arquivo: `src/components/admin/CloneFromMarketplace.tsx`**
 
-**Fluxo:**
-1. Usuario seleciona marketplace e cola URL
-2. Validacao da URL pelo padrao do marketplace
-3. Busca token de integracao ativo na tabela `mercadolivre_integrations` (por enquanto so ML tem integracao)
-4. Verifica se token nao expirou
-5. Envia payload completo para webhook `https://n8n-n8n.nuwfic.easypanel.host/webhook/clone_advertise`
-6. Exibe resultado (toast + badge inline)
-
-**Payload enviado ao webhook:**
-- Dados do produto atual (id, name, description, price, images, attributes, sku, gtin, etc.)
-- Marketplace e URL do anuncio
-- Token de integracao (access_token, refresh_token, ml_user_id)
-- user_id e timestamp
-
----
-
-### 2. Integrar na Pagina de Edicao
-
-**Arquivo modificado: `src/pages/admin/Products.tsx`**
-
-- Importar `CloneFromMarketplace`
-- Renderizar abaixo do `ProductComparisonView` dentro do Dialog de edicao
-- Visivel apenas quando editando produto existente (`editingProduct?.id`)
-- Callback `onCloneSuccess` chama `refetchProducts` para recarregar dados
-
----
+1. Remover o bloco que bloqueia a execucao quando `integration` e `null` para o Mercado Livre (linhas 113-120)
+2. Remover a verificacao de token expirado que tambem bloqueia (linhas 123-129)
+3. Manter o envio do `integration` no payload, mas como valor opcional (`null` quando nao disponivel) - isso ja esta implementado corretamente no payload
 
 ### Secao Tecnica
 
-**Arquivos criados:**
-1. `src/components/admin/CloneFromMarketplace.tsx`
+O payload ja suporta `integration: null` (linha 152-160 do codigo atual). A unica mudanca e remover os dois blocos de validacao que impedem o envio quando nao ha integracao ativa. O webhook no n8n recebera `integration: null` e devera tratar esse caso buscando os dados via scraping/API publica.
 
-**Arquivos modificados:**
-1. `src/pages/admin/Products.tsx` - adicionar import e renderizacao do componente
-
-**Nenhuma alteracao de banco de dados necessaria** - o componente usa tabelas existentes (`mercadolivre_integrations`) e envia dados para webhook externo (n8n).
-
-**Dependencias utilizadas:** Todos os componentes UI ja existem no projeto (Card, Select, Input, Button, Checkbox, toast/sonner).
-
-**Auth:** Usa `useAuth` de `@/contexts/AuthContext` para obter `user.id`.
