@@ -169,13 +169,19 @@ export function CloneFromMarketplace({ product, onCloneSuccess }: CloneFromMarke
       if (waitForResponse) {
         const result = await response.json();
 
-        if (result.success) {
-          setCloneResult({ success: true, message: result.message || "Produto clonado com sucesso!" });
+        // Resposta vem como array - extrair primeiro item
+        const item = Array.isArray(result) ? result[0] : result;
+        const isSuccess = item?.success === true;
+        const productData = item?.data || item?.product;
+
+        if (isSuccess) {
+          setCloneResult({ success: true, message: "Produto clonado com sucesso!" });
           toast.success("Produto clonado com sucesso!", { description: "Os dados foram atualizados." });
-          onCloneSuccess?.(result.product);
+          onCloneSuccess?.(productData);
         } else {
-          setCloneResult({ success: false, message: result.error || "Erro ao clonar produto" });
-          toast.error("Erro ao clonar produto", { description: result.error || "Verifique os dados e tente novamente." });
+          const errorMsg = item?.error || item?.message || "Erro ao clonar produto";
+          setCloneResult({ success: false, message: errorMsg });
+          toast.error("Erro ao clonar produto", { description: errorMsg });
         }
       } else {
         toast.success("Produto enviado para clonagem!", { description: "O produto será atualizado em alguns instantes." });
