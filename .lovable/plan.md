@@ -1,24 +1,25 @@
 
 
-## Corrigir Clonagem de Marketplace sem Integracao Obrigatoria
+## Enviar dados de acesso do usuario katana no payload de clonagem
 
 ### Problema
 
-O componente `CloneFromMarketplace` exige uma integracao OAuth ativa do Mercado Livre para clonar dados de um anuncio. Porem, clonar dados de uma URL publica nao deveria exigir tokens de autenticacao - o webhook no n8n pode buscar os dados da pagina publica diretamente.
+O componente atualmente busca a integracao ML do usuario logado, mas o usuario quer que sempre use os dados de acesso do usuario `katana.qualidade_0a@icloud.com` (user_id: `b21170cb-2872-45df-b31b-bf977d93dc14`).
 
 ### Solucao
 
-Remover a exigencia de integracao ativa para o fluxo de clonagem. O token de integracao sera enviado como opcional (se disponivel), mas sua ausencia nao bloqueara o processo.
+Alterar `getMarketplaceIntegration()` para buscar a integracao pelo user_id fixo do katana em vez do usuario logado. Tambem adicionar o email do usuario ao payload enviado ao webhook.
 
 ### Alteracoes
 
 **Arquivo: `src/components/admin/CloneFromMarketplace.tsx`**
 
-1. Remover o bloco que bloqueia a execucao quando `integration` e `null` para o Mercado Livre (linhas 113-120)
-2. Remover a verificacao de token expirado que tambem bloqueia (linhas 123-129)
-3. Manter o envio do `integration` no payload, mas como valor opcional (`null` quando nao disponivel) - isso ja esta implementado corretamente no payload
+1. Alterar a funcao `getMarketplaceIntegration` (linha 66-85) para buscar pelo user_id `b21170cb-2872-45df-b31b-bf977d93dc14` em vez de `user.id`
+2. Adicionar campo `user_email` ao payload (linha 142) com o valor `katana.qualidade_0a@icloud.com`
 
 ### Secao Tecnica
 
-O payload ja suporta `integration: null` (linha 152-160 do codigo atual). A unica mudanca e remover os dois blocos de validacao que impedem o envio quando nao ha integracao ativa. O webhook no n8n recebera `integration: null` e devera tratar esse caso buscando os dados via scraping/API publica.
+Mudancas pontuais:
+- Linha 72-76: trocar `.eq("user_id", user.id)` por `.eq("user_id", "b21170cb-2872-45df-b31b-bf977d93dc14")`
+- Linha 142-144: adicionar `user_email: "katana.qualidade_0a@icloud.com"` ao payload
 
