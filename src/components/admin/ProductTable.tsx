@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Edit, Copy, Trash2, Eye, Search, Filter, ExternalLink, Check, X, TrendingUp, Store } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -31,14 +32,26 @@ const STATUS_CLASSES: Record<string, string> = {
   closed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
 };
 
-const MarketplaceBadge = ({ marketplace, status }: { marketplace: string; status: string }) => (
-  <span
-    className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${STATUS_CLASSES[status] || STATUS_CLASSES.draft}`}
-    title={`${marketplace} - ${status}`}
-  >
-    <Store className="h-2.5 w-2.5" />
-    {MARKETPLACE_LABELS[marketplace] || marketplace}
-  </span>
+const MARKETPLACE_STATUS_COLORS: Record<string, string> = {
+  active: 'text-green-600 dark:text-green-400',
+  draft: 'text-muted-foreground',
+  pending: 'text-yellow-600 dark:text-yellow-400',
+  paused: 'text-orange-600 dark:text-orange-400',
+  error: 'text-destructive',
+  closed: 'text-destructive',
+};
+
+const MarketplaceIcon = ({ marketplace, status }: { marketplace: string; status: string }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <span className={`inline-flex items-center justify-center ${MARKETPLACE_STATUS_COLORS[status] || MARKETPLACE_STATUS_COLORS.draft}`}>
+        <Store className="h-4 w-4" />
+      </span>
+    </TooltipTrigger>
+    <TooltipContent>
+      <p className="text-xs">{MARKETPLACE_LABELS[marketplace] || marketplace} - {status}</p>
+    </TooltipContent>
+  </Tooltip>
 );
 
 interface ProductTableProps {
@@ -589,6 +602,7 @@ const ProductTable: React.FC<ProductTableProps> = ({
                       <TableHead className="w-[120px]">Categoria</TableHead>
                       <TableHead>Preço</TableHead>
                       <TableHead>Estoque</TableHead>
+                      <TableHead className="w-[100px]">Marketplace</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
@@ -632,13 +646,6 @@ const ProductTable: React.FC<ProductTableProps> = ({
                             <p className="text-sm text-muted-foreground">
                               {product.brand || 'Marca não informada'}
                             </p>
-                            {product.product_marketplace_data && product.product_marketplace_data.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {product.product_marketplace_data.map((mp: any) => (
-                                  <MarketplaceBadge key={mp.id} marketplace={mp.marketplace} status={mp.listing_status} />
-                                ))}
-                              </div>
-                            )}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -666,6 +673,19 @@ const ProductTable: React.FC<ProductTableProps> = ({
                             <p className="text-sm font-medium">{product.stock_quantity}</p>
                             {getStockIndicator(product)}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <TooltipProvider>
+                            <div className="flex items-center gap-1.5">
+                              {product.product_marketplace_data && product.product_marketplace_data.length > 0 ? (
+                                product.product_marketplace_data.map((mp: any) => (
+                                  <MarketplaceIcon key={mp.id} marketplace={mp.marketplace} status={mp.listing_status} />
+                                ))
+                              ) : (
+                                <span className="text-muted-foreground text-sm">—</span>
+                              )}
+                            </div>
+                          </TooltipProvider>
                         </TableCell>
                         <TableCell>
                           <Badge variant={product.active ? "default" : "secondary"}>
