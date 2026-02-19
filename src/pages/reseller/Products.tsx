@@ -8,6 +8,7 @@ import { useResellerStore } from '@/hooks/useResellerStore';
 import { useToast } from '@/hooks/use-toast';
 import { useMercadoLivreIntegration } from '@/hooks/useMercadoLivreIntegration';
 import { MercadoLivreButton } from '@/components/reseller/MercadoLivreButton';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { 
   Package, 
   Edit,
@@ -20,7 +21,8 @@ import {
   TrendingUp,
   Eye,
   Trash2,
-  ExternalLink
+  ExternalLink,
+  ChevronDown
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -41,6 +43,7 @@ const ResellerProducts = () => {
     isProductPublished,
     isProductPublishing,
     isProductUnpublishing,
+    getProductPermalink,
     publishProduct,
     unpublishProduct,
   } = useMercadoLivreIntegration();
@@ -345,22 +348,46 @@ const ResellerProducts = () => {
                           {product.active ? "Desativar" : "Ativar"}
                         </Button>
                         
-                        {product.active && product.product && store?.store_slug && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            asChild
-                            className="w-full"
-                          >
-                            <a 
-                              href={`/loja/${store.store_slug}/produto/${product.product_id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <ExternalLink className="h-3 w-3 mr-1" />
-                              Ver na Loja
-                            </a>
-                          </Button>
+                        {product.active && product.product && (store?.store_slug || (hasActiveIntegration && isProductPublished(product.product_id) && getProductPermalink(product.product_id))) && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full"
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                Ver na Loja
+                                <ChevronDown className="h-3 w-3 ml-1" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-background z-50">
+                              {store?.store_slug && (
+                                <DropdownMenuItem asChild>
+                                  <a 
+                                    href={`/loja/${store.store_slug}/produto/${product.product_id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <ExternalLink className="h-3 w-3 mr-2" />
+                                    Ver na Minha Loja ↗️
+                                  </a>
+                                </DropdownMenuItem>
+                              )}
+                              {hasActiveIntegration && isProductPublished(product.product_id) && getProductPermalink(product.product_id) && (
+                                <DropdownMenuItem asChild>
+                                  <a 
+                                    href={getProductPermalink(product.product_id)!}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <ExternalLink className="h-3 w-3 mr-2" />
+                                    Ver no Mercado Livre ↗️
+                                  </a>
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
                         
                         {hasActiveIntegration && product.product && (

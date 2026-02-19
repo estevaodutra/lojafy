@@ -1581,6 +1581,7 @@ export type Database = {
           created_at: string
           id: string
           ml_item_id: string | null
+          permalink: string | null
           product_id: string
           published_at: string
           status: string
@@ -1591,6 +1592,7 @@ export type Database = {
           created_at?: string
           id?: string
           ml_item_id?: string | null
+          permalink?: string | null
           product_id: string
           published_at?: string
           status?: string
@@ -1601,6 +1603,7 @@ export type Database = {
           created_at?: string
           id?: string
           ml_item_id?: string | null
+          permalink?: string | null
           product_id?: string
           published_at?: string
           status?: string
