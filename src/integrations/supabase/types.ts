@@ -2532,8 +2532,8 @@ export type Database = {
       product_marketplace_data: {
         Row: {
           created_at: string | null
-          data: Json
           id: string
+          is_validated: boolean | null
           last_sync_at: string | null
           listing_id: string | null
           listing_status: string | null
@@ -2542,11 +2542,13 @@ export type Database = {
           product_id: string
           published_at: string | null
           updated_at: string | null
+          validated_at: string | null
+          validated_body: Json
         }
         Insert: {
           created_at?: string | null
-          data?: Json
           id?: string
+          is_validated?: boolean | null
           last_sync_at?: string | null
           listing_id?: string | null
           listing_status?: string | null
@@ -2555,11 +2557,13 @@ export type Database = {
           product_id: string
           published_at?: string | null
           updated_at?: string | null
+          validated_at?: string | null
+          validated_body?: Json
         }
         Update: {
           created_at?: string | null
-          data?: Json
           id?: string
+          is_validated?: boolean | null
           last_sync_at?: string | null
           listing_id?: string | null
           listing_status?: string | null
@@ -2568,6 +2572,8 @@ export type Database = {
           product_id?: string
           published_at?: string | null
           updated_at?: string | null
+          validated_at?: string | null
+          validated_body?: Json
         }
         Relationships: [
           {
@@ -4260,7 +4266,7 @@ export type Database = {
     Views: {
       v_products_mercadolivre: {
         Row: {
-          data: Json | null
+          is_validated: boolean | null
           last_sync_at: string | null
           listing_id: string | null
           listing_status: string | null
@@ -4272,12 +4278,12 @@ export type Database = {
           marketplace: string | null
           marketplace_data_id: string | null
           ml_category_id: string | null
-          ml_category_name: string | null
-          ml_domain_id: string | null
-          ml_price: number | null
+          ml_title: string | null
           product_id: string | null
           product_name: string | null
           published_at: string | null
+          validated_at: string | null
+          validated_body: Json | null
         }
         Relationships: []
       }
@@ -4326,7 +4332,7 @@ export type Database = {
       }
       v_products_with_marketplace: {
         Row: {
-          data: Json | null
+          is_validated: boolean | null
           last_sync_at: string | null
           listing_id: string | null
           listing_status: string | null
@@ -4338,12 +4344,12 @@ export type Database = {
           marketplace: string | null
           marketplace_data_id: string | null
           ml_category_id: string | null
-          ml_category_name: string | null
-          ml_domain_id: string | null
-          ml_price: number | null
+          ml_title: string | null
           product_id: string | null
           product_name: string | null
           published_at: string | null
+          validated_at: string | null
+          validated_body: Json | null
         }
         Relationships: []
       }

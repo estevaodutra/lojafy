@@ -14,24 +14,6 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
   });
 }
 
-// Control fields that are extracted from body (not stored in data JSONB)
-const CONTROL_FIELDS = ['product_id', 'marketplace', 'listing_id', 'listing_url', 'listing_status'];
-
-// Fields that should NOT be stored in data JSONB (they come from the Lojafy product at publish time)
-const FORBIDDEN_DATA_FIELDS = ['price', 'available_quantity', 'attributes', 'listing_type_id', 'buying_mode', 'currency_id'];
-
-// Valid listing_type values
-const VALID_LISTING_TYPES = ['classic', 'premium'];
-
-// Helper: Convert Lojafy listing_type to Mercado Livre listing_type_id
-export function getMLListingType(lojafyType: string): string {
-  const map: Record<string, string> = {
-    classic: 'gold_special',
-    premium: 'gold_pro',
-  };
-  return map[lojafyType] || 'gold_special';
-}
-
 Deno.serve(async (req) => {
   const startTime = Date.now();
 
@@ -50,7 +32,7 @@ Deno.serve(async (req) => {
   const method = req.method;
   const endpoint = pathParts[1]; // "products" or "mercadolivre"
   const subEndpoint = pathParts[2]; // id, "by-product", "unpublished"
-  const subId = pathParts[3]; // productId (when by-product)
+  const subId = pathParts[3]; // productId (when by-product) or "publish-body"
 
   const ipAddress = getClientIp(req);
 
@@ -87,13 +69,14 @@ Deno.serve(async (req) => {
 
   try {
     // ============================================
-    // POST /products - Criar/Atualizar dados marketplace (upsert)
+    // POST /products - Salvar body validado (upsert)
     // ============================================
     if (method === 'POST' && endpoint === 'products' && !subEndpoint) {
       const body = await req.json();
 
       if (!body.product_id) return jsonResponse({ success: false, error: 'product_id é obrigatório' }, 400);
       if (!body.marketplace) return jsonResponse({ success: false, error: 'marketplace é obrigatório' }, 400);
+      if (!body.validated_body) return jsonResponse({ success: false, error: 'validated_body é obrigatório' }, 400);
 
       // Verify product exists
       const { data: productExists, error: productError } = await supabase
@@ -106,21 +89,7 @@ Deno.serve(async (req) => {
         return jsonResponse({ success: false, error: 'Produto não encontrado na tabela products' }, 404);
       }
 
-      // Validate listing_type if provided
-      if (body.listing_type && !VALID_LISTING_TYPES.includes(body.listing_type)) {
-        return jsonResponse({ success: false, error: `listing_type deve ser: ${VALID_LISTING_TYPES.join(', ')}` }, 400);
-      }
-
-      // Default listing_type to classic
-      if (!body.listing_type) {
-        body.listing_type = 'classic';
-      }
-
-      // Extract control fields, everything else goes into data JSONB
-      const dataPayload = { ...body };
-      for (const field of [...CONTROL_FIELDS, ...FORBIDDEN_DATA_FIELDS]) {
-        delete dataPayload[field];
-      }
+      const isValidated = body.is_validated ?? true;
 
       const { data, error } = await supabase
         .from('product_marketplace_data')
@@ -128,10 +97,12 @@ Deno.serve(async (req) => {
           {
             product_id: body.product_id,
             marketplace: body.marketplace,
-            data: dataPayload,
+            validated_body: body.validated_body,
+            is_validated: isValidated,
+            validated_at: isValidated ? new Date().toISOString() : null,
             listing_id: body.listing_id || null,
             listing_url: body.listing_url || null,
-            listing_status: body.listing_status || 'draft',
+            listing_status: isValidated ? 'ready' : 'draft',
           },
           { onConflict: 'product_id,marketplace' }
         )
@@ -165,6 +136,7 @@ Deno.serve(async (req) => {
       const marketplace = url.searchParams.get('marketplace');
       const listingStatus = url.searchParams.get('listing_status');
       const productId = url.searchParams.get('product_id');
+      const isValidated = url.searchParams.get('is_validated');
       const page = parseInt(url.searchParams.get('page') || '1');
       const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
       const offset = (page - 1) * limit;
@@ -181,6 +153,9 @@ Deno.serve(async (req) => {
       if (marketplace) query = query.eq('marketplace', marketplace);
       if (listingStatus) query = query.eq('listing_status', listingStatus);
       if (productId) query = query.eq('product_id', productId);
+      if (isValidated !== null && isValidated !== undefined) {
+        query = query.eq('is_validated', isValidated === 'true');
+      }
 
       query = query.order('created_at', { ascending: false });
       query = query.range(offset, offset + limit - 1);
@@ -197,7 +172,7 @@ Deno.serve(async (req) => {
         ip_address: ipAddress,
         status_code: 200,
         duration_ms: Date.now() - startTime,
-        query_params: { marketplace, listing_status: listingStatus, product_id: productId, page, limit } as Record<string, unknown>,
+        query_params: { marketplace, listing_status: listingStatus, product_id: productId, is_validated: isValidated, page, limit } as Record<string, unknown>,
         response_summary: { success: true, count },
       });
 
@@ -225,7 +200,7 @@ Deno.serve(async (req) => {
       const filterUserId = url.searchParams.get('user_id');
 
       // Get product IDs already registered for this marketplace
-      let existingQuery = supabase
+      const existingQuery = supabase
         .from('product_marketplace_data')
         .select('product_id')
         .eq('marketplace', marketplace);
@@ -312,6 +287,66 @@ Deno.serve(async (req) => {
     }
 
     // ============================================
+    // GET /products/:id/publish-body - Body pronto para publicar
+    // ============================================
+    if (method === 'GET' && endpoint === 'products' && subEndpoint && subId === 'publish-body') {
+      const id = subEndpoint;
+      const price = parseFloat(url.searchParams.get('price') || '0');
+      const quantity = parseInt(url.searchParams.get('quantity') || '0');
+
+      if (!price || price <= 0) {
+        return jsonResponse({ success: false, error: 'price é obrigatório e deve ser maior que 0' }, 400);
+      }
+
+      const { data, error } = await supabase
+        .from('product_marketplace_data')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return jsonResponse({ success: false, error: 'Registro não encontrado' }, 404);
+        }
+        throw error;
+      }
+
+      if (!data.is_validated) {
+        return jsonResponse({
+          success: false,
+          error: 'Body não validado. Salve o validated_body primeiro.',
+          ready_to_publish: false,
+        }, 400);
+      }
+
+      // Build final body with price and quantity replaced
+      const publishBody = {
+        ...(data.validated_body as Record<string, unknown>),
+        price: price,
+        available_quantity: quantity > 0 ? quantity : (data.validated_body as Record<string, unknown>).available_quantity,
+      };
+
+      await logApiRequest({
+        function_name: 'lojafy-integra',
+        method,
+        path: url.pathname,
+        api_key_id: apiKeyId || undefined,
+        user_id: userId || undefined,
+        ip_address: ipAddress,
+        status_code: 200,
+        duration_ms: Date.now() - startTime,
+        query_params: { price, quantity },
+        response_summary: { success: true, ready_to_publish: true },
+      });
+
+      return jsonResponse({
+        success: true,
+        ready_to_publish: true,
+        body: publishBody,
+      });
+    }
+
+    // ============================================
     // GET /products/:id - Buscar por ID
     // ============================================
     if (method === 'GET' && endpoint === 'products' && subEndpoint && subEndpoint !== 'by-product' && subEndpoint !== 'unpublished') {
@@ -361,8 +396,12 @@ Deno.serve(async (req) => {
       if (body.published_at !== undefined) updateFields.published_at = body.published_at;
       if (body.last_sync_at !== undefined) updateFields.last_sync_at = body.last_sync_at;
 
-      // Update data JSONB if provided
-      if (body.data !== undefined) updateFields.data = body.data;
+      // Update validated_body if provided (also update validation fields)
+      if (body.validated_body !== undefined) {
+        updateFields.validated_body = body.validated_body;
+        updateFields.is_validated = true;
+        updateFields.validated_at = new Date().toISOString();
+      }
 
       const { data, error } = await supabase
         .from('product_marketplace_data')

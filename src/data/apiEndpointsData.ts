@@ -966,24 +966,31 @@ const integraMLEndpoints: EndpointData[] = [
 // Lojafy Integra - Produtos Marketplace Endpoints
 const integraProductsEndpoints: EndpointData[] = [
   {
-    title: 'Criar/Atualizar Dados de Marketplace',
+    title: 'Salvar Body Validado',
     method: 'POST',
     url: '/functions/v1/lojafy-integra/products',
-    description: 'Cria ou atualiza (upsert) dados específicos de um marketplace para um produto. Os campos product_id, marketplace, listing_id, listing_url e listing_status são campos de controle. Todo o restante do body é armazenado no campo data (JSONB). Campos como price, stock_quantity e attributes vêm do produto Lojafy na hora da publicação e são removidos automaticamente do payload.',
+    description: 'Salva ou atualiza (upsert) o body completo e validado de um produto para um marketplace. O validated_body contém o payload inteiro já validado pela API do ML, pronto para publicação. Os campos price e available_quantity são substituídos na hora de publicar.',
     headers: [
       { name: 'X-API-Key', description: 'Chave de API com permissão integracoes.write', example: 'sk_...', required: true }
     ],
     requestBody: {
       product_id: 'uuid-do-produto-lojafy',
       marketplace: 'mercadolivre',
-      listing_status: 'draft',
-      category_id: 'MLB281603',
-      category_name: 'Corretores de Postura',
-      domain_id: 'MLB-POSTURE_CORRECTORS',
-      listing_type: 'classic',
-      condition: 'new',
-      title: 'Título customizado pro ML (opcional)',
-      shipping: { mode: 'me2', free_shipping: false }
+      validated_body: {
+        title: 'Cinta Archy Correctora Postura Costas Homens Colete (11130)',
+        category_id: 'MLB428951',
+        price: 0,
+        currency_id: 'BRL',
+        available_quantity: 0,
+        buying_mode: 'buy_it_now',
+        listing_type_id: 'gold_special',
+        condition: 'new',
+        description: 'Descrição completa do produto...',
+        pictures: [{ source: 'https://exemplo.com/foto1.jpg' }],
+        attributes: [{ id: 'BRAND', value_name: 'Archy' }],
+        sale_terms: [{ id: 'WARRANTY_TYPE', value_name: 'Garantia do vendedor' }]
+      },
+      is_validated: true
     },
     responseExample: {
       success: true,
@@ -991,23 +998,16 @@ const integraProductsEndpoints: EndpointData[] = [
         id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
         product_id: 'uuid-do-produto-lojafy',
         marketplace: 'mercadolivre',
-        data: {
-          category_id: 'MLB281603',
-          category_name: 'Corretores de Postura',
-          domain_id: 'MLB-POSTURE_CORRECTORS',
-          listing_type: 'classic',
-          condition: 'new',
-          title: 'Título customizado pro ML (opcional)',
-          shipping: { mode: 'me2', free_shipping: false }
-        },
-        listing_status: 'draft',
+        validated_body: { title: '...', category_id: 'MLB428951' },
+        is_validated: true,
+        validated_at: '2026-02-18T20:00:00Z',
+        listing_status: 'ready',
         listing_id: null,
-        created_at: '2026-02-18T15:30:00Z'
+        created_at: '2026-02-18T20:00:00Z'
       }
     },
     errorExamples: [
-      { code: 400, title: 'Campos obrigatórios', description: 'product_id ou marketplace ausentes', example: { success: false, error: 'product_id é obrigatório' } },
-      { code: 400, title: 'listing_type inválido', description: 'Valor não é classic ou premium', example: { success: false, error: 'listing_type deve ser: classic, premium' } },
+      { code: 400, title: 'Campos obrigatórios', description: 'product_id, marketplace ou validated_body ausentes', example: { success: false, error: 'validated_body é obrigatório' } },
       { code: 404, title: 'Produto não encontrado', description: 'product_id não existe na tabela products', example: { success: false, error: 'Produto não encontrado na tabela products' } }
     ]
   },
@@ -1015,14 +1015,15 @@ const integraProductsEndpoints: EndpointData[] = [
     title: 'Listar Produtos por Marketplace',
     method: 'GET',
     url: '/functions/v1/lojafy-integra/products',
-    description: 'Lista dados de marketplace dos produtos com filtros e paginação. Inclui join com o produto base da Lojafy.',
+    description: 'Lista dados de marketplace dos produtos com filtros e paginação. Inclui join com o produto base da Lojafy. Suporta filtro por is_validated.',
     headers: [
       { name: 'X-API-Key', description: 'Chave de API com permissão integracoes.read', example: 'sk_...', required: true }
     ],
     queryParams: [
       { name: 'marketplace', description: 'Filtrar por marketplace', example: 'mercadolivre' },
-      { name: 'listing_status', description: 'Filtrar por status (draft, active, paused, etc.)', example: 'active' },
+      { name: 'listing_status', description: 'Filtrar por status (draft, ready, active, paused, etc.)', example: 'ready' },
       { name: 'product_id', description: 'Filtrar por produto específico', example: 'uuid-do-produto' },
+      { name: 'is_validated', description: 'Filtrar por status de validação', example: 'true' },
       { name: 'page', description: 'Página (padrão: 1)', example: '1' },
       { name: 'limit', description: 'Itens por página (padrão: 50, máx: 100)', example: '20' }
     ],
@@ -1033,7 +1034,8 @@ const integraProductsEndpoints: EndpointData[] = [
           id: 'uuid',
           product_id: 'uuid-produto',
           marketplace: 'mercadolivre',
-          data: { category_id: 'MLB281603', listing_type: 'classic', condition: 'new', title: 'Título ML' },
+          validated_body: { title: 'Título ML', category_id: 'MLB428951', listing_type_id: 'gold_special' },
+          is_validated: true,
           listing_id: 'MLB-123456789',
           listing_status: 'active',
           products: { id: 'uuid-produto', name: 'Produto Base', sku: 'SKU-001' }
@@ -1049,7 +1051,7 @@ const integraProductsEndpoints: EndpointData[] = [
     title: 'Buscar Produto por ID',
     method: 'GET',
     url: '/functions/v1/lojafy-integra/products/:id',
-    description: 'Retorna os dados completos de um registro marketplace específico, incluindo o campo data (JSONB) e dados do produto original via join.',
+    description: 'Retorna os dados completos de um registro marketplace específico, incluindo o validated_body e dados do produto original via join.',
     headers: [
       { name: 'X-API-Key', description: 'Chave de API com permissão integracoes.read', example: 'sk_...', required: true }
     ],
@@ -1059,12 +1061,9 @@ const integraProductsEndpoints: EndpointData[] = [
         id: 'uuid-marketplace-data',
         product_id: 'uuid-produto-lojafy',
         marketplace: 'mercadolivre',
-        data: {
-          category_id: 'MLB281603',
-          listing_type: 'classic',
-          condition: 'new',
-          title: 'Título ML'
-        },
+        validated_body: { title: 'Título ML', category_id: 'MLB428951', listing_type_id: 'gold_special', condition: 'new' },
+        is_validated: true,
+        validated_at: '2026-02-18T20:00:00Z',
         listing_id: 'MLB-123456789',
         listing_url: 'https://www.mercadolivre.com.br/...',
         listing_status: 'active',
@@ -1079,15 +1078,15 @@ const integraProductsEndpoints: EndpointData[] = [
     title: 'Listar Marketplaces de um Produto',
     method: 'GET',
     url: '/functions/v1/lojafy-integra/products/by-product/:productId',
-    description: 'Retorna todos os registros de marketplace de um produto Lojafy, com dados e status de cada listagem.',
+    description: 'Retorna todos os registros de marketplace de um produto Lojafy, com validated_body e status de cada listagem.',
     headers: [
       { name: 'X-API-Key', description: 'Chave de API com permissão integracoes.read', example: 'sk_...', required: true }
     ],
     responseExample: {
       success: true,
       data: [
-        { id: 'uuid-1', marketplace: 'mercadolivre', listing_status: 'active', listing_id: 'MLB-123', data: { category_id: 'MLB281603', listing_type: 'classic' } },
-        { id: 'uuid-2', marketplace: 'shopee', listing_status: 'draft', listing_id: null, data: { listing_type: 'classic' } }
+        { id: 'uuid-1', marketplace: 'mercadolivre', listing_status: 'active', listing_id: 'MLB-123', validated_body: { title: '...', category_id: 'MLB428951' }, is_validated: true },
+        { id: 'uuid-2', marketplace: 'shopee', listing_status: 'draft', listing_id: null, validated_body: {}, is_validated: false }
       ]
     },
     errorExamples: [
@@ -1095,10 +1094,45 @@ const integraProductsEndpoints: EndpointData[] = [
     ]
   },
   {
+    title: 'Obter Body para Publicar',
+    method: 'GET',
+    url: '/functions/v1/lojafy-integra/products/:id/publish-body',
+    description: 'Retorna o validated_body com price e available_quantity substituídos pelos valores informados. Requer que is_validated = true. Ideal para o n8n usar antes de POST /items no ML.',
+    headers: [
+      { name: 'X-API-Key', description: 'Chave de API com permissão integracoes.read', example: 'sk_...', required: true }
+    ],
+    queryParams: [
+      { name: 'price', description: 'Preço de venda do revendedor (obrigatório, > 0)', example: '99.99' },
+      { name: 'quantity', description: 'Quantidade disponível (opcional)', example: '50' }
+    ],
+    responseExample: {
+      success: true,
+      ready_to_publish: true,
+      body: {
+        title: 'Cinta Archy Correctora Postura...',
+        category_id: 'MLB428951',
+        price: 99.99,
+        currency_id: 'BRL',
+        available_quantity: 50,
+        buying_mode: 'buy_it_now',
+        listing_type_id: 'gold_special',
+        condition: 'new',
+        description: '...',
+        pictures: [{ source: 'https://...' }],
+        attributes: [{ id: 'BRAND', value_name: 'Archy' }]
+      }
+    },
+    errorExamples: [
+      { code: 400, title: 'Price obrigatório', description: 'Preço não informado ou <= 0', example: { success: false, error: 'price é obrigatório e deve ser maior que 0' } },
+      { code: 400, title: 'Não validado', description: 'Body ainda não foi validado', example: { success: false, error: 'Body não validado', ready_to_publish: false } },
+      { code: 404, title: 'Não encontrado', description: 'ID não existe', example: { success: false, error: 'Registro não encontrado' } }
+    ]
+  },
+  {
     title: 'Atualizar Dados de Marketplace',
     method: 'PUT',
     url: '/functions/v1/lojafy-integra/products/:id',
-    description: 'Atualiza campos de controle (listing_id, listing_url, listing_status, published_at, last_sync_at) e/ou o campo data (JSONB) de um registro.',
+    description: 'Atualiza campos de controle (listing_id, listing_url, listing_status, published_at, last_sync_at) e/ou o validated_body. Ao atualizar validated_body, is_validated e validated_at são atualizados automaticamente.',
     headers: [
       { name: 'X-API-Key', description: 'Chave de API com permissão integracoes.write', example: 'sk_...', required: true }
     ],
@@ -1106,12 +1140,7 @@ const integraProductsEndpoints: EndpointData[] = [
       listing_id: 'MLB123456789',
       listing_url: 'https://produto.mercadolivre.com.br/MLB-123456789',
       listing_status: 'active',
-      published_at: '2026-02-18T15:00:00Z',
-      data: {
-        category_id: 'MLB281603',
-        listing_type: 'premium',
-        title: 'Título Atualizado'
-      }
+      published_at: '2026-02-18T15:00:00Z'
     },
     responseExample: {
       success: true,
@@ -1119,7 +1148,8 @@ const integraProductsEndpoints: EndpointData[] = [
         id: 'uuid-marketplace-data',
         listing_id: 'MLB123456789',
         listing_status: 'active',
-        data: { category_id: 'MLB281603', listing_type: 'premium', title: 'Título Atualizado' },
+        validated_body: { title: '...', category_id: 'MLB428951' },
+        is_validated: true,
         updated_at: '2026-02-18T16:00:00Z'
       }
     },

@@ -139,7 +139,8 @@ export const useMercadoLivreIntegration = () => {
       const webhookPayload = {
         product: productData,
         reseller_price: resellerProduct?.custom_price || null,
-        marketplace_data: marketplaceData?.data || null,
+        marketplace_data: marketplaceData?.validated_body || null,
+        is_validated: marketplaceData?.is_validated ?? false,
         marketplace_listing: {
           listing_id: marketplaceData?.listing_id ?? null,
           listing_status: marketplaceData?.listing_status ?? null,
