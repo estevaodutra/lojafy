@@ -8,6 +8,7 @@ import ProductTable from '@/components/admin/ProductTable';
 import ProductForm from '@/components/admin/ProductForm';
 import { ProductComparisonView } from '@/components/admin/ProductComparisonView';
 import { RestoreOriginalButton } from '@/components/admin/RestoreOriginalButton';
+import { CloneFromMarketplace } from '@/components/admin/CloneFromMarketplace';
 import StockAlert from '@/components/admin/StockAlert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -310,6 +311,16 @@ const Products = () => {
                 />
               </div>
               <ProductComparisonView product={editingProduct} />
+            </div>
+          )}
+          {editingProduct?.id && (
+            <div className="mt-4">
+              <CloneFromMarketplace
+                product={editingProduct}
+                onCloneSuccess={() => {
+                  setTimeout(() => refetchProducts(), 3000);
+                }}
+              />
             </div>
           )}
         </DialogContent>
