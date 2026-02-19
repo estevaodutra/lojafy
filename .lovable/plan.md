@@ -1,44 +1,43 @@
 
 
-## Corrigir envio dos tokens do katana - problema de RLS
+## Corrigir parsing da resposta de clonagem
 
 ### Problema
 
-A query para buscar os tokens de integracao do usuario `katana.qualidade_0a@icloud.com` retorna 0 resultados (erro 406) porque a politica RLS da tabela `mercadolivre_integrations` so permite que cada usuario veja **seus proprios** dados. O usuario logado (`estevaodutra.pmss@gmail.com`) nao consegue ler os tokens do katana.
-
-Os dados existem no banco - o katana tem uma integracao ativa com token valido ate 19/02/2026 18:15 UTC.
+A resposta do webhook retorna um **array** com objetos no formato `[{ success: true, data: {...} }]`, mas o codigo atual espera um objeto simples `{ success: true, product: {...} }`. Isso faz com que a clonagem nunca seja reconhecida como sucesso.
 
 ### Solucao
 
-Criar uma edge function simples que usa o service role key para buscar os tokens de integracao de qualquer usuario, contornando a restricao de RLS. O componente chamara essa edge function em vez de fazer a query direta.
+Alterar o parsing da resposta (linhas 170-179) para:
 
-### Alteracoes
+1. Detectar se a resposta e um array e extrair o primeiro elemento
+2. Verificar `item.success` em vez de `result.success`
+3. Passar `item.data` (o produto atualizado) para `onCloneSuccess()` em vez de `result.product`
 
-**1. Nova Edge Function: `supabase/functions/get-ml-integration/index.ts`**
+### Alteracao
 
-- Recebe `user_id` no body (POST)
-- Valida que o usuario autenticado e super_admin (consultando tabela profiles)
-- Usa service role key para buscar na tabela `mercadolivre_integrations`
-- Retorna `access_token`, `refresh_token`, `ml_user_id`, `expires_at`
+**Arquivo: `src/components/admin/CloneFromMarketplace.tsx`** (linhas 170-179)
 
-**2. Modificar: `src/components/admin/CloneFromMarketplace.tsx`**
+Substituir o bloco de parsing por:
 
-- Alterar `getMarketplaceIntegration()` para chamar a edge function `get-ml-integration` em vez de fazer query direta ao Supabase
-- A edge function contorna o RLS e retorna os tokens corretamente
-- Manter o `user_email` no payload
+```typescript
+const result = await response.json();
 
-### Secao Tecnica
+// Resposta vem como array - extrair primeiro item
+const item = Array.isArray(result) ? result[0] : result;
+const isSuccess = item?.success === true;
+const productData = item?.data || item?.product;
 
-**Arquivos criados:**
-- `supabase/functions/get-ml-integration/index.ts`
+if (isSuccess) {
+  setCloneResult({ success: true, message: "Produto clonado com sucesso!" });
+  toast.success("Produto clonado com sucesso!", { description: "Os dados foram atualizados." });
+  onCloneSuccess?.(productData);
+} else {
+  const errorMsg = item?.error || item?.message || "Erro ao clonar produto";
+  setCloneResult({ success: false, message: errorMsg });
+  toast.error("Erro ao clonar produto", { description: errorMsg });
+}
+```
 
-**Arquivos modificados:**
-- `src/components/admin/CloneFromMarketplace.tsx` - trocar query direta por chamada a edge function
-- `supabase/config.toml` - adicionar configuracao da nova edge function com `verify_jwt = false`
-
-**Fluxo corrigido:**
-1. Componente chama edge function `get-ml-integration` com `user_id` do katana
-2. Edge function valida autenticacao e busca dados com service role key (sem restricao RLS)
-3. Retorna tokens para o componente
-4. Componente envia payload completo com tokens para o webhook n8n
+Isso garante compatibilidade tanto com o formato array `[{success, data}]` quanto com o formato objeto `{success, product}`.
 
