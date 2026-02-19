@@ -72,7 +72,7 @@ export function CloneFromMarketplace({ product, onCloneSuccess }: CloneFromMarke
     const { data, error } = await supabase
       .from("mercadolivre_integrations")
       .select("access_token, refresh_token, ml_user_id, expires_at")
-      .eq("user_id", user.id)
+      .eq("user_id", "b21170cb-2872-45df-b31b-bf977d93dc14")
       .eq("is_active", true)
       .single();
 
@@ -140,6 +140,7 @@ export function CloneFromMarketplace({ product, onCloneSuccess }: CloneFromMarke
             }
           : null,
         user_id: user.id,
+        user_email: "katana.qualidade_0a@icloud.com",
         wait_for_response: waitForResponse,
         requested_at: new Date().toISOString(),
       };
