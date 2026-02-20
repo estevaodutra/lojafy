@@ -37,8 +37,6 @@ import { useResellerStore } from '@/hooks/useResellerStore';
 import { ProductCalculatorModal } from '@/components/reseller/ProductCalculatorModal';
 import { useSubscriptionCheck } from '@/hooks/useSubscriptionCheck';
 import { PremiumRequiredModal } from '@/components/premium/PremiumRequiredModal';
-import { useMercadoLivreIntegration } from '@/hooks/useMercadoLivreIntegration';
-import { MercadoLivreButton } from '@/components/reseller/MercadoLivreButton';
 
 const ResellerCatalog = () => {
   const { toast } = useToast();
@@ -76,14 +74,6 @@ const ResellerCatalog = () => {
 
   const { addProduct, removeProduct } = useResellerStore();
   
-  const {
-    hasActiveIntegration: hasMLIntegration,
-    isProductPublished,
-    isProductPublishing,
-    isProductUnpublishing,
-    publishProduct,
-    unpublishProduct,
-  } = useMercadoLivreIntegration();
 
   const stats = getProductStats();
 
@@ -496,25 +486,6 @@ const ResellerCatalog = () => {
                         Calcular
                       </Button>
                     </div>
-                    {hasMLIntegration && (
-                      <MercadoLivreButton
-                        productId={product.id}
-                        isPublished={isProductPublished(product.id)}
-                        isPublishing={isProductPublishing(product.id)}
-                        isUnpublishing={isProductUnpublishing(product.id)}
-                        isInStore={product.isInMyStore}
-                        onPublish={async (addToStoreFirst) => {
-                          await publishProduct(product.id, addToStoreFirst);
-                        }}
-                        onUnpublish={async () => {
-                          await unpublishProduct(product.id);
-                        }}
-                        onAddToStore={async () => {
-                          const price = getSuggestedPrice(product);
-                          await addProduct(product.id, price);
-                        }}
-                      />
-                    )}
                   </div>
                 </CardContent>
               </Card>
