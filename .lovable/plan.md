@@ -1,71 +1,110 @@
 
 
-## Atualizar Calculadora de Margem com Taxas do Mercado Livre
+## Gerenciamento de Produtos por Feature
 
-### O que sera feito
+### Resumo
 
-Reescrever o componente `ProductCalculatorModal` para incluir as taxas reais do Mercado Livre nos calculos de margem, lucro e preco minimo. Atualmente a calculadora ignora taxas, mostrando valores incorretos.
+Permitir que o Superadmin vincule, ordene e gerencie produtos associados a cada feature (especialmente "Top 10 Produtos") diretamente no painel de Features.
 
-### Alteracoes
+### 1. Banco de Dados
 
-**Arquivo: `src/components/reseller/ProductCalculatorModal.tsx`**
+**Nova tabela `feature_produtos`:**
 
-#### 1. Novo estado: tipo de anuncio
-- Adicionar estado `tipoAnuncio` com opcoes "classico" (14%) e "premium" (19%)
-- Importar componentes `Select`, `SelectContent`, `SelectItem`, `SelectTrigger`, `SelectValue`
+| Campo | Tipo | Descricao |
+|-------|------|-----------|
+| id | UUID (PK) | Identificador unico |
+| feature_id | UUID (FK features) | Feature vinculada |
+| produto_id | UUID (FK products) | Produto vinculado |
+| ordem | integer (default 0) | Posicao na lista |
+| ativo | boolean (default true) | Se esta ativo |
+| created_at | timestamptz | Data de criacao |
 
-#### 2. Seletor de tipo de anuncio
-- Adicionar um `Select` entre as informacoes do produto e os campos de preco
-- Opcoes: Classico (14%) e Premium (19%)
+- Constraint UNIQUE(feature_id, produto_id)
+- Indices em feature_id e produto_id
+- RLS: apenas super_admin pode ler/inserir/atualizar/deletar
 
-#### 3. Formulas corrigidas
-Substituir as formulas atuais pelas que consideram taxa ML:
+**Alteracao na tabela `features`:**
 
-| Calculo | Formula Atual (errada) | Formula Nova (correta) |
-|---------|----------------------|----------------------|
-| Lucro | `preco - custo` | `preco - custo - (preco * taxaML)` |
-| Margem | `(preco - custo) / custo * 100` | `(lucro / preco) * 100` |
-| Preco pela margem | `custo * (1 + margem/100)` | `custo / (1 - taxaML - margem/100)` |
+- Adicionar coluna `gerencia_produtos` boolean default false
+- Adicionar coluna `limite_produtos` integer nullable
 
-#### 4. Resultado da analise atualizado
-Mostrar detalhamento completo:
-- Taxa ML (valor em R$)
-- Custo
-- Lucro real (ja descontando taxa)
-- Margem real
-- Status: Prejuizo / Margem baixa / Margem OK / Margem otima
-- Preco minimo para a margem desejada
+### 2. Alteracoes no Frontend
 
-#### 5. Tabela de referencia rapida
-Adicionar abaixo do resultado uma mini tabela mostrando precos minimos para margens de 10%, 15%, 20%, 25%, 30%, 35%, 40% - calculados com a taxa selecionada.
+**Arquivo: `src/hooks/useFeatures.ts`**
+- Incluir campos `gerencia_produtos` e `limite_produtos` na interface `Feature`
+- Incluir no upsert mutation
 
-### Secao Tecnica
+**Arquivo: `src/hooks/useFeatureProducts.ts` (novo)**
+- Hook dedicado para CRUD de produtos vinculados a uma feature
+- Funcoes: listar, adicionar, remover, reordenar
+- Query com join em `products` para trazer nome, SKU, preco, imagem
 
-**Constantes de taxa:**
+**Arquivo: `src/components/admin/FeatureCard.tsx`**
+- Exibir indicador "X produtos vinculados" quando `gerencia_produtos = true`
+- Adicionar opcao "Gerenciar Produtos" no DropdownMenu
+
+**Arquivo: `src/components/admin/FeatureProductsModal.tsx` (novo)**
+- Modal principal de gerenciamento de produtos
+- Lista de produtos vinculados com drag-and-drop (usando @dnd-kit ja instalado)
+- Botao para adicionar produtos
+- Botao de remover por item (com confirmacao)
+- Exibe nome, SKU, preco de cada produto
+
+**Arquivo: `src/components/admin/AddProductsToFeatureModal.tsx` (novo)**
+- Modal de busca e selecao de produtos
+- Campo de busca com debounce
+- Filtra produtos nao vinculados a feature
+- Selecao multipla com checkbox
+- Botao "Adicionar" insere os selecionados
+
+**Arquivo: `src/pages/admin/Features.tsx`**
+- Adicionar estado e handlers para abrir o modal de gerenciamento de produtos
+- Passar callbacks para o FeatureCard
+
+**Arquivo: `src/components/admin/FeatureFormModal.tsx`**
+- Adicionar campos `gerencia_produtos` (Switch) e `limite_produtos` (Input number) no formulario de criacao/edicao
+
+### 3. Secao Tecnica
+
+**Fluxo de dados:**
+
 ```text
-CLASSICO = 0.14 (14%)
-PREMIUM  = 0.19 (19%)
+FeatureCard (menu "Gerenciar Produtos")
+  -> FeatureProductsModal (lista com drag-and-drop)
+    -> useFeatureProducts hook (CRUD via Supabase)
+    -> AddProductsToFeatureModal (busca e adiciona)
 ```
 
-**Funcoes de calculo:**
+**Drag and Drop:**
+- Usa @dnd-kit/core + @dnd-kit/sortable (ja instalados)
+- Ao soltar, atualiza campo `ordem` de todos os itens reordenados via batch update
+
+**Queries principais:**
+
 ```text
-valorTaxa  = precoVenda * taxaML
-lucroReal  = precoVenda - custoProduto - valorTaxa
-margemReal = (lucroReal / precoVenda) * 100
-precoMinimo = custoProduto / (1 - taxaML - margemDesejada/100)
+-- Listar produtos da feature
+SELECT fp.*, p.name, p.sku, p.price, p.image_url
+FROM feature_produtos fp
+JOIN products p ON p.id = fp.produto_id
+WHERE fp.feature_id = ?
+ORDER BY fp.ordem ASC
+
+-- Buscar produtos para adicionar (excluindo ja vinculados)
+SELECT p.*
+FROM products p
+WHERE p.active = true
+  AND p.id NOT IN (SELECT produto_id FROM feature_produtos WHERE feature_id = ?)
+  AND (p.name ILIKE '%termo%' OR p.sku ILIKE '%termo%')
+LIMIT 20
+
+-- Reordenar (batch upsert)
+UPDATE feature_produtos SET ordem = ? WHERE id = ?
 ```
 
-**Status da margem:**
-```text
-lucro < 0       -> Prejuizo (vermelho)
-margem < 10%    -> Margem baixa (vermelho)
-margem < 20%    -> Margem OK (amarelo)
-margem >= 20%   -> Margem otima (verde)
-```
+**RLS:**
+- SELECT/INSERT/UPDATE/DELETE restritos a usuarios com role `super_admin` via `is_admin_user()`
 
-**Imports adicionais:**
-- `Select, SelectContent, SelectItem, SelectTrigger, SelectValue` de `@/components/ui/select`
-- `TrendingDown, AlertTriangle` de `lucide-react`
-
-**Arquivo unico alterado:** `src/components/reseller/ProductCalculatorModal.tsx`
+**Arquivos criados:** 3 (1 hook + 2 componentes)
+**Arquivos modificados:** 4 (FeatureCard, FeatureFormModal, Features page, useFeatures hook)
+**Migracoes:** 1 (tabela + colunas + RLS)
 
