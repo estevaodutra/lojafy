@@ -18,6 +18,7 @@ import {
   Edit,
   Power,
   Trophy,
+  Package,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -51,12 +52,14 @@ interface FeatureCardProps {
   feature: Feature;
   onEdit: (feature: Feature) => void;
   onToggleActive: (id: string, ativo: boolean) => void;
+  onManageProducts?: (feature: Feature) => void;
 }
 
 export const FeatureCard: React.FC<FeatureCardProps> = ({
   feature,
   onEdit,
   onToggleActive,
+  onManageProducts,
 }) => {
   const Icon = iconMap[feature.icone] || Sparkles;
 
@@ -95,6 +98,12 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
                 <Edit className="w-4 h-4 mr-2" />
                 Editar
               </DropdownMenuItem>
+              {feature.gerencia_produtos && onManageProducts && (
+                <DropdownMenuItem onClick={() => onManageProducts(feature)}>
+                  <Package className="w-4 h-4 mr-2" />
+                  Gerenciar Produtos
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 onClick={() => onToggleActive(feature.id, !feature.ativo)}
               >
@@ -123,6 +132,13 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
           </div>
           <span>{formatPrice(feature.preco_mensal)}/mês</span>
         </div>
+
+        {feature.gerencia_produtos && (
+          <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+            <Package className="w-3 h-3" />
+            <span>{feature.product_count || 0} produtos vinculados</span>
+          </div>
+        )}
 
         {feature.requer_features.length > 0 && (
           <div className="mt-2 text-xs text-muted-foreground">

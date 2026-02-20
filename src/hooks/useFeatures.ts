@@ -19,9 +19,12 @@ export interface Feature {
   roles_permitidas: string[];
   requer_features: string[];
   metadata: Record<string, any>;
+  gerencia_produtos: boolean;
+  limite_produtos: number | null;
   created_at: string;
   updated_at: string;
   user_count?: number;
+  product_count?: number;
 }
 
 export const useFeatures = () => {
@@ -40,13 +43,21 @@ export const useFeatures = () => {
 
       if (error) throw error;
 
-      // Get user count for each feature
+      // Get user count and product count for each feature
       const featuresWithCount = await Promise.all(
         (data || []).map(async (feature) => {
           const { data: count } = await supabase.rpc('get_feature_user_count', {
             _feature_id: feature.id,
           });
-          return { ...feature, user_count: count || 0 };
+          let productCount = 0;
+          if (feature.gerencia_produtos) {
+            const { count: pCount } = await supabase
+              .from('feature_produtos')
+              .select('*', { count: 'exact', head: true })
+              .eq('feature_id', feature.id);
+            productCount = pCount || 0;
+          }
+          return { ...feature, user_count: count || 0, product_count: productCount };
         })
       );
 
@@ -72,6 +83,8 @@ export const useFeatures = () => {
             trial_dias: feature.trial_dias,
             ativo: feature.ativo,
             visivel_catalogo: feature.visivel_catalogo,
+            gerencia_produtos: feature.gerencia_produtos,
+            limite_produtos: feature.limite_produtos,
           })
           .eq('id', feature.id)
           .select()
@@ -95,6 +108,8 @@ export const useFeatures = () => {
             trial_dias: feature.trial_dias,
             ativo: feature.ativo,
             visivel_catalogo: feature.visivel_catalogo,
+            gerencia_produtos: feature.gerencia_produtos,
+            limite_produtos: feature.limite_produtos,
           })
           .select()
           .single();
