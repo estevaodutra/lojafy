@@ -1,37 +1,30 @@
 
 
-## Corrigir Acesso ao Gerenciamento de Produtos
+## Corrigir Validacao do Campo Slug
 
 ### Problema
 
-A tabela `feature_produtos` e as colunas `gerencia_produtos`/`limite_produtos` foram criadas no banco, mas o cache do PostgREST (API do Supabase) nao foi recarregado apos a migracao. Isso faz com que as operacoes de salvar esses novos campos falhem silenciosamente -- por isso, mesmo apos ativar "Gerencia Produtos" e salvar, o valor nao persiste no banco.
+O campo Slug no formulario de features usa a regex `^[a-z_]+$`, que permite apenas letras minusculas e underscores. Slugs com numeros (como `top_10_produtos`) sao rejeitados pela validacao.
 
 ### Solucao
 
-Executar o comando SQL abaixo para forcar o PostgREST a reconhecer as novas colunas e tabela:
-
-```text
-NOTIFY pgrst, 'reload schema';
-```
-
-Isso sera feito via uma migracao SQL simples.
+Alterar a regex de validacao do slug no `FeatureFormModal.tsx` para `^[a-z0-9_]+$`, permitindo letras minusculas, numeros e underscores.
 
 ### Alteracao
 
-**Arquivo: Nova migracao SQL**
-- Criar migracao contendo apenas `NOTIFY pgrst, 'reload schema';`
-- Apos aplicada, o PostgREST passara a reconhecer `gerencia_produtos`, `limite_produtos` na tabela `features` e a tabela `feature_produtos`
-
-### Resultado esperado
-
-1. O superadmin salva a feature com "Gerencia Produtos" ativado -- o valor persiste no banco
-2. O card da feature mostra "X produtos vinculados"
-3. O menu exibe a opcao "Gerenciar Produtos"
-4. Ao clicar, o modal abre e permite buscar/adicionar/reordenar produtos
+**Arquivo: `src/components/admin/FeatureFormModal.tsx`**
+- Linha do schema zod: trocar `^[a-z_]+$` por `^[a-z0-9_]+$`
+- Atualizar mensagem de erro para "Apenas letras minusculas, numeros e underscores"
 
 ### Secao Tecnica
 
-- Nenhuma alteracao de codigo frontend necessaria
-- Apenas 1 migracao SQL com `NOTIFY pgrst, 'reload schema'`
-- Causa raiz: PostgREST mantem cache do schema e nao detecta automaticamente novas colunas/tabelas criadas por DDL
+Alteracao de 1 linha no schema de validacao zod:
+
+```text
+// De:
+slug: z.string().min(1, '...').regex(/^[a-z_]+$/, 'Apenas letras minúsculas e underscores')
+
+// Para:
+slug: z.string().min(1, '...').regex(/^[a-z0-9_]+$/, 'Apenas letras minúsculas, números e underscores')
+```
 
