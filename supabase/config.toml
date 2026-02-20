@@ -197,3 +197,6 @@ verify_jwt = false
 
 [functions.get-ml-integration]
 verify_jwt = false
+
+[functions.clone-advertise-proxy]
+verify_jwt = false

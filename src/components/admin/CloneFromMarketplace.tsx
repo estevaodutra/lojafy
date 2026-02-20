@@ -153,24 +153,17 @@ export function CloneFromMarketplace({ product, onCloneSuccess }: CloneFromMarke
         requested_at: new Date().toISOString(),
       };
 
-      const response = await fetch(
-        "https://n8n-n8n.nuwfic.easypanel.host/webhook/clone_advertise",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      );
+      const { data, error: invokeError } = await supabase.functions.invoke("clone-advertise-proxy", {
+        body: payload,
+      });
 
-      if (!response.ok) {
-        throw new Error("Erro ao enviar para processamento");
+      if (invokeError) {
+        throw new Error(invokeError.message || "Erro ao enviar para processamento");
       }
 
       if (waitForResponse) {
-        const result = await response.json();
-
         // Resposta vem como array - extrair primeiro item
-        const item = Array.isArray(result) ? result[0] : result;
+        const item = Array.isArray(data) ? data[0] : data;
         const isSuccess = item?.success === true;
         const productData = item?.data || item?.product;
 
