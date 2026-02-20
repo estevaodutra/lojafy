@@ -54,7 +54,8 @@ export const useFeatures = () => {
             const { count: pCount } = await supabase
               .from('feature_produtos')
               .select('*', { count: 'exact', head: true })
-              .eq('feature_id', feature.id);
+              .eq('feature_id', feature.id)
+              .eq('ativo', true);
             productCount = pCount || 0;
           }
           return { ...feature, user_count: count || 0, product_count: productCount };

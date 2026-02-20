@@ -76,6 +76,7 @@ export const useFeatureProducts = (featureId: string | null) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feature-products', featureId] });
+      queryClient.invalidateQueries({ queryKey: ['features'] });
       toast({ title: 'Sucesso', description: 'Produtos adicionados!' });
     },
     onError: (error) => {
@@ -90,6 +91,7 @@ export const useFeatureProducts = (featureId: string | null) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feature-products', featureId] });
+      queryClient.invalidateQueries({ queryKey: ['features'] });
       toast({ title: 'Sucesso', description: 'Produto removido!' });
     },
   });
