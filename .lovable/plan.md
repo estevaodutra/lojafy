@@ -1,43 +1,44 @@
 
 
-## Corrigir parsing da resposta de clonagem
+## Corrigir erro na clonagem - problema de CORS ou parsing da resposta
 
 ### Problema
 
-A resposta do webhook retorna um **array** com objetos no formato `[{ success: true, data: {...} }]`, mas o codigo atual espera um objeto simples `{ success: true, product: {...} }`. Isso faz com que a clonagem nunca seja reconhecida como sucesso.
+O webhook do n8n respondeu com sucesso, mas o frontend mostra "Erro ao processar clonagem". Isso acontece porque a chamada `fetch` e feita diretamente do navegador para o n8n (`https://n8n-n8n.nuwfic.easypanel.host/webhook/clone_advertise`), o que causa erro de CORS - o navegador bloqueia a leitura da resposta mesmo que o servidor tenha processado o request.
+
+Este e o mesmo problema que ja foi resolvido para a publicacao no Mercado Livre com a Edge Function `ml-publish-proxy`.
 
 ### Solucao
 
-Alterar o parsing da resposta (linhas 170-179) para:
+Criar uma Edge Function proxy (`clone-advertise-proxy`) que encaminha o payload para o webhook do n8n, contornando a restricao de CORS. O frontend chamara a Edge Function em vez do n8n diretamente.
 
-1. Detectar se a resposta e um array e extrair o primeiro elemento
-2. Verificar `item.success` em vez de `result.success`
-3. Passar `item.data` (o produto atualizado) para `onCloneSuccess()` em vez de `result.product`
+### Alteracoes
 
-### Alteracao
+**1. Nova Edge Function: `supabase/functions/clone-advertise-proxy/index.ts`**
 
-**Arquivo: `src/components/admin/CloneFromMarketplace.tsx`** (linhas 170-179)
+- Recebe o payload do frontend via POST
+- Encaminha para `https://n8n-n8n.nuwfic.easypanel.host/webhook/clone_advertise`
+- Retorna a resposta do n8n para o frontend
+- Inclui headers CORS adequados
+- Sem verificacao JWT (mesmo padrao do `ml-publish-proxy`)
 
-Substituir o bloco de parsing por:
+**2. Modificar: `src/components/admin/CloneFromMarketplace.tsx`**
 
-```typescript
-const result = await response.json();
+- Trocar a chamada `fetch` direta ao n8n (linha 156-163) por `supabase.functions.invoke("clone-advertise-proxy", { body: payload })`
+- Ajustar o parsing da resposta para funcionar com o retorno da Edge Function
 
-// Resposta vem como array - extrair primeiro item
-const item = Array.isArray(result) ? result[0] : result;
-const isSuccess = item?.success === true;
-const productData = item?.data || item?.product;
+**3. Atualizar: `supabase/config.toml`**
 
-if (isSuccess) {
-  setCloneResult({ success: true, message: "Produto clonado com sucesso!" });
-  toast.success("Produto clonado com sucesso!", { description: "Os dados foram atualizados." });
-  onCloneSuccess?.(productData);
-} else {
-  const errorMsg = item?.error || item?.message || "Erro ao clonar produto";
-  setCloneResult({ success: false, message: errorMsg });
-  toast.error("Erro ao clonar produto", { description: errorMsg });
-}
-```
+- Registrar a nova funcao `clone-advertise-proxy` com `verify_jwt = false`
 
-Isso garante compatibilidade tanto com o formato array `[{success, data}]` quanto com o formato objeto `{success, product}`.
+### Secao Tecnica
+
+**Fluxo corrigido:**
+1. Frontend envia payload para Edge Function `clone-advertise-proxy`
+2. Edge Function encaminha para webhook n8n (server-to-server, sem CORS)
+3. n8n processa e retorna resposta
+4. Edge Function retorna resposta para o frontend
+5. Frontend faz parsing do resultado normalmente
+
+A Edge Function seguira o mesmo padrao simples do `ml-publish-proxy` existente - proxy puro sem autenticacao.
 
