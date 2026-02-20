@@ -30,7 +30,7 @@ import { Switch } from '@/components/ui/switch';
 import { Feature } from '@/hooks/useFeatures';
 
 const formSchema = z.object({
-  slug: z.string().min(1, 'Slug é obrigatório').regex(/^[a-z_]+$/, 'Apenas letras minúsculas e underscores'),
+  slug: z.string().min(1, 'Slug é obrigatório').regex(/^[a-z0-9_]+$/, 'Apenas letras minúsculas, números e underscores'),
   nome: z.string().min(1, 'Nome é obrigatório'),
   descricao: z.string().optional(),
   icone: z.string().default('Sparkles'),
