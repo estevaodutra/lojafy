@@ -1,19 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Calculator, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
+import { Calculator } from 'lucide-react';
 import { CatalogProduct } from '@/hooks/useResellerCatalog';
 
-const TAXAS_ML = {
-  classico: 0.14,
-  premium: 0.19,
-} as const;
-
-type TipoAnuncio = keyof typeof TAXAS_ML;
+const TAXAS_ML = { classico: 0.14, premium: 0.19 } as const;
+const MARGENS_REF = [10, 15, 20, 25, 30, 35, 40];
 
 interface ProductCalculatorModalProps {
   product: CatalogProduct | null;
@@ -22,70 +17,60 @@ interface ProductCalculatorModalProps {
   onAddToStore: (productId: string, customPrice: number) => void;
 }
 
+type TipoAnuncio = 'classico' | 'premium';
+
+interface PrecoSelecionado {
+  preco: number;
+  tipo: TipoAnuncio;
+  margem: number;
+}
+
 export const ProductCalculatorModal: React.FC<ProductCalculatorModalProps> = ({
   product,
   isOpen,
   onClose,
   onAddToStore,
 }) => {
-  const [customPrice, setCustomPrice] = useState<string>('');
   const [desiredMargin, setDesiredMargin] = useState<string>('30');
-  const [tipoAnuncio, setTipoAnuncio] = useState<TipoAnuncio>('classico');
-
-  useEffect(() => {
-    if (product && isOpen) {
-      const suggestedPrice = product.original_price || product.price;
-      setCustomPrice(suggestedPrice.toString());
-    }
-  }, [product, isOpen]);
+  const [precoSelecionado, setPrecoSelecionado] = useState<PrecoSelecionado | null>(null);
 
   if (!product) return null;
 
   const costPrice = product.cost_price || 0;
-  const currentPrice = parseFloat(customPrice) || 0;
   const marginPercent = parseFloat(desiredMargin) || 0;
-  const taxaML = TAXAS_ML[tipoAnuncio];
+  const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
-  // Cálculos com taxa ML
-  const valorTaxa = currentPrice * taxaML;
-  const lucroReal = currentPrice - costPrice - valorTaxa;
-  const margemReal = currentPrice > 0 ? (lucroReal / currentPrice) * 100 : 0;
-
-  const calcularPrecoMinimo = (margem: number): number => {
-    const divisor = 1 - taxaML - margem / 100;
+  const calcularPrecoMinimo = (margem: number, taxa: number): number => {
+    const divisor = 1 - taxa - margem / 100;
     if (divisor <= 0) return Infinity;
     return costPrice / divisor;
   };
 
-  const precoMinimo = calcularPrecoMinimo(marginPercent);
+  const calcularLucro = (preco: number, taxa: number): number => {
+    return preco - costPrice - preco * taxa;
+  };
 
-  const handleCalculateFromMargin = () => {
-    if (isFinite(precoMinimo) && precoMinimo > 0) {
-      setCustomPrice((Math.ceil(precoMinimo * 100) / 100).toFixed(2));
+  const handleSelectCell = (margem: number, tipo: TipoAnuncio) => {
+    const taxa = TAXAS_ML[tipo];
+    const preco = calcularPrecoMinimo(margem, taxa);
+    if (isFinite(preco)) {
+      setPrecoSelecionado({ preco: Math.ceil(preco * 100) / 100, tipo, margem });
     }
   };
 
   const handleAddToStore = () => {
-    if (currentPrice > 0) {
-      onAddToStore(product.id, currentPrice);
+    if (precoSelecionado) {
+      onAddToStore(product.id, precoSelecionado.preco);
       onClose();
     }
   };
 
-  const getStatus = () => {
-    if (lucroReal < 0) return { label: '❌ Prejuízo', color: 'text-red-600' };
-    if (margemReal < 10) return { label: '⚠️ Margem baixa', color: 'text-red-600' };
-    if (margemReal < 20) return { label: '✅ Margem OK', color: 'text-yellow-600' };
-    return { label: '🚀 Margem ótima', color: 'text-green-600' };
-  };
-
-  const status = getStatus();
-  const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
-  const margensRef = [10, 15, 20, 25, 30, 35, 40];
+  const precoMinClassico = calcularPrecoMinimo(marginPercent, TAXAS_ML.classico);
+  const precoMinPremium = calcularPrecoMinimo(marginPercent, TAXAS_ML.premium);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calculator className="h-5 w-5" />
@@ -123,132 +108,113 @@ export const ProductCalculatorModal: React.FC<ProductCalculatorModalProps> = ({
             </div>
           </div>
 
-          {/* Tipo de Anúncio */}
+          {/* Margem Desejada */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Tipo de Anúncio (Mercado Livre)</Label>
-            <Select value={tipoAnuncio} onValueChange={(v) => setTipoAnuncio(v as TipoAnuncio)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="classico">Clássico — Taxa 14%</SelectItem>
-                <SelectItem value="premium">Premium — Taxa 19%</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label htmlFor="desired-margin" className="text-sm font-medium">Margem Desejada</Label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Input
+                  id="desired-margin"
+                  type="number"
+                  step="1"
+                  min="0"
+                  max="80"
+                  value={desiredMargin}
+                  onChange={(e) => setDesiredMargin(e.target.value)}
+                  placeholder="0"
+                  className="pr-8"
+                />
+                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground">%</span>
+              </div>
+              <Button type="button" variant="outline" className="px-4">
+                Calcular
+              </Button>
+            </div>
+            {marginPercent > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Clássico: {isFinite(precoMinClassico) ? fmt(precoMinClassico) : '—'} | Premium: {isFinite(precoMinPremium) ? fmt(precoMinPremium) : '—'}
+              </p>
+            )}
           </div>
 
-          {/* Calculadora */}
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="custom-price" className="text-sm font-medium">Preço de Venda</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground">R$</span>
-                  <Input
-                    id="custom-price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={customPrice}
-                    onChange={(e) => setCustomPrice(e.target.value)}
-                    placeholder="0,00"
-                    className="pl-8"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="desired-margin" className="text-sm font-medium">Margem Desejada</Label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Input
-                      id="desired-margin"
-                      type="number"
-                      step="1"
-                      min="0"
-                      max="80"
-                      value={desiredMargin}
-                      onChange={(e) => setDesiredMargin(e.target.value)}
-                      placeholder="0"
-                      className="pr-8"
-                    />
-                    <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground">%</span>
-                  </div>
-                  <Button type="button" variant="outline" onClick={handleCalculateFromMargin} className="px-4">
-                    Calcular
-                  </Button>
-                </div>
-                {isFinite(precoMinimo) && precoMinimo > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Preço mínimo para {marginPercent}%: {fmt(precoMinimo)}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Resultado */}
-            <div className="p-4 bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg border space-y-3">
-              <h4 className="font-semibold flex items-center gap-2">💰 Resultado</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between p-1.5 bg-background/50 rounded">
-                  <span className="text-muted-foreground">Taxa ML ({(taxaML * 100).toFixed(0)}%):</span>
-                  <span className="font-medium text-red-500">- {fmt(valorTaxa)}</span>
-                </div>
-                <div className="flex justify-between p-1.5 bg-background/50 rounded">
-                  <span className="text-muted-foreground">Custo:</span>
-                  <span className="font-medium">- {fmt(costPrice)}</span>
-                </div>
-                <div className="border-t my-1" />
-                <div className="flex justify-between p-1.5 bg-background/50 rounded">
-                  <span className="text-muted-foreground">Lucro:</span>
-                  <span className={`font-bold text-lg ${lucroReal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {fmt(lucroReal)}
-                  </span>
-                </div>
-                <div className="flex justify-between p-1.5 bg-background/50 rounded">
-                  <span className="text-muted-foreground">Margem:</span>
-                  <span className={`font-bold text-lg ${status.color}`}>
-                    {margemReal.toFixed(1)}%
-                  </span>
-                </div>
-                <div className="text-xs text-center pt-1 border-t">
-                  <span className={status.color}>{status.label}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Tabela de Referência */}
+          {/* Tabela Comparativa */}
           <div className="space-y-2">
-            <h4 className="text-sm font-medium text-muted-foreground">Tabela de Referência ({tipoAnuncio === 'classico' ? 'Clássico 14%' : 'Premium 19%'})</h4>
+            <h4 className="text-sm font-medium text-muted-foreground">Tabela de Referência</h4>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="h-8 text-xs">Margem</TableHead>
-                  <TableHead className="h-8 text-xs">Preço Mín.</TableHead>
+                  <TableHead rowSpan={2} className="h-8 text-xs align-middle">Margem</TableHead>
+                  <TableHead colSpan={2} className="h-8 text-xs text-center border-l">Clássico (14%)</TableHead>
+                  <TableHead colSpan={2} className="h-8 text-xs text-center border-l">Premium (19%)</TableHead>
+                </TableRow>
+                <TableRow>
+                  <TableHead className="h-8 text-xs border-l">Preço</TableHead>
+                  <TableHead className="h-8 text-xs">Lucro</TableHead>
+                  <TableHead className="h-8 text-xs border-l">Preço</TableHead>
                   <TableHead className="h-8 text-xs">Lucro</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {margensRef.map((m) => {
-                  const pm = calcularPrecoMinimo(m);
-                  const lucro = isFinite(pm) ? pm - costPrice - pm * taxaML : 0;
+                {MARGENS_REF.map((m) => {
+                  const pcClass = calcularPrecoMinimo(m, TAXAS_ML.classico);
+                  const lcClass = isFinite(pcClass) ? calcularLucro(pcClass, TAXAS_ML.classico) : 0;
+                  const pcPrem = calcularPrecoMinimo(m, TAXAS_ML.premium);
+                  const lcPrem = isFinite(pcPrem) ? calcularLucro(pcPrem, TAXAS_ML.premium) : 0;
+
+                  const selClass = precoSelecionado?.margem === m && precoSelecionado?.tipo === 'classico';
+                  const selPrem = precoSelecionado?.margem === m && precoSelecionado?.tipo === 'premium';
+
                   return (
                     <TableRow key={m} className="text-xs">
-                      <TableCell className="py-1.5">{m}%</TableCell>
-                      <TableCell className="py-1.5">{isFinite(pm) ? fmt(pm) : '—'}</TableCell>
-                      <TableCell className="py-1.5">{isFinite(pm) ? fmt(lucro) : '—'}</TableCell>
+                      <TableCell className="py-1.5 font-medium">{m}%</TableCell>
+                      <TableCell
+                        className={`py-1.5 border-l cursor-pointer transition-colors hover:bg-primary/5 ${selClass ? 'bg-primary/10 ring-2 ring-primary ring-inset font-bold' : ''}`}
+                        onClick={() => handleSelectCell(m, 'classico')}
+                      >
+                        {isFinite(pcClass) ? fmt(pcClass) : '—'}
+                      </TableCell>
+                      <TableCell
+                        className={`py-1.5 cursor-pointer transition-colors hover:bg-primary/5 ${selClass ? 'bg-primary/10 ring-2 ring-primary ring-inset font-bold' : ''}`}
+                        onClick={() => handleSelectCell(m, 'classico')}
+                      >
+                        {isFinite(pcClass) ? fmt(lcClass) : '—'}
+                      </TableCell>
+                      <TableCell
+                        className={`py-1.5 border-l cursor-pointer transition-colors hover:bg-primary/5 ${selPrem ? 'bg-primary/10 ring-2 ring-primary ring-inset font-bold' : ''}`}
+                        onClick={() => handleSelectCell(m, 'premium')}
+                      >
+                        {isFinite(pcPrem) ? fmt(pcPrem) : '—'}
+                      </TableCell>
+                      <TableCell
+                        className={`py-1.5 cursor-pointer transition-colors hover:bg-primary/5 ${selPrem ? 'bg-primary/10 ring-2 ring-primary ring-inset font-bold' : ''}`}
+                        onClick={() => handleSelectCell(m, 'premium')}
+                      >
+                        {isFinite(pcPrem) ? fmt(lcPrem) : '—'}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
+            <p className="text-xs text-muted-foreground text-center">Clique em uma célula para selecionar o preço</p>
           </div>
+
+          {/* Seleção */}
+          {precoSelecionado && (
+            <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Selecionado:</span>
+                <span className="font-bold text-primary">
+                  {fmt(precoSelecionado.preco)} ({precoSelecionado.tipo === 'classico' ? 'Clássico' : 'Premium'} — {precoSelecionado.margem}%)
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex gap-3">
             <Button variant="outline" onClick={onClose} className="flex-1">Cancelar</Button>
-            <Button onClick={handleAddToStore} disabled={!currentPrice || currentPrice <= 0} className="flex-1">
+            <Button onClick={handleAddToStore} disabled={!precoSelecionado} className="flex-1">
               {product.isInMyStore ? 'Atualizar Preço' : 'Adicionar à Loja'}
             </Button>
           </div>
