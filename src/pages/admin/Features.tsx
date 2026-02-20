@@ -13,6 +13,7 @@ import {
 import { useFeatures, Feature } from '@/hooks/useFeatures';
 import { FeatureCard } from '@/components/admin/FeatureCard';
 import { FeatureFormModal } from '@/components/admin/FeatureFormModal';
+import { FeatureProductsModal } from '@/components/admin/FeatureProductsModal';
 
 const categoryLabels: Record<string, string> = {
   loja: '🏪 Loja',
@@ -35,6 +36,7 @@ const Features: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [productsModalFeature, setProductsModalFeature] = useState<Feature | null>(null);
 
   const handleEdit = (feature: Feature) => {
     setEditingFeature(feature);
@@ -52,6 +54,10 @@ const Features: React.FC = () => {
 
   const handleToggleActive = (id: string, ativo: boolean) => {
     toggleFeatureActive.mutate({ id, ativo });
+  };
+
+  const handleManageProducts = (feature: Feature) => {
+    setProductsModalFeature(feature);
   };
 
   // Filter features
@@ -214,6 +220,7 @@ const Features: React.FC = () => {
                   feature={feature}
                   onEdit={handleEdit}
                   onToggleActive={handleToggleActive}
+                  onManageProducts={handleManageProducts}
                 />
               ))}
             </div>
@@ -237,6 +244,14 @@ const Features: React.FC = () => {
         feature={editingFeature}
         onSave={handleSave}
       />
+
+      {productsModalFeature && (
+        <FeatureProductsModal
+          isOpen={!!productsModalFeature}
+          onClose={() => setProductsModalFeature(null)}
+          feature={productsModalFeature}
+        />
+      )}
     </div>
   );
 };

@@ -1125,6 +1125,76 @@ export type Database = {
           },
         ]
       }
+      feature_produtos: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          feature_id: string
+          id: string
+          ordem: number
+          produto_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          feature_id: string
+          id?: string
+          ordem?: number
+          produto_id: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          feature_id?: string
+          id?: string
+          ordem?: number
+          produto_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feature_produtos_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "features"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feature_produtos_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feature_produtos_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_mercadolivre"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "feature_produtos_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_needs_enrichment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feature_produtos_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_attributes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feature_produtos_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "v_products_with_marketplace"
+            referencedColumns: ["product_id"]
+          },
+        ]
+      }
       feature_transactions: {
         Row: {
           created_at: string | null
@@ -1208,8 +1278,10 @@ export type Database = {
           categoria: string
           created_at: string | null
           descricao: string | null
+          gerencia_produtos: boolean | null
           icone: string | null
           id: string
+          limite_produtos: number | null
           metadata: Json | null
           nome: string
           ordem_exibicao: number | null
@@ -1228,8 +1300,10 @@ export type Database = {
           categoria?: string
           created_at?: string | null
           descricao?: string | null
+          gerencia_produtos?: boolean | null
           icone?: string | null
           id?: string
+          limite_produtos?: number | null
           metadata?: Json | null
           nome: string
           ordem_exibicao?: number | null
@@ -1248,8 +1322,10 @@ export type Database = {
           categoria?: string
           created_at?: string | null
           descricao?: string | null
+          gerencia_produtos?: boolean | null
           icone?: string | null
           id?: string
+          limite_produtos?: number | null
           metadata?: Json | null
           nome?: string
           ordem_exibicao?: number | null

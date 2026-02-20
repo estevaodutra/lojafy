@@ -42,6 +42,8 @@ const formSchema = z.object({
   trial_dias: z.number().default(0),
   ativo: z.boolean().default(true),
   visivel_catalogo: z.boolean().default(false),
+  gerencia_produtos: z.boolean().default(false),
+  limite_produtos: z.number().nullable().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -92,6 +94,8 @@ export const FeatureFormModal: React.FC<FeatureFormModalProps> = ({
       trial_dias: 0,
       ativo: true,
       visivel_catalogo: false,
+      gerencia_produtos: false,
+      limite_produtos: null,
     },
   });
 
@@ -110,6 +114,8 @@ export const FeatureFormModal: React.FC<FeatureFormModalProps> = ({
         trial_dias: feature.trial_dias,
         ativo: feature.ativo,
         visivel_catalogo: feature.visivel_catalogo,
+        gerencia_produtos: feature.gerencia_produtos,
+        limite_produtos: feature.limite_produtos,
       });
     } else {
       form.reset({
@@ -125,6 +131,8 @@ export const FeatureFormModal: React.FC<FeatureFormModalProps> = ({
         trial_dias: 0,
         ativo: true,
         visivel_catalogo: false,
+        gerencia_produtos: false,
+        limite_produtos: null,
       });
     }
   }, [feature, form]);
@@ -402,7 +410,48 @@ export const FeatureFormModal: React.FC<FeatureFormModalProps> = ({
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="gerencia_produtos"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-2">
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormLabel className="!mt-0">Gerencia Produtos</FormLabel>
+                  </FormItem>
+                )}
+              />
             </div>
+
+            {form.watch('gerencia_produtos') && (
+              <FormField
+                control={form.control}
+                name="limite_produtos"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Limite de Produtos (vazio = ilimitado)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        value={field.value ?? ''}
+                        onChange={(e) =>
+                          field.onChange(
+                            e.target.value ? parseInt(e.target.value) : null
+                          )
+                        }
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div className="flex justify-end gap-2 pt-4">
               <Button type="button" variant="outline" onClick={onClose}>
