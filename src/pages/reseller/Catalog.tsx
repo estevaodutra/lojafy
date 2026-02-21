@@ -431,10 +431,12 @@ const ResellerCatalog = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {products.map((product) => {
             const suggestedPrice = getSuggestedPrice(product);
-            const margin = product.cost_price ? calculateMargin(product.cost_price, suggestedPrice) : 0;
+            const resellerCost = product.price; // Preco definido pelo super admin = custo do revendedor
+            const suggestedPriceVal = suggestedPrice;
+            const margin = resellerCost ? calculateMargin(resellerCost, suggestedPriceVal) : 0;
             const displayPrice = product.isInMyStore && product.myStorePrice ? product.myStorePrice : suggestedPrice;
             const taxaML = displayPrice * TAXA_ML;
-            const lucro = displayPrice - (product.cost_price || 0) - taxaML;
+            const lucro = displayPrice - resellerCost - taxaML;
 
             const productImages = product.images?.length > 0 
               ? product.images.slice(0, 4) 
@@ -508,7 +510,7 @@ const ResellerCatalog = () => {
                     <div>
                       <p className="text-muted-foreground text-xs">Custo</p>
                       <p className="font-medium">
-                        {product.cost_price ? `R$ ${product.cost_price.toFixed(2)}` : 'N/A'}
+                        R$ {resellerCost.toFixed(2)}
                       </p>
                     </div>
                     <div>
@@ -532,7 +534,7 @@ const ResellerCatalog = () => {
                             </p>
                             <div className="text-xs space-y-0.5">
                               <p>Preço: R$ {displayPrice.toFixed(2)}</p>
-                              <p>- Custo: R$ {(product.cost_price || 0).toFixed(2)}</p>
+                              <p>- Custo: R$ {resellerCost.toFixed(2)}</p>
                               <p>- Taxa ML: R$ {taxaML.toFixed(2)}</p>
                               <Separator className="my-1" />
                               <p className="font-semibold">= Lucro: R$ {lucro.toFixed(2)}</p>
