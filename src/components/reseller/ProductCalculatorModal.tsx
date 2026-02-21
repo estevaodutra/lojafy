@@ -37,7 +37,6 @@ export const ProductCalculatorModal: React.FC<ProductCalculatorModalProps> = ({
   if (!product) return null;
 
   const costPrice = product.price; // Preço definido pelo admin = custo do revendedor
-  const suggestedPrice = costPrice * 1.30; // 30% de margem
   const marginPercent = parseFloat(desiredMargin) || 0;
   const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
@@ -46,6 +45,8 @@ export const ProductCalculatorModal: React.FC<ProductCalculatorModalProps> = ({
     if (divisor <= 0) return Infinity;
     return costPrice / divisor;
   };
+
+  const suggestedPrice = calcularPrecoMinimo(30, TAXAS_ML.classico);
 
   const calcularLucro = (preco: number, taxa: number): number => {
     return preco - costPrice - preco * taxa;
