@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -281,7 +282,7 @@ export default function CourseViewer() {
                 <Card>
                   <CardContent className="p-6">
                     {currentLesson?.content ? (
-                      <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: currentLesson.content }} />
+                      <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentLesson.content) }} />
                     ) : (
                       <p className="text-muted-foreground text-center py-8">
                         Nenhuma descrição disponível
