@@ -97,7 +97,7 @@ const Hero = () => {
       return (
         <section className="relative overflow-hidden py-4">
           <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
-            <div className="w-full aspect-[4/5] md:aspect-[8/3] rounded-lg overflow-hidden bg-muted">
+            <div className="w-full md:aspect-[8/3] rounded-lg overflow-hidden bg-muted">
               <picture>
                 {banner.mobile_image_url && (
                   <source 
@@ -108,7 +108,7 @@ const Hero = () => {
                 <img
                   src={banner.image_url}
                   alt="Banner"
-                  className="w-full h-full object-contain md:object-cover"
+                  className="w-full h-auto md:h-full md:object-cover"
                 />
               </picture>
             </div>
@@ -211,7 +211,7 @@ const Hero = () => {
                 <CarouselItem key={banner.id}>
                   <div className="py-4">
                     <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
-                      <div className="w-full aspect-[4/5] md:aspect-[8/3] rounded-lg overflow-hidden bg-muted">
+                      <div className="w-full md:aspect-[8/3] rounded-lg overflow-hidden bg-muted">
                         <picture>
                           {banner.mobile_image_url && (
                             <source 
@@ -222,7 +222,7 @@ const Hero = () => {
                           <img
                             src={banner.image_url}
                             alt="Banner"
-                            className="w-full h-full object-cover"
+                            className="w-full h-auto md:h-full md:object-cover"
                           />
                         </picture>
                       </div>
