@@ -1,26 +1,39 @@
 
-## Corrigir Espaco em Branco no Banner Mobile
+
+## Ajustar Container do Banner Mobile ao Tamanho da Imagem
 
 ### Problema
 
-No componente `Hero.tsx`, quando ha apenas 1 banner (sem carousel), a imagem no mobile usa `object-contain` ao inves de `object-cover`. Isso faz com que a imagem encolha para caber dentro do container 4:5, deixando grandes areas em branco acima e abaixo.
-
-O carousel (multiplos banners) ja usa `object-cover` corretamente na linha 225.
+O container do banner mobile tem um aspect ratio fixo (`aspect-[4/5]`) e a imagem usa `object-contain`, o que cria espaco em branco ao redor quando a imagem e menor que o container. O usuario nao quer esticar a imagem para preencher -- quer que o container se ajuste ao tamanho real da imagem.
 
 ### Correcao
 
-**Arquivo:** `src/components/Hero.tsx` (linha 111)
+**Arquivo:** `src/components/Hero.tsx`
 
-Trocar `object-contain` por `object-cover` para que a imagem preencha todo o container no mobile, igual ao carousel:
+1. **Banner unico (linha 100):** Remover o aspect ratio fixo no mobile e deixar a imagem definir a altura naturalmente. Manter o aspect ratio no desktop.
 
 ```
-// ANTES (linha 111):
-className="w-full h-full object-contain md:object-cover"
+// ANTES:
+<div className="w-full aspect-[4/5] md:aspect-[8/3] rounded-lg overflow-hidden bg-muted">
+  <img className="w-full h-full object-contain md:object-cover" />
 
 // DEPOIS:
-className="w-full h-full object-cover"
+<div className="w-full md:aspect-[8/3] rounded-lg overflow-hidden bg-muted">
+  <img className="w-full h-auto md:h-full md:object-cover" />
+```
+
+2. **Carousel (linhas ~218-230):** Aplicar a mesma logica nos slides do carousel com banner tipo imagem.
+
+```
+// ANTES:
+<div className="w-full aspect-[4/5] md:aspect-[8/3] rounded-lg overflow-hidden bg-muted">
+  <img className="w-full h-full object-cover" />
+
+// DEPOIS:
+<div className="w-full md:aspect-[8/3] rounded-lg overflow-hidden bg-muted">
+  <img className="w-full h-auto md:h-full md:object-cover" />
 ```
 
 ### Resultado
 
-A imagem do banner mobile preenchera todo o container sem espacos em branco, consistente com o comportamento do carousel.
+No mobile, o container vai se ajustar ao tamanho real da imagem, eliminando o espaco em branco. No desktop, o aspect ratio 8:3 continua sendo mantido.
