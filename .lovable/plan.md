@@ -1,40 +1,26 @@
 
-
-## Corrigir Preco Sugerido no Card do Catalogo
+## Corrigir Espaco em Branco no Banner Mobile
 
 ### Problema
 
-O card do catalogo usa `calculatePrice(product.price, 30)` que faz um markup simples (`custo * 1.30 = R$ 12,99`). A calculadora usa `calcularPrecoMinimo(30, 0.14)` que considera a taxa do ML (`custo / (1 - 0.14 - 0.30) = R$ 17,84`). Os dois precisam usar a mesma formula.
+No componente `Hero.tsx`, quando ha apenas 1 banner (sem carousel), a imagem no mobile usa `object-contain` ao inves de `object-cover`. Isso faz com que a imagem encolha para caber dentro do container 4:5, deixando grandes areas em branco acima e abaixo.
+
+O carousel (multiplos banners) ja usa `object-cover` corretamente na linha 225.
 
 ### Correcao
 
-**Arquivo:** `src/hooks/useResellerCatalog.ts`
+**Arquivo:** `src/components/Hero.tsx` (linha 111)
 
-Atualizar a funcao `getSuggestedPrice` (linhas 261-267) para usar a formula que considera a taxa do Mercado Livre Classico (14%):
+Trocar `object-contain` por `object-cover` para que a imagem preencha todo o container no mobile, igual ao carousel:
 
-```typescript
-// ANTES:
-const getSuggestedPrice = (product: CatalogProduct): number => {
-  if (product.price) {
-    return calculatePrice(product.price, 30); // custo * 1.30
-  }
-  return 0;
-};
+```
+// ANTES (linha 111):
+className="w-full h-full object-contain md:object-cover"
 
 // DEPOIS:
-const TAXA_ML_CLASSICO = 0.14;
-
-const getSuggestedPrice = (product: CatalogProduct): number => {
-  if (product.price) {
-    const divisor = 1 - TAXA_ML_CLASSICO - 30 / 100;
-    if (divisor <= 0) return 0;
-    return product.price / divisor; // Mesmo calculo da calculadora
-  }
-  return 0;
-};
+className="w-full h-full object-cover"
 ```
 
 ### Resultado
 
-O "Preco Sugerido" no card e na calculadora exibirao o mesmo valor (R$ 17,84), ambos considerando a taxa de 14% do Classico e margem de 30%.
-
+A imagem do banner mobile preenchera todo o container sem espacos em branco, consistente com o comportamento do carousel.
