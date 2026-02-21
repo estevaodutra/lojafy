@@ -108,7 +108,7 @@ const Hero = () => {
                 <img
                   src={banner.image_url}
                   alt="Banner"
-                  className="w-full h-full object-contain md:object-cover"
+                  className="w-full h-full object-cover"
                 />
               </picture>
             </div>
