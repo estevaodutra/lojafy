@@ -548,7 +548,7 @@ const ResellerCatalog = () => {
 
                   {/* Explanatory message */}
                   <p className="text-xs text-muted-foreground">
-                    ⚡ O preço sugerido cobre todos os custos e taxas do ML
+                    ⚡ O preço sugerido cobre todos os custos e taxas
                   </p>
 
                   <div className="flex items-center justify-between">
