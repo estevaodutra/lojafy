@@ -1,34 +1,40 @@
 
 
-## Corrigir Formula do Preco Sugerido
+## Corrigir Preco Sugerido no Card do Catalogo
 
 ### Problema
 
-O "Preco Sugerido" usa uma formula simples de markup (`custo * 1.30 = R$ 12,99`), enquanto a tabela usa a formula correta que considera as taxas do ML (`custo / (1 - taxa - margem) = R$ 17,84`). Os dois valores deveriam ser consistentes.
-
-### Causa
-
-Na linha 39 do `ProductCalculatorModal.tsx`:
-```
-const suggestedPrice = costPrice * 1.30;
-```
-Isso e um markup simples de 30%, que nao considera as taxas do Mercado Livre. A tabela usa `calcularPrecoMinimo(30, 0.14)` que resulta em R$ 17,84.
+O card do catalogo usa `calculatePrice(product.price, 30)` que faz um markup simples (`custo * 1.30 = R$ 12,99`). A calculadora usa `calcularPrecoMinimo(30, 0.14)` que considera a taxa do ML (`custo / (1 - 0.14 - 0.30) = R$ 17,84`). Os dois precisam usar a mesma formula.
 
 ### Correcao
 
-**Arquivo:** `src/components/reseller/ProductCalculatorModal.tsx`
+**Arquivo:** `src/hooks/useResellerCatalog.ts`
 
-Substituir o calculo simples pelo calculo que considera a taxa do Classico (14%) como padrao:
+Atualizar a funcao `getSuggestedPrice` (linhas 261-267) para usar a formula que considera a taxa do Mercado Livre Classico (14%):
 
 ```typescript
 // ANTES:
-const suggestedPrice = costPrice * 1.30;
+const getSuggestedPrice = (product: CatalogProduct): number => {
+  if (product.price) {
+    return calculatePrice(product.price, 30); // custo * 1.30
+  }
+  return 0;
+};
 
 // DEPOIS:
-const suggestedPrice = calcularPrecoMinimo(30, TAXAS_ML.classico);
+const TAXA_ML_CLASSICO = 0.14;
+
+const getSuggestedPrice = (product: CatalogProduct): number => {
+  if (product.price) {
+    const divisor = 1 - TAXA_ML_CLASSICO - 30 / 100;
+    if (divisor <= 0) return 0;
+    return product.price / divisor; // Mesmo calculo da calculadora
+  }
+  return 0;
+};
 ```
 
-Isso fara o Preco Sugerido exibir R$ 17,84, consistente com a linha de 30% / Classico da tabela.
+### Resultado
 
-Obs: a funcao `calcularPrecoMinimo` ja existe no componente e e usada pela tabela, entao basta reutiliza-la. Porem ela depende de `costPrice`, que e declarado antes dela. Sera necessario mover a declaracao de `suggestedPrice` para depois da definicao de `calcularPrecoMinimo`.
+O "Preco Sugerido" no card e na calculadora exibirao o mesmo valor (R$ 17,84), ambos considerando a taxa de 14% do Classico e margem de 30%.
 
