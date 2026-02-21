@@ -258,10 +258,13 @@ export const useResellerCatalog = () => {
     return cost * (1 + marginPercent / 100);
   };
 
+  const TAXA_ML_CLASSICO = 0.14;
+
   const getSuggestedPrice = (product: CatalogProduct): number => {
-    // Margem padrão de 30% sobre o preço que o revendedor paga (product.price)
     if (product.price) {
-      return calculatePrice(product.price, 30);
+      const divisor = 1 - TAXA_ML_CLASSICO - 30 / 100;
+      if (divisor <= 0) return 0;
+      return product.price / divisor;
     }
     return 0;
   };
