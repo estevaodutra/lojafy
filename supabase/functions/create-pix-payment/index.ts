@@ -41,33 +41,28 @@ serve(async (req) => {
     
     const { amount, description, payer, orderItems, shippingAddress }: PixPaymentRequest = await req.json();
     
-    // Since verify_jwt = false, we don't require authentication but try to get user if available
-    let user = null;
-    let userId = null;
-    
+    // Authentication is required for PIX payment
     const authHeader = req.headers.get('authorization');
-    if (authHeader) {
-      try {
-        const token = authHeader.replace('Bearer ', '');
-        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
-        
-        if (!authError && authUser) {
-          user = authUser;
-          userId = authUser.id;
-          console.log('Usuário autenticado:', userId);
-        } else {
-          console.log('Token inválido ou usuário não encontrado, continuando sem autenticação');
-        }
-      } catch (authError) {
-        console.log('Erro na autenticação, continuando sem autenticação:', authError);
-      }
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required to create a payment' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
-    // Generate fallback user ID if no authentication
-    if (!userId) {
-      userId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      console.log('Usando ID de usuário temporário:', userId);
+    if (authError || !user) {
+      console.error('Authentication failed:', authError?.message);
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired authentication token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+
+    const userId = user.id;
+    console.log('Usuário autenticado:', userId);
     
     console.log('Dados recebidos:', { amount, description, payer: { ...payer, cpf: '***' } });
 
@@ -83,20 +78,18 @@ serve(async (req) => {
     // Generate unique external reference
     const externalReference = `order_${Date.now()}_${userId.substring(0, 8)}`;
     
-    // Fetch complete user profile data (only if authenticated)
+    // Fetch complete user profile data
     let profileData = null;
-    if (user) {
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
 
-      if (profileError) {
-        console.log('User profile not found, continuing without profile data:', profileError.message);
-      } else {
-        profileData = profile;
-      }
+    if (profileError) {
+      console.log('User profile not found, continuing without profile data:', profileError.message);
+    } else {
+      profileData = profile;
     }
 
     // Fetch complete product information
@@ -338,6 +331,7 @@ serve(async (req) => {
     // Create order in database with N8N response data
     const orderInsertData: any = {
       order_number: orderNumber,
+      user_id: user.id,
       total_amount: amount,
       payment_method: 'pix',
       payment_status: 'pending',
@@ -349,11 +343,6 @@ serve(async (req) => {
       external_reference: externalReference,
       payment_expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutos
     };
-
-    // Only add user_id if we have an authenticated user
-    if (user) {
-      orderInsertData.user_id = user.id;
-    }
 
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
