@@ -65,12 +65,22 @@ export const useResellerCatalog = () => {
       // If topProducts filter is active, fetch top 10 IDs first
       let topProductIds: string[] | null = null;
       if (filtersToApply.topProducts) {
-        const { data: rankingData } = await supabase
-          .from('product_ranking')
-          .select('product_id')
-          .order('position', { ascending: true })
-          .limit(10);
-        topProductIds = rankingData?.map(r => r.product_id) || [];
+        const { data: featureData } = await supabase
+          .from('features')
+          .select('id')
+          .eq('slug', 'top_10_produtos')
+          .maybeSingle();
+
+        if (featureData) {
+          const { data: featureProdutos } = await supabase
+            .from('feature_produtos')
+            .select('produto_id')
+            .eq('feature_id', featureData.id)
+            .eq('ativo', true)
+            .order('ordem', { ascending: true })
+            .limit(10);
+          topProductIds = featureProdutos?.map(r => r.produto_id) || [];
+        }
         if (topProductIds.length === 0) {
           setProducts([]);
           setTotalCount(0);
