@@ -34,9 +34,64 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Webhook Mercado Pago recebido');
+    // Validate Mercado Pago signature if secret is configured
+    const webhookSecret = Deno.env.get('MERCADO_PAGO_WEBHOOK_SECRET');
+    if (webhookSecret) {
+      const signature = req.headers.get('x-signature');
+      const requestId = req.headers.get('x-request-id');
+
+      if (!signature || !requestId) {
+        console.error('Missing x-signature or x-request-id headers');
+        return new Response('Unauthorized', { status: 401, headers: corsHeaders });
+      }
+
+      // Parse ts and hash from signature header: "ts=...,v1=..."
+      const parts: Record<string, string> = {};
+      signature.split(',').forEach(part => {
+        const [key, value] = part.split('=');
+        if (key && value) parts[key.trim()] = value.trim();
+      });
+
+      const ts = parts['ts'];
+      const v1 = parts['v1'];
+
+      if (!ts || !v1) {
+        console.error('Invalid signature format');
+        return new Response('Invalid signature', { status: 401, headers: corsHeaders });
+      }
+
+      // We need to read the body to get data.id for manifest, so clone first
+      const bodyText = await req.text();
+      const webhookDataRaw = JSON.parse(bodyText);
+      const dataId = webhookDataRaw?.data?.id;
+
+      const manifest = `id:${dataId};request-id:${requestId};ts:${ts};`;
+      const encoder = new TextEncoder();
+      const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(webhookSecret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      );
+      const signatureBytes = await crypto.subtle.sign('HMAC', key, encoder.encode(manifest));
+      const expectedHash = Array.from(new Uint8Array(signatureBytes))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+
+      if (v1 !== expectedHash) {
+        console.error('Signature mismatch');
+        return new Response('Invalid signature', { status: 401, headers: corsHeaders });
+      }
+
+      // Signature valid - use already parsed body
+      console.log('Webhook Mercado Pago recebido (signature validated)');
+      var webhookData: MercadoPagoWebhook = webhookDataRaw;
+    } else {
+      console.log('Webhook Mercado Pago recebido (no secret configured - signature not validated)');
+      var webhookData: MercadoPagoWebhook = await req.json();
+    }
     
-    const webhookData: MercadoPagoWebhook = await req.json();
     console.log('Webhook data:', webhookData);
 
     // Validate webhook type

@@ -27,6 +27,19 @@ serve(async (req) => {
   }
 
   try {
+    // Validate shared secret
+    const webhookSecret = Deno.env.get('N8N_WEBHOOK_SECRET');
+    if (webhookSecret) {
+      const providedSecret = req.headers.get('x-webhook-secret');
+      if (!providedSecret || providedSecret !== webhookSecret) {
+        console.error('Invalid or missing webhook secret');
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     console.log('Webhook N8N de pagamento recebido');
     
     const webhookData: N8NPaymentWebhook = await req.json();
@@ -346,7 +359,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error processing N8N webhook:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error instanceof Error ? error.message : String(error) }),
+      JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

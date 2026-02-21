@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useLessonContent } from '@/hooks/useLessonContent';
 import { useModuleContent } from '@/hooks/useModuleContent';
@@ -169,7 +170,7 @@ export default function LessonViewer() {
 
         {lesson.content && (
           <CardContent>
-            <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: lesson.content }} />
+            <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(lesson.content) }} />
           </CardContent>
         )}
       </Card>
