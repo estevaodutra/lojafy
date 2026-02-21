@@ -15,7 +15,7 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from '@/components/ui/pagination';
-import { TooltipProvider } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Search, 
@@ -31,7 +31,8 @@ import {
   ArrowUpDown,
   Check,
   Trophy,
-  CheckCircle2
+  CheckCircle2,
+  Info
 } from 'lucide-react';
 import { useCategories } from '@/hooks/useCategories';
 import { useResellerCatalog } from '@/hooks/useResellerCatalog';
@@ -39,6 +40,8 @@ import { useResellerStore } from '@/hooks/useResellerStore';
 import { ProductCalculatorModal } from '@/components/reseller/ProductCalculatorModal';
 import { useSubscriptionCheck } from '@/hooks/useSubscriptionCheck';
 import { PremiumRequiredModal } from '@/components/premium/PremiumRequiredModal';
+
+const TAXA_ML = 0.14; // 14% Clássico
 
 const ResellerCatalog = () => {
   const { toast } = useToast();
@@ -81,9 +84,9 @@ const ResellerCatalog = () => {
   const stats = getProductStats();
 
   const getMarginColor = (margin: number) => {
-    if (margin >= 30) return 'text-green-600';
-    if (margin >= 15) return 'text-yellow-600';
-    return 'text-red-600';
+    if (margin >= 20) return 'text-green-700 border-green-500';
+    if (margin >= 10) return 'text-yellow-700 border-yellow-500';
+    return 'text-red-700 border-red-500';
   };
 
   const getStockColor = (stock: number) => {
@@ -429,16 +432,36 @@ const ResellerCatalog = () => {
           {products.map((product) => {
             const suggestedPrice = getSuggestedPrice(product);
             const margin = product.cost_price ? calculateMargin(product.cost_price, suggestedPrice) : 0;
+            const displayPrice = product.isInMyStore && product.myStorePrice ? product.myStorePrice : suggestedPrice;
+            const taxaML = displayPrice * TAXA_ML;
+            const lucro = displayPrice - (product.cost_price || 0) - taxaML;
+
+            const productImages = product.images?.length > 0 
+              ? product.images.slice(0, 4) 
+              : [product.main_image_url || product.image_url || '/placeholder.svg'];
             
             return (
               <Card key={product.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader className="pb-2">
                   <div className="relative">
-                    <img 
-                      src={product.main_image_url || product.image_url || "/api/placeholder/300/300"} 
-                      alt={product.name}
-                      className="w-full h-48 object-cover rounded-lg"
-                    />
+                    {productImages.length === 1 ? (
+                      <img 
+                        src={productImages[0]} 
+                        alt={product.name}
+                        className="w-full h-48 object-cover rounded-lg"
+                      />
+                    ) : (
+                      <div className="grid grid-cols-2 gap-1 rounded-lg overflow-hidden h-48">
+                        {productImages.map((img, idx) => (
+                          <img 
+                            key={idx}
+                            src={img} 
+                            alt={`${product.name} ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        ))}
+                      </div>
+                    )}
                     {product.featured && (
                       <Badge className="absolute top-2 left-2 bg-purple-500 hover:bg-purple-600">
                         <Star className="h-3 w-3 mr-1" />
@@ -471,72 +494,100 @@ const ResellerCatalog = () => {
                     )}
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3">
+                  {/* SKU above name */}
                   <div>
-                    <CardTitle className="text-lg line-clamp-2">{product.name}</CardTitle>
-                    <CardDescription>
-                      {product.brand} • SKU: {product.sku}
-                    </CardDescription>
+                    <p className="text-xs text-muted-foreground">
+                      {product.brand && `${product.brand} • `}SKU: {product.sku}
+                    </p>
+                    <CardTitle className="text-lg line-clamp-2 mt-0.5">{product.name}</CardTitle>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  {/* 3-column price grid */}
+                  <div className="grid grid-cols-3 gap-2 text-sm">
                     <div>
-                      <p className="text-muted-foreground">Custo</p>
+                      <p className="text-muted-foreground text-xs">Custo</p>
                       <p className="font-medium">
                         {product.cost_price ? `R$ ${product.cost_price.toFixed(2)}` : 'N/A'}
                       </p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">
-                        {product.isInMyStore ? 'Meu Preço' : 'Preço Sugerido'}
+                      <p className="text-muted-foreground text-xs">
+                        {product.isInMyStore ? 'Meu Preço' : 'Preço Sug.'}
                       </p>
                       <p className="font-medium">
-                        R$ {(product.isInMyStore && product.myStorePrice ? product.myStorePrice : suggestedPrice).toFixed(2)}
+                        R$ {displayPrice.toFixed(2)}
+                      </p>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1">
+                        <p className="text-muted-foreground text-xs">Lucro</p>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[220px]">
+                            <p className="font-medium text-xs mb-1">
+                              Taxa ML: {(TAXA_ML * 100).toFixed(0)}% (Clássico)
+                            </p>
+                            <div className="text-xs space-y-0.5">
+                              <p>Preço: R$ {displayPrice.toFixed(2)}</p>
+                              <p>- Custo: R$ {(product.cost_price || 0).toFixed(2)}</p>
+                              <p>- Taxa ML: R$ {taxaML.toFixed(2)}</p>
+                              <Separator className="my-1" />
+                              <p className="font-semibold">= Lucro: R$ {lucro.toFixed(2)}</p>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <p className={`font-medium ${lucro >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        R$ {lucro.toFixed(2)}
                       </p>
                     </div>
                   </div>
 
+                  {/* Explanatory message */}
+                  <p className="text-xs text-muted-foreground">
+                    ⚡ O preço sugerido cobre todos os custos e taxas do ML
+                  </p>
+
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="outline" className={getMarginColor(margin)}>
-                        {Math.round(margin)}% margem
-                      </Badge>
-                    </div>
+                    <Badge variant="outline" className={getMarginColor(margin)}>
+                      {Math.round(margin)}% margem
+                    </Badge>
                     <span className={`text-sm ${getStockColor(product.stock_quantity)}`}>
                       {product.stock_quantity} em estoque
                     </span>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex space-x-2">
-                      {product.isInMyStore ? (
-                        <Button 
-                          variant="outline"
-                          className="flex-1"
-                          onClick={() => handleRemoveFromStore(product.id)}
-                        >
-                          <Minus className="h-4 w-4 mr-1" />
-                          Remover
-                        </Button>
-                      ) : (
-                        <Button 
-                          className="flex-1"
-                          onClick={() => handleAddToStore(product.id)}
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          Adicionar
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
+                  <div className="flex space-x-2">
+                    {product.isInMyStore ? (
+                      <Button 
                         variant="outline"
                         className="flex-1"
-                        onClick={() => handleOpenCalculator(product)}
+                        onClick={() => handleRemoveFromStore(product.id)}
                       >
-                        <Calculator className="h-4 w-4 mr-1" />
-                        Calcular
+                        <Minus className="h-4 w-4 mr-1" />
+                        Remover
                       </Button>
-                    </div>
+                    ) : (
+                      <Button 
+                        className="flex-1"
+                        onClick={() => handleAddToStore(product.id)}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Adicionar
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => handleOpenCalculator(product)}
+                    >
+                      <Calculator className="h-4 w-4 mr-1" />
+                      Calcular
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
