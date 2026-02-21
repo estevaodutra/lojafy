@@ -1,53 +1,45 @@
 
-## Corrigir Precificacao no Card do Catalogo do Revendedor
+
+## Corrigir Preco de Custo na Calculadora de Margem
 
 ### Problema
 
-O card do catalogo exibe `product.cost_price` (custo real do produto para o negocio) como "Custo" do revendedor. O correto e usar `product.price` (preco de venda definido pelo super admin), que e o valor que o revendedor efetivamente paga pelo produto.
+O `ProductCalculatorModal` usa `product.cost_price` (custo interno do negocio) como base de calculo. Para o revendedor, o custo real e `product.price` (preco definido pelo super admin). Alem disso, o "Preco Sugerido" exibe `product.price` ao inves do preco com margem de 30%.
 
-### Alteracao
+### Alteracoes
 
-**Arquivo:** `src/pages/reseller/Catalog.tsx`
+**Arquivo:** `src/components/reseller/ProductCalculatorModal.tsx`
 
-#### 1. Variavel de custo do revendedor (linha 434-437)
-
-Substituir o uso de `product.cost_price` por `product.price` no calculo de margem e lucro:
+#### 1. Corrigir a variavel costPrice (linha 39)
 
 ```text
 // ANTES:
-const margin = product.cost_price ? calculateMargin(product.cost_price, suggestedPrice) : 0;
-const lucro = displayPrice - (product.cost_price || 0) - taxaML;
+const costPrice = product.cost_price || 0;
 
 // DEPOIS:
-const resellerCost = product.price; // Preco definido pelo super admin = custo do revendedor
-const margin = resellerCost ? calculateMargin(resellerCost, suggestedPrice) : 0;
-const lucro = displayPrice - resellerCost - taxaML;
+const costPrice = product.price; // Preco definido pelo admin = custo do revendedor
 ```
 
-#### 2. Exibicao do custo no grid de precos (linha 509-512)
+#### 2. Corrigir o Preco Sugerido exibido (linha 105)
 
-Trocar a referencia de `product.cost_price` para `resellerCost`:
+Calcular o preco sugerido com margem de 30% sobre o custo do revendedor:
 
 ```text
 // ANTES:
-{product.cost_price ? `R$ ${product.cost_price.toFixed(2)}` : 'N/A'}
+<p className="font-medium text-lg">{fmt(product.price)}</p>
 
 // DEPOIS:
-R$ {resellerCost.toFixed(2)}
+const suggestedPrice = costPrice * 1.30; // 30% de margem
+// E exibir: {fmt(suggestedPrice)}
 ```
 
-#### 3. Tooltip do lucro (linha 535)
+#### 3. Atualizar o label "Preco de Custo" (linha 100)
 
-Atualizar a linha de custo no tooltip:
+Manter como "Preco de Custo" pois agora reflete corretamente o custo do revendedor (`product.price`).
 
-```text
-// ANTES:
-<p>- Custo: R$ {(product.cost_price || 0).toFixed(2)}</p>
+### Resultado
 
-// DEPOIS:
-<p>- Custo: R$ {resellerCost.toFixed(2)}</p>
-```
+- "Preco de Custo" mostrara o preco que o revendedor paga (definido pelo admin)
+- "Preco Sugerido" mostrara o preco com 30% de margem
+- Todos os calculos da tabela de margem usarao o custo correto
 
-### Resumo
-
-Tres pontos de alteracao no mesmo arquivo, todos substituindo `product.cost_price` por `product.price` (via variavel `resellerCost`) para refletir corretamente o custo do revendedor.
