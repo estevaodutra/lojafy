@@ -29,7 +29,9 @@ import {
   Star,
   ShoppingCart,
   ArrowUpDown,
-  Check
+  Check,
+  Trophy,
+  CheckCircle2
 } from 'lucide-react';
 import { useCategories } from '@/hooks/useCategories';
 import { useResellerCatalog } from '@/hooks/useResellerCatalog';
@@ -51,6 +53,7 @@ const ResellerCatalog = () => {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [specialFilter, setSpecialFilter] = useState<'all' | 'top10' | 'ml_ready'>('all');
   const { requiresPremium, paymentUrl } = useSubscriptionCheck();
 
   const { data: categories = [], isLoading: categoriesLoading } = useCategories();
@@ -135,6 +138,15 @@ const ResellerCatalog = () => {
     applyFilters({
       ...filters,
       sortBy: sort
+    });
+  };
+
+  const handleSpecialFilter = (filter: 'all' | 'top10' | 'ml_ready') => {
+    setSpecialFilter(filter);
+    applyFilters({
+      ...filters,
+      topProducts: filter === 'top10' ? true : undefined,
+      mlReadyOnly: filter === 'ml_ready' ? true : undefined,
     });
   };
 
@@ -263,6 +275,33 @@ const ResellerCatalog = () => {
             </p>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Special Filter Chips */}
+      <div className="flex flex-wrap gap-2">
+        <Badge 
+          variant={specialFilter === 'all' ? 'default' : 'outline'}
+          className="cursor-pointer px-3 py-1.5 text-sm"
+          onClick={() => handleSpecialFilter('all')}
+        >
+          Todos
+        </Badge>
+        <Badge 
+          variant={specialFilter === 'top10' ? 'default' : 'outline'}
+          className="cursor-pointer px-3 py-1.5 text-sm gap-1"
+          onClick={() => handleSpecialFilter('top10')}
+        >
+          <Trophy className="h-3.5 w-3.5" />
+          Top 10
+        </Badge>
+        <Badge 
+          variant={specialFilter === 'ml_ready' ? 'default' : 'outline'}
+          className="cursor-pointer px-3 py-1.5 text-sm gap-1 bg-amber-500 hover:bg-amber-600 text-white border-amber-500"
+          onClick={() => handleSpecialFilter('ml_ready')}
+        >
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          Prontos ML
+        </Badge>
       </div>
 
       {/* Filters */}
@@ -410,6 +449,18 @@ const ResellerCatalog = () => {
                       <Badge className="absolute top-2 right-2 bg-orange-500 hover:bg-orange-600">
                         <TrendingUp className="h-3 w-3 mr-1" />
                         Alto Giro
+                      </Badge>
+                    )}
+                    {product.ml_ready && !product.high_rotation && (
+                      <Badge className="absolute top-2 right-2 bg-amber-500 hover:bg-amber-600 text-white text-xs">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        ML
+                      </Badge>
+                    )}
+                    {product.ml_ready && product.high_rotation && (
+                      <Badge className="absolute top-10 right-2 bg-amber-500 hover:bg-amber-600 text-white text-xs">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        ML
                       </Badge>
                     )}
                     {product.isInMyStore && (

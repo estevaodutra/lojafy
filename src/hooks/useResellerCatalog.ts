@@ -30,6 +30,7 @@ export interface CatalogProduct {
   };
   isInMyStore?: boolean;
   myStorePrice?: number;
+  ml_ready?: boolean;
 }
 
 export interface CatalogFilters {
@@ -40,6 +41,8 @@ export interface CatalogFilters {
   highRotationOnly?: boolean;
   inStock?: boolean;
   sortBy?: string;
+  topProducts?: boolean;
+  mlReadyOnly?: boolean;
 }
 
 export const useResellerCatalog = () => {
@@ -57,6 +60,45 @@ export const useResellerCatalog = () => {
     try {
       setIsLoading(true);
       
+      const filtersToApply = currentFilters || filters;
+      
+      // If topProducts filter is active, fetch top 10 IDs first
+      let topProductIds: string[] | null = null;
+      if (filtersToApply.topProducts) {
+        const { data: rankingData } = await supabase
+          .from('product_ranking')
+          .select('product_id')
+          .order('position', { ascending: true })
+          .limit(10);
+        topProductIds = rankingData?.map(r => r.product_id) || [];
+        if (topProductIds.length === 0) {
+          setProducts([]);
+          setTotalCount(0);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // Fetch ML ready product IDs
+      const { data: mlReadyData } = await supabase
+        .from('product_marketplace_data')
+        .select('product_id')
+        .eq('marketplace', 'mercadolivre')
+        .or('is_validated.eq.true,listing_status.in.(ready,active,pending)');
+      const mlReadyIds = new Set(mlReadyData?.map(r => r.product_id) || []);
+
+      // If mlReadyOnly filter is active, restrict to ML ready IDs
+      let mlFilterIds: string[] | null = null;
+      if (filtersToApply.mlReadyOnly) {
+        mlFilterIds = Array.from(mlReadyIds);
+        if (mlFilterIds.length === 0) {
+          setProducts([]);
+          setTotalCount(0);
+          setIsLoading(false);
+          return;
+        }
+      }
+
       // Calculate pagination range
       const from = (page - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
@@ -70,9 +112,17 @@ export const useResellerCatalog = () => {
         .eq('active', true)
         .range(from, to);
 
+      // Apply top products filter
+      if (topProductIds) {
+        query = query.in('id', topProductIds);
+      }
+
+      // Apply ML ready only filter
+      if (mlFilterIds) {
+        query = query.in('id', mlFilterIds);
+      }
+
       // Apply filters
-      const filtersToApply = currentFilters || filters;
-      
       if (filtersToApply.search) {
         query = query.or(`name.ilike.%${filtersToApply.search}%,sku.ilike.%${filtersToApply.search}%`);
       }
@@ -97,10 +147,7 @@ export const useResellerCatalog = () => {
         query = query.gt('stock_quantity', 0);
       }
 
-      // Apply sorting with optimized hierarchy:
-      // 1. Featured products first (featured DESC)
-      // 2. High rotation products last (high_rotation ASC)
-      // 3. User-selected sorting
+      // Apply sorting
       const sortBy = filtersToApply.sortBy || 'name';
       switch (sortBy) {
         case 'name':
@@ -138,7 +185,6 @@ export const useResellerCatalog = () => {
 
       if (error) throw error;
       
-      // Set total count for pagination
       setTotalCount(count || 0);
 
       // Fetch user's store products to mark which ones are already in store
@@ -156,16 +202,20 @@ export const useResellerCatalog = () => {
 
         setMyStoreProducts(myProductIds);
 
-        // Mark products that are in user's store
         const enrichedProducts = (data || []).map(product => ({
           ...product,
           isInMyStore: myProductIds.includes(product.id),
-          myStorePrice: myProductPrices[product.id]
+          myStorePrice: myProductPrices[product.id],
+          ml_ready: mlReadyIds.has(product.id),
         }));
 
         setProducts(enrichedProducts);
       } else {
-        setProducts(data || []);
+        const enrichedProducts = (data || []).map(product => ({
+          ...product,
+          ml_ready: mlReadyIds.has(product.id),
+        }));
+        setProducts(enrichedProducts);
       }
     } catch (err: any) {
       setError(err.message);
