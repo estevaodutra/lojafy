@@ -1,45 +1,34 @@
 
 
-## Corrigir Preco de Custo na Calculadora de Margem
+## Corrigir Formula do Preco Sugerido
 
 ### Problema
 
-O `ProductCalculatorModal` usa `product.cost_price` (custo interno do negocio) como base de calculo. Para o revendedor, o custo real e `product.price` (preco definido pelo super admin). Alem disso, o "Preco Sugerido" exibe `product.price` ao inves do preco com margem de 30%.
+O "Preco Sugerido" usa uma formula simples de markup (`custo * 1.30 = R$ 12,99`), enquanto a tabela usa a formula correta que considera as taxas do ML (`custo / (1 - taxa - margem) = R$ 17,84`). Os dois valores deveriam ser consistentes.
 
-### Alteracoes
+### Causa
+
+Na linha 39 do `ProductCalculatorModal.tsx`:
+```
+const suggestedPrice = costPrice * 1.30;
+```
+Isso e um markup simples de 30%, que nao considera as taxas do Mercado Livre. A tabela usa `calcularPrecoMinimo(30, 0.14)` que resulta em R$ 17,84.
+
+### Correcao
 
 **Arquivo:** `src/components/reseller/ProductCalculatorModal.tsx`
 
-#### 1. Corrigir a variavel costPrice (linha 39)
+Substituir o calculo simples pelo calculo que considera a taxa do Classico (14%) como padrao:
 
-```text
+```typescript
 // ANTES:
-const costPrice = product.cost_price || 0;
+const suggestedPrice = costPrice * 1.30;
 
 // DEPOIS:
-const costPrice = product.price; // Preco definido pelo admin = custo do revendedor
+const suggestedPrice = calcularPrecoMinimo(30, TAXAS_ML.classico);
 ```
 
-#### 2. Corrigir o Preco Sugerido exibido (linha 105)
+Isso fara o Preco Sugerido exibir R$ 17,84, consistente com a linha de 30% / Classico da tabela.
 
-Calcular o preco sugerido com margem de 30% sobre o custo do revendedor:
-
-```text
-// ANTES:
-<p className="font-medium text-lg">{fmt(product.price)}</p>
-
-// DEPOIS:
-const suggestedPrice = costPrice * 1.30; // 30% de margem
-// E exibir: {fmt(suggestedPrice)}
-```
-
-#### 3. Atualizar o label "Preco de Custo" (linha 100)
-
-Manter como "Preco de Custo" pois agora reflete corretamente o custo do revendedor (`product.price`).
-
-### Resultado
-
-- "Preco de Custo" mostrara o preco que o revendedor paga (definido pelo admin)
-- "Preco Sugerido" mostrara o preco com 30% de margem
-- Todos os calculos da tabela de margem usarao o custo correto
+Obs: a funcao `calcularPrecoMinimo` ja existe no componente e e usada pela tabela, entao basta reutiliza-la. Porem ela depende de `costPrice`, que e declarado antes dela. Sera necessario mover a declaracao de `suggestedPrice` para depois da definicao de `calcularPrecoMinimo`.
 
