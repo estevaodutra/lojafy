@@ -1,53 +1,32 @@
 
 
-## Corrigir Filtro "Top 10" no Catalogo do Revendedor
+## Corrigir Filtro "Top 10" - Problema de Permissao RLS
 
-### Problema
+### Problema Identificado
 
-O filtro "Top 10" no catalogo busca produtos da tabela `product_ranking`, que esta vazia. Porem, os 10 produtos foram vinculados na feature "Top 10 Produtos" (slug: `top_10_produtos`) atraves da tabela `feature_produtos`. Sao dois sistemas diferentes e o filtro esta apontando para o errado.
+Os dados existem corretamente no banco (10 produtos vinculados na tabela `feature_produtos`), mas a politica de seguranca (RLS) da tabela `feature_produtos` so permite leitura para administradores (`is_admin_user()`). Quando um revendedor tenta buscar os produtos Top 10, a query retorna vazio porque ele nao tem permissao de leitura.
 
 ### Solucao
 
-Alterar a query do filtro Top 10 no hook `useResellerCatalog.ts` para buscar os produtos da tabela `feature_produtos` vinculados a feature com slug `top_10_produtos`, em vez de buscar da tabela `product_ranking`.
+Adicionar uma politica RLS de SELECT na tabela `feature_produtos` que permita todos os usuarios autenticados lerem registros ativos. Isso e seguro porque os dados de vinculacao de produtos a features nao sao sensiveis.
 
 ### Alteracao
 
-**Arquivo: `src/hooks/useResellerCatalog.ts`**
-
-Substituir o bloco que busca de `product_ranking` (linhas 67-80) por:
+**Migracao SQL** - Criar nova politica de leitura publica para `feature_produtos`:
 
 ```text
-// Passo 1: buscar o ID da feature "top_10_produtos"
-const { data: featureData } = await supabase
-  .from('features')
-  .select('id')
-  .eq('slug', 'top_10_produtos')
-  .maybeSingle();
-
-// Passo 2: buscar os produto_ids vinculados a essa feature
-if (featureData) {
-  const { data: featureProdutos } = await supabase
-    .from('feature_produtos')
-    .select('produto_id')
-    .eq('feature_id', featureData.id)
-    .eq('ativo', true)
-    .order('ordem', { ascending: true })
-    .limit(10);
-  topProductIds = featureProdutos?.map(r => r.produto_id) || [];
-}
+CREATE POLICY "Anyone can read active feature_produtos"
+  ON feature_produtos
+  FOR SELECT
+  TO authenticated
+  USING (ativo = true);
 ```
 
-E na query principal, o `.in('id', topProductIds)` continua funcionando normalmente.
+Isso permite que qualquer usuario autenticado (incluindo revendedores) leia os registros onde `ativo = true`, mantendo as restricoes de INSERT/UPDATE/DELETE apenas para admins.
 
-### Secao Tecnica
+### Arquivos alterados
 
-A mudanca e apenas na fonte de dados do filtro Top 10:
+1. Nova migracao SQL para adicionar a politica RLS
 
-```text
-ANTES: product_ranking -> product_id (tabela vazia)
-DEPOIS: features (slug=top_10_produtos) -> feature_produtos -> produto_id (10 produtos vinculados)
-```
+Nenhuma alteracao de codigo necessaria -- o hook `useResellerCatalog.ts` ja esta correto.
 
-Nenhuma outra alteracao necessaria -- o restante do fluxo (filtro `.in('id', topProductIds)` e early return quando vazio) permanece igual.
-
-**Arquivo alterado:** `src/hooks/useResellerCatalog.ts`
