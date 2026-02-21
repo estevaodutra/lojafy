@@ -259,18 +259,11 @@ export const useResellerCatalog = () => {
   };
 
   const getSuggestedPrice = (product: CatalogProduct): number => {
-    // If product has original_price, use it as suggested
-    if (product.original_price) {
-      return product.original_price;
+    // Margem padrão de 30% sobre o preço que o revendedor paga (product.price)
+    if (product.price) {
+      return calculatePrice(product.price, 30);
     }
-    
-    // Otherwise, suggest a 30% margin over cost if available
-    if (product.cost_price) {
-      return calculatePrice(product.cost_price, 30);
-    }
-    
-    // Fallback to current price
-    return product.price;
+    return 0;
   };
 
   const getProductStats = () => {
