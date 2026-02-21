@@ -36,7 +36,8 @@ export const ProductCalculatorModal: React.FC<ProductCalculatorModalProps> = ({
 
   if (!product) return null;
 
-  const costPrice = product.cost_price || 0;
+  const costPrice = product.price; // Preço definido pelo admin = custo do revendedor
+  const suggestedPrice = costPrice * 1.30; // 30% de margem
   const marginPercent = parseFloat(desiredMargin) || 0;
   const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
@@ -102,7 +103,7 @@ export const ProductCalculatorModal: React.FC<ProductCalculatorModalProps> = ({
                 </div>
                 <div className="space-y-1">
                   <p className="text-muted-foreground">Preço Sugerido:</p>
-                  <p className="font-medium text-lg">{fmt(product.price)}</p>
+                  <p className="font-medium text-lg">{fmt(suggestedPrice)}</p>
                 </div>
               </div>
             </div>
