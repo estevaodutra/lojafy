@@ -52,7 +52,16 @@ Deno.serve(async (req) => {
     const resetLink = linkData.properties.action_link;
     console.log('[reset-password-proxy] Recovery link generated for:', body.email);
 
-    // 2. Send email + reset_link to n8n webhook for delivery
+    // 2. Fetch profile data
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('first_name, last_name, phone, cpf')
+      .eq('user_id', linkData.user.id)
+      .single();
+
+    console.log('[reset-password-proxy] Profile found:', !!profile);
+
+    // 3. Send email + reset_link + profile data to n8n webhook for delivery
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
@@ -63,6 +72,10 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           email: body.email,
           reset_link: resetLink,
+          first_name: profile?.first_name ?? null,
+          last_name: profile?.last_name ?? null,
+          phone: profile?.phone ?? null,
+          cpf: profile?.cpf ?? null,
         }),
         signal: controller.signal,
       });
@@ -79,7 +92,7 @@ Deno.serve(async (req) => {
       console.error('[reset-password-proxy] Webhook error (non-critical):', webhookErr);
     }
 
-    // 3. Return success
+    // 4. Return success
     return new Response(JSON.stringify({ message: 'Link de redefinição enviado com sucesso!' }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
