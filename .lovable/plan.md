@@ -1,46 +1,30 @@
 
-## Fix: "Erro no login - missing email or phone" on Password Reset
+## Corrigir redirect_to do link de recuperacao de senha
 
-### Problem
-The "Recuperar senha" (Reset Password) dialog is rendered inside the login `<form>` tag. When the user submits the reset password form, the submit event bubbles up and also triggers the parent login form, which attempts `signInWithPassword` with empty email/password fields.
+### Problema
+O link de recuperacao de senha esta usando `redirect_to=http://localhost:3000` porque o **Site URL** configurado no dashboard do Supabase ainda aponta para `http://localhost:3000`. A Edge Function passa `redirectTo: 'https://lojafy.app/reset-password'`, mas o Supabase usa o Site URL como base quando o redirect nao esta na lista de URLs permitidas.
 
-### Solution
-Move the reset password `<Dialog>` component outside the login `<form>` tag. This prevents form event bubbling issues entirely.
+### Solucao (configuracao no Supabase Dashboard)
 
-### Technical Details
+Voce precisa atualizar duas configuracoes no Supabase Dashboard:
 
-**File**: `src/pages/Auth.tsx`
+1. **Acessar**: Supabase Dashboard > Authentication > URL Configuration
+2. **Site URL**: Alterar de `http://localhost:3000` para `https://lojafy.app`
+3. **Redirect URLs**: Adicionar as seguintes URLs na lista de URLs permitidas:
+   - `https://lojafy.app/**`
+   - `https://lojafy.lovable.app/**`
 
-Currently the structure is:
-```
-<form onSubmit={handleLogin}>
-  ...email input...
-  ...password input...
-  <Dialog>  <!-- Reset password dialog is INSIDE login form -->
-    <form onSubmit={handleResetPassword}>
-      ...
-    </form>
-  </Dialog>
-  <Button type="submit">Entrar</Button>
-</form>
-```
+### Por que isso acontece?
+O Supabase Admin API (`generateLink`) valida o `redirectTo` contra a lista de Redirect URLs permitidas. Se a URL nao esta na lista, ele ignora o parametro e usa o Site URL padrao (`http://localhost:3000`). Por isso o link gerado tem `redirect_to=http://localhost:3000`.
 
-The fix restructures to:
-```
-<form onSubmit={handleLogin}>
-  ...email input...
-  ...password input...
-  <Button variant="link" onClick={() => setShowResetPasswordDialog(true)}>
-    Esqueci minha senha
-  </Button>
-  <Button type="submit">Entrar</Button>
-</form>
+### Passos
+1. Acesse o Supabase Dashboard na secao Authentication > URL Configuration
+2. Atualize o Site URL para `https://lojafy.app`
+3. Adicione `https://lojafy.app/**` e `https://lojafy.lovable.app/**` na lista de Redirect URLs
+4. Salve as alteracoes
+5. Teste novamente o fluxo de reset de senha
 
-<Dialog>  <!-- Reset password dialog is OUTSIDE login form -->
-  <form onSubmit={handleResetPassword}>
-    ...
-  </form>
-</Dialog>
-```
+### Resultado esperado
+Apos a configuracao, os links de recuperacao virao com `redirect_to=https://lojafy.app/reset-password`.
 
-This moves the `Dialog` (with its `DialogTrigger` replaced by a simple `onClick`) out of the login form, eliminating the nested form issue completely.
+Nenhuma alteracao de codigo e necessaria -- o problema e apenas de configuracao no dashboard.
