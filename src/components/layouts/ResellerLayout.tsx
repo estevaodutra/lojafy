@@ -176,24 +176,13 @@ const ResellerSidebar = () => {
           )}
         </div>
         
-        {filteredMenuGroups.map((group) => (
-          <Collapsible
-            key={group.label}
-            open={openCategories.has(group.label)}
-            onOpenChange={(open) => toggleCategory(group.label, open)}
-          >
-            <SidebarGroup>
-              <CollapsibleTrigger asChild>
-                <SidebarGroupLabel className="cursor-pointer flex items-center justify-between hover:bg-sidebar-accent/50 rounded-md transition-colors">
-                  <span>{group.label}</span>
-                  {openCategories.has(group.label) ? (
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                  )}
-                </SidebarGroupLabel>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
+        {filteredMenuGroups.map((group) => {
+          const alwaysOpen = group.label === 'Principal' || group.label === 'Produtos';
+
+          if (alwaysOpen) {
+            return (
+              <SidebarGroup key={group.label}>
+                <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu>
                     {group.items.map((item) => (
@@ -218,10 +207,57 @@ const ResellerSidebar = () => {
                     ))}
                   </SidebarMenu>
                 </SidebarGroupContent>
-              </CollapsibleContent>
-            </SidebarGroup>
-          </Collapsible>
-        ))}
+              </SidebarGroup>
+            );
+          }
+
+          return (
+            <Collapsible
+              key={group.label}
+              open={openCategories.has(group.label)}
+              onOpenChange={(open) => toggleCategory(group.label, open)}
+            >
+              <SidebarGroup>
+                <CollapsibleTrigger asChild>
+                  <SidebarGroupLabel className="cursor-pointer flex items-center justify-between hover:bg-sidebar-accent/50 rounded-md transition-colors">
+                    <span>{group.label}</span>
+                    {openCategories.has(group.label) ? (
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                    )}
+                  </SidebarGroupLabel>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {group.items.map((item) => (
+                        <SidebarMenuItem key={item.title}>
+                          <SidebarMenuButton 
+                            asChild
+                            className={currentPath === item.url ? 'bg-sidebar-accent' : ''}
+                          >
+                            <button onClick={() => navigate(item.url)} className="flex items-center justify-between w-full">
+                              <div className="flex items-center">
+                                <item.icon className="mr-2 h-4 w-4" />
+                                <span>{item.title}</span>
+                              </div>
+                              {item.badge && (
+                                <Badge variant="secondary" className="ml-auto text-xs">
+                                  {item.badge}
+                                </Badge>
+                              )}
+                            </button>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </CollapsibleContent>
+              </SidebarGroup>
+            </Collapsible>
+          );
+        })}
 
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>
