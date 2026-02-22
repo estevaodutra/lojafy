@@ -1,47 +1,33 @@
 
+## Ajuste de Layout do OnboardingWizard para Mobile
 
-## Fix: One-Time Access Link Error Handling
+### Problema
+No mobile (390px), o modal do onboarding apresenta problemas de layout:
+- Titulo "Bem-vindo ao Programa de Revenda!" cortado/overflow
+- Botoes "Comecar" e "Marcar como Concluido" ficam apertados na mesma linha
+- Padding excessivo dentro dos cards de step
+- O dialog ocupa muito espaco sem scroll adequado
 
-### Problem
-When the edge function `verify-onetime-link` returns a non-2xx status (e.g., "Este link ja foi utilizado"), the Supabase JS client sets `data` to `null` and wraps the HTTP error generically. The frontend then shows the unhelpful message "Edge Function returned a non-2xx status code" instead of the actual Portuguese error message from the function.
+### Solucao
+Ajustar o componente `OnboardingWizard.tsx` para melhor responsividade:
 
-### Root Cause
-`supabase.functions.invoke()` behavior on non-2xx responses:
-- `data` = `null`
-- `error` = `FunctionsHttpError` with generic message
-- The actual JSON body is accessible via `error.context` (a `Response` object)
+1. **Titulo**: Reduzir tamanho no mobile (`text-lg sm:text-2xl`)
+2. **DialogContent**: Ajustar padding e margens para mobile (`p-4 sm:p-6`)
+3. **Step cards**: Reduzir padding no mobile (`p-3 sm:p-4`)
+4. **Botoes de acao**: Empilhar verticalmente no mobile (`flex-col sm:flex-row`)
+5. **Botao "Marcar como Concluido"**: Texto menor no mobile para caber melhor
+6. **Footer**: Empilhar texto e botao no mobile (`flex-col sm:flex-row`)
 
-The current code at line 38 tries `data?.error` first (which is `null`), then falls back to `error?.message` (which is the generic SDK message).
+### Detalhes Tecnicos
 
-### Solution
-Modify `src/pages/AuthOneTime.tsx` to extract the real error message from the edge function response when `supabase.functions.invoke()` returns an error:
+**Arquivo**: `src/components/reseller/OnboardingWizard.tsx`
 
-```typescript
-const { data, error } = await supabase.functions.invoke('verify-onetime-link', {
-  body: { token },
-});
-
-if (error || !data?.success) {
-  console.error('Verification error:', error, data);
-  
-  // Extract the actual error message from the edge function response
-  let actualError = data?.error;
-  if (!actualError && error) {
-    try {
-      const errorBody = await error.context?.json();
-      actualError = errorBody?.error;
-    } catch {}
-  }
-  
-  setStatus('error');
-  setErrorMessage(actualError || error?.message || 'Erro ao validar o link de acesso.');
-  return;
-}
-```
-
-### Technical Details
-- **File changed**: `src/pages/AuthOneTime.tsx` (lines 35-39)
-- When the SDK reports an error, attempt to parse `error.context` as JSON to get the original `{ error: "..." }` body from the edge function
-- Falls back gracefully if context parsing fails
-- No changes needed to the edge function itself
-
+Principais alteracoes de classes Tailwind:
+- Linha 22: `DialogContent` - adicionar `p-4 sm:p-6` e `w-[95vw] sm:w-auto`
+- Linha 25: `DialogTitle` - `text-lg sm:text-2xl`
+- Linha 60: Step card - `p-3 sm:p-4`
+- Linha 66: Flex container - `gap-2 sm:gap-3`
+- Linha 77: Step title - `text-sm sm:text-base`
+- Linha 91: Botoes container - `flex-col sm:flex-row`
+- Linha 101-107: Botao outline - adicionar `text-xs sm:text-sm` e texto abreviado
+- Linha 117-129: Footer - `flex-col sm:flex-row gap-2`
