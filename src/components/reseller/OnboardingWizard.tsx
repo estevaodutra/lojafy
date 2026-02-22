@@ -19,10 +19,10 @@ export const OnboardingWizard = () => {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto p-4 sm:p-6 w-[95vw] sm:w-auto">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-2xl">
+          <div className="flex items-center justify-between gap-2">
+            <DialogTitle className="text-lg sm:text-2xl">
               🚀 Bem-vindo ao Programa de Revenda!
             </DialogTitle>
             <Button
@@ -57,13 +57,13 @@ export const OnboardingWizard = () => {
             {steps.map((step) => (
               <div
                 key={step.id}
-                className={`border rounded-lg p-4 transition-all ${
+                className={`border rounded-lg p-3 sm:p-4 transition-all ${
                   step.completed
                     ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
                     : 'bg-card hover:bg-muted'
                 }`}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-2 sm:gap-3">
                   <div className="flex-shrink-0 mt-0.5">
                     {step.completed ? (
                       <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-500" />
@@ -74,7 +74,7 @@ export const OnboardingWizard = () => {
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <h3 className={`font-semibold ${step.completed ? 'text-green-700 dark:text-green-400' : ''}`}>
+                      <h3 className={`font-semibold text-sm sm:text-base ${step.completed ? 'text-green-700 dark:text-green-400' : ''}`}>
                         {step.order}. {step.title}
                       </h3>
                       {step.completed && (
@@ -88,7 +88,7 @@ export const OnboardingWizard = () => {
                     </p>
 
                     {!step.completed && (
-                      <div className="flex gap-2 mt-3">
+                      <div className="flex flex-col sm:flex-row gap-2 mt-3">
                         <Button
                           asChild
                           size="sm"
@@ -102,6 +102,7 @@ export const OnboardingWizard = () => {
                           size="sm"
                           variant="outline"
                           onClick={() => markStepCompleted(step.id)}
+                          className="text-xs sm:text-sm"
                         >
                           Marcar como Concluído
                         </Button>
@@ -115,8 +116,8 @@ export const OnboardingWizard = () => {
 
           {/* Footer */}
           <div className="border-t pt-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+              <p className="text-xs sm:text-sm text-muted-foreground text-center sm:text-left">
                 Você pode reabrir este guia a qualquer momento
               </p>
               <Button
