@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronLeft, ChevronRight, Download, FileText, Lock } from 'lucide-react';
-import { CourseBreadcrumb } from '@/components/courses/CourseBreadcrumb';
+import { Separator } from '@/components/ui/separator';
+import { ChevronLeft, ChevronRight, Download, FileText, Lock, CheckCircle2 } from 'lucide-react';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,6 +33,8 @@ export default function LessonViewer() {
   const currentIndex = lessons?.findIndex(l => l.id === lessonId) ?? -1;
   const previousLesson = currentIndex > 0 ? lessons?.[currentIndex - 1] : null;
   const nextLesson = currentIndex >= 0 && lessons ? lessons[currentIndex + 1] : null;
+  const totalLessons = lessons?.length ?? 0;
+  const currentLessonNumber = currentIndex >= 0 ? currentIndex + 1 : 0;
 
   const handleToggleComplete = () => {
     if (!enrollment || !user) {
@@ -46,6 +48,11 @@ export default function LessonViewer() {
       enrollmentId: enrollment.id,
       isCompleted: !isCompleted,
     });
+  };
+
+  const handleNavigate = (targetLessonId: string) => {
+    navigate(`/minha-conta/aula/${targetLessonId}`);
+    window.scrollTo(0, 0);
   };
 
   if (lessonLoading || moduleLessonsLoading || enrollmentLoading) {
@@ -68,7 +75,6 @@ export default function LessonViewer() {
     );
   }
 
-  // Verificar matrícula antes de exibir aula
   const courseId = lesson.course_modules?.course_id;
   if (courseId && !canAccessCourse(courseId)) {
     return (
@@ -85,55 +91,52 @@ export default function LessonViewer() {
     );
   }
 
-  // Extract video embed URL from various sources
+  // Extract video embed URL
   const getEmbedUrl = (url?: string) => {
     if (!url) return null;
-    
-    // YouTube
     const youtubeMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
-    if (youtubeMatch) {
-      return `https://www.youtube.com/embed/${youtubeMatch[1]}`;
-    }
-    
-    // Google Drive
+    if (youtubeMatch) return `https://www.youtube.com/embed/${youtubeMatch[1]}`;
     const driveMatch = url.match(/drive\.google\.com\/file\/d\/([^\/]+)/);
-    if (driveMatch) {
-      return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
-    }
-    
-    // Direct video URL
-    if (url.match(/\.(mp4|webm|ogg)$/i)) {
-      return url;
-    }
-    
+    if (driveMatch) return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+    if (url.match(/\.(mp4|webm|ogg)$/i)) return url;
     return url;
   };
 
   const embedUrl = getEmbedUrl(lesson.video_url);
+  const isLastLesson = !nextLesson;
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <CourseBreadcrumb
-        items={[
-          { label: 'Academy', href: '/minha-conta/academy' },
-          { label: lesson.course_modules.courses.title, href: `/minha-conta/curso/${lesson.course_modules.course_id}` },
-          { label: lesson.course_modules.title, href: `/minha-conta/curso/${lesson.course_modules.course_id}/modulo/${lesson.course_modules.id}` },
-          { label: lesson.title, current: true },
-        ]}
-      />
-
-      <div className="mb-6">
-        <Button variant="ghost" asChild>
+    <div className="container mx-auto px-4 py-6 sm:px-6 sm:py-8 max-w-3xl">
+      {/* Header: Voltar + Nome do Curso */}
+      <div className="mb-4 sm:mb-6">
+        <Button variant="ghost" size="sm" asChild className="mb-3 -ml-2">
           <Link to={`/minha-conta/curso/${lesson.course_modules.course_id}/modulo/${lesson.course_modules.id}`}>
-            <ChevronLeft className="mr-2 h-4 w-4" />
+            <ChevronLeft className="mr-1 h-4 w-4" />
             Voltar para Aulas
           </Link>
         </Button>
+        <h1 className="text-lg sm:text-xl font-semibold text-foreground">
+          {lesson.course_modules.courses.title}
+        </h1>
+      </div>
+
+      <Separator className="mb-6" />
+
+      {/* Indicador "Aula X de Y" + Título */}
+      <div className="mb-5">
+        {totalLessons > 0 && (
+          <p className="text-sm text-muted-foreground mb-1">
+            Aula {currentLessonNumber} de {totalLessons}
+          </p>
+        )}
+        <h2 className="text-xl sm:text-2xl font-bold text-foreground">
+          {lesson.title}
+        </h2>
       </div>
 
       {/* Video Player */}
       {embedUrl && (
-        <div className="aspect-video bg-black rounded-lg overflow-hidden mb-6">
+        <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-sm mb-5">
           <iframe
             src={embedUrl}
             className="w-full h-full"
@@ -143,48 +146,57 @@ export default function LessonViewer() {
         </div>
       )}
 
-      {/* Lesson Info */}
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <CardTitle className="text-3xl mb-2">{lesson.title}</CardTitle>
-              {lesson.description && (
-                <p className="text-muted-foreground">{lesson.description}</p>
-              )}
-            </div>
-            {enrollment && (
-              <div className="flex items-center gap-2 ml-4">
-                <Checkbox
-                  id="completed"
-                  checked={isCompleted}
-                  onCheckedChange={handleToggleComplete}
-                />
-                <label htmlFor="completed" className="text-sm font-medium cursor-pointer">
-                  Marcar como concluída
-                </label>
-              </div>
-            )}
-          </div>
-        </CardHeader>
+      {/* Descrição da aula */}
+      {lesson.description && (
+        <p className="text-muted-foreground mb-5">
+          {lesson.description}
+        </p>
+      )}
 
-        {lesson.content && (
-          <CardContent>
-            <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(lesson.content) }} />
-          </CardContent>
-        )}
-      </Card>
+      {/* Conteúdo HTML */}
+      {lesson.content && (
+        <div className="prose prose-sm max-w-none mb-5">
+          <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(lesson.content) }} />
+        </div>
+      )}
+
+      {/* Checkbox concluída */}
+      {enrollment && (
+        <div
+          className={`border rounded-lg p-3 sm:p-4 mb-6 flex items-center gap-3 cursor-pointer transition-colors ${
+            isCompleted ? 'border-primary/30 bg-primary/5' : 'hover:bg-accent'
+          }`}
+          onClick={handleToggleComplete}
+        >
+          <Checkbox
+            id="completed"
+            checked={isCompleted}
+            onCheckedChange={handleToggleComplete}
+            className="pointer-events-none"
+          />
+          <label htmlFor="completed" className="text-sm font-medium cursor-pointer flex items-center gap-2">
+            {isCompleted ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+                Aula concluída
+              </>
+            ) : (
+              'Marcar aula como concluída'
+            )}
+          </label>
+        </div>
+      )}
 
       {/* Attachments */}
       {lesson.attachments && lesson.attachments.length > 0 && (
         <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center gap-2">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-lg flex items-center gap-2">
               <Download className="h-5 w-5" />
               Materiais de Apoio
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
             <div className="space-y-2">
               {lesson.attachments.map((attachment, index) => (
                 <a
@@ -206,24 +218,46 @@ export default function LessonViewer() {
         </Card>
       )}
 
-      {/* Navigation */}
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          onClick={() => previousLesson && navigate(`/minha-conta/aula/${previousLesson.id}`)}
-          disabled={!previousLesson}
-        >
-          <ChevronLeft className="mr-2 h-4 w-4" />
-          Aula Anterior
-        </Button>
+      {/* Navegação entre aulas */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:justify-between mt-8">
+        {previousLesson ? (
+          <button
+            onClick={() => handleNavigate(previousLesson.id)}
+            className="flex items-center gap-3 p-4 rounded-lg border hover:bg-accent transition-colors text-left flex-1"
+          >
+            <ChevronLeft className="h-5 w-5 text-muted-foreground shrink-0" />
+            <div>
+              <p className="text-xs text-muted-foreground">Aula Anterior</p>
+              <p className="text-sm font-medium">{previousLesson.title}</p>
+            </div>
+          </button>
+        ) : (
+          <div className="flex-1" />
+        )}
 
-        <Button
-          onClick={() => nextLesson && navigate(`/minha-conta/aula/${nextLesson.id}`)}
-          disabled={!nextLesson}
-        >
-          Próxima Aula
-          <ChevronRight className="ml-2 h-4 w-4" />
-        </Button>
+        {nextLesson ? (
+          <button
+            onClick={() => handleNavigate(nextLesson.id)}
+            className="flex items-center justify-end gap-3 p-4 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-right flex-1"
+          >
+            <div>
+              <p className="text-xs opacity-80">Próxima Aula</p>
+              <p className="text-sm font-medium">{nextLesson.title}</p>
+            </div>
+            <ChevronRight className="h-5 w-5 shrink-0" />
+          </button>
+        ) : (
+          <button
+            onClick={() => navigate(`/minha-conta/curso/${lesson.course_modules.course_id}`)}
+            className="flex items-center justify-end gap-3 p-4 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-right flex-1"
+          >
+            <div>
+              <p className="text-xs opacity-80">Fim do módulo</p>
+              <p className="text-sm font-medium">Concluir Curso</p>
+            </div>
+            <CheckCircle2 className="h-5 w-5 shrink-0" />
+          </button>
+        )}
       </div>
     </div>
   );
