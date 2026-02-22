@@ -34,8 +34,17 @@ const AuthOneTime = () => {
 
         if (error || !data?.success) {
           console.error('Verification error:', error, data);
+          
+          let actualError = data?.error;
+          if (!actualError && error) {
+            try {
+              const errorBody = await (error as any).context?.json();
+              actualError = errorBody?.error;
+            } catch {}
+          }
+          
           setStatus('error');
-          setErrorMessage(data?.error || error?.message || 'Erro ao validar o link de acesso.');
+          setErrorMessage(actualError || error?.message || 'Erro ao validar o link de acesso.');
           return;
         }
 
