@@ -1,26 +1,46 @@
 
+## Fix: "Erro no login - missing email or phone" on Password Reset
 
-## Corrigir URL de Redirecionamento do Reset de Senha
+### Problem
+The "Recuperar senha" (Reset Password) dialog is rendered inside the login `<form>` tag. When the user submits the reset password form, the submit event bubbles up and also triggers the parent login form, which attempts `signInWithPassword` with empty email/password fields.
 
-### Problema
-O link de recuperacao de senha esta redirecionando para `lojafy.lovable.app/reset-password` ao inves de `lojafy.app/reset-password`.
+### Solution
+Move the reset password `<Dialog>` component outside the login `<form>` tag. This prevents form event bubbling issues entirely.
 
-### Solucao
-Alterar a constante `REDIRECT_URL` no arquivo `supabase/functions/reset-password-proxy/index.ts`.
+### Technical Details
 
-### Detalhes Tecnicos
+**File**: `src/pages/Auth.tsx`
 
-**Arquivo**: `supabase/functions/reset-password-proxy/index.ts` (linha 12)
-
-Alterar de:
+Currently the structure is:
 ```
-const REDIRECT_URL = 'https://lojafy.lovable.app/reset-password';
+<form onSubmit={handleLogin}>
+  ...email input...
+  ...password input...
+  <Dialog>  <!-- Reset password dialog is INSIDE login form -->
+    <form onSubmit={handleResetPassword}>
+      ...
+    </form>
+  </Dialog>
+  <Button type="submit">Entrar</Button>
+</form>
 ```
 
-Para:
+The fix restructures to:
 ```
-const REDIRECT_URL = 'https://lojafy.app/reset-password';
+<form onSubmit={handleLogin}>
+  ...email input...
+  ...password input...
+  <Button variant="link" onClick={() => setShowResetPasswordDialog(true)}>
+    Esqueci minha senha
+  </Button>
+  <Button type="submit">Entrar</Button>
+</form>
+
+<Dialog>  <!-- Reset password dialog is OUTSIDE login form -->
+  <form onSubmit={handleResetPassword}>
+    ...
+  </form>
+</Dialog>
 ```
 
-Apos o deploy, os novos links de recovery gerados pela Admin API usarao o dominio correto.
-
+This moves the `Dialog` (with its `DialogTrigger` replaced by a simple `onClick`) out of the login form, eliminating the nested form issue completely.
