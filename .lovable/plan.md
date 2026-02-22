@@ -1,68 +1,37 @@
 
+## Corrigir Envio do Link de Redefinicao de Senha
 
-## Redesign do Processo de Redefinicao de Senha
+### Problema
+O webhook n8n (`lojafy_reset_password`) esta apenas devolvendo os metadados da requisicao em vez de gerar o link de recovery e envia-lo ao usuario.
 
-### Visao Geral
+### Solucao
+Modificar a Edge Function `reset-password-proxy` para:
+1. Gerar o link de recovery diretamente usando a Supabase Admin API (`/auth/v1/admin/generate-link`)
+2. Enviar o link gerado para o webhook n8n, que sera responsavel apenas pela **entrega** (WhatsApp, email, etc.)
+3. Retornar sucesso/erro ao frontend
 
-Substituir o fluxo atual (que usa `supabase.auth.resetPasswordForEmail` diretamente) por um fluxo via webhook n8n, e criar a pagina `/reset-password` que falta para o usuario definir a nova senha.
+### Fluxo Corrigido
 
-### Componentes do Plano
+1. Usuario clica "Esqueci minha senha" e digita o email
+2. Frontend chama a Edge Function `reset-password-proxy`
+3. A Edge Function usa a `SUPABASE_SERVICE_ROLE_KEY` para chamar `POST /auth/v1/admin/generate-link` com `type: recovery` e `redirect_to: https://lojafy.lovable.app/reset-password`
+4. A Edge Function extrai o link de recovery da resposta
+5. A Edge Function envia o email + link para o webhook n8n (`lojafy_reset_password`)
+6. O n8n recebe `{ email, reset_link }` e entrega ao usuario (WhatsApp, email, etc.)
+7. A Edge Function retorna `{ message: "Link enviado" }` ao frontend
 
-#### 1. Criar Edge Function `reset-password-proxy`
+### Detalhes Tecnicos
 
-Seguindo o padrao existente de proxies (como `clone-advertise-proxy`), criar `supabase/functions/reset-password-proxy/index.ts` que:
-- Recebe `{ email }` no body
-- Encaminha para `https://n8n-n8n.nuwfic.easypanel.host/webhook/lojafy_reset_password`
-- Aguarda resposta e retorna ao frontend
+**Arquivo modificado**: `supabase/functions/reset-password-proxy/index.ts`
 
-#### 2. Registrar no `supabase/config.toml`
+Alteracoes:
+- Adicionar chamada a Supabase Admin API usando `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` (ja disponiveis como env vars nas Edge Functions)
+- Endpoint: `POST {SUPABASE_URL}/auth/v1/admin/generate-link`
+- Body: `{ "type": "recovery", "email": "...", "redirect_to": "https://lojafy.lovable.app/reset-password" }`
+- Header: `Authorization: Bearer {SERVICE_ROLE_KEY}`, `apikey: {SERVICE_ROLE_KEY}`
+- Extrair `action_link` da resposta
+- Enviar `{ email, reset_link: action_link }` para o webhook n8n
+- Se o n8n falhar na entrega, ainda retornar sucesso (o link foi gerado)
+- Se o email nao existir no Supabase, retornar mensagem generica (sem revelar se o email existe ou nao)
 
-Adicionar:
-```toml
-[functions.reset-password-proxy]
-verify_jwt = false
-```
-
-#### 3. Modificar `resetPassword` no `AuthContext.tsx`
-
-Substituir a chamada `supabase.auth.resetPasswordForEmail` por uma chamada ao proxy:
-```
-supabase.functions.invoke('reset-password-proxy', { body: { email } })
-```
-Aguardar a resposta do webhook e tratar sucesso/erro baseado no retorno.
-
-#### 4. Criar pagina `/reset-password` (ResetPassword.tsx)
-
-Nova pagina em `src/pages/ResetPassword.tsx` que:
-- Detecta o token de recovery na URL (hash `type=recovery`)
-- Chama `supabase.auth.setSession()` com os tokens do hash
-- Exibe formulario para nova senha (com confirmacao)
-- Chama `supabase.auth.updateUser({ password })` para salvar
-- Redireciona para `/auth` apos sucesso
-
-#### 5. Adicionar rota no `App.tsx`
-
-Registrar `<Route path="/reset-password" element={<ResetPassword />} />` como rota publica.
-
-### Fluxo Completo
-
-1. Usuario clica "Esqueci minha senha" na tela de login
-2. Digita o email e clica "Enviar"
-3. Frontend chama o proxy edge function
-4. Proxy encaminha para o webhook n8n
-5. n8n gera o link de reset (via Supabase Admin API) e envia por email/WhatsApp
-6. Frontend exibe mensagem de sucesso baseada na resposta do webhook
-7. Usuario clica no link recebido, e redirecionado para `/reset-password`
-8. Pagina extrai os tokens da URL, autentica o usuario, exibe formulario de nova senha
-9. Apos definir a nova senha, redireciona para `/auth`
-
-### Arquivos Modificados/Criados
-
-| Arquivo | Acao |
-|---------|------|
-| `supabase/functions/reset-password-proxy/index.ts` | Criar |
-| `supabase/config.toml` | Adicionar entrada |
-| `src/contexts/AuthContext.tsx` | Modificar `resetPassword` |
-| `src/pages/ResetPassword.tsx` | Criar |
-| `src/App.tsx` | Adicionar rota |
-
+Nenhum outro arquivo precisa ser alterado. O frontend e a pagina `/reset-password` ja estao prontos.
