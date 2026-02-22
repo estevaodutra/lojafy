@@ -186,8 +186,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
       
       if (error) {
-        // Send error event to N8N
-        await sendAuthEvent('login', email, undefined, 'error', { error: error.message });
+        // Send error event to N8N (only if email is provided)
+        if (email) {
+          await sendAuthEvent('login', email, undefined, 'error', { error: error.message });
+        }
         
         // Translate common error messages to Portuguese
         let errorMessage = error.message;
