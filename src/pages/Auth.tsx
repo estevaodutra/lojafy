@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthRedirect } from '@/hooks/useAuthRedirect';
 import { useToast } from '@/hooks/use-toast';
@@ -240,47 +240,9 @@ const Auth = () => {
                   </div>
                   
                   <div className="flex items-center justify-between">
-                    <Dialog open={showResetPasswordDialog} onOpenChange={setShowResetPasswordDialog}>
-                      <DialogTrigger asChild>
-                        <Button variant="link" className="p-0 h-auto text-sm text-muted-foreground hover:text-primary">
-                          Esqueci minha senha
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                          <DialogTitle>Recuperar senha</DialogTitle>
-                          <DialogDescription>
-                            Digite seu email para receber instruções de recuperação de senha.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <form onSubmit={handleResetPassword} className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="reset-email">Email</Label>
-                            <div className="relative">
-                              <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                              <Input
-                                id="reset-email"
-                                type="email"
-                                placeholder="seu@email.com"
-                                value={resetEmail}
-                                onChange={(e) => setResetEmail(e.target.value)}
-                                className="pl-10"
-                                required
-                              />
-                            </div>
-                          </div>
-                          <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setShowResetPasswordDialog(false)}>
-                              Cancelar
-                            </Button>
-                            <Button type="submit" disabled={isLoading}>
-                              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                              Enviar
-                            </Button>
-                          </DialogFooter>
-                        </form>
-                      </DialogContent>
-                    </Dialog>
+                    <Button type="button" variant="link" className="p-0 h-auto text-sm text-muted-foreground hover:text-primary" onClick={() => setShowResetPasswordDialog(true)}>
+                      Esqueci minha senha
+                    </Button>
                   </div>
                   
                   <Button type="submit" className="w-full" disabled={isLoading}>
@@ -420,6 +382,43 @@ const Auth = () => {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={showResetPasswordDialog} onOpenChange={setShowResetPasswordDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Recuperar senha</DialogTitle>
+            <DialogDescription>
+              Digite seu email para receber instruções de recuperação de senha.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="reset-email">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="reset-email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  className="pl-10"
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowResetPasswordDialog(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Enviar
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
