@@ -30,6 +30,7 @@ import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import AuthOneTime from "./pages/AuthOneTime";
 import AuthPremium from "./pages/AuthPremium";
+import ResetPassword from "./pages/ResetPassword";
 import CustomerLayout from "./components/customer/CustomerLayout";
 import CustomerDashboard from "./pages/customer/Dashboard";
 import CustomerOrders from "./pages/customer/Orders";
@@ -216,6 +217,7 @@ const App = () => {
               <Route path="/auth" element={<Auth />} />
               <Route path="/auth/onetime" element={<AuthOneTime />} />
               <Route path="/auth/premium" element={<AuthPremium />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/checkout/curso/:courseId" element={<CourseCheckout />} />
               
               {/* Customer Panel Routes */}

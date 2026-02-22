@@ -223,32 +223,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const resetPassword = async (email: string) => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth?reset=true`,
+      const { data, error } = await supabase.functions.invoke('reset-password-proxy', {
+        body: { email },
       });
-      
+
       if (error) {
-        // Translate error messages to Portuguese
-        let errorMessage = error.message;
-        if (error.message.includes('Invalid email')) {
-          errorMessage = 'Email inválido. Verifique o formato do email.';
-        }
-        
+        toast({
+          variant: "destructive",
+          title: "Erro ao recuperar senha",
+          description: "Não foi possível processar sua solicitação. Tente novamente.",
+        });
+        return { error };
+      }
+
+      // Check webhook response for errors
+      if (data?.error) {
+        const errorMessage = data.error || 'Erro ao processar solicitação.';
         toast({
           variant: "destructive",
           title: "Erro ao recuperar senha",
           description: errorMessage,
         });
-        return { error: { ...error, friendlyMessage: errorMessage } };
+        return { error: { message: errorMessage } };
       }
 
       toast({
-        title: "Email enviado!",
-        description: "Verifique sua caixa de entrada para redefinir sua senha.",
+        title: "Solicitação enviada!",
+        description: data?.message || "Se o email estiver cadastrado, você receberá um link para redefinir sua senha.",
       });
       
       return { error: null };
     } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erro ao recuperar senha",
+        description: "Ocorreu um erro inesperado. Tente novamente.",
+      });
       return { error };
     }
   };
