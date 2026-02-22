@@ -1,45 +1,26 @@
 
-## Enviar Dados do Perfil no Webhook de Reset
 
-### O que muda
+## Corrigir URL de Redirecionamento do Reset de Senha
 
-Modificar a Edge Function `reset-password-proxy` para, apos gerar o link de recovery, buscar os dados do perfil do usuario na tabela `profiles` e incluir no payload enviado ao webhook n8n.
+### Problema
+O link de recuperacao de senha esta redirecionando para `lojafy.lovable.app/reset-password` ao inves de `lojafy.app/reset-password`.
 
-### Dados enviados ao webhook
-
-O payload enviado para `lojafy_reset_password` passara de:
-
-```json
-{ "email": "...", "reset_link": "..." }
-```
-
-Para:
-
-```json
-{
-  "email": "usuario@email.com",
-  "reset_link": "https://...",
-  "first_name": "Joao",
-  "last_name": "Silva",
-  "phone": "5511999999999",
-  "cpf": "12345678900"
-}
-```
+### Solucao
+Alterar a constante `REDIRECT_URL` no arquivo `supabase/functions/reset-password-proxy/index.ts`.
 
 ### Detalhes Tecnicos
 
-**Arquivo modificado**: `supabase/functions/reset-password-proxy/index.ts`
+**Arquivo**: `supabase/functions/reset-password-proxy/index.ts` (linha 12)
 
-Apos gerar o link de recovery (que ja retorna o `user.id` nos dados), adicionar uma consulta a tabela `profiles`:
-
+Alterar de:
 ```
-const { data: profile } = await supabaseAdmin
-  .from('profiles')
-  .select('first_name, last_name, phone, cpf')
-  .eq('user_id', linkData.user.id)
-  .single();
+const REDIRECT_URL = 'https://lojafy.lovable.app/reset-password';
 ```
 
-Incluir os campos `first_name`, `last_name`, `phone` e `cpf` no body do fetch para o webhook. Campos nulos serao enviados como `null`.
+Para:
+```
+const REDIRECT_URL = 'https://lojafy.app/reset-password';
+```
 
-Nenhum outro arquivo precisa ser alterado.
+Apos o deploy, os novos links de recovery gerados pela Admin API usarao o dominio correto.
+
