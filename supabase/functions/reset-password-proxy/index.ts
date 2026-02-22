@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const WEBHOOK_URL = 'https://n8n-n8n.nuwfic.easypanel.host/webhook/lojafy_reset_password';
-const REDIRECT_URL = 'https://lojafy.lovable.app/reset-password';
+const REDIRECT_URL = 'https://lojafy.app/reset-password';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
