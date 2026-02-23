@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -185,6 +185,13 @@ const AppWithNotifications = () => {
 };
 
 const App = () => {
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery') && hash.includes('access_token')) {
+      window.location.href = '/reset-password' + hash;
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
