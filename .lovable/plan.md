@@ -1,33 +1,67 @@
 
-## Corrigir redirecionamento do link de recuperacao de senha
 
-### Problema
-O link de recuperacao agora redireciona corretamente para `https://lojafy.app`, mas o Supabase esta removendo o path `/reset-password` do `redirect_to`. Isso faz o usuario cair na pagina raiz (`/`) com os tokens de recovery no hash da URL, em vez de ir para `/reset-password` onde o formulario de nova senha esta.
+## Corrigir reset de senha - Bypass do redirect do Supabase
+
+### Problema raiz
+O endpoint `/auth/v1/verify` do Supabase sempre redireciona para o **Site URL** configurado no dashboard (que esta como `localhost:3000`), ignorando o parametro `redirect_to`. Mesmo configurando corretamente, o Supabase tem esse comportamento.
 
 ### Solucao
-Adicionar uma deteccao global no app que intercepta tokens de recovery na URL hash e redireciona automaticamente para `/reset-password`.
-
-### Detalhes Tecnicos
-
-**Arquivo**: `src/App.tsx` (ou componente raiz de roteamento)
-
-Adicionar um `useEffect` no componente principal que:
-
-1. Verifica se a URL hash contem `type=recovery` e `access_token`
-2. Se sim, redireciona para `/reset-password` preservando o hash com os tokens
-
-```typescript
-useEffect(() => {
-  const hash = window.location.hash;
-  if (hash && hash.includes('type=recovery') && hash.includes('access_token')) {
-    // Redirecionar para /reset-password mantendo o hash
-    window.location.href = '/reset-password' + hash;
-  }
-}, []);
-```
+Parar de enviar o `action_link` do Supabase no email. Em vez disso, extrair o `token_hash` da resposta do `generateLink` e construir um link direto para `https://lojafy.app/reset-password?token_hash=XXX&type=recovery`. No frontend, usar `verifyOtp()` para validar o token e criar a sessao.
 
 ### Arquivos a editar
-- `src/App.tsx` - Adicionar deteccao de recovery token no hash
+
+**1. Edge Function: `supabase/functions/reset-password-proxy/index.ts`**
+- Extrair `hashed_token` da resposta do `generateLink` (disponivel em `linkData.properties.hashed_token`)
+- Construir link customizado: `https://lojafy.app/reset-password?token_hash={hashed_token}&type=recovery`
+- Enviar esse link customizado para o webhook n8n em vez do `action_link` do Supabase
+
+**2. Frontend: `src/pages/ResetPassword.tsx`**
+- Adicionar deteccao de query params `token_hash` e `type=recovery`
+- Quando encontrar esses params, chamar `supabase.auth.verifyOtp({ token_hash, type: 'recovery' })` para estabelecer a sessao
+- Manter o fallback existente para hash params (compatibilidade)
+
+**3. Remover interceptor: `src/App.tsx`**
+- Remover o `useEffect` de interceptacao de recovery tokens adicionado anteriormente, pois nao sera mais necessario
+
+### Detalhes tecnicos
+
+**Edge Function (mudanca principal):**
+```typescript
+// Antes: enviava o action_link do Supabase
+const resetLink = linkData.properties.action_link;
+
+// Depois: constroi link direto com token_hash
+const tokenHash = linkData.properties.hashed_token;
+const resetLink = `https://lojafy.app/reset-password?token_hash=${tokenHash}&type=recovery`;
+```
+
+**Frontend (ResetPassword.tsx):**
+```typescript
+// Adicionar verificacao por query params
+const searchParams = new URLSearchParams(window.location.search);
+const tokenHash = searchParams.get('token_hash');
+const type = searchParams.get('type');
+
+if (type === 'recovery' && tokenHash) {
+  const { error } = await supabase.auth.verifyOtp({
+    token_hash: tokenHash,
+    type: 'recovery',
+  });
+  // Se sucesso, sessionReady = true
+}
+```
+
+### Fluxo apos a correcao
+
+1. Usuario clica "Esqueci minha senha"
+2. Edge Function gera token via `generateLink`
+3. Edge Function constroi link direto: `https://lojafy.app/reset-password?token_hash=XXX&type=recovery`
+4. Link e enviado por email via webhook n8n
+5. Usuario clica no link, vai direto para `/reset-password`
+6. Frontend detecta query params, chama `verifyOtp` para criar sessao
+7. Formulario de nova senha aparece
+8. Sem nenhuma dependencia do redirect do Supabase
 
 ### Resultado esperado
-Quando o usuario clicar no link de recuperacao, sera redirecionado para `https://lojafy.app`, o app detectara o token de recovery no hash e redirecionara automaticamente para `/reset-password#access_token=...&type=recovery`, onde o formulario de nova senha funcionara normalmente.
+O fluxo de reset de senha funcionara independentemente da configuracao do Site URL no Supabase Dashboard, eliminando o problema de `localhost` de vez.
+
