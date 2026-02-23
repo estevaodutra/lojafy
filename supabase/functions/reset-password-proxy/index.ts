@@ -49,8 +49,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const resetLink = linkData.properties.action_link;
-    console.log('[reset-password-proxy] Recovery link generated for:', body.email);
+    // Build custom link with token_hash to bypass Supabase redirect
+    const tokenHash = linkData.properties.hashed_token;
+    const resetLink = `https://lojafy.app/reset-password?token_hash=${tokenHash}&type=recovery`;
+    console.log('[reset-password-proxy] Custom recovery link generated for:', body.email);
 
     // 2. Fetch profile data
     const { data: profile } = await supabaseAdmin

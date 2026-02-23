@@ -22,6 +22,32 @@ const ResetPassword = () => {
 
   useEffect(() => {
     const handleRecovery = async () => {
+      // 1. Check query params (new flow with token_hash)
+      const searchParams = new URLSearchParams(window.location.search);
+      const tokenHash = searchParams.get('token_hash');
+      const queryType = searchParams.get('type');
+
+      if (queryType === 'recovery' && tokenHash) {
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: 'recovery',
+        });
+
+        if (error) {
+          console.error('Error verifying OTP:', error);
+          setSessionError(true);
+          toast({
+            variant: 'destructive',
+            title: 'Link expirado',
+            description: 'Este link de redefinição expirou ou é inválido. Solicite um novo.',
+          });
+        } else {
+          setSessionReady(true);
+        }
+        return;
+      }
+
+      // 2. Fallback: check hash params (legacy flow)
       const hash = window.location.hash;
       const params = new URLSearchParams(hash.replace('#', ''));
       const accessToken = params.get('access_token');
@@ -46,7 +72,7 @@ const ResetPassword = () => {
           setSessionReady(true);
         }
       } else {
-        // Check if user already has a session (e.g., from PKCE flow)
+        // 3. Check if user already has a session
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           setSessionReady(true);
