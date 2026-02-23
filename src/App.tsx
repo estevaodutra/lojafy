@@ -185,12 +185,6 @@ const AppWithNotifications = () => {
 };
 
 const App = () => {
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (hash && hash.includes('type=recovery') && hash.includes('access_token')) {
-      window.location.href = '/reset-password' + hash;
-    }
-  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
