@@ -1,30 +1,33 @@
 
-## Corrigir redirect_to do link de recuperacao de senha
+## Corrigir redirecionamento do link de recuperacao de senha
 
 ### Problema
-O link de recuperacao de senha esta usando `redirect_to=http://localhost:3000` porque o **Site URL** configurado no dashboard do Supabase ainda aponta para `http://localhost:3000`. A Edge Function passa `redirectTo: 'https://lojafy.app/reset-password'`, mas o Supabase usa o Site URL como base quando o redirect nao esta na lista de URLs permitidas.
+O link de recuperacao agora redireciona corretamente para `https://lojafy.app`, mas o Supabase esta removendo o path `/reset-password` do `redirect_to`. Isso faz o usuario cair na pagina raiz (`/`) com os tokens de recovery no hash da URL, em vez de ir para `/reset-password` onde o formulario de nova senha esta.
 
-### Solucao (configuracao no Supabase Dashboard)
+### Solucao
+Adicionar uma deteccao global no app que intercepta tokens de recovery na URL hash e redireciona automaticamente para `/reset-password`.
 
-Voce precisa atualizar duas configuracoes no Supabase Dashboard:
+### Detalhes Tecnicos
 
-1. **Acessar**: Supabase Dashboard > Authentication > URL Configuration
-2. **Site URL**: Alterar de `http://localhost:3000` para `https://lojafy.app`
-3. **Redirect URLs**: Adicionar as seguintes URLs na lista de URLs permitidas:
-   - `https://lojafy.app/**`
-   - `https://lojafy.lovable.app/**`
+**Arquivo**: `src/App.tsx` (ou componente raiz de roteamento)
 
-### Por que isso acontece?
-O Supabase Admin API (`generateLink`) valida o `redirectTo` contra a lista de Redirect URLs permitidas. Se a URL nao esta na lista, ele ignora o parametro e usa o Site URL padrao (`http://localhost:3000`). Por isso o link gerado tem `redirect_to=http://localhost:3000`.
+Adicionar um `useEffect` no componente principal que:
 
-### Passos
-1. Acesse o Supabase Dashboard na secao Authentication > URL Configuration
-2. Atualize o Site URL para `https://lojafy.app`
-3. Adicione `https://lojafy.app/**` e `https://lojafy.lovable.app/**` na lista de Redirect URLs
-4. Salve as alteracoes
-5. Teste novamente o fluxo de reset de senha
+1. Verifica se a URL hash contem `type=recovery` e `access_token`
+2. Se sim, redireciona para `/reset-password` preservando o hash com os tokens
+
+```typescript
+useEffect(() => {
+  const hash = window.location.hash;
+  if (hash && hash.includes('type=recovery') && hash.includes('access_token')) {
+    // Redirecionar para /reset-password mantendo o hash
+    window.location.href = '/reset-password' + hash;
+  }
+}, []);
+```
+
+### Arquivos a editar
+- `src/App.tsx` - Adicionar deteccao de recovery token no hash
 
 ### Resultado esperado
-Apos a configuracao, os links de recuperacao virao com `redirect_to=https://lojafy.app/reset-password`.
-
-Nenhuma alteracao de codigo e necessaria -- o problema e apenas de configuracao no dashboard.
+Quando o usuario clicar no link de recuperacao, sera redirecionado para `https://lojafy.app`, o app detectara o token de recovery no hash e redirecionara automaticamente para `/reset-password#access_token=...&type=recovery`, onde o formulario de nova senha funcionara normalmente.
