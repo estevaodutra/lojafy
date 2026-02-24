@@ -22,7 +22,8 @@ import {
   DollarSign,
   GraduationCap,
   Code,
-  Sparkles
+  Sparkles,
+  CreditCard
 } from 'lucide-react';
 import {
   Sidebar,
@@ -78,6 +79,11 @@ const superAdminMenuItems = [
     title: 'Features',
     url: '/super-admin/features',
     icon: Sparkles,
+  },
+  {
+    title: 'Planos',
+    url: '/super-admin/planos',
+    icon: CreditCard,
   },
   {
     title: 'API Docs',
