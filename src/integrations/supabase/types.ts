@@ -2441,6 +2441,96 @@ export type Database = {
           },
         ]
       }
+      plan_features: {
+        Row: {
+          created_at: string
+          feature_id: string
+          id: string
+          limites: Json | null
+          plan_id: string
+        }
+        Insert: {
+          created_at?: string
+          feature_id: string
+          id?: string
+          limites?: Json | null
+          plan_id: string
+        }
+        Update: {
+          created_at?: string
+          feature_id?: string
+          id?: string
+          limites?: Json | null
+          plan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_features_feature_id_fkey"
+            columns: ["feature_id"]
+            isOneToOne: false
+            referencedRelation: "features"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_features_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plans: {
+        Row: {
+          ativo: boolean | null
+          cor: string | null
+          created_at: string
+          descricao: string | null
+          destaque: boolean | null
+          icone: string | null
+          id: string
+          nome: string
+          ordem: number | null
+          preco_anual: number | null
+          preco_mensal: number | null
+          preco_vitalicio: number | null
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          cor?: string | null
+          created_at?: string
+          descricao?: string | null
+          destaque?: boolean | null
+          icone?: string | null
+          id?: string
+          nome: string
+          ordem?: number | null
+          preco_anual?: number | null
+          preco_mensal?: number | null
+          preco_vitalicio?: number | null
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean | null
+          cor?: string | null
+          created_at?: string
+          descricao?: string | null
+          destaque?: boolean | null
+          icone?: string | null
+          id?: string
+          nome?: string
+          ordem?: number | null
+          preco_anual?: number | null
+          preco_mensal?: number | null
+          preco_vitalicio?: number | null
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       platform_settings: {
         Row: {
           additional_costs: Json | null
@@ -3051,6 +3141,10 @@ export type Database = {
           origem_tipo: Database["public"]["Enums"]["origem_tipo"] | null
           password_set: boolean | null
           phone: string | null
+          plan_expires_at: string | null
+          plan_id: string | null
+          plan_started_at: string | null
+          plan_type: string | null
           role: Database["public"]["Enums"]["app_role"]
           subdomain: string | null
           subscription_expires_at: string | null
@@ -3079,6 +3173,10 @@ export type Database = {
           origem_tipo?: Database["public"]["Enums"]["origem_tipo"] | null
           password_set?: boolean | null
           phone?: string | null
+          plan_expires_at?: string | null
+          plan_id?: string | null
+          plan_started_at?: string | null
+          plan_type?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           subdomain?: string | null
           subscription_expires_at?: string | null
@@ -3107,6 +3205,10 @@ export type Database = {
           origem_tipo?: Database["public"]["Enums"]["origem_tipo"] | null
           password_set?: boolean | null
           phone?: string | null
+          plan_expires_at?: string | null
+          plan_id?: string | null
+          plan_started_at?: string | null
+          plan_type?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           subdomain?: string | null
           subscription_expires_at?: string | null
@@ -3117,7 +3219,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       reseller_banners: {
         Row: {
@@ -4583,6 +4693,8 @@ export type Database = {
           type: string
         }[]
       }
+      get_plan_feature_count: { Args: { _plan_id: string }; Returns: number }
+      get_plan_user_count: { Args: { _plan_id: string }; Returns: number }
       get_product_total_stock: {
         Args: { p_product_id: string }
         Returns: number

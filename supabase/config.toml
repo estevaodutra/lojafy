@@ -203,3 +203,6 @@ verify_jwt = false
 
 [functions.reset-password-proxy]
 verify_jwt = false
+
+[functions.atribuir-plano]
+verify_jwt = false
