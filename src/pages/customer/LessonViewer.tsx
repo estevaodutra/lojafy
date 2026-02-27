@@ -67,10 +67,18 @@ export default function LessonViewer() {
   if (!lesson) {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
-        <h1 className="text-2xl font-bold mb-4">Aula não encontrada</h1>
-        <Button asChild>
-          <Link to="/minha-conta/academy">Voltar para Academy</Link>
-        </Button>
+        <h1 className="text-2xl font-bold mb-4">Não foi possível carregar a aula</h1>
+        <p className="text-muted-foreground mb-6">
+          Isso pode acontecer se sua sessão expirou ou se houve um problema de conexão.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Button variant="outline" onClick={() => window.location.reload()}>
+            Tentar novamente
+          </Button>
+          <Button asChild>
+            <Link to="/minha-conta/academy">Voltar para Academy</Link>
+          </Button>
+        </div>
       </div>
     );
   }
