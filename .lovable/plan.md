@@ -1,26 +1,42 @@
 
 
-## Diagnostico: A pagina /super-admin/planos NAO tem erro 404 de codigo
+# Diagnostico: "Aula não encontrada" ao clicar em "Assistir Aula"
 
-### O que esta acontecendo
+## Causa raiz identificada
 
-A rota `/super-admin/planos` esta corretamente definida no `App.tsx` (linha 314) e o componente `Planos.tsx` existe em `src/pages/admin/Planos.tsx`. O codigo esta correto.
+O `useLessonContent` usa uma query com nested `!inner` joins:
+```
+course_lessons → course_modules!inner → courses!inner
+```
 
-O 404 acontece porque voce **nao esta logado como super_admin** no preview. O `RoleBasedRoute` verifica a autenticacao e, se o usuario nao esta logado, redireciona para `/auth`. Se esta logado mas nao e super_admin, redireciona para `/`.
+Quando o PostgREST processa essa query, as policies RLS de **todas** as tabelas na chain devem permitir acesso. A policy RLS de `course_lessons` verifica:
+- `access_level = 'all'` → **falha** (os cursos publicados são `access_level = 'reseller'`)
+- enrollment do usuário → **só funciona se autenticado E matriculado**
+- super_admin → **só para admins**
 
-Quando testei pelo browser, a pagina redirecionou corretamente para a tela de login (`/auth`), confirmando que a rota existe e funciona.
+Se a sessão do usuário expirar ou houver qualquer falha na chain de RLS, `.single()` retorna erro, `lesson` fica `undefined`, e aparece "Aula não encontrada".
 
-### Como testar
+Enquanto isso, a listagem de aulas (`useModuleContent`) faz `select('*')` sem joins nested, o que é menos suscetível a falhas.
 
-1. Acesse `/auth` no preview
-2. Faca login com uma conta que tenha `role = 'super_admin'` no banco
-3. Depois navegue para `/super-admin/planos`
+## Plano de correção
 
-### Verificacao do banco
+### 1. Simplificar query do `useLessonContent`
+Dividir em 2 queries separadas em vez de nested `!inner` joins:
+- Query 1: buscar a lesson por ID com `select('*')`
+- Query 2: buscar o module com course info usando `module_id` da lesson
 
-Se quiser, posso verificar qual usuario tem role `super_admin` no banco para confirmar as credenciais de acesso. Nao ha nenhuma alteracao de codigo necessaria.
+Isso evita a chain de RLS em joins nested.
 
-### Caso queira uma solucao alternativa
+### 2. Adicionar tratamento de erro com log
+Adicionar `console.error` no `queryFn` do `useLessonContent` para logar erros RLS ao invés de silenciosamente retornar undefined.
 
-Se preferir, posso adicionar a pagina de Planos tambem nas rotas do `/admin` (acessivel por `admin` e `super_admin`), para que voce possa acessar por `/admin/planos` com sua conta admin atual.
+### 3. Melhorar a mensagem de erro no LessonViewer
+Quando `lesson` é null mas `lessonLoading` é false, mostrar uma mensagem mais informativa com sugestão de relogar, em vez de apenas "Aula não encontrada".
+
+## Arquivos a editar
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/hooks/useLessonContent.ts` | Simplificar query, dividir em 2, adicionar error logging |
+| `src/pages/customer/LessonViewer.tsx` | Melhorar mensagem de erro quando lesson não carrega |
 
