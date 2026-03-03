@@ -1,42 +1,28 @@
 
 
-# Diagnostico: "Aula não encontrada" ao clicar em "Assistir Aula"
+# Diagnostico: Variações nos Produtos
 
-## Causa raiz identificada
+## Resultado da investigação
 
-O `useLessonContent` usa uma query com nested `!inner` joins:
-```
-course_lessons → course_modules!inner → courses!inner
-```
+As variações **estão funcionando corretamente** no sistema. Testei acessando o produto "Kit 24 Canetas Marcadoras" tanto pela loja principal (`/produto/...`) quanto pela loja de revendedor (`/loja/tacado/produto/...`) e os botões de variação (24 Un, 36 Un, 48 Un) apareceram normalmente em ambos.
 
-Quando o PostgREST processa essa query, as policies RLS de **todas** as tabelas na chain devem permitir acesso. A policy RLS de `course_lessons` verifica:
-- `access_level = 'all'` → **falha** (os cursos publicados são `access_level = 'reseller'`)
-- enrollment do usuário → **só funciona se autenticado E matriculado**
-- super_admin → **só para admins**
+## O problema real
 
-Se a sessão do usuário expirar ou houver qualquer falha na chain de RLS, `.single()` retorna erro, `lesson` fica `undefined`, e aparece "Aula não encontrada".
+O produto da sua screenshot (Chaleira Elétrica Retrátil) **não tem variações cadastradas** no banco de dados. Na verdade, de 154 produtos ativos, apenas **2 produtos** possuem variações registradas na tabela `product_variants`.
 
-Enquanto isso, a listagem de aulas (`useModuleContent`) faz `select('*')` sem joins nested, o que é menos suscetível a falhas.
+| Métrica | Valor |
+|---------|-------|
+| Produtos ativos | 154 |
+| Produtos com variações | 2 |
+| Total de variações | 4 |
 
-## Plano de correção
+## O que fazer
 
-### 1. Simplificar query do `useLessonContent`
-Dividir em 2 queries separadas em vez de nested `!inner` joins:
-- Query 1: buscar a lesson por ID com `select('*')`
-- Query 2: buscar o module com course info usando `module_id` da lesson
+As variações precisam ser cadastradas para cada produto individualmente pelo painel admin, no formulário de edição do produto (`ProductForm`). Para a Chaleira Elétrica, por exemplo, seria necessário cadastrar variações como "110V" e "220V", ou as cores disponíveis.
 
-Isso evita a chain de RLS em joins nested.
+## Opções de próximo passo
 
-### 2. Adicionar tratamento de erro com log
-Adicionar `console.error` no `queryFn` do `useLessonContent` para logar erros RLS ao invés de silenciosamente retornar undefined.
-
-### 3. Melhorar a mensagem de erro no LessonViewer
-Quando `lesson` é null mas `lessonLoading` é false, mostrar uma mensagem mais informativa com sugestão de relogar, em vez de apenas "Aula não encontrada".
-
-## Arquivos a editar
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/hooks/useLessonContent.ts` | Simplificar query, dividir em 2, adicionar error logging |
-| `src/pages/customer/LessonViewer.tsx` | Melhorar mensagem de erro quando lesson não carrega |
+1. **Cadastrar variações manualmente**: Acesse o painel admin, edite o produto desejado e adicione as variações (nome, preço, estoque)
+2. **Criar variações em lote via SQL**: Posso inserir variações para produtos específicos diretamente no banco se você me informar quais produtos e quais opções deseja
+3. **Melhorar o formulário de variações**: Se o formulário atual não está intuitivo para cadastrar variações, posso redesenhá-lo
 
