@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ShoppingBag, Store, Package, Link2, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -5,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/contexts/AuthContext';
+import { BetaWarningDialog } from '@/components/integrations/BetaWarningDialog';
 
 const comingSoonMarketplaces = [
   {
@@ -50,10 +52,15 @@ const benefits = [
 
 const LojafyIntegra = () => {
   const { user } = useAuth();
+  const [showBetaWarning, setShowBetaWarning] = useState(false);
 
   const getMercadoLivreAuthUrl = () => {
     const userId = user?.id || '';
     return `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=2003351424267574&redirect_uri=https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Callback&state=${userId}`;
+  };
+
+  const handleConfirmBeta = () => {
+    window.open(getMercadoLivreAuthUrl(), '_blank');
   };
 
   return (
@@ -113,11 +120,9 @@ const LojafyIntegra = () => {
               <CardDescription>Integre com o maior marketplace da América Latina</CardDescription>
             </CardHeader>
             <CardFooter>
-              <Button className="w-full" asChild>
-                <a href={getMercadoLivreAuthUrl()} target="_blank" rel="noopener noreferrer">
-                  <Link2 className="mr-2 h-4 w-4" />
-                  Integrar
-                </a>
+              <Button className="w-full" onClick={() => setShowBetaWarning(true)}>
+                <Link2 className="mr-2 h-4 w-4" />
+                Integrar
               </Button>
             </CardFooter>
           </Card>
@@ -156,6 +161,12 @@ const LojafyIntegra = () => {
           ))}
         </div>
       </div>
+      <BetaWarningDialog
+        open={showBetaWarning}
+        onOpenChange={setShowBetaWarning}
+        onConfirm={handleConfirmBeta}
+        marketplaceName="Mercado Livre"
+      />
     </div>
   );
 };
