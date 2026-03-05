@@ -1,31 +1,33 @@
 
 
-# Fix: Variações não aparecem ao reabrir o formulário de edição
+# Fix: "Produto não encontrado" ao clicar nos Top 10 Produtos
 
 ## Causa raiz
 
-O `ProductForm` está dentro de um `<Dialog>` que **não desmonta** o conteúdo quando fecha. O `useRef(variantsInitialized)` permanece `true` da edição anterior, impedindo o `useEffect` de popular as variações na próxima abertura.
+O produto "Tela Ampliadora 3D para Celular" (e possivelmente outros) tem `active = false` no banco de dados. A página `/produto/:id` filtra com `.eq('active', true)`, então retorna "Produto não encontrado".
 
-## Correção
+Além disso, a página `TopProdutosVencedores.tsx` usa **URLs hardcoded** com UUIDs fixos (linhas 18-95), em vez de buscar dinamicamente da tabela `feature_produtos`. Isso significa que qualquer mudança nos produtos (desativação, exclusão, novos produtos) quebra os links.
 
-No `ProductForm.tsx`, adicionar um segundo `useEffect` que reseta `variantsInitialized.current = false` sempre que o `product?.id` mudar. Isso garante que quando o diálogo reabre com o mesmo ou outro produto, as variações serão carregadas novamente.
+## Plano
 
-Além disso, limpar o estado `variants` quando o produto muda para evitar exibir variações do produto anterior.
+### 1. Tornar a lista de produtos dinâmica no `TopProdutosVencedores.tsx`
 
-### Arquivo: `src/components/admin/ProductForm.tsx`
+Substituir o array `initialProducts` hardcoded por dados dinâmicos da tabela `feature_produtos` (usando o slug `top_10_produtos`):
 
-Adicionar logo após a declaração do `variantsInitialized` ref:
+- Buscar o `feature_id` da feature com slug `top_10_produtos`
+- Usar `useFeatureProducts(featureId)` para obter os produtos vinculados com nome, URL e ordem
+- Manter a funcionalidade de checklist/progresso no localStorage, mas indexada por `produto_id` em vez de IDs fixos
+- Gerar `productUrl` dinamicamente como `/produto/{produto_id}`
 
-```typescript
-// Reset initialization when product changes
-useEffect(() => {
-  variantsInitialized.current = false;
-  setVariants([]);
-}, [product?.id]);
-```
+### 2. Remover filtro `active = true` para produtos acessados por link direto (opcional)
 
-Isso garante que:
-1. Ao abrir para editar produto A → variações de A são carregadas
-2. Ao fechar e reabrir produto A → ref reseta, variações recarregam
-3. Ao trocar de produto A para B → ref reseta, variações de B carregam
+Na página `Produto.tsx`, considerar remover o `.eq('active', true)` da query principal, já que se o usuário tem o link direto, deveria poder ver o produto. Alternativamente, ativar os produtos que estão no Top 10.
+
+**Recomendação:** A abordagem mais segura é tornar a lista dinâmica (passo 1) e garantir que apenas produtos ativos sejam vinculados à feature. Isso evita o problema na raiz.
+
+### Arquivos a editar
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/pages/reseller/TopProdutosVencedores.tsx` | Substituir dados hardcoded por query dinâmica usando `feature_produtos` |
 
