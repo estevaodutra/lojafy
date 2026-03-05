@@ -346,6 +346,13 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
 
   // Populate variants state when existing variants are loaded
   const variantsInitialized = useRef(false);
+
+  // Reset initialization when product changes
+  useEffect(() => {
+    variantsInitialized.current = false;
+    setVariants([]);
+  }, [product?.id]);
+
   useEffect(() => {
     if (existingVariants && existingVariants.length > 0 && !variantsInitialized.current) {
       variantsInitialized.current = true;
