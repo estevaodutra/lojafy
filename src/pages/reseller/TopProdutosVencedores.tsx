@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Trophy, Clock, Target, CheckCircle2, Circle, ExternalLink, Rocket, Users, MessageCircle, Facebook, Instagram, Store, Zap, AlertTriangle, Sparkles, Timer, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Trophy, Clock, Target, CheckCircle2, Circle, ExternalLink, Rocket, Users, MessageCircle, Facebook, Instagram, Store, Zap, AlertTriangle, Sparkles, Timer, ChevronDown, ChevronUp, Copy, Check, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,92 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-interface Product {
-  id: string;
-  number: number;
-  name: string;
-  productUrl: string;
-  completed: boolean;
-  userLink: string;
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useFeatureProducts } from '@/hooks/useFeatureProducts';
+
+interface ChecklistState {
+  [produtoId: string]: { completed: boolean; userLink: string };
 }
-const initialProducts: Product[] = [{
-  id: '1',
-  number: 1,
-  name: 'Tela Ampliadora 3D para Celular',
-  productUrl: '/produto/0a8d1f8f-984a-4c52-8c2f-88250ac393ca',
-  completed: false,
-  userLink: ''
-}, {
-  id: '2',
-  number: 2,
-  name: 'Dermaroller Microagulhamento',
-  productUrl: '/produto/252cd780-fa9f-4825-b14b-9ec6c7e57d7b',
-  completed: false,
-  userLink: ''
-}, {
-  id: '3',
-  number: 3,
-  name: 'Lousa Mágica LCD Infantil',
-  productUrl: '/produto/06684218-913b-4e88-94d7-fc193ba8b28f',
-  completed: false,
-  userLink: ''
-}, {
-  id: '4',
-  number: 4,
-  name: 'Palmilha Elevatória',
-  productUrl: '/produto/645f1845-b184-47de-b4bf-9b277fe1ce39',
-  completed: false,
-  userLink: ''
-}, {
-  id: '5',
-  number: 5,
-  name: 'Palmilha Gel Ortopédica (Calcanhar)',
-  productUrl: '/produto/5211ef86-e034-4cfe-9836-ebbc417dad0d',
-  completed: false,
-  userLink: ''
-}, {
-  id: '6',
-  number: 6,
-  name: 'Joelheira de Compressão',
-  productUrl: '/produto/581bd820-17cc-43df-b924-5d15d4ba768a',
-  completed: false,
-  userLink: ''
-}, {
-  id: '7',
-  number: 7,
-  name: 'Meia / Palmilha Fascite Plantar',
-  productUrl: '/produto/8954f5bf-cbd6-424a-8e7a-80584cbdd77e',
-  completed: false,
-  userLink: ''
-}, {
-  id: '8',
-  number: 8,
-  name: 'Cascata de Chocolate',
-  productUrl: '/produto/e5debf21-08d1-4ab5-9e6b-afb8ba5e04bc',
-  completed: false,
-  userLink: ''
-}, {
-  id: '9',
-  number: 9,
-  name: 'Tábua Mágica de Descongelamento',
-  productUrl: '/produto/02d9ea24-0942-4748-97fc-38bb2ad2560b',
-  completed: false,
-  userLink: ''
-}, {
-  id: '10',
-  number: 10,
-  name: 'Regata Modeladora Efeito Sauna',
-  productUrl: '/produto/7f6a1540-ff88-4260-8a00-3dcb90e6208d',
-  completed: false,
-  userLink: ''
-}, {
-  id: '11',
-  number: 11,
-  name: 'Cinta Modeladora Alta Compressão Feminina',
-  productUrl: '/produto/4bec5a4c-79d3-4ae0-9038-9b9f51c26b62',
-  completed: false,
-  userLink: ''
-}];
 const strategies = [{
   icon: Users,
   title: 'Amigos e Familiares',
@@ -131,45 +52,74 @@ const strategies = [{
   color: 'bg-pink-500'
 }];
 const TopProdutosVencedores: React.FC = () => {
-  const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem('missao24h_products');
-    return saved ? JSON.parse(saved) : initialProducts;
+  // Fetch feature id for top_10_produtos
+  const { data: feature } = useQuery({
+    queryKey: ['feature-top10-slug'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('features')
+        .select('id')
+        .eq('slug', 'top_10_produtos')
+        .single();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const featureId = feature?.id || null;
+  const { products: featureProducts, isLoading } = useFeatureProducts(featureId);
+
+  const [checklist, setChecklist] = useState<ChecklistState>(() => {
+    const saved = localStorage.getItem('missao24h_checklist');
+    return saved ? JSON.parse(saved) : {};
   });
   const [checklistOpen, setChecklistOpen] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const products = useMemo(() => featureProducts.map((fp, i) => ({
+    id: fp.produto_id,
+    number: i + 1,
+    name: fp.product_name,
+    productUrl: `/produto/${fp.produto_id}`,
+    completed: checklist[fp.produto_id]?.completed || false,
+    userLink: checklist[fp.produto_id]?.userLink || '',
+  })), [featureProducts, checklist]);
+
   const completedCount = products.filter(p => p.completed).length;
-  const progressPercentage = completedCount / products.length * 100;
-  const handleToggleComplete = (id: string) => {
-    const updated = products.map(p => p.id === id ? {
-      ...p,
-      completed: !p.completed
-    } : p);
-    setProducts(updated);
-    localStorage.setItem('missao24h_products', JSON.stringify(updated));
-    const product = updated.find(p => p.id === id);
-    if (product?.completed) {
-      toast.success(`✅ ${product.name} marcado como publicado!`);
+  const progressPercentage = products.length > 0 ? (completedCount / products.length) * 100 : 0;
+
+  const handleToggleComplete = (produtoId: string) => {
+    const prev = checklist[produtoId] || { completed: false, userLink: '' };
+    const updated = { ...checklist, [produtoId]: { ...prev, completed: !prev.completed } };
+    setChecklist(updated);
+    localStorage.setItem('missao24h_checklist', JSON.stringify(updated));
+    if (!prev.completed) {
+      const product = products.find(p => p.id === produtoId);
+      toast.success(`✅ ${product?.name} marcado como publicado!`);
     }
   };
-  const handleUpdateLink = (id: string, link: string) => {
-    const updated = products.map(p => p.id === id ? {
-      ...p,
-      userLink: link
-    } : p);
-    setProducts(updated);
-    localStorage.setItem('missao24h_products', JSON.stringify(updated));
+
+  const handleUpdateLink = (produtoId: string, link: string) => {
+    const prev = checklist[produtoId] || { completed: false, userLink: '' };
+    const updated = { ...checklist, [produtoId]: { ...prev, userLink: link } };
+    setChecklist(updated);
+    localStorage.setItem('missao24h_checklist', JSON.stringify(updated));
   };
-  const handleResetProgress = () => {
-    setProducts(initialProducts);
-    localStorage.removeItem('missao24h_products');
-    toast.info('Progresso resetado!');
-  };
+
   const handleCopyLink = (url: string, id: string) => {
     navigator.clipboard.writeText(window.location.origin + url);
     setCopiedId(id);
     toast.success('Link copiado!');
     setTimeout(() => setCopiedId(null), 2000);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
   return <div className="space-y-8 max-w-6xl mx-auto pb-12">
       {/* Hero Section */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-red-500 p-8 text-white">
@@ -185,12 +135,12 @@ const TopProdutosVencedores: React.FC = () => {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
               <h1 className="text-4xl md:text-5xl font-bold mb-2">Missão 24h</h1>
-              <p className="text-xl text-amber-100 font-medium">11 Produtos Ativos</p>
+              <p className="text-xl text-amber-100 font-medium">{products.length} Produtos Ativos</p>
               <p className="mt-3 text-amber-100/80 max-w-lg">
                 <strong className="text-white">Leia em 5 minutos.</strong> Execute em 24 horas.
               </p>
               <p className="mt-2 text-sm text-amber-100/70">
-                Daqui a 24 horas, você <strong className="text-white">PRECISA</strong> estar com os 11 anúncios publicados 
+                Daqui a 24 horas, você <strong className="text-white">PRECISA</strong> estar com os {products.length} anúncios publicados 
                 e ativos em pelo menos 1 marketplace.
               </p>
             </div>
@@ -222,7 +172,7 @@ const TopProdutosVencedores: React.FC = () => {
               <Sparkles className="w-5 h-5 text-primary" />
               Progresso da Missão
             </CardTitle>
-            <CardDescription>{completedCount}/11 produtos publicados</CardDescription>
+            <CardDescription>{completedCount}/{products.length} produtos publicados</CardDescription>
           </CardHeader>
           <CardContent>
             <Progress value={progressPercentage} className="h-3 mb-4" />
@@ -294,7 +244,7 @@ const TopProdutosVencedores: React.FC = () => {
       <div id="products-list">
         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
           <Trophy className="w-6 h-6 text-primary" />
-          Listagem dos 11 Produtos
+          Listagem dos {products.length} Produtos
         </h2>
         
         <div className="grid md:grid-cols-2 gap-4">
