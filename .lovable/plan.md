@@ -1,15 +1,31 @@
 
 
-# Plan: Beta Warning Dialog for Mercado Livre Integration
+# Fix: Variações não aparecem ao reabrir o formulário de edição
 
-## Changes
+## Causa raiz
 
-### 1. Create `src/components/integrations/BetaWarningDialog.tsx`
-New dialog component matching the user's spec: header with Flask icon + "Beta" badge, warning alert, list of possible issues (Bug, RefreshCw, AlertTriangle icons), green reassurance box, checkbox for acceptance, and Cancel/Continue buttons. Continue button disabled until checkbox is checked. On confirm, calls `onConfirm` callback and resets state.
+O `ProductForm` está dentro de um `<Dialog>` que **não desmonta** o conteúdo quando fecha. O `useRef(variantsInitialized)` permanece `true` da edição anterior, impedindo o `useEffect` de popular as variações na próxima abertura.
 
-### 2. Update `src/pages/reseller/LojafyIntegra.tsx`
-- Add state `showBetaWarning` (boolean)
-- Change the Mercado Livre "Integrar" button from a direct `<a>` link to a `<Button onClick>` that opens the dialog
-- On dialog confirm, redirect to the OAuth URL via `window.open(getMercadoLivreAuthUrl(), '_blank')`
-- Render `<BetaWarningDialog>` at the bottom of the component
+## Correção
+
+No `ProductForm.tsx`, adicionar um segundo `useEffect` que reseta `variantsInitialized.current = false` sempre que o `product?.id` mudar. Isso garante que quando o diálogo reabre com o mesmo ou outro produto, as variações serão carregadas novamente.
+
+Além disso, limpar o estado `variants` quando o produto muda para evitar exibir variações do produto anterior.
+
+### Arquivo: `src/components/admin/ProductForm.tsx`
+
+Adicionar logo após a declaração do `variantsInitialized` ref:
+
+```typescript
+// Reset initialization when product changes
+useEffect(() => {
+  variantsInitialized.current = false;
+  setVariants([]);
+}, [product?.id]);
+```
+
+Isso garante que:
+1. Ao abrir para editar produto A → variações de A são carregadas
+2. Ao fechar e reabrir produto A → ref reseta, variações recarregam
+3. Ao trocar de produto A para B → ref reseta, variações de B carregam
 
