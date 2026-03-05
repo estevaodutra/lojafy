@@ -1,40 +1,16 @@
 
 
-# Alterações nos cards de produtos - Top 10
+# Criar rota pública `/top_10_produtos`
 
-## Resumo das mudanças
+## O que será feito
 
-Nos cards de produto da página Top Produtos:
+Adicionar uma rota pública `/top_10_produtos` que renderiza o componente `TopProdutosVencedores` sem exigir autenticação, sem layout de painel (customer/reseller), e acessível por qualquer pessoa.
 
-1. **Remover** o campo "Seu Anúncio" (input + label)
-2. **Transformar** "Referência Externa" de input editável para **botão** "Ver Referência" (abre link em nova aba, visível apenas quando há link cadastrado pelo admin)
-3. **Transformar** "Produto Base" (label + botão + copiar) em um **botão único** "Abrir Lojafy" mais limpo
+## Alterações
 
-## Alterações em `src/pages/reseller/TopProdutosVencedores.tsx`
+### `src/App.tsx`
+- Adicionar uma nova rota pública `<Route path="/top_10_produtos" element={<ResellerTopProdutosVencedores />} />` junto das outras rotas públicas (após linha ~223, junto com `/auth`, `/faq`, etc.)
+- O import de `ResellerTopProdutosVencedores` já existe no arquivo, então nada mais é necessário
 
-### Dentro do card (linhas ~278-312), substituir os 3 blocos por:
-
-```tsx
-<div className="flex items-center gap-2 flex-wrap">
-  <Button variant="outline" size="sm" className="h-8 text-xs"
-    onClick={() => window.open(product.productUrl, '_blank')}>
-    Abrir Lojafy <ExternalLink className="w-3 h-3 ml-1" />
-  </Button>
-  <Button variant="ghost" size="icon" className="h-7 w-7"
-    onClick={() => handleCopyLink(product.productUrl, product.id)}>
-    {copiedId === product.id ? <Check ... /> : <Copy ... />}
-  </Button>
-  {product.referenceLink && (
-    <Button variant="outline" size="sm" className="h-8 text-xs"
-      onClick={() => window.open(product.referenceLink, '_blank')}>
-      Ver Referência <ExternalLink className="w-3 h-3 ml-1" />
-    </Button>
-  )}
-</div>
-```
-
-### Limpeza
-- Remover `handleUpdateLink` e `handleUpdateReferenceLink` (não mais necessários na página do revendedor)
-- Remover `userLink` do estado/checklist do revendedor
-- Manter `referenceLink` apenas como leitura vindo do banco (via `useFeatureProducts`)
+A página será renderizada diretamente, sem `FeatureRoute`, `RoleBasedRoute` ou layout de painel — qualquer pessoa pode acessar via URL.
 
