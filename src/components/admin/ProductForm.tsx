@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -345,8 +345,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
   });
 
   // Populate variants state when existing variants are loaded
+  const variantsInitialized = useRef(false);
   useEffect(() => {
-    if (existingVariants.length > 0 && variants.length === 0) {
+    if (existingVariants && existingVariants.length > 0 && !variantsInitialized.current) {
+      variantsInitialized.current = true;
       const mappedVariants: ProductVariant[] = existingVariants.map(v => ({
         id: v.id,
         type: v.type as 'color' | 'size' | 'model',
