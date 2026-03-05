@@ -1,31 +1,28 @@
 
 
-# Fix: Links dos produtos apontando para o domínio errado
+# Adicionar campo de referência externa (Mercado Livre) no card de produto
 
-## Problema
+## O que será feito
 
-O botão "Abrir Lojafy" usa `window.open(product.productUrl, '_blank')` com URL relativa (`/produto/ID`), que abre no domínio atual (preview). O "Copiar link" usa `window.location.origin`, que também pega o domínio do preview.
+Adicionar um novo campo no card de cada produto na lista "Top Produtos" para o revendedor informar/visualizar o link de referência externa do anúncio (ex: link do Mercado Livre). Esse campo ficará entre o "Produto Base" e o "Seu Anúncio".
 
-O correto é apontar para o domínio publicado: `https://lojafy.lovable.app`.
+## Alterações
 
-## Correção
+### `src/pages/reseller/TopProdutosVencedores.tsx`
 
-No `TopProdutosVencedores.tsx`:
+1. **Atualizar o estado do checklist** para incluir `referenceLink` além de `completed` e `userLink`
+2. **Adicionar handler** `handleUpdateReferenceLink` para salvar o link de referência no localStorage
+3. **Adicionar novo campo no card** entre "Produto Base" e "Seu Anúncio":
+   - Label: "Referência Externa:" (com ícone do Mercado Livre ou link externo)
+   - Input para colar o link do anúncio de referência
+   - Botão para abrir o link em nova aba (quando preenchido)
+4. **Atualizar o `useMemo`** para incluir `referenceLink` do checklist
 
-1. Definir uma constante com o domínio publicado:
-```typescript
-const PUBLISHED_DOMAIN = 'https://lojafy.lovable.app';
+O layout do card ficará:
 ```
-
-2. Atualizar `productUrl` no `useMemo` para usar URL absoluta:
-```typescript
-productUrl: `${PUBLISHED_DOMAIN}/produto/${fp.produto_id}`,
+[checkbox] [número] Nome do Produto
+PRODUTO BASE: Abrir Lojafy 🔗 📋
+REFERÊNCIA EXTERNA: [input: Cole o link de referência (ex: Mercado Livre)] 🔗
+SEU ANÚNCIO: [input: Cole o link do seu anúncio aqui]
 ```
-
-3. Atualizar `handleCopyLink` para copiar a URL diretamente (sem `window.location.origin`):
-```typescript
-navigator.clipboard.writeText(url);
-```
-
-### Arquivo: `src/pages/reseller/TopProdutosVencedores.tsx`
 
