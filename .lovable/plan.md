@@ -1,24 +1,35 @@
 
 
-# Fix: Produtos não aparecem para usuários anônimos
+# Fix: 404 persistente na rota `/top_10_produtos`
 
 ## Diagnóstico
 
-As políticas RLS das tabelas `features` e `feature_produtos` estão restritas ao role `authenticated`. Usuários anônimos (não logados) não conseguem ler os dados, por isso a página mostra 0 produtos.
+Analisei o código completo e a rota está **corretamente definida** na linha 224 do `App.tsx`. O import e export do componente estão corretos. Nenhum guard ou redirect interfere nesta rota.
 
-A tabela `products` já permite leitura pública (`public`), mas as outras duas não.
+O problema é quase certamente o **Service Worker em cache** — ele ainda está servindo uma versão antiga do app (antes da rota ser adicionada). O `navigateFallback` foi adicionado ao config, mas o SW precisa ser atualizado no browser do usuário.
 
 ## Solução
 
-Alterar as políticas de SELECT público dessas duas tabelas para incluir o role `public` (que inclui `anon`):
+### 1. Forçar atualização do Service Worker no código
 
-### 1. `features` — política "Features visíveis para todos"
-- DROP a política atual (role `authenticated`)
-- Recriar com role `public` e mesma condição `(ativo = true)`
+Adicionar um mecanismo no `main.tsx` ou `App.tsx` para forçar o unregister de service workers antigos e garantir que o app mais recente seja carregado:
 
-### 2. `feature_produtos` — política "Anyone can read active feature_produtos"
-- DROP a política atual (role `authenticated`)
-- Recriar com role `public` e mesma condição `(ativo = true)`
+```typescript
+// No início do App ou main.tsx
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    registrations.forEach(registration => registration.unregister());
+  });
+}
+```
 
-Isso permite que qualquer visitante (logado ou não) veja features e produtos ativos, mantendo a segurança para operações de escrita.
+### 2. Alternativa mais suave — verificar se a rota funciona sem SW
+
+Adicionar `self.__WB_MANIFEST` check e garantir que `skipWaiting` + `clientsClaim` estejam funcionando. Já estão no config, mas podemos verificar se o build está aplicando corretamente.
+
+### 3. Ação imediata recomendada
+
+Além da mudança no código, o usuário pode testar imediatamente abrindo o DevTools > Application > Service Workers > Unregister, ou abrindo em aba anônima sem cache.
+
+A mudança de código garantirá que futuros visitantes não tenham esse problema.
 
