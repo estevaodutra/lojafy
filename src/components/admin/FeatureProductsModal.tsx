@@ -7,7 +7,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, GripVertical, Trash2, Package } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Plus, GripVertical, Trash2, Package, ExternalLink } from 'lucide-react';
 import { Feature } from '@/hooks/useFeatures';
 import { useFeatureProducts, FeatureProduct } from '@/hooks/useFeatureProducts';
 import { AddProductsToFeatureModal } from './AddProductsToFeatureModal';
@@ -39,7 +40,8 @@ const SortableItem: React.FC<{
   item: FeatureProduct;
   index: number;
   onRemove: (id: string) => void;
-}> = ({ item, index, onRemove }) => {
+  onUpdateReferenceLink: (id: string, link: string) => void;
+}> = ({ item, index, onRemove, onUpdateReferenceLink }) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: item.id,
   });
@@ -78,11 +80,29 @@ const SortableItem: React.FC<{
         />
       )}
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 space-y-1">
         <p className="text-sm font-medium truncate">{item.product_name}</p>
         <p className="text-xs text-muted-foreground">
           SKU: {item.product_sku} | {formatPrice(item.product_price)}
         </p>
+        <div className="flex items-center gap-1">
+          <Input
+            placeholder="Link de referência (ex: Mercado Livre)"
+            defaultValue={item.reference_link || ''}
+            onBlur={(e) => onUpdateReferenceLink(item.id, e.target.value)}
+            className="h-7 text-xs"
+          />
+          {item.reference_link && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 flex-shrink-0"
+              onClick={() => window.open(item.reference_link!, '_blank')}
+            >
+              <ExternalLink className="w-3 h-3 text-primary" />
+            </Button>
+          )}
+        </div>
       </div>
 
       <Button
@@ -102,7 +122,7 @@ export const FeatureProductsModal: React.FC<FeatureProductsModalProps> = ({
   onClose,
   feature,
 }) => {
-  const { products, isLoading, addProducts, removeProduct, reorderProducts } =
+  const { products, isLoading, addProducts, removeProduct, reorderProducts, updateReferenceLink } =
     useFeatureProducts(feature?.id || null);
   const [localProducts, setLocalProducts] = useState<FeatureProduct[]>([]);
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -137,6 +157,10 @@ export const FeatureProductsModal: React.FC<FeatureProductsModalProps> = ({
 
   const handleAddProducts = (productIds: string[]) => {
     addProducts.mutate({ featureId: feature.id, productIds });
+  };
+
+  const handleUpdateReferenceLink = (id: string, link: string) => {
+    updateReferenceLink.mutate({ id, reference_link: link });
   };
 
   return (
@@ -195,6 +219,7 @@ export const FeatureProductsModal: React.FC<FeatureProductsModalProps> = ({
                       item={item}
                       index={index}
                       onRemove={handleRemove}
+                      onUpdateReferenceLink={handleUpdateReferenceLink}
                     />
                   ))}
                 </SortableContext>

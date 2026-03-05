@@ -13,6 +13,7 @@ export interface FeatureProduct {
   product_sku: string;
   product_price: number;
   product_image: string | null;
+  reference_link: string | null;
 }
 
 export const useFeatureProducts = (featureId: string | null) => {
@@ -57,6 +58,7 @@ export const useFeatureProducts = (featureId: string | null) => {
           product_sku: (p as any).sku || '',
           product_price: (p as any).price || 0,
           product_image: (p as any).image_url || null,
+          reference_link: fp.reference_link || null,
         } as FeatureProduct;
       });
     },
@@ -96,6 +98,19 @@ export const useFeatureProducts = (featureId: string | null) => {
     },
   });
 
+  const updateReferenceLink = useMutation({
+    mutationFn: async ({ id, reference_link }: { id: string; reference_link: string }) => {
+      const { error } = await supabase
+        .from('feature_produtos')
+        .update({ reference_link } as any)
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feature-products', featureId] });
+    },
+  });
+
   const reorderProducts = useMutation({
     mutationFn: async (items: { id: string; ordem: number }[]) => {
       // Update each item's ordem
@@ -118,5 +133,6 @@ export const useFeatureProducts = (featureId: string | null) => {
     addProducts,
     removeProduct,
     reorderProducts,
+    updateReferenceLink,
   };
 };

@@ -1,0 +1,1 @@
+ALTER TABLE public.feature_produtos ADD COLUMN reference_link text;

@@ -85,7 +85,7 @@ const TopProdutosVencedores: React.FC = () => {
     productUrl: `${PUBLISHED_DOMAIN}/produto/${fp.produto_id}`,
     completed: checklist[fp.produto_id]?.completed || false,
     userLink: checklist[fp.produto_id]?.userLink || '',
-    referenceLink: checklist[fp.produto_id]?.referenceLink || '',
+    referenceLink: checklist[fp.produto_id]?.referenceLink || fp.reference_link || '',
   })), [featureProducts, checklist]);
 
   const completedCount = products.filter(p => p.completed).length;
