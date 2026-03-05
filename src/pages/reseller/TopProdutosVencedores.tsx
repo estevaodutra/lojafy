@@ -51,6 +51,8 @@ const strategies = [{
   tip: 'Impulsionar é tração inicial.',
   color: 'bg-pink-500'
 }];
+const PUBLISHED_DOMAIN = 'https://lojafy.lovable.app';
+
 const TopProdutosVencedores: React.FC = () => {
   // Fetch feature id for top_10_produtos
   const { data: feature } = useQuery({
@@ -80,7 +82,7 @@ const TopProdutosVencedores: React.FC = () => {
     id: fp.produto_id,
     number: i + 1,
     name: fp.product_name,
-    productUrl: `/produto/${fp.produto_id}`,
+    productUrl: `${PUBLISHED_DOMAIN}/produto/${fp.produto_id}`,
     completed: checklist[fp.produto_id]?.completed || false,
     userLink: checklist[fp.produto_id]?.userLink || '',
   })), [featureProducts, checklist]);
@@ -107,7 +109,7 @@ const TopProdutosVencedores: React.FC = () => {
   };
 
   const handleCopyLink = (url: string, id: string) => {
-    navigator.clipboard.writeText(window.location.origin + url);
+    navigator.clipboard.writeText(url);
     setCopiedId(id);
     toast.success('Link copiado!');
     setTimeout(() => setCopiedId(null), 2000);
