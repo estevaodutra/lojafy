@@ -1,25 +1,24 @@
 
 
-# Fix: 404 na rota `/top_10_produtos`
+# Fix: Produtos não aparecem para usuários anônimos
 
 ## Diagnóstico
 
-A rota está corretamente definida no `src/App.tsx` (linha 224). O problema é o **PWA Service Worker** (vite-plugin-pwa/Workbox). O Workbox está configurado sem `navigateFallback`, então quando o usuário navega diretamente para `/top_10_produtos`, o service worker não sabe redirecionar para `index.html` (necessário para SPA routing) e retorna 404.
+As políticas RLS das tabelas `features` e `feature_produtos` estão restritas ao role `authenticated`. Usuários anônimos (não logados) não conseguem ler os dados, por isso a página mostra 0 produtos.
+
+A tabela `products` já permite leitura pública (`public`), mas as outras duas não.
 
 ## Solução
 
-### `vite.config.ts` — Adicionar `navigateFallback` ao Workbox
+Alterar as políticas de SELECT público dessas duas tabelas para incluir o role `public` (que inclui `anon`):
 
-Adicionar a propriedade `navigateFallback: '/index.html'` dentro do bloco `workbox`, para que o service worker redirecione todas as rotas de navegação para o `index.html`, permitindo que o React Router resolva a rota corretamente.
+### 1. `features` — política "Features visíveis para todos"
+- DROP a política atual (role `authenticated`)
+- Recriar com role `public` e mesma condição `(ativo = true)`
 
-```ts
-workbox: {
-  skipWaiting: true,
-  clientsClaim: true,
-  navigateFallback: '/index.html',  // ← adicionar
-  maximumFileSizeToCacheInBytes: ...
-}
-```
+### 2. `feature_produtos` — política "Anyone can read active feature_produtos"
+- DROP a política atual (role `authenticated`)
+- Recriar com role `public` e mesma condição `(ativo = true)`
 
-Isso resolve o 404 para `/top_10_produtos` e qualquer outra rota SPA que possa ter o mesmo problema.
+Isso permite que qualquer visitante (logado ou não) veja features e produtos ativos, mantendo a segurança para operações de escrita.
 
