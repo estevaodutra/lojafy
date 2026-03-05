@@ -221,6 +221,7 @@ const App = () => {
               <Route path="/auth/premium" element={<AuthPremium />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/checkout/curso/:courseId" element={<CourseCheckout />} />
+              <Route path="/top_10_produtos" element={<ResellerTopProdutosVencedores />} />
               
               {/* Customer Panel Routes */}
               <Route path="/minha-conta" element={<CustomerLayout />}>
