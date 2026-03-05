@@ -1133,6 +1133,7 @@ export type Database = {
           id: string
           ordem: number
           produto_id: string
+          reference_link: string | null
         }
         Insert: {
           ativo?: boolean
@@ -1141,6 +1142,7 @@ export type Database = {
           id?: string
           ordem?: number
           produto_id: string
+          reference_link?: string | null
         }
         Update: {
           ativo?: boolean
@@ -1149,6 +1151,7 @@ export type Database = {
           id?: string
           ordem?: number
           produto_id?: string
+          reference_link?: string | null
         }
         Relationships: [
           {
