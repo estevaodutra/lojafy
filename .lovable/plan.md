@@ -1,28 +1,34 @@
 
 
-# Adicionar campo de referência externa (Mercado Livre) no card de produto
+# Adicionar campo de link de referência externa no Gerenciamento de Produtos
 
-## O que será feito
-
-Adicionar um novo campo no card de cada produto na lista "Top Produtos" para o revendedor informar/visualizar o link de referência externa do anúncio (ex: link do Mercado Livre). Esse campo ficará entre o "Produto Base" e o "Seu Anúncio".
+## Problema
+No modal "Gerenciar Produtos" do admin, cada produto listado não tem campo para informar o link de referência externa (ex: Mercado Livre). Esse link precisa ser salvo no banco e exibido na página do revendedor.
 
 ## Alterações
 
-### `src/pages/reseller/TopProdutosVencedores.tsx`
-
-1. **Atualizar o estado do checklist** para incluir `referenceLink` além de `completed` e `userLink`
-2. **Adicionar handler** `handleUpdateReferenceLink` para salvar o link de referência no localStorage
-3. **Adicionar novo campo no card** entre "Produto Base" e "Seu Anúncio":
-   - Label: "Referência Externa:" (com ícone do Mercado Livre ou link externo)
-   - Input para colar o link do anúncio de referência
-   - Botão para abrir o link em nova aba (quando preenchido)
-4. **Atualizar o `useMemo`** para incluir `referenceLink` do checklist
-
-O layout do card ficará:
+### 1. Banco de dados — Nova coluna na tabela `feature_produtos`
+Adicionar coluna `reference_link` (text, nullable) via migration SQL:
+```sql
+ALTER TABLE feature_produtos ADD COLUMN reference_link text;
 ```
-[checkbox] [número] Nome do Produto
-PRODUTO BASE: Abrir Lojafy 🔗 📋
-REFERÊNCIA EXTERNA: [input: Cole o link de referência (ex: Mercado Livre)] 🔗
-SEU ANÚNCIO: [input: Cole o link do seu anúncio aqui]
-```
+
+### 2. `src/integrations/supabase/types.ts`
+Adicionar `reference_link` nos tipos Row, Insert e Update de `feature_produtos`.
+
+### 3. `src/hooks/useFeatureProducts.ts`
+- Adicionar `reference_link` à interface `FeatureProduct`
+- Mapear o campo no retorno da query
+- Criar mutation `updateReferenceLink` para salvar o link no banco
+
+### 4. `src/components/admin/FeatureProductsModal.tsx`
+- Adicionar um campo `Input` em cada `SortableItem` abaixo do SKU/preço para informar o link de referência
+- Botão para abrir o link em nova aba (quando preenchido)
+- Salvar automaticamente ao sair do campo (onBlur) ou com debounce
+
+### 5. `src/pages/reseller/TopProdutosVencedores.tsx`
+- Usar o `reference_link` do banco (vindo do `useFeatureProducts`) como valor inicial do campo "Referência Externa", em vez de depender apenas do localStorage
+
+## Resultado
+O superadmin poderá informar o link de referência diretamente no gerenciamento de produtos, e esse link aparecerá automaticamente para os revendedores na página Top Produtos.
 
