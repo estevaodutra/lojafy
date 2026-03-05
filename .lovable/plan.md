@@ -1,33 +1,31 @@
 
 
-# Fix: "Produto não encontrado" ao clicar nos Top 10 Produtos
+# Fix: Links dos produtos apontando para o domínio errado
 
-## Causa raiz
+## Problema
 
-O produto "Tela Ampliadora 3D para Celular" (e possivelmente outros) tem `active = false` no banco de dados. A página `/produto/:id` filtra com `.eq('active', true)`, então retorna "Produto não encontrado".
+O botão "Abrir Lojafy" usa `window.open(product.productUrl, '_blank')` com URL relativa (`/produto/ID`), que abre no domínio atual (preview). O "Copiar link" usa `window.location.origin`, que também pega o domínio do preview.
 
-Além disso, a página `TopProdutosVencedores.tsx` usa **URLs hardcoded** com UUIDs fixos (linhas 18-95), em vez de buscar dinamicamente da tabela `feature_produtos`. Isso significa que qualquer mudança nos produtos (desativação, exclusão, novos produtos) quebra os links.
+O correto é apontar para o domínio publicado: `https://lojafy.lovable.app`.
 
-## Plano
+## Correção
 
-### 1. Tornar a lista de produtos dinâmica no `TopProdutosVencedores.tsx`
+No `TopProdutosVencedores.tsx`:
 
-Substituir o array `initialProducts` hardcoded por dados dinâmicos da tabela `feature_produtos` (usando o slug `top_10_produtos`):
+1. Definir uma constante com o domínio publicado:
+```typescript
+const PUBLISHED_DOMAIN = 'https://lojafy.lovable.app';
+```
 
-- Buscar o `feature_id` da feature com slug `top_10_produtos`
-- Usar `useFeatureProducts(featureId)` para obter os produtos vinculados com nome, URL e ordem
-- Manter a funcionalidade de checklist/progresso no localStorage, mas indexada por `produto_id` em vez de IDs fixos
-- Gerar `productUrl` dinamicamente como `/produto/{produto_id}`
+2. Atualizar `productUrl` no `useMemo` para usar URL absoluta:
+```typescript
+productUrl: `${PUBLISHED_DOMAIN}/produto/${fp.produto_id}`,
+```
 
-### 2. Remover filtro `active = true` para produtos acessados por link direto (opcional)
+3. Atualizar `handleCopyLink` para copiar a URL diretamente (sem `window.location.origin`):
+```typescript
+navigator.clipboard.writeText(url);
+```
 
-Na página `Produto.tsx`, considerar remover o `.eq('active', true)` da query principal, já que se o usuário tem o link direto, deveria poder ver o produto. Alternativamente, ativar os produtos que estão no Top 10.
-
-**Recomendação:** A abordagem mais segura é tornar a lista dinâmica (passo 1) e garantir que apenas produtos ativos sejam vinculados à feature. Isso evita o problema na raiz.
-
-### Arquivos a editar
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/pages/reseller/TopProdutosVencedores.tsx` | Substituir dados hardcoded por query dinâmica usando `feature_produtos` |
+### Arquivo: `src/pages/reseller/TopProdutosVencedores.tsx`
 
