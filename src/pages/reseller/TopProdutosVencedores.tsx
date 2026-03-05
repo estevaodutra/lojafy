@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Trophy, Clock, Target, CheckCircle2, Circle, ExternalLink, Rocket, Users, MessageCircle, Facebook, Instagram, Store, Zap, AlertTriangle, Sparkles, Timer, ChevronDown, ChevronUp, Copy, Check, Loader2 } from 'lucide-react';
+import { Trophy, Clock, Target, CheckCircle2, Circle, ExternalLink, Rocket, Users, MessageCircle, Facebook, Instagram, Store, Zap, AlertTriangle, Sparkles, ChevronDown, ChevronUp, Copy, Check, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useFeatureProducts } from '@/hooks/useFeatureProducts';
 
 interface ChecklistState {
-  [produtoId: string]: { completed: boolean; userLink: string; referenceLink?: string };
+  [produtoId: string]: { completed: boolean };
 }
 const strategies = [{
   icon: Users,
@@ -84,8 +84,7 @@ const TopProdutosVencedores: React.FC = () => {
     name: fp.product_name,
     productUrl: `${PUBLISHED_DOMAIN}/produto/${fp.produto_id}`,
     completed: checklist[fp.produto_id]?.completed || false,
-    userLink: checklist[fp.produto_id]?.userLink || '',
-    referenceLink: checklist[fp.produto_id]?.referenceLink || fp.reference_link || '',
+    referenceLink: fp.reference_link || '',
   })), [featureProducts, checklist]);
 
   const completedCount = products.filter(p => p.completed).length;
@@ -102,19 +101,6 @@ const TopProdutosVencedores: React.FC = () => {
     }
   };
 
-  const handleUpdateLink = (produtoId: string, link: string) => {
-    const prev = checklist[produtoId] || { completed: false, userLink: '' };
-    const updated = { ...checklist, [produtoId]: { ...prev, userLink: link } };
-    setChecklist(updated);
-    localStorage.setItem('missao24h_checklist', JSON.stringify(updated));
-  };
-
-  const handleUpdateReferenceLink = (produtoId: string, link: string) => {
-    const prev = checklist[produtoId] || { completed: false, userLink: '', referenceLink: '' };
-    const updated = { ...checklist, [produtoId]: { ...prev, referenceLink: link } };
-    setChecklist(updated);
-    localStorage.setItem('missao24h_checklist', JSON.stringify(updated));
-  };
 
   const handleCopyLink = (url: string, id: string) => {
     navigator.clipboard.writeText(url);
@@ -275,40 +261,18 @@ const TopProdutosVencedores: React.FC = () => {
                       </span>
                     </div>
                     
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground uppercase font-medium">
-                          Produto Base:
-                        </span>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs text-primary" onClick={() => window.open(product.productUrl, '_blank')}>
-                          Abrir Lojafy
-                          <ExternalLink className="w-3 h-3 ml-1" />
+                    <div className="flex items-center gap-2 flex-wrap mt-1">
+                      <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => window.open(product.productUrl, '_blank')}>
+                        Abrir Lojafy <ExternalLink className="w-3 h-3 ml-1" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCopyLink(product.productUrl, product.id)}>
+                        {copiedId === product.id ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                      </Button>
+                      {product.referenceLink && (
+                        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => window.open(product.referenceLink, '_blank')}>
+                          Ver Referência <ExternalLink className="w-3 h-3 ml-1" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCopyLink(product.productUrl, product.id)}>
-                          {copiedId === product.id ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                        </Button>
-                      </div>
-                      
-                      <div>
-                        <span className="text-xs text-muted-foreground uppercase font-medium block mb-1">
-                          Referência Externa:
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <Input placeholder="Cole o link de referência (ex: Mercado Livre)" value={product.referenceLink} onChange={e => handleUpdateReferenceLink(product.id, e.target.value)} className="h-8 text-sm" />
-                          {product.referenceLink && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onClick={() => window.open(product.referenceLink, '_blank')}>
-                              <ExternalLink className="w-3 h-3 text-primary" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-
-                      <div>
-                        <span className="text-xs text-muted-foreground uppercase font-medium block mb-1">
-                          Seu Anúncio:
-                        </span>
-                        <Input placeholder="Cole o link do seu anúncio aqui" value={product.userLink} onChange={e => handleUpdateLink(product.id, e.target.value)} className="h-8 text-sm" />
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
