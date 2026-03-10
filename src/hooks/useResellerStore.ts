@@ -108,7 +108,8 @@ export const useResellerStore = () => {
               slug,
               icon,
               color
-            )
+            ),
+            product_marketplace_data(id, marketplace, listing_status)
           )
         `)
         .eq('reseller_id', user.id)
@@ -225,7 +226,8 @@ export const useResellerStore = () => {
               slug,
               icon,
               color
-            )
+            ),
+            product_marketplace_data(id, marketplace, listing_status)
           )
         `)
         .single();
@@ -301,7 +303,8 @@ export const useResellerStore = () => {
               slug,
               icon,
               color
-            )
+            ),
+            product_marketplace_data(id, marketplace, listing_status)
           )
         `)
         .single();
@@ -359,7 +362,8 @@ export const useResellerStore = () => {
               slug,
               icon,
               color
-            )
+            ),
+            product_marketplace_data(id, marketplace, listing_status)
           )
         `)
         .single();
