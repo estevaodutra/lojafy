@@ -1,22 +1,35 @@
 
 
-# Fix: Ocultar botão Mercado Livre para produtos inativos
+# Fix: 404 persistente na rota `/top_10_produtos`
 
-## Problema
-O botão "Mercado Livre" aparece para todos os produtos, mesmo os inativos. Só deveria aparecer para produtos com `product.active === true`.
+## Diagnóstico
+
+Analisei o código completo e a rota está **corretamente definida** na linha 224 do `App.tsx`. O import e export do componente estão corretos. Nenhum guard ou redirect interfere nesta rota.
+
+O problema é quase certamente o **Service Worker em cache** — ele ainda está servindo uma versão antiga do app (antes da rota ser adicionada). O `navigateFallback` foi adicionado ao config, mas o SW precisa ser atualizado no browser do usuário.
 
 ## Solução
 
-### `src/pages/reseller/Products.tsx`
-Adicionar a condição `product.active` ao bloco que renderiza o `MercadoLivreButton`:
+### 1. Forçar atualização do Service Worker no código
 
-```tsx
-// De:
-{hasActiveIntegration && product.product && (
+Adicionar um mecanismo no `main.tsx` ou `App.tsx` para forçar o unregister de service workers antigos e garantir que o app mais recente seja carregado:
 
-// Para:
-{hasActiveIntegration && product.active && product.product && (
+```typescript
+// No início do App ou main.tsx
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    registrations.forEach(registration => registration.unregister());
+  });
+}
 ```
 
-Uma única linha alterada.
+### 2. Alternativa mais suave — verificar se a rota funciona sem SW
+
+Adicionar `self.__WB_MANIFEST` check e garantir que `skipWaiting` + `clientsClaim` estejam funcionando. Já estão no config, mas podemos verificar se o build está aplicando corretamente.
+
+### 3. Ação imediata recomendada
+
+Além da mudança no código, o usuário pode testar imediatamente abrindo o DevTools > Application > Service Workers > Unregister, ou abrindo em aba anônima sem cache.
+
+A mudança de código garantirá que futuros visitantes não tenham esse problema.
 

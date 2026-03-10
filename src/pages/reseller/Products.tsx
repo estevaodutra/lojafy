@@ -390,7 +390,7 @@ const ResellerProducts = () => {
                           </DropdownMenu>
                         )}
                         
-                        {hasActiveIntegration && product.product && (
+                        {hasActiveIntegration && product.active && product.product && (
                           <MercadoLivreButton
                             productId={product.product_id}
                             isPublished={isProductPublished(product.product_id)}
