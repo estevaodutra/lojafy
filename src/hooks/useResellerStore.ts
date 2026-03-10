@@ -226,7 +226,8 @@ export const useResellerStore = () => {
               slug,
               icon,
               color
-            )
+            ),
+            product_marketplace_data(id, marketplace, listing_status)
           )
         `)
         .single();
