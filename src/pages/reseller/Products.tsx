@@ -390,7 +390,7 @@ const ResellerProducts = () => {
                           </DropdownMenu>
                         )}
                         
-                        {hasActiveIntegration && product.active && product.product && (
+                        {hasActiveIntegration && product.active && product.product && product.product.product_marketplace_data?.some((mp: any) => mp.marketplace === 'mercadolivre') && (
                           <MercadoLivreButton
                             productId={product.product_id}
                             isPublished={isProductPublished(product.product_id)}
