@@ -90,7 +90,7 @@ const Header = () => {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
+          <Link to="/categorias" className="flex items-center space-x-2">
             {config?.logo_url ? <img src={config.logo_url} alt={config.store_name} className="h-10 w-auto" /> : <div className="w-10 h-10 bg-hero-gradient rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-xl">E</span>
               </div>}
@@ -222,7 +222,7 @@ const Header = () => {
                   {/* Navigation Links */}
                   <nav className="flex-1 p-4">
                     <div className="space-y-4">
-                      <Link to="/" className="block py-2 text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
+                      <Link to="/categorias" className="block py-2 text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
                         Início
                       </Link>
                       <Link to="/categorias" className="block py-2 text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
@@ -323,7 +323,7 @@ const Header = () => {
         {/* Navigation Menu */}
         <nav className="hidden md:flex items-center space-x-8 mt-4">
           <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
-            <Link to="/">Início</Link>
+            <Link to="/categorias">Início</Link>
           </Button>
           <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
             <Link to="/categorias">Lançamentos</Link>
