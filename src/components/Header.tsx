@@ -323,7 +323,7 @@ const Header = () => {
         {/* Navigation Menu */}
         <nav className="hidden md:flex items-center space-x-8 mt-4">
           <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
-            <Link to="/">Início</Link>
+            <Link to="/categorias">Início</Link>
           </Button>
           <Button variant="ghost" className="text-foreground hover:text-primary" asChild>
             <Link to="/categorias">Lançamentos</Link>
