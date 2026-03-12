@@ -33,7 +33,7 @@ export const useAuthRedirect = () => {
 
     // Only redirect from auth page or home page
     const currentPath = location.pathname;
-    if (currentPath !== '/auth' && currentPath !== '/') return;
+    if (currentPath !== '/auth' && currentPath !== '/' && currentPath !== '/categorias') return;
 
     // Don't redirect if user is viewing store or catalog intentionally
     const searchParams = new URLSearchParams(location.search);
