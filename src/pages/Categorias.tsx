@@ -30,6 +30,7 @@ const PRODUCTS_PER_PAGE = 20;
 
 const Categorias = () => {
   const { slug } = useParams();
+  useAuthRedirect();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState("relevance");
   const [priceRange, setPriceRange] = useState([0, 10000]);
