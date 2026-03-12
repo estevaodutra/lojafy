@@ -222,7 +222,7 @@ const Header = () => {
                   {/* Navigation Links */}
                   <nav className="flex-1 p-4">
                     <div className="space-y-4">
-                      <Link to="/" className="block py-2 text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
+                      <Link to="/categorias" className="block py-2 text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
                         Início
                       </Link>
                       <Link to="/categorias" className="block py-2 text-foreground hover:text-primary transition-colors" onClick={() => setMobileMenuOpen(false)}>
