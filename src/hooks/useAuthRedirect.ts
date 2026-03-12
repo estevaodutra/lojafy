@@ -45,29 +45,10 @@ export const useAuthRedirect = () => {
 
     console.log('🚀 Redirecting user with role:', role);
 
-    // Redirect based on role with a small delay
+    // Redirect all users to home after login
     setTimeout(() => {
-      switch (role) {
-        case 'super_admin':
-          navigate('/super-admin', { replace: true });
-          break;
-        case 'admin':
-          navigate('/admin', { replace: true });
-          break;
-        case 'supplier':
-          navigate('/supplier', { replace: true });
-          break;
-        case 'reseller':
-          navigate('/reseller', { replace: true });
-          break;
-        case 'customer':
-          // Customer stays on home page
-          if (currentPath === '/auth') {
-            navigate('/', { replace: true });
-          }
-          break;
-        default:
-          break;
+      if (currentPath === '/auth') {
+        navigate('/', { replace: true });
       }
     }, 100);
   }, [role, isAuthenticated, navigate, location.pathname, location.search]);
