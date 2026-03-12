@@ -90,7 +90,7 @@ const Header = () => {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
+          <Link to="/categorias" className="flex items-center space-x-2">
             {config?.logo_url ? <img src={config.logo_url} alt={config.store_name} className="h-10 w-auto" /> : <div className="w-10 h-10 bg-hero-gradient rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-xl">E</span>
               </div>}
