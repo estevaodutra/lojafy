@@ -1,24 +1,35 @@
 
 
-# Redirecionar "/" para "/categorias"
+# Fix: 404 persistente na rota `/top_10_produtos`
 
-## Alteração
+## Diagnóstico
 
-### `src/App.tsx`
-Substituir a rota `"/"` que renderiza `<Index />` por um `<Navigate to="/categorias" replace />`:
+Analisei o código completo e a rota está **corretamente definida** na linha 224 do `App.tsx`. O import e export do componente estão corretos. Nenhum guard ou redirect interfere nesta rota.
 
-```tsx
-// De:
-<Route path="/" element={<Index />} />
+O problema é quase certamente o **Service Worker em cache** — ele ainda está servindo uma versão antiga do app (antes da rota ser adicionada). O `navigateFallback` foi adicionado ao config, mas o SW precisa ser atualizado no browser do usuário.
 
-// Para:
-<Route path="/" element={<Navigate to="/categorias" replace />} />
+## Solução
+
+### 1. Forçar atualização do Service Worker no código
+
+Adicionar um mecanismo no `main.tsx` ou `App.tsx` para forçar o unregister de service workers antigos e garantir que o app mais recente seja carregado:
+
+```typescript
+// No início do App ou main.tsx
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    registrations.forEach(registration => registration.unregister());
+  });
+}
 ```
 
-Importar `Navigate` de `react-router-dom` (já deve estar importado, mas verificarei).
+### 2. Alternativa mais suave — verificar se a rota funciona sem SW
 
-O hook `useAuthRedirect` que roda dentro do `Index` precisará ser movido ou replicado na página `Categorias` para que usuários autenticados (admin, reseller, etc.) continuem sendo redirecionados ao seu painel. Vou verificar se `Categorias` já possui esse comportamento ou se precisa ser adicionado.
+Adicionar `self.__WB_MANIFEST` check e garantir que `skipWaiting` + `clientsClaim` estejam funcionando. Já estão no config, mas podemos verificar se o build está aplicando corretamente.
 
-### `src/pages/Categorias.tsx`
-Adicionar `useAuthRedirect()` caso ainda não tenha, para manter o redirecionamento automático por role.
+### 3. Ação imediata recomendada
+
+Além da mudança no código, o usuário pode testar imediatamente abrindo o DevTools > Application > Service Workers > Unregister, ou abrindo em aba anônima sem cache.
+
+A mudança de código garantirá que futuros visitantes não tenham esse problema.
 

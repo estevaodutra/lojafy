@@ -24,11 +24,13 @@ import { useFavorites } from "@/contexts/FavoritesContext";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuthRedirect } from "@/hooks/useAuthRedirect";
 
 const PRODUCTS_PER_PAGE = 20;
 
 const Categorias = () => {
   const { slug } = useParams();
+  useAuthRedirect();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState("relevance");
   const [priceRange, setPriceRange] = useState([0, 10000]);
