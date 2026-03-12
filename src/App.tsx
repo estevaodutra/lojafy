@@ -198,7 +198,7 @@ const App = () => {
           <BrowserRouter>
             <AppWithNotifications />
             <Routes>
-              <Route path="/" element={<Navigate to="/categorias" replace />} />
+              <Route path="/" element={<Index />} />
               <Route path="/categorias" element={<Categorias />} />
               <Route path="/categorias/:slug" element={<Categorias />} />
               <Route path="/promocoes" element={<Promocoes />} />
