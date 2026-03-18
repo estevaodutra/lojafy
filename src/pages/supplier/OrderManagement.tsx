@@ -190,6 +190,12 @@ const SupplierOrderManagement = () => {
       setReposicaoOrder(order);
     } else if (requiresModal === 'em_falta') {
       setEmFaltaOrder(order);
+    } else if (requiresModal === 'cancelamento') {
+      setCancelamentoOrder(order);
+    } else if (requiresModal === 'devolucao') {
+      setDevolucaoOrder(order);
+    } else if (requiresModal === 'troca') {
+      setTrocaOrder(order);
     } else {
       updateOrderStatus(order.id, targetStatus);
     }
