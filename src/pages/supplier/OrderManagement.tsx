@@ -16,6 +16,9 @@ import { useToast } from "@/hooks/use-toast";
 import { ALL_STATUSES, ORDER_STATUS_CONFIG, getStatusConfig, SUPPLIER_QUICK_ACTIONS, type OrderStatus } from "@/constants/orderStatus";
 import { ReposicaoModal } from "@/components/supplier/ReposicaoModal";
 import { EmFaltaModal } from "@/components/supplier/EmFaltaModal";
+import { CancelamentoModal } from "@/components/supplier/CancelamentoModal";
+import { DevolucaoModal } from "@/components/supplier/DevolucaoModal";
+import { TrocaModal } from "@/components/supplier/TrocaModal";
 import { toast as sonnerToast } from "sonner";
 
 const SupplierOrderManagement = () => {
