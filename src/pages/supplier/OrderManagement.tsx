@@ -33,6 +33,9 @@ const SupplierOrderManagement = () => {
   // Modal states
   const [reposicaoOrder, setReposicaoOrder] = useState<any>(null);
   const [emFaltaOrder, setEmFaltaOrder] = useState<any>(null);
+  const [cancelamentoOrder, setCancelamentoOrder] = useState<any>(null);
+  const [devolucaoOrder, setDevolucaoOrder] = useState<any>(null);
+  const [trocaOrder, setTrocaOrder] = useState<any>(null);
 
   const getStatusBadge = (status: string) => {
     const config = getStatusConfig(status);
