@@ -2301,7 +2301,11 @@ export type Database = {
       orders: {
         Row: {
           billing_address: Json | null
+          cancelamento_motivo: string | null
+          cancelamento_observacao: string | null
           created_at: string
+          devolucao_motivo: string | null
+          devolucao_observacao: string | null
           estimated_shipping_date: string | null
           external_reference: string | null
           has_shipping_file: boolean | null
@@ -2325,12 +2329,18 @@ export type Database = {
           tax_amount: number | null
           total_amount: number
           tracking_number: string | null
+          troca_motivo: string | null
+          troca_observacao: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           billing_address?: Json | null
+          cancelamento_motivo?: string | null
+          cancelamento_observacao?: string | null
           created_at?: string
+          devolucao_motivo?: string | null
+          devolucao_observacao?: string | null
           estimated_shipping_date?: string | null
           external_reference?: string | null
           has_shipping_file?: boolean | null
@@ -2354,12 +2364,18 @@ export type Database = {
           tax_amount?: number | null
           total_amount: number
           tracking_number?: string | null
+          troca_motivo?: string | null
+          troca_observacao?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           billing_address?: Json | null
+          cancelamento_motivo?: string | null
+          cancelamento_observacao?: string | null
           created_at?: string
+          devolucao_motivo?: string | null
+          devolucao_observacao?: string | null
           estimated_shipping_date?: string | null
           external_reference?: string | null
           has_shipping_file?: boolean | null
@@ -2383,6 +2399,8 @@ export type Database = {
           tax_amount?: number | null
           total_amount?: number
           tracking_number?: string | null
+          troca_motivo?: string | null
+          troca_observacao?: string | null
           updated_at?: string
           user_id?: string
         }
