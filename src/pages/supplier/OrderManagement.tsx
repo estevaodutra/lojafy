@@ -437,6 +437,42 @@ const SupplierOrderManagement = () => {
           setEmFaltaOrder(null);
         }}
       />
+      <CancelamentoModal
+        isOpen={!!cancelamentoOrder}
+        onClose={() => setCancelamentoOrder(null)}
+        orderNumber={cancelamentoOrder?.order_number || ''}
+        onConfirm={(motivo, observacao) => {
+          updateOrderStatus(cancelamentoOrder.id, 'cancelado', {
+            cancelamento_motivo: motivo,
+            cancelamento_observacao: observacao,
+          });
+          setCancelamentoOrder(null);
+        }}
+      />
+      <DevolucaoModal
+        isOpen={!!devolucaoOrder}
+        onClose={() => setDevolucaoOrder(null)}
+        orderNumber={devolucaoOrder?.order_number || ''}
+        onConfirm={(motivo, observacao) => {
+          updateOrderStatus(devolucaoOrder.id, 'devolucao_solicitada', {
+            devolucao_motivo: motivo,
+            devolucao_observacao: observacao,
+          });
+          setDevolucaoOrder(null);
+        }}
+      />
+      <TrocaModal
+        isOpen={!!trocaOrder}
+        onClose={() => setTrocaOrder(null)}
+        orderNumber={trocaOrder?.order_number || ''}
+        onConfirm={(motivo, observacao) => {
+          updateOrderStatus(trocaOrder.id, 'troca_solicitada', {
+            troca_motivo: motivo,
+            troca_observacao: observacao,
+          });
+          setTrocaOrder(null);
+        }}
+      />
     </div>
   );
 };

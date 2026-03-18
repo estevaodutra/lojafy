@@ -28,7 +28,7 @@ function ResellerOrders() {
   const counts = getStatusCounts();
 
   // Only show tabs for statuses that have orders or are common
-  const visibleTabs: (OrderStatus | "all")[] = ["all", "pendente", "recebido", "em_preparacao", "embalado", "enviado", "finalizado", "cancelado"];
+  const visibleTabs: (OrderStatus | "all")[] = ["all", "pendente", "pago", "recebido", "em_preparacao", "embalado", "enviado", "finalizado", "devolucao_solicitada", "em_devolucao", "troca_solicitada", "em_troca", "cancelado", "reembolsado"];
 
   return (
     <div className="space-y-6">
