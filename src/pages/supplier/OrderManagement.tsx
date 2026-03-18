@@ -52,11 +52,26 @@ const SupplierOrderManagement = () => {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: string, extra?: { estimated_shipping_date?: string; status_reason?: string }) => {
+  const updateOrderStatus = async (orderId: string, newStatus: string, extra?: { 
+    estimated_shipping_date?: string; 
+    status_reason?: string;
+    cancelamento_motivo?: string;
+    cancelamento_observacao?: string;
+    devolucao_motivo?: string;
+    devolucao_observacao?: string;
+    troca_motivo?: string;
+    troca_observacao?: string;
+  }) => {
     try {
       const updateData: Record<string, any> = { status: newStatus };
       if (extra?.estimated_shipping_date) updateData.estimated_shipping_date = extra.estimated_shipping_date;
       if (extra?.status_reason) updateData.status_reason = extra.status_reason;
+      if (extra?.cancelamento_motivo) updateData.cancelamento_motivo = extra.cancelamento_motivo;
+      if (extra?.cancelamento_observacao) updateData.cancelamento_observacao = extra.cancelamento_observacao;
+      if (extra?.devolucao_motivo) updateData.devolucao_motivo = extra.devolucao_motivo;
+      if (extra?.devolucao_observacao) updateData.devolucao_observacao = extra.devolucao_observacao;
+      if (extra?.troca_motivo) updateData.troca_motivo = extra.troca_motivo;
+      if (extra?.troca_observacao) updateData.troca_observacao = extra.troca_observacao;
 
       const { error } = await supabase
         .from('orders')
