@@ -1,13 +1,13 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
 };
 
-// Status aceitos pela API (já em português, igual ao banco)
 const VALID_STATUSES = [
   'pendente',
+  'pago',
   'recebido',
   'em_preparacao',
   'embalado',
@@ -16,8 +16,14 @@ const VALID_STATUSES = [
   'em_falta',
   'finalizado',
   'cancelado',
-  'reembolsado'
+  'reembolsado',
+  'devolucao_solicitada',
+  'em_devolucao',
+  'troca_solicitada',
+  'em_troca'
 ];
+
+const REASONS_REQUIRING_OBSERVATION = ['erro_pedido', 'outro'];
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -80,7 +86,12 @@ Deno.serve(async (req) => {
       .eq('id', keyData.id);
 
     const body = await req.json();
-    const { order_number, status, tracking_number, notes, previsao_envio, motivo } = body;
+    const { 
+      order_number, status, tracking_number, notes, previsao_envio, motivo,
+      cancelamento_motivo, cancelamento_observacao,
+      devolucao_motivo, devolucao_observacao,
+      troca_motivo, troca_observacao
+    } = body;
 
     if (!order_number || !status) {
       return new Response(
@@ -99,6 +110,46 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Validate em_reposicao requires previsao_envio
+    if (status === 'em_reposicao' && !previsao_envio) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'previsao_envio é obrigatório para status em_reposicao' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate cancelado requires cancelamento_motivo
+    if (status === 'cancelado' && !cancelamento_motivo) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'cancelamento_motivo é obrigatório para status cancelado' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate cancelamento_observacao required for certain reasons
+    if (status === 'cancelado' && REASONS_REQUIRING_OBSERVATION.includes(cancelamento_motivo) && !cancelamento_observacao) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'cancelamento_observacao é obrigatório quando motivo é erro_pedido ou outro' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate devolucao_solicitada requires devolucao_motivo
+    if (status === 'devolucao_solicitada' && !devolucao_motivo) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'devolucao_motivo é obrigatório para status devolucao_solicitada' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate troca_solicitada requires troca_motivo
+    if (status === 'troca_solicitada' && !troca_motivo) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'troca_motivo é obrigatório para status troca_solicitada' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Find order
     const { data: order, error: orderError } = await supabase
       .from('orders')
@@ -113,14 +164,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate em_reposicao requires previsao_envio
-    if (status === 'em_reposicao' && !previsao_envio) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'previsao_envio é obrigatório para status em_reposicao' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const previousStatus = order.status;
 
     // Prepare update data
@@ -132,6 +175,12 @@ Deno.serve(async (req) => {
     if (tracking_number) updateData.tracking_number = tracking_number;
     if (previsao_envio) updateData.estimated_shipping_date = previsao_envio;
     if (motivo) updateData.status_reason = motivo;
+    if (cancelamento_motivo) updateData.cancelamento_motivo = cancelamento_motivo;
+    if (cancelamento_observacao) updateData.cancelamento_observacao = cancelamento_observacao;
+    if (devolucao_motivo) updateData.devolucao_motivo = devolucao_motivo;
+    if (devolucao_observacao) updateData.devolucao_observacao = devolucao_observacao;
+    if (troca_motivo) updateData.troca_motivo = troca_motivo;
+    if (troca_observacao) updateData.troca_observacao = troca_observacao;
 
     // Update order
     const { error: updateError } = await supabase

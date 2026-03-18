@@ -16,6 +16,9 @@ import { useToast } from "@/hooks/use-toast";
 import { ALL_STATUSES, ORDER_STATUS_CONFIG, getStatusConfig, SUPPLIER_QUICK_ACTIONS, type OrderStatus } from "@/constants/orderStatus";
 import { ReposicaoModal } from "@/components/supplier/ReposicaoModal";
 import { EmFaltaModal } from "@/components/supplier/EmFaltaModal";
+import { CancelamentoModal } from "@/components/supplier/CancelamentoModal";
+import { DevolucaoModal } from "@/components/supplier/DevolucaoModal";
+import { TrocaModal } from "@/components/supplier/TrocaModal";
 import { toast as sonnerToast } from "sonner";
 
 const SupplierOrderManagement = () => {
@@ -30,6 +33,9 @@ const SupplierOrderManagement = () => {
   // Modal states
   const [reposicaoOrder, setReposicaoOrder] = useState<any>(null);
   const [emFaltaOrder, setEmFaltaOrder] = useState<any>(null);
+  const [cancelamentoOrder, setCancelamentoOrder] = useState<any>(null);
+  const [devolucaoOrder, setDevolucaoOrder] = useState<any>(null);
+  const [trocaOrder, setTrocaOrder] = useState<any>(null);
 
   const getStatusBadge = (status: string) => {
     const config = getStatusConfig(status);
@@ -46,11 +52,26 @@ const SupplierOrderManagement = () => {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: string, extra?: { estimated_shipping_date?: string; status_reason?: string }) => {
+  const updateOrderStatus = async (orderId: string, newStatus: string, extra?: { 
+    estimated_shipping_date?: string; 
+    status_reason?: string;
+    cancelamento_motivo?: string;
+    cancelamento_observacao?: string;
+    devolucao_motivo?: string;
+    devolucao_observacao?: string;
+    troca_motivo?: string;
+    troca_observacao?: string;
+  }) => {
     try {
       const updateData: Record<string, any> = { status: newStatus };
       if (extra?.estimated_shipping_date) updateData.estimated_shipping_date = extra.estimated_shipping_date;
       if (extra?.status_reason) updateData.status_reason = extra.status_reason;
+      if (extra?.cancelamento_motivo) updateData.cancelamento_motivo = extra.cancelamento_motivo;
+      if (extra?.cancelamento_observacao) updateData.cancelamento_observacao = extra.cancelamento_observacao;
+      if (extra?.devolucao_motivo) updateData.devolucao_motivo = extra.devolucao_motivo;
+      if (extra?.devolucao_observacao) updateData.devolucao_observacao = extra.devolucao_observacao;
+      if (extra?.troca_motivo) updateData.troca_motivo = extra.troca_motivo;
+      if (extra?.troca_observacao) updateData.troca_observacao = extra.troca_observacao;
 
       const { error } = await supabase
         .from('orders')
@@ -169,6 +190,12 @@ const SupplierOrderManagement = () => {
       setReposicaoOrder(order);
     } else if (requiresModal === 'em_falta') {
       setEmFaltaOrder(order);
+    } else if (requiresModal === 'cancelamento') {
+      setCancelamentoOrder(order);
+    } else if (requiresModal === 'devolucao') {
+      setDevolucaoOrder(order);
+    } else if (requiresModal === 'troca') {
+      setTrocaOrder(order);
     } else {
       updateOrderStatus(order.id, targetStatus);
     }
@@ -408,6 +435,42 @@ const SupplierOrderManagement = () => {
         onConfirm={(reason) => {
           updateOrderStatus(emFaltaOrder.id, 'em_falta', { status_reason: reason });
           setEmFaltaOrder(null);
+        }}
+      />
+      <CancelamentoModal
+        isOpen={!!cancelamentoOrder}
+        onClose={() => setCancelamentoOrder(null)}
+        orderNumber={cancelamentoOrder?.order_number || ''}
+        onConfirm={(motivo, observacao) => {
+          updateOrderStatus(cancelamentoOrder.id, 'cancelado', {
+            cancelamento_motivo: motivo,
+            cancelamento_observacao: observacao,
+          });
+          setCancelamentoOrder(null);
+        }}
+      />
+      <DevolucaoModal
+        isOpen={!!devolucaoOrder}
+        onClose={() => setDevolucaoOrder(null)}
+        orderNumber={devolucaoOrder?.order_number || ''}
+        onConfirm={(motivo, observacao) => {
+          updateOrderStatus(devolucaoOrder.id, 'devolucao_solicitada', {
+            devolucao_motivo: motivo,
+            devolucao_observacao: observacao,
+          });
+          setDevolucaoOrder(null);
+        }}
+      />
+      <TrocaModal
+        isOpen={!!trocaOrder}
+        onClose={() => setTrocaOrder(null)}
+        orderNumber={trocaOrder?.order_number || ''}
+        onConfirm={(motivo, observacao) => {
+          updateOrderStatus(trocaOrder.id, 'troca_solicitada', {
+            troca_motivo: motivo,
+            troca_observacao: observacao,
+          });
+          setTrocaOrder(null);
         }}
       />
     </div>
