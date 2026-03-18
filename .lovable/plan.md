@@ -1,30 +1,35 @@
 
 
-# Atualizar Documentação da API — Novos Status de Pedidos
+# Fix: 404 persistente na rota `/top_10_produtos`
 
-## O que está desatualizado
+## Diagnóstico
 
-O arquivo `src/data/apiEndpointsData.ts` (linhas 310-361) mostra apenas 10 status e não documenta:
-- 5 novos status: `pago`, `devolucao_solicitada`, `em_devolucao`, `troca_solicitada`, `em_troca`
-- Campos obrigatórios por status: `cancelamento_motivo`, `cancelamento_observacao`, `devolucao_motivo`, `devolucao_observacao`, `troca_motivo`, `troca_observacao`
-- Novas transições (ex: `finalizado → devolucao_solicitada, troca_solicitada`)
+Analisei o código completo e a rota está **corretamente definida** na linha 224 do `App.tsx`. O import e export do componente estão corretos. Nenhum guard ou redirect interfere nesta rota.
 
-## Alterações
+O problema é quase certamente o **Service Worker em cache** — ele ainda está servindo uma versão antiga do app (antes da rota ser adicionada). O `navigateFallback` foi adicionado ao config, mas o SW precisa ser atualizado no browser do usuário.
 
-### `src/data/apiEndpointsData.ts` — endpoint "Atualizar Status do Pedido"
+## Solução
 
-1. **`description`**: mencionar os 15 status e os campos de motivo/observação
-2. **`requestBody`**: adicionar exemplos dos novos campos (`cancelamento_motivo`, `cancelamento_observacao`, `devolucao_motivo`, `devolucao_observacao`, `troca_motivo`, `troca_observacao`)
-3. **`responseExample._status_disponiveis`**: adicionar os 5 novos status
-4. **`responseExample._transicoes`**: atualizar com as novas transições (`pendente→pago`, `pago→recebido`, `finalizado→devolucao_solicitada/troca_solicitada`, etc.)
-5. **`errorExamples`**: atualizar mensagem de "Status inválido" para listar os 15 status, e adicionar novos erros:
-   - 400: `cancelamento_motivo` obrigatório para status `cancelado`
-   - 400: `cancelamento_observacao` obrigatório quando motivo = `erro_pedido` ou `outro`
-   - 400: `devolucao_motivo` obrigatório para `devolucao_solicitada`
-   - 400: `troca_motivo` obrigatório para `troca_solicitada`
+### 1. Forçar atualização do Service Worker no código
 
-### Arquivo afetado
-| Arquivo | Linhas | Ação |
-|---------|--------|------|
-| `src/data/apiEndpointsData.ts` | 314-361 | Atualizar endpoint com novos status, campos e transições |
+Adicionar um mecanismo no `main.tsx` ou `App.tsx` para forçar o unregister de service workers antigos e garantir que o app mais recente seja carregado:
+
+```typescript
+// No início do App ou main.tsx
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    registrations.forEach(registration => registration.unregister());
+  });
+}
+```
+
+### 2. Alternativa mais suave — verificar se a rota funciona sem SW
+
+Adicionar `self.__WB_MANIFEST` check e garantir que `skipWaiting` + `clientsClaim` estejam funcionando. Já estão no config, mas podemos verificar se o build está aplicando corretamente.
+
+### 3. Ação imediata recomendada
+
+Além da mudança no código, o usuário pode testar imediatamente abrindo o DevTools > Application > Service Workers > Unregister, ou abrindo em aba anônima sem cache.
+
+A mudança de código garantirá que futuros visitantes não tenham esse problema.
 
