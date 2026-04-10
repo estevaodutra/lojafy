@@ -25,6 +25,11 @@ interface PlatformSettings {
   additional_costs?: AdditionalCost[];
   horario_corte_envio?: string;
   dias_envio?: number[];
+  carteira_valor_minimo?: number;
+  carteira_valor_maximo?: number;
+  carteira_taxa_percentual?: number;
+  carteira_valores_sugeridos?: number[];
+  carteira_pagamento_parcial?: boolean;
   created_at: string;
   updated_at: string;
 }

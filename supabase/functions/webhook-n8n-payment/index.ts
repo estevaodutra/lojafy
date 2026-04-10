@@ -81,6 +81,76 @@ serve(async (req) => {
     orderData = orderResult;
 
     if (!orderData) {
+      // Check if this is a wallet recharge
+      if (webhookData.external_reference && webhookData.external_reference.startsWith('wallet_')) {
+        const txId = webhookData.external_reference.replace('wallet_', '');
+        console.log('Detected wallet recharge, transaction ID:', txId);
+
+        if (webhookData.status.toLowerCase() === 'approved') {
+          // Get the pending transaction
+          const { data: walletTx, error: txError } = await supabase
+            .from('wallet_transactions')
+            .select('*, wallets!inner(user_id)')
+            .eq('id', txId)
+            .eq('status', 'pending')
+            .single();
+
+          if (txError || !walletTx) {
+            console.log('Wallet transaction not found or already processed:', txId);
+            return new Response(
+              JSON.stringify({ success: true, message: 'Wallet transaction already processed or not found' }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          // Credit wallet via RPC
+          const userId = (walletTx as any).wallets?.user_id;
+          const { data: creditResult, error: creditError } = await supabase.rpc('creditar_carteira', {
+            p_user_id: userId,
+            p_valor: walletTx.valor,
+            p_taxa: walletTx.taxa || 0,
+            p_descricao: 'Recarga via PIX',
+            p_referencia_tipo: 'recarga_pix',
+            p_referencia_id: txId,
+            p_tipo: 'recarga',
+          });
+
+          if (creditError) {
+            console.error('Error crediting wallet:', creditError);
+          } else {
+            console.log('✅ Wallet credited successfully:', creditResult);
+          }
+
+          // Update original pending transaction status
+          await supabase
+            .from('wallet_transactions')
+            .update({ status: 'completed', payment_id: paymentId })
+            .eq('id', txId);
+
+          // Notify user
+          if (userId) {
+            await supabase.from('notifications').insert({
+              user_id: userId,
+              title: '💰 Saldo adicionado!',
+              message: `R$ ${Number(walletTx.valor).toFixed(2)} foi creditado na sua carteira.`,
+              type: 'wallet_recharge',
+              action_url: '/minha-conta/carteira',
+              action_label: 'Ver Carteira',
+            });
+          }
+
+          return new Response(
+            JSON.stringify({ success: true, message: 'Wallet recharged', transaction_id: txId }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, message: 'Wallet recharge status: ' + webhookData.status }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       // Try fallback search by external_reference if provided
       if (webhookData.external_reference) {
         console.log('Trying fallback search by external_reference:', webhookData.external_reference);
