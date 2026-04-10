@@ -24,6 +24,7 @@ import { ShoppingCart, CreditCard, Truck, Shield, AlertTriangle } from "lucide-r
 import pixIcon from "@/assets/pix-icon.png";
 import { ShippingMethodSelector } from "@/components/ShippingMethodSelector";
 import { HighRotationAlert } from '@/components/HighRotationAlert';
+import BannerPrevisaoEnvio from "@/components/checkout/BannerPrevisaoEnvio";
 interface CheckoutProps {
   showHeader?: boolean;
   showFooter?: boolean;
@@ -753,6 +754,7 @@ const Checkout = ({
                       </div>
                     </div>
                   </div>
+                  <BannerPrevisaoEnvio />
                   <p className="text-sm text-muted-foreground">
                     Clique no botão abaixo para gerar o QR Code PIX para pagamento.
                     O pagamento é processado instantaneamente.

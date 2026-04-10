@@ -23,6 +23,8 @@ interface PlatformSettings {
   auto_withdrawal_enabled: boolean;
   auto_withdrawal_frequency: string;
   additional_costs?: AdditionalCost[];
+  horario_corte_envio?: string;
+  dias_envio?: number[];
   created_at: string;
   updated_at: string;
 }
