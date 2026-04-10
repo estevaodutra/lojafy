@@ -3,6 +3,7 @@ import Plataforma from "./Plataforma";
 import SupportManagement from "./SupportManagement";
 import NotificationsManagement from "./NotificationsManagement";
 import AIKnowledgeBase from "./AIKnowledgeBase";
+import ShippingCutoffSettings from "@/components/admin/ShippingCutoffSettings";
 
 const Configuracoes = () => {
   return (
@@ -17,6 +18,7 @@ const Configuracoes = () => {
       <Tabs defaultValue="platform" className="space-y-6">
         <TabsList>
           <TabsTrigger value="platform">Plataforma</TabsTrigger>
+          <TabsTrigger value="shipping">Envio</TabsTrigger>
           <TabsTrigger value="support">Suporte</TabsTrigger>
           <TabsTrigger value="notifications">Notificações</TabsTrigger>
           <TabsTrigger value="ai">Base de Conhecimento</TabsTrigger>
@@ -24,6 +26,10 @@ const Configuracoes = () => {
 
         <TabsContent value="platform" className="space-y-4">
           <Plataforma />
+        </TabsContent>
+
+        <TabsContent value="shipping" className="space-y-4">
+          <ShippingCutoffSettings />
         </TabsContent>
 
         <TabsContent value="support" className="space-y-4">
