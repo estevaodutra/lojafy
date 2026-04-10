@@ -242,7 +242,70 @@ const SupplierOrderManagement = () => {
         </Badge>
       </div>
 
-      <Card className="mb-6">
+      {/* Urgent shipping cards */}
+      {(() => {
+        const today = new Date().toISOString().split('T')[0];
+        const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+        const activeStatuses = ['pago', 'recebido', 'em_preparacao', 'embalado'];
+        
+        const pedidosHoje = orders.filter((o: any) => 
+          o.estimated_shipping_date === today && activeStatuses.includes(o.status)
+        );
+        const pedidosAmanha = orders.filter((o: any) => 
+          o.estimated_shipping_date === tomorrow && activeStatuses.includes(o.status)
+        );
+
+        return (pedidosHoje.length > 0 || pedidosAmanha.length > 0) ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {pedidosHoje.length > 0 && (
+              <Card className="border-red-300 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
+                <CardContent className="pt-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="w-5 h-5 text-red-600" />
+                    <span className="font-bold text-red-700 dark:text-red-400">
+                      🚨 Pedidos para Enviar HOJE ({pedidosHoje.length})
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {pedidosHoje.slice(0, 5).map((o: any) => (
+                      <div key={o.id} className="text-sm text-red-600 dark:text-red-400 flex justify-between">
+                        <span>{o.order_number}</span>
+                        <Badge variant="destructive" className="text-xs">Urgente</Badge>
+                      </div>
+                    ))}
+                    {pedidosHoje.length > 5 && (
+                      <p className="text-xs text-red-500">+ {pedidosHoje.length - 5} mais</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            {pedidosAmanha.length > 0 && (
+              <Card className="border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
+                <CardContent className="pt-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="w-5 h-5 text-amber-600" />
+                    <span className="font-bold text-amber-700 dark:text-amber-400">
+                      📦 Pedidos para Amanhã ({pedidosAmanha.length})
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {pedidosAmanha.slice(0, 5).map((o: any) => (
+                      <div key={o.id} className="text-sm text-amber-600 dark:text-amber-400">
+                        {o.order_number}
+                      </div>
+                    ))}
+                    {pedidosAmanha.length > 5 && (
+                      <p className="text-xs text-amber-500">+ {pedidosAmanha.length - 5} mais</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        ) : null;
+      })()}
+
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Filter className="w-5 h-5" />
