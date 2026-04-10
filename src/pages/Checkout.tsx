@@ -846,7 +846,37 @@ const Checkout = ({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="p-4 border rounded-lg bg-muted/50">
+                  {/* Wallet payment option */}
+                  {user && walletSaldo > 0 && (
+                    <div 
+                      className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${walletPaymentMethod === 'wallet' ? 'border-primary bg-primary/5' : 'border-muted hover:border-primary/50'}`}
+                      onClick={() => setWalletPaymentMethod('wallet')}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center text-xl">
+                          💰
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-semibold">Saldo da Carteira</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Disponível: {formatPrice(walletSaldo)}
+                          </p>
+                          {walletSaldo >= total ? (
+                            <p className="text-xs text-emerald-600 font-medium mt-0.5">✅ Saldo suficiente para este pedido</p>
+                          ) : (
+                            <p className="text-xs text-amber-600 font-medium mt-0.5">⚠️ Saldo insuficiente. Faltam {formatPrice(total - walletSaldo)}</p>
+                          )}
+                        </div>
+                        <input type="radio" checked={walletPaymentMethod === 'wallet'} onChange={() => setWalletPaymentMethod('wallet')} className="w-4 h-4" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* PIX option */}
+                  <div 
+                    className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${walletPaymentMethod === 'pix' ? 'border-primary bg-primary/5' : 'border-muted hover:border-primary/50'}`}
+                    onClick={() => setWalletPaymentMethod('pix')}
+                  >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-xl">
                         💠
@@ -857,16 +887,36 @@ const Checkout = ({
                           Pagamento instantâneo e seguro
                         </p>
                       </div>
+                      <input type="radio" checked={walletPaymentMethod === 'pix'} onChange={() => setWalletPaymentMethod('pix')} className="w-4 h-4 ml-auto" />
                     </div>
                   </div>
+
                   <BannerPrevisaoEnvio />
-                  <p className="text-sm text-muted-foreground">
-                    Clique no botão abaixo para gerar o QR Code PIX para pagamento.
-                    O pagamento é processado instantaneamente.
-                  </p>
-                  <Button onClick={handleGeneratePix} disabled={isProcessingPayment || !canAdvanceToNextStep()} size="lg" className="w-full bg-[#3fc356]">
-                    {isProcessingPayment ? "Gerando PIX..." : "Concluir Pagamento"}
-                  </Button>
+                  
+                  {walletPaymentMethod === 'pix' ? (
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        Clique no botão abaixo para gerar o QR Code PIX para pagamento.
+                      </p>
+                      <Button onClick={handleGeneratePix} disabled={isProcessingPayment || !canAdvanceToNextStep()} size="lg" className="w-full bg-[#3fc356]">
+                        {isProcessingPayment ? "Gerando PIX..." : "Concluir Pagamento via PIX"}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        O valor de {formatPrice(total)} será debitado do seu saldo da carteira.
+                      </p>
+                      <Button 
+                        onClick={handlePayWithWallet} 
+                        disabled={isPayingWithWallet || walletSaldo < total || !canAdvanceToNextStep()} 
+                        size="lg" 
+                        className="w-full bg-emerald-600 hover:bg-emerald-700"
+                      >
+                        {isPayingWithWallet ? "Processando..." : `Pagar com Saldo (${formatPrice(walletSaldo)})`}
+                      </Button>
+                    </>
+                  )}
                 </CardContent>
               </Card>}
 
