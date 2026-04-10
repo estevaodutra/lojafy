@@ -108,19 +108,21 @@ export const AddBalanceModal = ({ open, onOpenChange }: AddBalanceModalProps) =>
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{pixData ? "Pague via PIX" : "Adicionar Saldo"}</DialogTitle>
         </DialogHeader>
 
         {pixData ? (
-          <ModernPixPayment
-            qrCode={pixData.qr_code}
-            qrCodeBase64={pixData.qr_code_base64}
-            amount={pixData.amount}
-            paymentId={pixData.payment_id}
-            onPaymentConfirmed={handlePaymentConfirmed}
-          />
+          <div className="overflow-y-auto max-h-[70vh] pr-1 -mr-1">
+            <ModernPixPayment
+              qrCode={pixData.qr_code}
+              qrCodeBase64={pixData.qr_code_base64}
+              amount={pixData.amount}
+              paymentId={pixData.payment_id}
+              onPaymentConfirmed={handlePaymentConfirmed}
+            />
+          </div>
         ) : (
           <div className="space-y-5">
             <div>
