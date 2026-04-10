@@ -349,6 +349,17 @@ const Checkout = ({
         return;
       }
 
+      // Validar etiqueta obrigatória
+      if (isLabelMethod() && selectedShippingMethod?.requires_upload && !shippingFile) {
+        toast({
+          title: "Etiqueta obrigatória",
+          description: "Por favor, anexe a etiqueta de envio antes de finalizar o pedido.",
+          variant: "destructive"
+        });
+        setIsProcessingPayment(false);
+        return;
+      }
+
       // Save user data and address before processing payment
       await saveUserDataAndAddress();
       const orderItems = cartItems.map(item => ({
