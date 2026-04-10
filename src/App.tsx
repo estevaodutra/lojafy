@@ -41,6 +41,7 @@ import CustomerHelp from "./pages/customer/Help";
 import CustomerNotifications from "./pages/customer/Notifications";
 import CustomerTickets from "./pages/customer/Tickets";
 import CustomerTicketDetails from "./pages/customer/TicketDetails";
+import CustomerWallet from "./pages/customer/CustomerWallet";
 import Academy from "./pages/customer/Academy";
 import CourseViewer from "./pages/customer/CourseViewer";
 import CourseCheckout from "./pages/CourseCheckout";
@@ -237,6 +238,7 @@ const App = () => {
                   </FeatureRoute>
                 } />
                 <Route path="pedidos" element={<CustomerOrders />} />
+                <Route path="carteira" element={<CustomerWallet />} />
                 <Route path="tickets" element={<CustomerTickets />} />
                 <Route path="tickets/:ticketId" element={<CustomerTicketDetails />} />
                 <Route path="notificacoes" element={<CustomerNotifications />} />
