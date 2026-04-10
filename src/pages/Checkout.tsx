@@ -25,8 +25,7 @@ import pixIcon from "@/assets/pix-icon.png";
 import { ShippingMethodSelector } from "@/components/ShippingMethodSelector";
 import { HighRotationAlert } from '@/components/HighRotationAlert';
 import BannerPrevisaoEnvio from "@/components/checkout/BannerPrevisaoEnvio";
-import { useWallet, useWalletSettings } from "@/hooks/useWallet";
-import { Wallet } from "lucide-react";
+import { useWallet } from "@/hooks/useWallet";
 interface CheckoutProps {
   showHeader?: boolean;
   showFooter?: boolean;
@@ -70,7 +69,7 @@ const Checkout = ({
     amount: number;
   } | null>(null);
   const [showHighRotationAlert, setShowHighRotationAlert] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'wallet'>('pix');
+  const [walletPaymentMethod, setWalletPaymentMethod] = useState<'pix' | 'wallet'>('pix');
   const [isPayingWithWallet, setIsPayingWithWallet] = useState(false);
   const { data: walletData } = useWallet();
   const walletSaldo = walletData?.saldo ?? 0;
