@@ -9,21 +9,21 @@ const VALID_STATUSES = [
   'pendente',
   'pago',
   'recebido',
-  'em_preparacao',
   'embalado',
   'enviado',
+  'finalizado',
   'em_reposicao',
   'em_falta',
-  'finalizado',
+  'cancelamento_solicitado',
   'cancelado',
-  'reembolsado',
-  'devolucao_solicitada',
-  'em_devolucao',
-  'troca_solicitada',
-  'em_troca'
+  'devolucao_andamento',
+  'devolucao_recebida',
+  'devolucao_analise',
+  'devolucao_aprovada',
+  'reembolsado'
 ];
 
-const REASONS_REQUIRING_OBSERVATION = ['erro_pedido', 'outro'];
+const REASONS_REQUIRING_OBSERVATION = ['erro_pedido', 'fraude', 'devolucao_negada', 'outro'];
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
       order_number, status, tracking_number, notes, previsao_envio, motivo,
       cancelamento_motivo, cancelamento_observacao,
       devolucao_motivo, devolucao_observacao,
-      troca_motivo, troca_observacao
+      motivo_atraso, motivo_falta
     } = body;
 
     if (!order_number || !status) {
@@ -110,10 +110,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate em_reposicao requires previsao_envio
+    // Validate em_reposicao requires previsao_envio and motivo_atraso
     if (status === 'em_reposicao' && !previsao_envio) {
       return new Response(
         JSON.stringify({ success: false, error: 'previsao_envio é obrigatório para status em_reposicao' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (status === 'em_falta' && !motivo_falta && !motivo) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'motivo_falta é obrigatório para status em_falta' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -129,23 +136,15 @@ Deno.serve(async (req) => {
     // Validate cancelamento_observacao required for certain reasons
     if (status === 'cancelado' && REASONS_REQUIRING_OBSERVATION.includes(cancelamento_motivo) && !cancelamento_observacao) {
       return new Response(
-        JSON.stringify({ success: false, error: 'cancelamento_observacao é obrigatório quando motivo é erro_pedido ou outro' }),
+        JSON.stringify({ success: false, error: 'cancelamento_observacao é obrigatório quando motivo é erro_pedido, fraude, devolucao_negada ou outro' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validate devolucao_solicitada requires devolucao_motivo
-    if (status === 'devolucao_solicitada' && !devolucao_motivo) {
+    // Validate devolucao_andamento requires devolucao_motivo
+    if (status === 'devolucao_andamento' && !devolucao_motivo) {
       return new Response(
-        JSON.stringify({ success: false, error: 'devolucao_motivo é obrigatório para status devolucao_solicitada' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Validate troca_solicitada requires troca_motivo
-    if (status === 'troca_solicitada' && !troca_motivo) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'troca_motivo é obrigatório para status troca_solicitada' }),
+        JSON.stringify({ success: false, error: 'devolucao_motivo é obrigatório para status devolucao_andamento' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -222,8 +221,17 @@ Deno.serve(async (req) => {
     if (cancelamento_observacao) updateData.cancelamento_observacao = cancelamento_observacao;
     if (devolucao_motivo) updateData.devolucao_motivo = devolucao_motivo;
     if (devolucao_observacao) updateData.devolucao_observacao = devolucao_observacao;
-    if (troca_motivo) updateData.troca_motivo = troca_motivo;
-    if (troca_observacao) updateData.troca_observacao = troca_observacao;
+    if (motivo_atraso) updateData.motivo_atraso = motivo_atraso;
+    if (motivo_falta) updateData.motivo_falta = motivo_falta;
+
+    // Set timestamp fields
+    if (status === 'cancelamento_solicitado') updateData.cancelamento_solicitado_em = new Date().toISOString();
+    if (status === 'cancelado') updateData.cancelado_em = new Date().toISOString();
+    if (status === 'devolucao_andamento') updateData.devolucao_iniciada_em = new Date().toISOString();
+    if (status === 'devolucao_recebida') updateData.devolucao_recebida_em = new Date().toISOString();
+    if (status === 'devolucao_analise') updateData.devolucao_analisada_em = new Date().toISOString();
+    if (status === 'devolucao_aprovada') updateData.devolucao_aprovada_em = new Date().toISOString();
+    if (status === 'reembolsado') updateData.reembolsado_em = new Date().toISOString();
 
     // Update order
     const { error: updateError } = await supabase
@@ -245,7 +253,7 @@ Deno.serve(async (req) => {
       .insert({
         order_id: order.id,
         status,
-        notes: notes || motivo || `Status atualizado via API: ${previousStatus} → ${status}`
+        notes: notes || motivo || motivo_atraso || motivo_falta || `Status atualizado via API: ${previousStatus} → ${status}`
       });
 
     // If em_falta, deactivate products
