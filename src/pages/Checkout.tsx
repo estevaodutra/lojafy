@@ -516,6 +516,106 @@ const Checkout = ({
   const handleGeneratePix = () => {
     createModernPix();
   };
+  const handlePayWithWallet = async () => {
+    if (walletSaldo < total) {
+      toast({
+        title: "Saldo insuficiente",
+        description: `Seu saldo é ${formatPrice(walletSaldo)}. Faltam ${formatPrice(total - walletSaldo)}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsPayingWithWallet(true);
+    try {
+      // Validate CPF
+      if (!validateCPF(formData.cpf)) {
+        toast({ title: "CPF inválido", description: "Por favor, informe um CPF válido.", variant: "destructive" });
+        return;
+      }
+      // Validate shipping label
+      if (isLabelMethod() && selectedShippingMethod?.requires_upload && !shippingFile) {
+        toast({ title: "Etiqueta obrigatória", description: "Anexe a etiqueta de envio.", variant: "destructive" });
+        return;
+      }
+      await saveUserDataAndAddress();
+      // Create order first via edge function (same as PIX but we'll debit wallet)
+      const orderItems = cartItems.map(item => ({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.price
+      }));
+      const { data: orderData, error: orderError } = await supabase.functions.invoke('create-pix-payment', {
+        body: {
+          amount: parseFloat(total.toFixed(2)),
+          description: `Pedido - ${cartItems.length} item(s)`,
+          payer: {
+            email: formData.email,
+            firstName: formData.firstName,
+            lastName: formData.lastName || '',
+            cpf: cleanCPF(formData.cpf)
+          },
+          orderItems,
+          shippingAddress: isLabelMethod() ? null : {
+            street: formData.address,
+            number: formData.number,
+            complement: formData.complement,
+            neighborhood: formData.neighborhood,
+            city: formData.city,
+            state: formData.state,
+            zipCode: formData.zipCode
+          },
+          payment_method: 'wallet',
+        },
+      });
+      if (orderError) throw orderError;
+      const orderId = orderData?.order_id;
+      if (!orderId) throw new Error('Pedido não criado');
+      // Upload shipping file if needed
+      if (shippingFile?.file && orderId) {
+        const fileExtension = shippingFile.file.name.split('.').pop();
+        const fileName = `order_${orderId}_${Date.now()}.${fileExtension}`;
+        const filePath = `${orderId}/${fileName}`;
+        await supabase.storage.from('shipping-files').upload(filePath, shippingFile.file);
+        await supabase.from('order_shipping_files').insert({
+          order_id: orderId,
+          file_name: shippingFile.file.name,
+          file_path: filePath,
+          file_size: shippingFile.file.size
+        });
+      }
+      // Debit wallet
+      const { data: debitResult, error: debitError } = await supabase.rpc('debitar_carteira', {
+        p_user_id: user!.id,
+        p_valor: parseFloat(total.toFixed(2)),
+        p_descricao: `Pagamento Pedido ${orderData?.order_number || ''}`,
+        p_referencia_tipo: 'pedido',
+        p_referencia_id: orderId,
+      });
+      if (debitError) throw debitError;
+      const result = debitResult as any;
+      if (!result?.success) throw new Error(result?.error || 'Erro ao debitar saldo');
+      // Mark order as paid
+      await supabase.from('orders').update({
+        status: 'recebido',
+        payment_status: 'paid',
+        payment_method: 'wallet',
+      }).eq('id', orderId);
+      await supabase.from('order_status_history').insert({
+        order_id: orderId,
+        status: 'recebido',
+        notes: 'Pagamento com saldo da carteira',
+      });
+      clearCart();
+      toast({ title: "Pedido confirmado!", description: "Pagamento realizado com saldo da carteira." });
+      navigate("/minha-conta/pedidos");
+    } catch (err: any) {
+      console.error('Wallet payment error:', err);
+      toast({ title: "Erro no pagamento", description: err.message || "Tente novamente.", variant: "destructive" });
+    } finally {
+      setIsPayingWithWallet(false);
+    }
+  };
   const handlePixPaymentConfirmed = () => {
     clearCart();
     toast({
