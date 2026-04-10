@@ -172,6 +172,49 @@ Deno.serve(async (req) => {
       updated_at: new Date().toISOString()
     };
 
+    // If status is 'pago', calculate shipping estimate
+    if (status === 'pago') {
+      updateData.pago_em = new Date().toISOString();
+
+      // Fetch platform shipping cutoff settings
+      const { data: platformSettings } = await supabase
+        .from('platform_settings')
+        .select('horario_corte_envio, dias_envio')
+        .single();
+
+      const horarioCorte = platformSettings?.horario_corte_envio || '11:00';
+      const diasEnvio: number[] = (platformSettings?.dias_envio as number[]) || [1, 2, 3, 4, 5];
+
+      // Calculate in Brasilia timezone
+      const now = new Date();
+      const brasiliaStr = now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' });
+      const brasilia = new Date(brasiliaStr);
+
+      const [corteH, corteM] = String(horarioCorte).split(':').map(Number);
+      const hora = brasilia.getHours();
+      const minuto = brasilia.getMinutes();
+      const diaSemana = brasilia.getDay();
+
+      const diaEnvioMap = diaSemana === 0 ? 7 : diaSemana;
+      const antesDoCorte = hora < corteH || (hora === corteH && minuto < corteM);
+      const ehDiaEnvio = diasEnvio.includes(diaEnvioMap);
+
+      if (antesDoCorte && ehDiaEnvio) {
+        updateData.envio_mesmo_dia = true;
+        updateData.estimated_shipping_date = brasilia.toISOString().split('T')[0];
+      } else {
+        updateData.envio_mesmo_dia = false;
+        const next = new Date(brasilia);
+        next.setDate(next.getDate() + 1);
+        while (!diasEnvio.includes(next.getDay() === 0 ? 7 : next.getDay())) {
+          next.setDate(next.getDate() + 1);
+        }
+        updateData.estimated_shipping_date = next.toISOString().split('T')[0];
+      }
+
+      console.log(`Shipping estimate for order ${order_number}: date=${updateData.estimated_shipping_date}, same_day=${updateData.envio_mesmo_dia}`);
+    }
+
     if (tracking_number) updateData.tracking_number = tracking_number;
     if (previsao_envio) updateData.estimated_shipping_date = previsao_envio;
     if (motivo) updateData.status_reason = motivo;
