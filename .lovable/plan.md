@@ -1,35 +1,41 @@
 
+# Corrigir: Etiqueta obrigatória para checkout com método "Envio com Etiqueta"
 
-# Fix: 404 persistente na rota `/top_10_produtos`
+## Problema
 
-## Diagnóstico
+Os 3 pedidos (`ORD-1775783958721`, `ORD-1775782016603`, `ORD-1775781630051`) foram criados e pagos sem etiqueta (`has_shipping_file: false`), apesar do único método de envio ativo ("Envio com Etiqueta") ter `requires_upload: true`.
 
-Analisei o código completo e a rota está **corretamente definida** na linha 224 do `App.tsx`. O import e export do componente estão corretos. Nenhum guard ou redirect interfere nesta rota.
+A validação `canAdvanceToNextStep` no step 2 verifica `shippingFile`, mas a função `createPixPayment` (que cria o pedido) **não re-valida** a presença do arquivo antes de prosseguir. Se o estado `shippingFile` for perdido (ex: re-render, navegação entre steps), o pedido é criado sem etiqueta.
 
-O problema é quase certamente o **Service Worker em cache** — ele ainda está servindo uma versão antiga do app (antes da rota ser adicionada). O `navigateFallback` foi adicionado ao config, mas o SW precisa ser atualizado no browser do usuário.
+## Correções
 
-## Solução
+### 1. `src/pages/Checkout.tsx` — Validação no `createPixPayment`
 
-### 1. Forçar atualização do Service Worker no código
-
-Adicionar um mecanismo no `main.tsx` ou `App.tsx` para forçar o unregister de service workers antigos e garantir que o app mais recente seja carregado:
+Adicionar verificação **antes** de criar o pagamento PIX:
 
 ```typescript
-// No início do App ou main.tsx
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(registrations => {
-    registrations.forEach(registration => registration.unregister());
+// Dentro de createPixPayment, antes de chamar createModernPixPayment
+if (isLabelMethod() && selectedShippingMethod?.requires_upload && !shippingFile) {
+  toast({
+    title: "Etiqueta obrigatória",
+    description: "Por favor, anexe a etiqueta de envio antes de finalizar o pedido.",
+    variant: "destructive"
   });
+  setIsProcessingPayment(false);
+  return;
 }
 ```
 
-### 2. Alternativa mais suave — verificar se a rota funciona sem SW
+### 2. `src/pages/Checkout.tsx` — Marcar `has_shipping_file` na criação
 
-Adicionar `self.__WB_MANIFEST` check e garantir que `skipWaiting` + `clientsClaim` estejam funcionando. Já estão no config, mas podemos verificar se o build está aplicando corretamente.
+Atualizar o pedido para `has_shipping_file: true` somente após upload bem-sucedido (já faz isso na seção de upload). Mas adicionar fallback: se upload falhar e `requires_upload` era `true`, cancelar/alertar.
 
-### 3. Ação imediata recomendada
+### 3. Botão de pagamento — Desabilitar sem etiqueta
 
-Além da mudança no código, o usuário pode testar imediatamente abrindo o DevTools > Application > Service Workers > Unregister, ou abrindo em aba anônima sem cache.
+No botão "Gerar PIX" (step 3/4), desabilitar quando `isLabelMethod() && requires_upload && !shippingFile`.
 
-A mudança de código garantirá que futuros visitantes não tenham esse problema.
+## Arquivo afetado
 
+| Arquivo | Ação |
+|---------|------|
+| `src/pages/Checkout.tsx` | Adicionar validação de etiqueta em `createPixPayment` e desabilitar botão |
