@@ -2563,6 +2563,11 @@ export type Database = {
           additional_costs: Json | null
           auto_withdrawal_enabled: boolean | null
           auto_withdrawal_frequency: string | null
+          carteira_pagamento_parcial: boolean | null
+          carteira_taxa_percentual: number | null
+          carteira_valor_maximo: number | null
+          carteira_valor_minimo: number | null
+          carteira_valores_sugeridos: Json | null
           created_at: string | null
           dias_envio: Json | null
           gateway_fee_percentage: number | null
@@ -2580,6 +2585,11 @@ export type Database = {
           additional_costs?: Json | null
           auto_withdrawal_enabled?: boolean | null
           auto_withdrawal_frequency?: string | null
+          carteira_pagamento_parcial?: boolean | null
+          carteira_taxa_percentual?: number | null
+          carteira_valor_maximo?: number | null
+          carteira_valor_minimo?: number | null
+          carteira_valores_sugeridos?: Json | null
           created_at?: string | null
           dias_envio?: Json | null
           gateway_fee_percentage?: number | null
@@ -2597,6 +2607,11 @@ export type Database = {
           additional_costs?: Json | null
           auto_withdrawal_enabled?: boolean | null
           auto_withdrawal_frequency?: string | null
+          carteira_pagamento_parcial?: boolean | null
+          carteira_taxa_percentual?: number | null
+          carteira_valor_maximo?: number | null
+          carteira_valor_minimo?: number | null
+          carteira_valores_sugeridos?: Json | null
           created_at?: string | null
           dias_envio?: Json | null
           gateway_fee_percentage?: number | null
@@ -4361,6 +4376,92 @@ export type Database = {
         }
         Relationships: []
       }
+      wallet_transactions: {
+        Row: {
+          created_at: string | null
+          descricao: string | null
+          id: string
+          payment_id: string | null
+          referencia_id: string | null
+          referencia_tipo: string | null
+          saldo_anterior: number
+          saldo_posterior: number
+          status: string
+          taxa: number | null
+          tipo: Database["public"]["Enums"]["wallet_transaction_tipo"]
+          valor: number
+          valor_pago: number | null
+          wallet_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          descricao?: string | null
+          id?: string
+          payment_id?: string | null
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          saldo_anterior: number
+          saldo_posterior: number
+          status?: string
+          taxa?: number | null
+          tipo: Database["public"]["Enums"]["wallet_transaction_tipo"]
+          valor: number
+          valor_pago?: number | null
+          wallet_id: string
+        }
+        Update: {
+          created_at?: string | null
+          descricao?: string | null
+          id?: string
+          payment_id?: string | null
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          saldo_anterior?: number
+          saldo_posterior?: number
+          status?: string
+          taxa?: number | null
+          tipo?: Database["public"]["Enums"]["wallet_transaction_tipo"]
+          valor?: number
+          valor_pago?: number | null
+          wallet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wallet_transactions_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wallets: {
+        Row: {
+          created_at: string | null
+          id: string
+          saldo: number
+          saldo_bloqueado: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          saldo?: number
+          saldo_bloqueado?: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          saldo?: number
+          saldo_bloqueado?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       webhook_dispatch_logs: {
         Row: {
           dispatched_at: string | null
@@ -4640,6 +4741,28 @@ export type Database = {
       complete_withdrawal: {
         Args: { p_admin_id: string; p_withdrawal_id: string }
         Returns: undefined
+      }
+      creditar_carteira: {
+        Args: {
+          p_descricao?: string
+          p_referencia_id?: string
+          p_referencia_tipo?: string
+          p_taxa?: number
+          p_tipo?: Database["public"]["Enums"]["wallet_transaction_tipo"]
+          p_user_id: string
+          p_valor: number
+        }
+        Returns: Json
+      }
+      debitar_carteira: {
+        Args: {
+          p_descricao: string
+          p_referencia_id: string
+          p_referencia_tipo: string
+          p_user_id: string
+          p_valor: number
+        }
+        Returns: Json
       }
       delete_inactive_users: {
         Args: never
@@ -4923,6 +5046,14 @@ export type Database = {
         | "waiting_admin"
         | "resolved"
         | "closed"
+      wallet_transaction_tipo:
+        | "recarga"
+        | "pagamento_pedido"
+        | "estorno"
+        | "bonus"
+        | "ajuste_credito"
+        | "ajuste_debito"
+        | "cashback"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -5100,6 +5231,15 @@ export const Constants = {
         "waiting_admin",
         "resolved",
         "closed",
+      ],
+      wallet_transaction_tipo: [
+        "recarga",
+        "pagamento_pedido",
+        "estorno",
+        "bonus",
+        "ajuste_credito",
+        "ajuste_debito",
+        "cashback",
       ],
     },
   },
