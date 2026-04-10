@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
         taxa: taxa,
         valor_pago: totalPagar,
         saldo_anterior: saldoAtual,
-        saldo_posterior: saldoAtual, // Will be updated when payment is confirmed
+        saldo_posterior: saldoAtual,
         descricao: 'Recarga via PIX',
         referencia_tipo: 'recarga_pix',
         status: 'pending',
@@ -114,44 +114,143 @@ Deno.serve(async (req) => {
     // Get user profile for PIX
     const { data: profile } = await supabase
       .from('profiles')
-      .select('first_name, last_name, cpf')
+      .select('first_name, last_name, cpf, phone')
       .eq('user_id', user.id)
       .single();
 
-    // Call create-pix-payment with wallet reference
-    const { data: pixResponse, error: pixError } = await supabase.functions.invoke('create-pix-payment', {
-      body: {
-        amount: totalPagar,
-        description: `Recarga Carteira - R$ ${valor.toFixed(2)}`,
-        payer: {
-          email: user.email,
-          firstName: profile?.first_name || 'Cliente',
-          lastName: profile?.last_name || '',
-          cpf: profile?.cpf || '',
-        },
-        orderItems: [{
-          productId: 'wallet-recharge',
-          productName: `Recarga Carteira R$ ${valor.toFixed(2)}`,
-          quantity: 1,
-          unitPrice: totalPagar,
-        }],
+    // Build N8N payload (same format as create-pix-payment)
+    const n8nPayload = {
+      pedido: {
         external_reference: `wallet_${transaction.id}`,
+        timestamp: new Date().toISOString(),
+        valor_total: totalPagar,
+        descricao: `Recarga Carteira - R$ ${valor.toFixed(2)}`,
+        quantidade_itens: 1,
       },
-    });
+      cliente: {
+        user_id: user.id,
+        nome_completo: `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim(),
+        email: user.email,
+        telefone: profile?.phone || '',
+        cpf: (profile?.cpf || '').replace(/\D/g, ''),
+        endereco: null,
+      },
+      produtos: [{
+        id: 'wallet-recharge',
+        nome: `Recarga Carteira R$ ${valor.toFixed(2)}`,
+        preco_unitario: totalPagar,
+        quantidade: 1,
+        valor_total_item: totalPagar,
+      }],
+      pagamento: {
+        metodo: 'pix',
+        valor: totalPagar,
+      },
+    };
 
-    if (pixError) {
-      // Rollback: delete pending transaction
+    // Call N8N webhook directly (same pattern as create-pix-payment)
+    const primaryWebhookUrl = Deno.env.get('N8N_WEBHOOK_URL') || 'https://n8n-n8n.nuwfic.easypanel.host/webhook/gerar_pix';
+    const testWebhookUrl = Deno.env.get('N8N_WEBHOOK_TEST_URL') || 'https://n8n-n8n.nuwfic.easypanel.host/webhook-test/gerar_pix';
+
+    let n8nResult: any;
+
+    // Attempt 1: Production webhook
+    try {
+      console.log('Wallet recharge: tentando webhook de produção...');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      const response = await fetch(primaryWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(n8nPayload),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      const responseText = await response.text();
+      console.log('N8N Response Status (Primary):', response.status);
+
+      try {
+        n8nResult = JSON.parse(responseText);
+      } catch {
+        throw new Error('N8N retornou resposta inválida');
+      }
+
+      if (response.ok) {
+        console.log('Webhook de produção respondeu com sucesso');
+      } else if (response.status === 404 && (n8nResult.message?.includes('not registered') || n8nResult.code === 404)) {
+        throw new Error('WEBHOOK_NOT_REGISTERED');
+      } else {
+        throw new Error(`N8N webhook failed with status ${response.status}`);
+      }
+    } catch (error) {
+      console.log('Erro no webhook primário:', error instanceof Error ? error.message : String(error));
+
+      if (error instanceof Error && error.message === 'WEBHOOK_NOT_REGISTERED') {
+        // Attempt 2: Test webhook
+        try {
+          console.log('Wallet recharge: tentando webhook de teste...');
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+          const response = await fetch(testWebhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(n8nPayload),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+
+          const responseText = await response.text();
+          console.log('N8N Response Status (Test):', response.status);
+
+          try {
+            n8nResult = JSON.parse(responseText);
+          } catch {
+            throw new Error('N8N retornou resposta inválida');
+          }
+
+          if (!response.ok) {
+            throw new Error(`N8N test webhook failed with status ${response.status}`);
+          }
+          console.log('Webhook de teste respondeu com sucesso');
+        } catch (testError) {
+          // Rollback transaction
+          await supabase.from('wallet_transactions').delete().eq('id', transaction.id);
+          throw testError;
+        }
+      } else if (error instanceof Error && error.name === 'AbortError') {
+        await supabase.from('wallet_transactions').delete().eq('id', transaction.id);
+        throw new Error('PIX_SERVICE_TIMEOUT');
+      } else {
+        await supabase.from('wallet_transactions').delete().eq('id', transaction.id);
+        throw error;
+      }
+    }
+
+    // Parse N8N response (same format as create-pix-payment)
+    let pixData: any;
+    if (Array.isArray(n8nResult) && n8nResult.length > 0) {
+      pixData = n8nResult[0];
+    } else if (n8nResult && typeof n8nResult === 'object') {
+      pixData = n8nResult;
+    } else {
       await supabase.from('wallet_transactions').delete().eq('id', transaction.id);
-      throw pixError;
+      throw new Error('Formato de resposta PIX inválido');
+    }
+
+    if (!pixData.qrCodeBase64 || !pixData.qrCodeCopyPaste) {
+      await supabase.from('wallet_transactions').delete().eq('id', transaction.id);
+      throw new Error('Dados do QR Code PIX não disponíveis');
     }
 
     // Update transaction with payment_id
-    if (pixResponse?.payment_id) {
-      await supabase
-        .from('wallet_transactions')
-        .update({ payment_id: pixResponse.payment_id })
-        .eq('id', transaction.id);
-    }
+    const paymentId = pixData.paymentId || `wallet_${transaction.id}`;
+    await supabase
+      .from('wallet_transactions')
+      .update({ payment_id: paymentId })
+      .eq('id', transaction.id);
 
     console.log(`Wallet recharge created: tx=${transaction.id}, valor=${valor}, taxa=${taxa}, total=${totalPagar}`);
 
@@ -162,9 +261,9 @@ Deno.serve(async (req) => {
         valor_saldo: valor,
         taxa: taxa,
         total_pagar: totalPagar,
-        qr_code: pixResponse?.qr_code || '',
-        qr_code_base64: pixResponse?.qr_code_base64 || '',
-        payment_id: pixResponse?.payment_id || '',
+        qr_code: pixData.qrCodeCopyPaste,
+        qr_code_base64: pixData.qrCodeBase64,
+        payment_id: paymentId,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
