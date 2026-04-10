@@ -25,6 +25,7 @@ import pixIcon from "@/assets/pix-icon.png";
 import { ShippingMethodSelector } from "@/components/ShippingMethodSelector";
 import { HighRotationAlert } from '@/components/HighRotationAlert';
 import BannerPrevisaoEnvio from "@/components/checkout/BannerPrevisaoEnvio";
+import { useWallet } from "@/hooks/useWallet";
 interface CheckoutProps {
   showHeader?: boolean;
   showFooter?: boolean;
@@ -68,6 +69,10 @@ const Checkout = ({
     amount: number;
   } | null>(null);
   const [showHighRotationAlert, setShowHighRotationAlert] = useState(false);
+  const [walletPaymentMethod, setWalletPaymentMethod] = useState<'pix' | 'wallet'>('pix');
+  const [isPayingWithWallet, setIsPayingWithWallet] = useState(false);
+  const { data: walletData } = useWallet();
+  const walletSaldo = walletData?.saldo ?? 0;
 
   // Check if cart is empty and redirect
   useEffect(() => {
@@ -511,6 +516,106 @@ const Checkout = ({
   const handleGeneratePix = () => {
     createModernPix();
   };
+  const handlePayWithWallet = async () => {
+    if (walletSaldo < total) {
+      toast({
+        title: "Saldo insuficiente",
+        description: `Seu saldo é ${formatPrice(walletSaldo)}. Faltam ${formatPrice(total - walletSaldo)}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsPayingWithWallet(true);
+    try {
+      // Validate CPF
+      if (!validateCPF(formData.cpf)) {
+        toast({ title: "CPF inválido", description: "Por favor, informe um CPF válido.", variant: "destructive" });
+        return;
+      }
+      // Validate shipping label
+      if (isLabelMethod() && selectedShippingMethod?.requires_upload && !shippingFile) {
+        toast({ title: "Etiqueta obrigatória", description: "Anexe a etiqueta de envio.", variant: "destructive" });
+        return;
+      }
+      await saveUserDataAndAddress();
+      // Create order first via edge function (same as PIX but we'll debit wallet)
+      const orderItems = cartItems.map(item => ({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.price
+      }));
+      const { data: orderData, error: orderError } = await supabase.functions.invoke('create-pix-payment', {
+        body: {
+          amount: parseFloat(total.toFixed(2)),
+          description: `Pedido - ${cartItems.length} item(s)`,
+          payer: {
+            email: formData.email,
+            firstName: formData.firstName,
+            lastName: formData.lastName || '',
+            cpf: cleanCPF(formData.cpf)
+          },
+          orderItems,
+          shippingAddress: isLabelMethod() ? null : {
+            street: formData.address,
+            number: formData.number,
+            complement: formData.complement,
+            neighborhood: formData.neighborhood,
+            city: formData.city,
+            state: formData.state,
+            zipCode: formData.zipCode
+          },
+          payment_method: 'wallet',
+        },
+      });
+      if (orderError) throw orderError;
+      const orderId = orderData?.order_id;
+      if (!orderId) throw new Error('Pedido não criado');
+      // Upload shipping file if needed
+      if (shippingFile?.file && orderId) {
+        const fileExtension = shippingFile.file.name.split('.').pop();
+        const fileName = `order_${orderId}_${Date.now()}.${fileExtension}`;
+        const filePath = `${orderId}/${fileName}`;
+        await supabase.storage.from('shipping-files').upload(filePath, shippingFile.file);
+        await supabase.from('order_shipping_files').insert({
+          order_id: orderId,
+          file_name: shippingFile.file.name,
+          file_path: filePath,
+          file_size: shippingFile.file.size
+        });
+      }
+      // Debit wallet
+      const { data: debitResult, error: debitError } = await supabase.rpc('debitar_carteira', {
+        p_user_id: user!.id,
+        p_valor: parseFloat(total.toFixed(2)),
+        p_descricao: `Pagamento Pedido ${orderData?.order_number || ''}`,
+        p_referencia_tipo: 'pedido',
+        p_referencia_id: orderId,
+      });
+      if (debitError) throw debitError;
+      const result = debitResult as any;
+      if (!result?.success) throw new Error(result?.error || 'Erro ao debitar saldo');
+      // Mark order as paid
+      await supabase.from('orders').update({
+        status: 'recebido',
+        payment_status: 'paid',
+        payment_method: 'wallet',
+      }).eq('id', orderId);
+      await supabase.from('order_status_history').insert({
+        order_id: orderId,
+        status: 'recebido',
+        notes: 'Pagamento com saldo da carteira',
+      });
+      clearCart();
+      toast({ title: "Pedido confirmado!", description: "Pagamento realizado com saldo da carteira." });
+      navigate("/minha-conta/pedidos");
+    } catch (err: any) {
+      console.error('Wallet payment error:', err);
+      toast({ title: "Erro no pagamento", description: err.message || "Tente novamente.", variant: "destructive" });
+    } finally {
+      setIsPayingWithWallet(false);
+    }
+  };
   const handlePixPaymentConfirmed = () => {
     clearCart();
     toast({
@@ -741,7 +846,37 @@ const Checkout = ({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="p-4 border rounded-lg bg-muted/50">
+                  {/* Wallet payment option */}
+                  {user && walletSaldo > 0 && (
+                    <div 
+                      className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${walletPaymentMethod === 'wallet' ? 'border-primary bg-primary/5' : 'border-muted hover:border-primary/50'}`}
+                      onClick={() => setWalletPaymentMethod('wallet')}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center text-xl">
+                          💰
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-semibold">Saldo da Carteira</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Disponível: {formatPrice(walletSaldo)}
+                          </p>
+                          {walletSaldo >= total ? (
+                            <p className="text-xs text-emerald-600 font-medium mt-0.5">✅ Saldo suficiente para este pedido</p>
+                          ) : (
+                            <p className="text-xs text-amber-600 font-medium mt-0.5">⚠️ Saldo insuficiente. Faltam {formatPrice(total - walletSaldo)}</p>
+                          )}
+                        </div>
+                        <input type="radio" checked={walletPaymentMethod === 'wallet'} onChange={() => setWalletPaymentMethod('wallet')} className="w-4 h-4" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* PIX option */}
+                  <div 
+                    className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${walletPaymentMethod === 'pix' ? 'border-primary bg-primary/5' : 'border-muted hover:border-primary/50'}`}
+                    onClick={() => setWalletPaymentMethod('pix')}
+                  >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-xl">
                         💠
@@ -752,16 +887,36 @@ const Checkout = ({
                           Pagamento instantâneo e seguro
                         </p>
                       </div>
+                      <input type="radio" checked={walletPaymentMethod === 'pix'} onChange={() => setWalletPaymentMethod('pix')} className="w-4 h-4 ml-auto" />
                     </div>
                   </div>
+
                   <BannerPrevisaoEnvio />
-                  <p className="text-sm text-muted-foreground">
-                    Clique no botão abaixo para gerar o QR Code PIX para pagamento.
-                    O pagamento é processado instantaneamente.
-                  </p>
-                  <Button onClick={handleGeneratePix} disabled={isProcessingPayment || !canAdvanceToNextStep()} size="lg" className="w-full bg-[#3fc356]">
-                    {isProcessingPayment ? "Gerando PIX..." : "Concluir Pagamento"}
-                  </Button>
+                  
+                  {walletPaymentMethod === 'pix' ? (
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        Clique no botão abaixo para gerar o QR Code PIX para pagamento.
+                      </p>
+                      <Button onClick={handleGeneratePix} disabled={isProcessingPayment || !canAdvanceToNextStep()} size="lg" className="w-full bg-[#3fc356]">
+                        {isProcessingPayment ? "Gerando PIX..." : "Concluir Pagamento via PIX"}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        O valor de {formatPrice(total)} será debitado do seu saldo da carteira.
+                      </p>
+                      <Button 
+                        onClick={handlePayWithWallet} 
+                        disabled={isPayingWithWallet || walletSaldo < total || !canAdvanceToNextStep()} 
+                        size="lg" 
+                        className="w-full bg-emerald-600 hover:bg-emerald-700"
+                      >
+                        {isPayingWithWallet ? "Processando..." : `Pagar com Saldo (${formatPrice(walletSaldo)})`}
+                      </Button>
+                    </>
+                  )}
                 </CardContent>
               </Card>}
 

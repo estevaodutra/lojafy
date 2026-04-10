@@ -4,6 +4,7 @@ import SupportManagement from "./SupportManagement";
 import NotificationsManagement from "./NotificationsManagement";
 import AIKnowledgeBase from "./AIKnowledgeBase";
 import ShippingCutoffSettings from "@/components/admin/ShippingCutoffSettings";
+import WalletSettings from "@/components/admin/WalletSettings";
 
 const Configuracoes = () => {
   return (
@@ -19,6 +20,7 @@ const Configuracoes = () => {
         <TabsList>
           <TabsTrigger value="platform">Plataforma</TabsTrigger>
           <TabsTrigger value="shipping">Envio</TabsTrigger>
+          <TabsTrigger value="wallet">Carteira</TabsTrigger>
           <TabsTrigger value="support">Suporte</TabsTrigger>
           <TabsTrigger value="notifications">Notificações</TabsTrigger>
           <TabsTrigger value="ai">Base de Conhecimento</TabsTrigger>
@@ -30,6 +32,10 @@ const Configuracoes = () => {
 
         <TabsContent value="shipping" className="space-y-4">
           <ShippingCutoffSettings />
+        </TabsContent>
+
+        <TabsContent value="wallet" className="space-y-4">
+          <WalletSettings />
         </TabsContent>
 
         <TabsContent value="support" className="space-y-4">
