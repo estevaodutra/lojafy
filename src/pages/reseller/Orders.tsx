@@ -28,7 +28,7 @@ function ResellerOrders() {
   const counts = getStatusCounts();
 
   // Only show tabs for statuses that have orders or are common
-  const visibleTabs: (OrderStatus | "all")[] = ["all", "pendente", "pago", "recebido", "em_preparacao", "embalado", "enviado", "finalizado", "devolucao_solicitada", "em_devolucao", "troca_solicitada", "em_troca", "cancelado", "reembolsado"];
+  const visibleTabs: (OrderStatus | "all")[] = ["all", "pendente", "pago", "recebido", "embalado", "enviado", "finalizado", "em_reposicao", "em_falta", "cancelamento_solicitado", "cancelado", "devolucao_andamento", "devolucao_recebida", "devolucao_analise", "devolucao_aprovada", "reembolsado"];
 
   return (
     <div className="space-y-6">
@@ -55,8 +55,8 @@ function ResellerOrders() {
         </Card>
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Em Preparação</CardDescription>
-            <CardTitle className="text-3xl text-blue-600">{(counts.recebido || 0) + (counts.em_preparacao || 0)}</CardTitle>
+            <CardDescription>Recebidos</CardDescription>
+            <CardTitle className="text-3xl text-blue-600">{counts.recebido || 0}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
