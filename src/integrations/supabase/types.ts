@@ -2306,12 +2306,14 @@ export type Database = {
           created_at: string
           devolucao_motivo: string | null
           devolucao_observacao: string | null
+          envio_mesmo_dia: boolean | null
           estimated_shipping_date: string | null
           external_reference: string | null
           has_shipping_file: boolean | null
           id: string
           notes: string | null
           order_number: string
+          pago_em: string | null
           payment_expires_at: string | null
           payment_id: string | null
           payment_method: string | null
@@ -2341,12 +2343,14 @@ export type Database = {
           created_at?: string
           devolucao_motivo?: string | null
           devolucao_observacao?: string | null
+          envio_mesmo_dia?: boolean | null
           estimated_shipping_date?: string | null
           external_reference?: string | null
           has_shipping_file?: boolean | null
           id?: string
           notes?: string | null
           order_number: string
+          pago_em?: string | null
           payment_expires_at?: string | null
           payment_id?: string | null
           payment_method?: string | null
@@ -2376,12 +2380,14 @@ export type Database = {
           created_at?: string
           devolucao_motivo?: string | null
           devolucao_observacao?: string | null
+          envio_mesmo_dia?: boolean | null
           estimated_shipping_date?: string | null
           external_reference?: string | null
           has_shipping_file?: boolean | null
           id?: string
           notes?: string | null
           order_number?: string
+          pago_em?: string | null
           payment_expires_at?: string | null
           payment_id?: string | null
           payment_method?: string | null
@@ -2558,8 +2564,10 @@ export type Database = {
           auto_withdrawal_enabled: boolean | null
           auto_withdrawal_frequency: string | null
           created_at: string | null
+          dias_envio: Json | null
           gateway_fee_percentage: number | null
           guarantee_period_days: number | null
+          horario_corte_envio: string | null
           id: string
           platform_fee_type: string | null
           platform_fee_value: number | null
@@ -2573,8 +2581,10 @@ export type Database = {
           auto_withdrawal_enabled?: boolean | null
           auto_withdrawal_frequency?: string | null
           created_at?: string | null
+          dias_envio?: Json | null
           gateway_fee_percentage?: number | null
           guarantee_period_days?: number | null
+          horario_corte_envio?: string | null
           id?: string
           platform_fee_type?: string | null
           platform_fee_value?: number | null
@@ -2588,8 +2598,10 @@ export type Database = {
           auto_withdrawal_enabled?: boolean | null
           auto_withdrawal_frequency?: string | null
           created_at?: string | null
+          dias_envio?: Json | null
           gateway_fee_percentage?: number | null
           guarantee_period_days?: number | null
+          horario_corte_envio?: string | null
           id?: string
           platform_fee_type?: string | null
           platform_fee_value?: number | null
