@@ -2301,17 +2301,28 @@ export type Database = {
       orders: {
         Row: {
           billing_address: Json | null
+          cancelado_em: string | null
           cancelamento_motivo: string | null
           cancelamento_observacao: string | null
+          cancelamento_solicitado_em: string | null
+          cancelamento_solicitado_por: string | null
           created_at: string
+          devolucao_analisada_em: string | null
+          devolucao_aprovada_em: string | null
+          devolucao_iniciada_em: string | null
           devolucao_motivo: string | null
           devolucao_observacao: string | null
+          devolucao_recebida_em: string | null
           envio_mesmo_dia: boolean | null
           estimated_shipping_date: string | null
           external_reference: string | null
           has_shipping_file: boolean | null
           id: string
+          motivo_atraso: string | null
+          motivo_falta: string | null
           notes: string | null
+          observacao_aprovacao: string | null
+          observacao_interna: string | null
           order_number: string
           pago_em: string | null
           payment_expires_at: string | null
@@ -2320,6 +2331,8 @@ export type Database = {
           payment_status: string | null
           pix_qr_code: string | null
           pix_qr_code_base64: string | null
+          reembolsado_em: string | null
+          reembolso_parcial: boolean | null
           reseller_id: string | null
           shipping_address: Json | null
           shipping_amount: number | null
@@ -2331,24 +2344,34 @@ export type Database = {
           tax_amount: number | null
           total_amount: number
           tracking_number: string | null
-          troca_motivo: string | null
-          troca_observacao: string | null
           updated_at: string
           user_id: string
+          valor_reembolso: number | null
         }
         Insert: {
           billing_address?: Json | null
+          cancelado_em?: string | null
           cancelamento_motivo?: string | null
           cancelamento_observacao?: string | null
+          cancelamento_solicitado_em?: string | null
+          cancelamento_solicitado_por?: string | null
           created_at?: string
+          devolucao_analisada_em?: string | null
+          devolucao_aprovada_em?: string | null
+          devolucao_iniciada_em?: string | null
           devolucao_motivo?: string | null
           devolucao_observacao?: string | null
+          devolucao_recebida_em?: string | null
           envio_mesmo_dia?: boolean | null
           estimated_shipping_date?: string | null
           external_reference?: string | null
           has_shipping_file?: boolean | null
           id?: string
+          motivo_atraso?: string | null
+          motivo_falta?: string | null
           notes?: string | null
+          observacao_aprovacao?: string | null
+          observacao_interna?: string | null
           order_number: string
           pago_em?: string | null
           payment_expires_at?: string | null
@@ -2357,6 +2380,8 @@ export type Database = {
           payment_status?: string | null
           pix_qr_code?: string | null
           pix_qr_code_base64?: string | null
+          reembolsado_em?: string | null
+          reembolso_parcial?: boolean | null
           reseller_id?: string | null
           shipping_address?: Json | null
           shipping_amount?: number | null
@@ -2368,24 +2393,34 @@ export type Database = {
           tax_amount?: number | null
           total_amount: number
           tracking_number?: string | null
-          troca_motivo?: string | null
-          troca_observacao?: string | null
           updated_at?: string
           user_id: string
+          valor_reembolso?: number | null
         }
         Update: {
           billing_address?: Json | null
+          cancelado_em?: string | null
           cancelamento_motivo?: string | null
           cancelamento_observacao?: string | null
+          cancelamento_solicitado_em?: string | null
+          cancelamento_solicitado_por?: string | null
           created_at?: string
+          devolucao_analisada_em?: string | null
+          devolucao_aprovada_em?: string | null
+          devolucao_iniciada_em?: string | null
           devolucao_motivo?: string | null
           devolucao_observacao?: string | null
+          devolucao_recebida_em?: string | null
           envio_mesmo_dia?: boolean | null
           estimated_shipping_date?: string | null
           external_reference?: string | null
           has_shipping_file?: boolean | null
           id?: string
+          motivo_atraso?: string | null
+          motivo_falta?: string | null
           notes?: string | null
+          observacao_aprovacao?: string | null
+          observacao_interna?: string | null
           order_number?: string
           pago_em?: string | null
           payment_expires_at?: string | null
@@ -2394,6 +2429,8 @@ export type Database = {
           payment_status?: string | null
           pix_qr_code?: string | null
           pix_qr_code_base64?: string | null
+          reembolsado_em?: string | null
+          reembolso_parcial?: boolean | null
           reseller_id?: string | null
           shipping_address?: Json | null
           shipping_amount?: number | null
@@ -2405,10 +2442,9 @@ export type Database = {
           tax_amount?: number | null
           total_amount?: number
           tracking_number?: string | null
-          troca_motivo?: string | null
-          troca_observacao?: string | null
           updated_at?: string
           user_id?: string
+          valor_reembolso?: number | null
         }
         Relationships: [
           {
