@@ -1,62 +1,22 @@
 
 
-# Wallet Recharge: Usar mesmo fluxo N8N do checkout
+# Redimensionar popup de pagamento PIX na carteira
 
-## Problema atual
-A edge function `wallet-recharge` chama `create-pix-payment` internamente via `supabase.functions.invoke`. Porém, `create-pix-payment` cria um pedido (`orders`) desnecessário para recargas de carteira. O fluxo correto é chamar o webhook N8N diretamente (mesma URL, mesmo formato de payload) sem criar pedido.
+## Problema
+O modal `AddBalanceModal` usa `sm:max-w-lg` mas o `ModernPixPayment` dentro dele renderiza múltiplos Cards grandes (valor, QR code, código PIX, instruções), causando overflow visível na screenshot.
 
 ## Solução
-Modificar `wallet-recharge` para enviar o payload diretamente ao webhook N8N (mesma lógica de `create-pix-payment`), sem passar por `create-pix-payment`. O `external_reference` com prefixo `wallet_` já garante que o `webhook-n8n-payment` identifique como recarga.
+1. **Aumentar o `DialogContent`** para `sm:max-w-md` quando exibindo PIX (já é `sm:max-w-lg`, mas o conteúdo precisa de scroll)
+2. **Adicionar `max-h-[80vh] overflow-y-auto`** ao container do PIX dentro do modal para permitir scroll
+3. **Compactar o `ModernPixPayment`** quando usado dentro do modal: reduzir padding, tamanho do QR code (de `w-48 h-48` para `w-36 h-36`), remover cards redundantes e consolidar em layout mais compacto
 
 ## Arquivo afetado
 
 | Arquivo | Ação |
 |---------|------|
-| `supabase/functions/wallet-recharge/index.ts` | Substituir chamada a `create-pix-payment` por chamada direta ao N8N webhook |
+| `src/components/wallet/AddBalanceModal.tsx` | Adicionar scroll e wrapper compacto ao redor do ModernPixPayment |
+| `src/components/ModernPixPayment.tsx` | Não alterar (usado também no checkout) |
 
-## Mudanças em `wallet-recharge/index.ts`
-
-1. **Remover** a chamada `supabase.functions.invoke('create-pix-payment', ...)`
-2. **Adicionar** chamada direta ao N8N webhook usando o mesmo padrão:
-   - Montar payload no formato `{ pedido, cliente, produtos, pagamento }` igual ao `create-pix-payment`
-   - Usar URLs `N8N_WEBHOOK_URL` / `N8N_WEBHOOK_TEST_URL` com fallback
-   - Timeout de 30s com `AbortController`
-   - Fallback de webhook produção → teste (mesmo padrão)
-3. **Parsear** resposta N8N: extrair `qrCodeBase64`, `qrCodeCopyPaste`, `paymentId`
-4. **Atualizar** a transação pendente com o `payment_id` do N8N
-5. **Retornar** QR code e payment_id para o frontend
-
-### Payload para N8N (mesmo formato do checkout)
-```typescript
-const n8nPayload = {
-  pedido: {
-    external_reference: `wallet_${transaction.id}`,
-    timestamp: new Date().toISOString(),
-    valor_total: totalPagar,
-    descricao: `Recarga Carteira - R$ ${valor.toFixed(2)}`,
-    quantidade_itens: 1
-  },
-  cliente: {
-    user_id: user.id,
-    nome_completo: `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim(),
-    email: user.email,
-    telefone: profile?.phone || '',
-    cpf: profile?.cpf?.replace(/\D/g, '') || '',
-    endereco: null
-  },
-  produtos: [{
-    id: 'wallet-recharge',
-    nome: `Recarga Carteira R$ ${valor.toFixed(2)}`,
-    preco_unitario: totalPagar,
-    quantidade: 1,
-    valor_total_item: totalPagar
-  }],
-  pagamento: {
-    metodo: 'pix',
-    valor: totalPagar
-  }
-};
-```
-
-O webhook `webhook-n8n-payment` já trata o prefixo `wallet_` no `external_reference` corretamente, portanto nenhuma mudança é necessária nele.
+## Abordagem
+Envolver o `ModernPixPayment` em um `div` com `max-h-[70vh] overflow-y-auto` dentro do `AddBalanceModal`, e mudar o `DialogContent` para `sm:max-w-md` para melhor centralização em mobile.
 
