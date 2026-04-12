@@ -13,6 +13,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { OpenTicketButton } from '@/components/order-tickets/OpenTicketButton';
 import { getAvailableTicketTypes } from '@/types/orderTickets';
 import { getStatusConfig, getStatusLabel as gslFn, getStatusVariant as gsvFn } from '@/constants/orderStatus';
+import { OrderActionBar } from '@/components/order-details/OrderActionBar';
+import { RelatedTickets } from '@/components/order-details/RelatedTickets';
 interface OrderItem {
   id: string;
   product_id: string;
@@ -617,6 +619,22 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               </Badge>}
           </DialogTitle>
         </DialogHeader>
+
+        {/* Action Bar */}
+        {order && profile && (
+          <OrderActionBar
+            order={order}
+            userRole={profile.role || 'customer'}
+            deliveredAt={deliveredAt}
+            existingTicketId={existingTicketId}
+            onRefresh={() => {
+              fetchOrderDetails();
+              fetchStatusHistory();
+              fetchExistingTicket();
+              fetchDeliveredAt();
+            }}
+          />
+        )}
 
         {loading ? <div className="text-center py-12">
             <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
@@ -1259,6 +1277,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     </CardContent>
                   </Card>}
               </div>}
+
+            {/* Related Tickets */}
+            <RelatedTickets orderId={order.id} />
 
             {/* Status History */}
             {statusHistory.length > 0 && <Card>
