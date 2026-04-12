@@ -38,12 +38,16 @@ export const CancelamentoModal = ({ isOpen, onClose, orderNumber, onConfirm }: C
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Cancelar Pedido #{orderNumber}</DialogTitle>
+          <DialogTitle>Solicitar Cancelamento - Pedido #{orderNumber}</DialogTitle>
           <DialogDescription>
-            Informe o motivo do cancelamento deste pedido.
+            A solicitação será enviada para aprovação do administrador.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
+            ⚠️ O valor só será creditado na carteira após aprovação do administrador.
+          </div>
+
           <div>
             <Label>Motivo do Cancelamento *</Label>
             <Select value={motivo} onValueChange={setMotivo}>
@@ -70,15 +74,15 @@ export const CancelamentoModal = ({ isOpen, onClose, orderNumber, onConfirm }: C
             />
           </div>
 
-          <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-md text-sm text-destructive">
+          <div className="flex items-center gap-2 p-3 bg-muted rounded-md text-sm text-muted-foreground">
             <AlertTriangle className="h-4 w-4 shrink-0" />
-            <span>Esta ação não pode ser desfeita.</span>
+            <span>A solicitação será analisada pelo administrador antes da efetivação.</span>
           </div>
 
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={handleClose}>Voltar</Button>
             <Button variant="destructive" onClick={handleConfirm} disabled={!isValid}>
-              Confirmar Cancelamento
+              Enviar Solicitação
             </Button>
           </div>
         </div>

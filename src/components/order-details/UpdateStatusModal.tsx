@@ -43,7 +43,8 @@ export const UpdateStatusModal = ({
   const [trackingNumber, setTrackingNumber] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const transitions = getAvailableTransitions(currentStatus);
+  // Filter out 'cancelado' - must go through solicitation flow
+  const transitions = getAvailableTransitions(currentStatus).filter(s => s !== 'cancelado');
 
   const canSubmit = () => {
     if (!newStatus) return false;

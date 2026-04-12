@@ -71,8 +71,13 @@ const SupplierOrderManagement = () => {
       if (extra?.motivo_atraso) updateData.motivo_atraso = extra.motivo_atraso;
       if (extra?.motivo_falta) updateData.motivo_falta = extra.motivo_falta;
 
+      // Block direct cancellation - must go through solicitation
+      if (newStatus === 'cancelado') {
+        newStatus = 'cancelamento_solicitado';
+        updateData.status = 'cancelamento_solicitado';
+      }
+
       // Set timestamp fields based on status
-      if (newStatus === 'cancelado') updateData.cancelado_em = new Date().toISOString();
       if (newStatus === 'devolucao_andamento') updateData.devolucao_iniciada_em = new Date().toISOString();
       if (newStatus === 'devolucao_recebida') updateData.devolucao_recebida_em = new Date().toISOString();
       if (newStatus === 'reembolsado') updateData.reembolsado_em = new Date().toISOString();
@@ -512,7 +517,7 @@ const SupplierOrderManagement = () => {
         onClose={() => setCancelamentoOrder(null)}
         orderNumber={cancelamentoOrder?.order_number || ''}
         onConfirm={(motivo, observacao) => {
-          updateOrderStatus(cancelamentoOrder.id, 'cancelado', {
+          updateOrderStatus(cancelamentoOrder.id, 'cancelamento_solicitado', {
             cancelamento_motivo: motivo,
             cancelamento_observacao: observacao,
           });

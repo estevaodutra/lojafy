@@ -60,19 +60,19 @@ export const ORDER_STATUS_CONFIG: Record<OrderStatus, OrderStatusConfig> = {
 };
 
 export const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pendente: ["pago", "cancelado"],
-  pago: ["recebido", "cancelado"],
-  recebido: ["embalado", "em_reposicao", "em_falta", "cancelado"],
-  embalado: ["enviado", "em_reposicao", "cancelado"],
-  em_reposicao: ["embalado", "enviado", "cancelado"],
+  pendente: ["pago", "cancelamento_solicitado"],
+  pago: ["recebido", "cancelamento_solicitado"],
+  recebido: ["embalado", "em_reposicao", "em_falta", "cancelamento_solicitado"],
+  embalado: ["enviado", "em_reposicao", "cancelamento_solicitado"],
+  em_reposicao: ["embalado", "enviado", "cancelamento_solicitado"],
   enviado: ["finalizado", "cancelamento_solicitado"],
   finalizado: ["devolucao_andamento"],
   cancelamento_solicitado: ["cancelado", "enviado"],
   cancelado: ["reembolsado"],
   em_falta: [],
-  devolucao_andamento: ["devolucao_recebida", "cancelado"],
+  devolucao_andamento: ["devolucao_recebida"],
   devolucao_recebida: ["devolucao_analise"],
-  devolucao_analise: ["devolucao_aprovada", "cancelado"],
+  devolucao_analise: ["devolucao_aprovada"],
   devolucao_aprovada: ["reembolsado"],
   reembolsado: [],
 };
