@@ -1,88 +1,72 @@
 
 
-# Adicionar Barra de Ações no Modal de Detalhes do Pedido
+# Fluxo de Aprovação de Cancelamento pelo Super Admin
 
-## Resumo
-Adicionar uma barra de ações contextual logo abaixo do header do `OrderDetailsModal`, com botões condicionais baseados no status do pedido e no papel do usuário. Inclui modais para cancelamento, devolução, atualização de status, observação e rastreio, além de uma seção de tickets relacionados.
+## Problema
+Atualmente, o `CancelOrderModal` cancela o pedido e credita a carteira imediatamente. Qualquer usuário com acesso (reseller, supplier, admin) pode executar o cancelamento diretamente. O correto é que todos os usuários apenas **solicitem** o cancelamento, e o **super_admin aprove** (momento em que o valor é creditado).
 
-## Arquivos a criar/editar
+## Mudanças
 
-| Arquivo | Acao |
+### 1. `CancelOrderModal.tsx` - Transformar em solicitação
+- Para **todos os usuários** (inclusive admin/supplier): ao invés de setar `status: 'cancelado'`, setar `status: 'cancelamento_solicitado'`
+- Gravar `cancelamento_motivo`, `cancelamento_observacao`, `cancelamento_solicitado_em`, `cancelamento_solicitado_por`
+- Remover a chamada a `creditar_carteira` deste modal
+- Atualizar textos: "Solicitar Cancelamento" em vez de "Confirmar Cancelamento"
+- Exceção: `super_admin` pode aprovar diretamente (cancelar + creditar) via botão separado
+
+### 2. `RequestCancelModal.tsx` - Mantém como está
+Já faz solicitação para pedidos `enviado`. Sem mudança.
+
+### 3. `RequestReturnModal.tsx` - Mantém como está  
+Já é uma solicitação. Sem mudança.
+
+### 4. `OrderActionBar.tsx` - Ajustar lógica de botões
+- Para reseller/supplier/admin: botão "Cancelar" vira "Solicitar Cancelamento" (usa o mesmo `CancelOrderModal` refatorado)
+- O botão "Solicitar Cancelamento" (para `enviado`) permanece como está
+
+### 5. Nova aba "Solicitações" na página `AdminOrders.tsx`
+- Adicionar `Tabs` (Todos os Pedidos | Solicitações)
+- Aba "Solicitações" lista pedidos com status `cancelamento_solicitado`, `devolucao_andamento`, `devolucao_analise`
+- Cada item mostra: número do pedido, cliente, motivo, data da solicitação, valor
+- Botões de ação: **Aprovar** (cancela + credita carteira) e **Recusar** (volta ao status anterior)
+
+### 6. Novo componente `OrderSolicitations.tsx`
+- Query pedidos com status de solicitação
+- Para cada solicitação, mostrar card com dados e ações
+- Botão "Aprovar Cancelamento":
+  - Atualiza status para `cancelado`
+  - Chama `creditar_carteira` com o valor total
+  - Insere histórico
+- Botão "Recusar":
+  - Volta status para o anterior (guardado no histórico ou inferido)
+  - Insere histórico com nota de recusa
+
+### 7. `handleMarkFraud` no `OrderActionBar.tsx`
+- Manter como está (super_admin pode cancelar diretamente por fraude e creditar)
+
+## Arquivos
+
+| Arquivo | Ação |
 |---------|------|
-| `src/components/order-details/OrderActionBar.tsx` | **Criar**: barra de ações com botões condicionais e dropdown "Mais" |
-| `src/components/order-details/CancelOrderModal.tsx` | **Criar**: modal cancelamento (reusa `CANCELLATION_REASONS`) com info de reembolso |
-| `src/components/order-details/RequestCancelModal.tsx` | **Criar**: modal "Solicitar Cancelamento" para pedidos enviados (checkbox de ciencia) |
-| `src/components/order-details/RequestReturnModal.tsx` | **Criar**: modal devolução (reusa `RETURN_REASONS`) com upload de fotos |
-| `src/components/order-details/UpdateStatusModal.tsx` | **Criar**: modal atualizar status para admin/fornecedor com campos dinâmicos por status |
-| `src/components/order-details/AddNoteModal.tsx` | **Criar**: modal observação (interna ou para cliente) |
-| `src/components/order-details/UpdateTrackingModal.tsx` | **Criar**: modal atualizar rastreio |
-| `src/components/order-details/RelatedTickets.tsx` | **Criar**: seção de tickets relacionados ao pedido |
-| `src/components/OrderDetailsModal.tsx` | **Editar**: integrar `OrderActionBar` abaixo do header e `RelatedTickets` antes do histórico |
+| `src/components/order-details/CancelOrderModal.tsx` | Refatorar: solicitar em vez de cancelar diretamente |
+| `src/components/order-details/OrderActionBar.tsx` | Ajustar labels dos botões |
+| `src/pages/admin/Orders.tsx` | Adicionar Tabs com aba "Solicitações" |
+| `src/components/admin/OrderSolicitations.tsx` | Criar: lista de solicitações pendentes com aprovação/recusa |
 
-## Detalhes
+## Fluxo resumido
 
-### 1. OrderActionBar.tsx
-- Props: `order`, `userRole`, `onRefresh` (callback para recarregar dados do pedido)
-- Botoes visíveis:
-  - **Abrir Ticket**: sempre (reusa `OpenTicketButton` existente)
-  - **Cancelar Pedido**: se status in `['pendente','pago','recebido','embalado','em_reposicao']` e role admin/fornecedor/revendedor
-  - **Solicitar Cancelamento**: se status = `enviado` e role revendedor/admin
-  - **Solicitar Devolução**: se status = `finalizado` e role revendedor/admin
-- Dropdown "Mais Ações" (DropdownMenu do shadcn):
-  - Copiar Número do Pedido (`navigator.clipboard`)
-  - Adicionar Observação (admin/fornecedor)
-  - Atualizar Rastreio (admin/fornecedor)
-  - Atualizar Status (admin/fornecedor, usa `STATUS_TRANSITIONS`)
-  - Separador + Marcar como Fraude (só super_admin, seta motivo `fraude` e cancela)
+```text
+Usuário clica "Solicitar Cancelamento"
+  → status = cancelamento_solicitado
+  → Aparece na aba "Solicitações" do super admin
+  
+Super Admin aprova
+  → status = cancelado
+  → creditar_carteira(valor)
+  → Notificação ao cliente
 
-### 2. CancelOrderModal.tsx
-- Reusa `CANCELLATION_REASONS` e `REASONS_REQUIRING_OBSERVATION` de `orderStatus.ts`
-- Mostra valor do reembolso (total_amount)
-- Alerta de ação irreversível
-- Ao confirmar: atualiza order status para `cancelado` com motivo, insere histórico, credita carteira via `creditar_carteira` RPC
-
-### 3. RequestCancelModal.tsx
-- Para pedidos com status `enviado`
-- Checkbox obrigatório de ciência
-- Campo motivo obrigatório
-- Ao confirmar: atualiza status para `cancelamento_solicitado`
-
-### 4. RequestReturnModal.tsx
-- Reusa `RETURN_REASONS` de `orderStatus.ts`
-- Campo descrição obrigatório
-- Upload de fotos opcional
-- Ao confirmar: atualiza status para `devolucao_andamento` com motivo e observação
-
-### 5. UpdateStatusModal.tsx
-- Select com transições válidas via `STATUS_TRANSITIONS[currentStatus]`
-- Campos dinâmicos:
-  - `em_reposicao`: previsão envio (datepicker) + motivo atraso
-  - `em_falta`: motivo
-  - `cancelado`: motivo cancelamento + observação condicional
-  - `devolucao_andamento`: motivo devolução
-- Reusa lógica de `updateOrderStatus` do `SupplierOrderManagement`
-
-### 6. AddNoteModal.tsx
-- Radio: interna vs para cliente
-- Textarea obrigatório
-- Insere em `order_status_history` com notes
-
-### 7. UpdateTrackingModal.tsx
-- Mostra rastreio atual
-- Input novo código
-- Checkbox "Notificar cliente"
-- Atualiza `tracking_number` na tabela `orders`
-
-### 8. RelatedTickets.tsx
-- Query `order_tickets` filtrado por `order_id`
-- Card por ticket: número, tipo, status badge, data, botão "Ver Ticket"
-- Link para abrir ticket se nenhum existir
-
-### 9. OrderDetailsModal.tsx
-- Inserir `<OrderActionBar>` entre o `DialogHeader` e o conteúdo (linha ~619)
-- Inserir `<RelatedTickets>` antes da seção de histórico (linha ~1263)
-- Passar `order`, `profile`, e callback `fetchOrderDetails` como props
-
-## Sem migração SQL necessária
-As tabelas `order_tickets`, `orders`, `order_status_history` já existem com todas as colunas necessárias. As stored procedures `creditar_carteira` e `debitar_carteira` já existem para reembolsos.
+Super Admin recusa
+  → status volta ao anterior
+  → Notificação ao cliente
+```
 
