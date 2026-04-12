@@ -1,54 +1,47 @@
 
 
-# Adicionar Abas no Modal de Detalhes do Usuário
+# Cancelar Recargas de Carteira Pendentes após 1 Hora
 
-## Resumo
-Reorganizar o `UserDetailsModal` para usar abas (Geral, Pedidos, Carteira, Features) abaixo das Informações Pessoais, com funcionalidades expandidas de pedidos e carteira.
+## Problema
+Recargas de carteira que não foram pagas permanecem com status `pending` indefinidamente na tabela `wallet_transactions`. Atualmente há 1 recarga pendente desde 10/04.
 
-## Arquivos a criar/editar
+## Solução
+Adicionar lógica de cancelamento automático de `wallet_transactions` pendentes com mais de 1 hora na edge function `check-pending-payments`, que já é executada periodicamente para verificar pedidos.
 
-| Arquivo | Ação |
-|---------|------|
-| `src/components/admin/UserDetailsModal.tsx` | Refatorar: manter info pessoal no topo, adicionar Tabs abaixo |
-| `src/components/admin/UserOrdersTab.tsx` | **Criar**: lista de pedidos com filtros, busca, paginação |
-| `src/components/admin/UserWalletTab.tsx` | **Criar**: saldo, totais, histórico de transações, botão ajuste |
-| `src/components/admin/AdminWalletAdjustModal.tsx` | **Criar**: modal crédito/débito manual com motivo obrigatório |
+## Implementação
 
-## Detalhes
+### Arquivo: `supabase/functions/check-pending-payments/index.ts`
 
-### 1. UserDetailsModal.tsx
-- Manter Card "Informações Pessoais" fixo no topo
-- Substituir as seções empilhadas (Endereços, Pedidos, Features) por `<Tabs>` do Radix
-- Aba **Geral**: conteúdo atual de endereços
-- Aba **Pedidos**: componente `UserOrdersTab`
-- Aba **Carteira**: componente `UserWalletTab`
-- Aba **Features**: componente `UserFeaturesSection` existente
-- Remover fetch de orders do modal (movido para UserOrdersTab)
+Adicionar um bloco após a verificação de pedidos pendentes que:
 
-### 2. UserOrdersTab.tsx
-- Query `orders` filtrada por `user_id`
-- Filtro por status (select com os 15 status novos via `ORDER_STATUS_CONFIG`)
-- Busca por `order_number`
-- Paginação "Carregar mais" (10 por vez)
-- Card de pedido: número, data, status badge, itens count, valor, botão "Ver Pedido"
+1. Busca `wallet_transactions` com `status = 'pending'` e `created_at < NOW() - INTERVAL '1 hour'`
+2. Atualiza o status para `cancelled`
+3. Loga quantas recargas foram canceladas
 
-### 3. UserWalletTab.tsx
-- Buscar wallet do usuário via `wallets` table
-- Card de saldo com valor disponível
-- Listar `wallet_transactions` paginado (20 por vez)
-- Cada transação: ícone por tipo, descrição, valor com cor (verde/vermelho), data
-- Botão "+ Adicionar Saldo" abre `AdminWalletAdjustModal`
+### Mudança no código
 
-### 4. AdminWalletAdjustModal.tsx
-- Radio: Crédito ou Débito
-- Input valor
-- Input motivo (obrigatório)
-- Checkbox "Cobrar taxa" (só para crédito)
-- Preview do novo saldo
-- Validação: débito não pode exceder saldo
-- Executa via `creditar_carteira` ou `debitar_carteira` stored procedures
-- Tipo transação: `ajuste_credito` ou `ajuste_debito`
+No final da função `check-pending-payments`, antes do return final, inserir:
 
-### Sem migração SQL necessária
-As stored procedures `creditar_carteira` e `debitar_carteira` já existem. As tabelas `wallets` e `wallet_transactions` já existem.
+```typescript
+// Cancel expired wallet recharges (pending > 1 hour)
+const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+const { data: expiredRecharges, error: rechargeError } = await supabase
+  .from('wallet_transactions')
+  .update({ status: 'cancelled' })
+  .eq('status', 'pending')
+  .eq('tipo', 'recarga')
+  .lt('created_at', oneHourAgo)
+  .select('id');
+
+const cancelledCount = expiredRecharges?.length || 0;
+if (cancelledCount > 0) {
+  console.log(`🗑️ ${cancelledCount} recarga(s) de carteira expirada(s) cancelada(s)`);
+}
+```
+
+### Resultado
+- Recargas pendentes por mais de 1 hora serão automaticamente marcadas como `cancelled`
+- Roda junto com a verificação de pedidos existente (sem nova function)
+- A recarga pendente atual (de 10/04) será cancelada na próxima execução
 
