@@ -1278,6 +1278,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   </Card>}
               </div>}
 
+            {/* Related Tickets */}
+            <RelatedTickets orderId={order.id} />
+
             {/* Status History */}
             {statusHistory.length > 0 && <Card>
                 <CardHeader>
