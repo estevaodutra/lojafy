@@ -9,12 +9,14 @@ import {
   IdCard,
   Copy,
   MapPin,
-  ShoppingBag,
   Clock,
   UserCog,
   Save,
   Loader2,
   CalendarClock,
+  Package,
+  Wallet,
+  Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -35,10 +37,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatPhone } from '@/lib/phone';
 import { UserFeaturesSection } from './UserFeaturesSection';
+import { UserOrdersTab } from './UserOrdersTab';
+import { UserWalletTab } from './UserWalletTab';
 
 const ROLES = [
   { value: 'customer', label: 'Cliente' },
@@ -79,129 +84,75 @@ interface Address {
   is_default: boolean;
 }
 
-interface Order {
-  id: string;
-  order_number: string;
-  created_at: string;
-  total_amount: number;
-  status: string;
-  order_items?: any[];
-}
-
 export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserDetailsModalProps) => {
   const [addresses, setAddresses] = useState<Address[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  // Editable fields state
   const [editedPhone, setEditedPhone] = useState('');
   const [editedRole, setEditedRole] = useState('customer');
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Sync state when user changes
   useEffect(() => {
     if (user && isOpen) {
       setEditedPhone(user.phone || '');
       setEditedRole(user.role);
       setHasChanges(false);
-      fetchUserDetails();
+      fetchAddresses();
     }
   }, [user, isOpen]);
 
-  // Detect changes
   useEffect(() => {
     if (user) {
-      const changed =
-        editedPhone !== (user.phone || '') ||
-        editedRole !== user.role;
+      const changed = editedPhone !== (user.phone || '') || editedRole !== user.role;
       setHasChanges(changed);
     }
   }, [editedPhone, editedRole, user]);
 
-  // Save changes
   const handleSaveChanges = async () => {
     if (!user) return;
     setIsSaving(true);
     try {
-      // Update phone in profiles (email is managed by auth)
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({
-          phone: editedPhone,
-        })
+        .update({ phone: editedPhone })
         .eq('user_id', user.user_id);
-
       if (profileError) throw profileError;
 
-      // Update role if changed
       if (editedRole !== user.role) {
-        // Delete existing roles
         await supabase.from('user_roles').delete().eq('user_id', user.user_id);
-
-        // Insert new role
         const { data: currentUser } = await supabase.auth.getUser();
         const { error: roleError } = await supabase.from('user_roles').insert({
           user_id: user.user_id,
           role: editedRole as any,
           granted_by: currentUser.user?.id,
         } as any);
-
         if (roleError) throw roleError;
       }
 
-      toast({
-        title: 'Sucesso!',
-        description: 'Informações atualizadas com sucesso',
-      });
-
+      toast({ title: 'Sucesso!', description: 'Informações atualizadas com sucesso' });
       onUserUpdated?.();
       setHasChanges(false);
     } catch (error: any) {
-      toast({
-        title: 'Erro',
-        description: error.message || 'Falha ao atualizar informações',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erro', description: error.message || 'Falha ao atualizar', variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const fetchUserDetails = async () => {
+  const fetchAddresses = async () => {
     if (!user) return;
-
     setLoading(true);
     try {
-      // Fetch addresses
-      const { data: addressData, error: addressError } = await supabase
+      const { data, error } = await supabase
         .from('addresses')
         .select('*')
         .eq('user_id', user.user_id);
-
-      if (addressError) throw addressError;
-      setAddresses(addressData || []);
-
-      // Fetch orders
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .select(`
-          id,
-          order_number,
-          created_at,
-          total_amount,
-          status,
-          order_items(id)
-        `)
-        .eq('user_id', user.user_id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (orderError) throw orderError;
-      setOrders(orderData || []);
+      if (error) throw error;
+      setAddresses(data || []);
     } catch (error) {
-      console.error('Error fetching user details:', error);
+      console.error('Error fetching addresses:', error);
     } finally {
       setLoading(false);
     }
@@ -209,26 +160,12 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast({
-      title: 'Copiado!',
-      description: 'ID copiado para área de transferência',
-    });
-  };
-
-  const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
-      pending: { label: 'Pendente', variant: 'secondary' },
-      confirmed: { label: 'Confirmado', variant: 'default' },
-      processing: { label: 'Em preparação', variant: 'secondary' },
-      shipped: { label: 'Despachado', variant: 'default' },
-      delivered: { label: 'Finalizado', variant: 'default' },
-      cancelled: { label: 'Cancelado', variant: 'destructive' },
-      refunded: { label: 'Reembolsado', variant: 'secondary' },
-    };
-    return statusMap[status] || { label: status, variant: 'outline' };
+    toast({ title: 'Copiado!', description: 'ID copiado para área de transferência' });
   };
 
   if (!user) return null;
+
+  const userName = `${user.first_name} ${user.last_name}`;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -244,21 +181,17 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
           <div className="text-center py-8">Carregando detalhes...</div>
         ) : (
           <div className="space-y-4">
-            {/* Personal Info */}
+            {/* Personal Info - always visible */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Informações Pessoais</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Nome (não editável) */}
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4 text-muted-foreground" />
-                  <span className="font-medium">
-                    {user.first_name} {user.last_name}
-                  </span>
+                  <span className="font-medium">{userName}</span>
                 </div>
 
-                {/* Role (editável) */}
                 <div className="grid grid-cols-[100px_1fr] items-center gap-2">
                   <Label className="flex items-center gap-2 text-sm">
                     <UserCog className="w-4 h-4 text-muted-foreground" />
@@ -270,15 +203,12 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
                     </SelectTrigger>
                     <SelectContent>
                       {ROLES.map((role) => (
-                        <SelectItem key={role.value} value={role.value}>
-                          {role.label}
-                        </SelectItem>
+                        <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Email (somente leitura - gerenciado pelo Auth) */}
                 <div className="grid grid-cols-[100px_1fr] items-center gap-2">
                   <Label className="flex items-center gap-2 text-sm">
                     <Mail className="w-4 h-4 text-muted-foreground" />
@@ -287,7 +217,6 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
                   <span className="text-sm">{user.email}</span>
                 </div>
 
-                {/* Telefone (editável) */}
                 <div className="grid grid-cols-[100px_1fr] items-center gap-2">
                   <Label className="flex items-center gap-2 text-sm">
                     <Phone className="w-4 h-4 text-muted-foreground" />
@@ -303,20 +232,16 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
                   />
                 </div>
 
-                {/* Plano */}
                 <div className="grid grid-cols-[100px_1fr] items-center gap-2">
                   <Label className="flex items-center gap-2 text-sm">
                     <CalendarClock className="w-4 h-4 text-muted-foreground" />
                     Plano
                   </Label>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={user.subscription_plan === 'premium' ? 'default' : 'secondary'}>
-                      {user.subscription_plan === 'premium' ? 'Premium' : 'Free'}
-                    </Badge>
-                  </div>
+                  <Badge variant={user.subscription_plan === 'premium' ? 'default' : 'secondary'}>
+                    {user.subscription_plan === 'premium' ? 'Premium' : 'Free'}
+                  </Badge>
                 </div>
 
-                {/* Data de Expiração */}
                 {user.subscription_expires_at && (
                   <div className="grid grid-cols-[100px_1fr] items-center gap-2">
                     <Label className="flex items-center gap-2 text-sm">
@@ -324,12 +249,7 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
                       Expira em
                     </Label>
                     <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "text-sm",
-                        new Date(user.subscription_expires_at) < new Date() 
-                          ? "text-destructive" 
-                          : "text-foreground"
-                      )}>
+                      <span className={cn("text-sm", new Date(user.subscription_expires_at) < new Date() ? "text-destructive" : "text-foreground")}>
                         {format(new Date(user.subscription_expires_at), "dd/MM/yyyy", { locale: ptBR })}
                       </span>
                       {new Date(user.subscription_expires_at) < new Date() && (
@@ -349,7 +269,6 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
                   </div>
                 )}
 
-                {/* Informações não editáveis */}
                 <div className="flex items-center gap-2 pt-2 border-t">
                   <Calendar className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">
@@ -366,35 +285,20 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
                   </div>
                 )}
 
-                {/* ID */}
                 <div className="flex items-center gap-2">
                   <IdCard className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm font-mono text-muted-foreground truncate max-w-[200px]">
                     {user.user_id}
                   </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0"
-                    onClick={() => copyToClipboard(user.user_id)}
-                  >
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => copyToClipboard(user.user_id)}>
                     <Copy className="w-3 h-3" />
                   </Button>
                 </div>
 
-                {/* Botão Salvar */}
                 {hasChanges && (
                   <div className="flex justify-end pt-2 border-t">
-                    <Button
-                      onClick={handleSaveChanges}
-                      disabled={isSaving}
-                      size="sm"
-                    >
-                      {isSaving ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Save className="w-4 h-4 mr-2" />
-                      )}
+                    <Button onClick={handleSaveChanges} disabled={isSaving} size="sm">
+                      {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                       Salvar Alterações
                     </Button>
                   </div>
@@ -402,100 +306,78 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
               </CardContent>
             </Card>
 
-            {/* Addresses */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
-                  Endereços ({addresses.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {addresses.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">Nenhum endereço cadastrado</p>
-                ) : (
-                  <div className="space-y-3">
-                    {addresses.map((address) => (
-                      <div key={address.id} className="p-3 border rounded-lg">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-medium text-sm">{address.type}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {address.street}, {address.number}
-                              {address.complement && `, ${address.complement}`}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {address.neighborhood} - {address.city}/{address.state}
-                            </p>
-                            <p className="text-sm text-muted-foreground">CEP: {address.zip_code}</p>
+            {/* Tabs */}
+            <Tabs defaultValue="geral" className="w-full">
+              <TabsList className="w-full grid grid-cols-4">
+                <TabsTrigger value="geral" className="text-xs sm:text-sm">
+                  <MapPin className="w-3.5 h-3.5 mr-1 hidden sm:inline" />
+                  Geral
+                </TabsTrigger>
+                <TabsTrigger value="pedidos" className="text-xs sm:text-sm">
+                  <Package className="w-3.5 h-3.5 mr-1 hidden sm:inline" />
+                  Pedidos
+                </TabsTrigger>
+                <TabsTrigger value="carteira" className="text-xs sm:text-sm">
+                  <Wallet className="w-3.5 h-3.5 mr-1 hidden sm:inline" />
+                  Carteira
+                </TabsTrigger>
+                <TabsTrigger value="features" className="text-xs sm:text-sm">
+                  <Zap className="w-3.5 h-3.5 mr-1 hidden sm:inline" />
+                  Features
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="geral">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <MapPin className="w-4 h-4" />
+                      Endereços ({addresses.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {addresses.length === 0 ? (
+                      <p className="text-muted-foreground text-sm">Nenhum endereço cadastrado</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {addresses.map((address) => (
+                          <div key={address.id} className="p-3 border rounded-lg">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-medium text-sm">{address.type}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {address.street}, {address.number}
+                                  {address.complement && `, ${address.complement}`}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {address.neighborhood} - {address.city}/{address.state}
+                                </p>
+                                <p className="text-sm text-muted-foreground">CEP: {address.zip_code}</p>
+                              </div>
+                              {address.is_default && (
+                                <Badge variant="default" className="text-xs">Padrão</Badge>
+                              )}
+                            </div>
                           </div>
-                          {address.is_default && (
-                            <Badge variant="default" className="text-xs">
-                              Padrão
-                            </Badge>
-                          )}
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Orders */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <ShoppingBag className="w-4 h-4" />
-                  Histórico de Pedidos ({orders.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {orders.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">Nenhum pedido realizado</p>
-                ) : (
-                  <div className="space-y-3">
-                    {orders.slice(0, 5).map((order) => {
-                      const statusInfo = getStatusBadge(order.status);
-                      return (
-                        <div key={order.id} className="p-3 border rounded-lg">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium text-sm">{order.order_number}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {format(new Date(order.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {order.order_items?.length || 0} item(s)
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="font-medium">
-                                {new Intl.NumberFormat('pt-BR', {
-                                  style: 'currency',
-                                  currency: 'BRL',
-                                }).format(Number(order.total_amount))}
-                              </p>
-                              <Badge variant={statusInfo.variant} className="text-xs">
-                                {statusInfo.label}
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {orders.length > 5 && (
-                      <p className="text-sm text-muted-foreground text-center">
-                        e mais {orders.length - 5} pedido(s)...
-                      </p>
                     )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-            {/* Features Section */}
-            <UserFeaturesSection userId={user.user_id} />
+              <TabsContent value="pedidos">
+                <UserOrdersTab userId={user.user_id} />
+              </TabsContent>
+
+              <TabsContent value="carteira">
+                <UserWalletTab userId={user.user_id} userName={userName} />
+              </TabsContent>
+
+              <TabsContent value="features">
+                <UserFeaturesSection userId={user.user_id} />
+              </TabsContent>
+            </Tabs>
           </div>
         )}
       </DialogContent>
