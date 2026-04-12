@@ -1,78 +1,54 @@
 
 
-# Refatorar Status de Pedidos conforme Nova Documentacao
+# Adicionar Abas no Modal de Detalhes do Usuário
 
 ## Resumo
-Migrar os 15 status atuais para os 15 novos status definidos na documentacao, incluindo migracao SQL de dados existentes, atualizacao do frontend e edge functions.
+Reorganizar o `UserDetailsModal` para usar abas (Geral, Pedidos, Carteira, Features) abaixo das Informações Pessoais, com funcionalidades expandidas de pedidos e carteira.
 
-## Mapeamento de Status
+## Arquivos a criar/editar
 
-```text
-REMOVIDOS (atual → novo):
-  em_preparacao    → recebido (42 pedidos existentes)
-  devolucao_solicitada → devolucao_andamento
-  em_devolucao     → devolucao_recebida
-  troca_solicitada → (remover, 0 pedidos)
-  em_troca         → (remover, 0 pedidos)
+| Arquivo | Ação |
+|---------|------|
+| `src/components/admin/UserDetailsModal.tsx` | Refatorar: manter info pessoal no topo, adicionar Tabs abaixo |
+| `src/components/admin/UserOrdersTab.tsx` | **Criar**: lista de pedidos com filtros, busca, paginação |
+| `src/components/admin/UserWalletTab.tsx` | **Criar**: saldo, totais, histórico de transações, botão ajuste |
+| `src/components/admin/AdminWalletAdjustModal.tsx` | **Criar**: modal crédito/débito manual com motivo obrigatório |
 
-ADICIONADOS:
-  cancelamento_solicitado
-  devolucao_andamento
-  devolucao_recebida
-  devolucao_analise
-  devolucao_aprovada
-```
+## Detalhes
 
-Dados existentes: 42 pedidos com `em_preparacao` serao migrados para `recebido`. Nenhum pedido usa `devolucao_solicitada`, `em_devolucao`, `troca_solicitada` ou `em_troca`.
+### 1. UserDetailsModal.tsx
+- Manter Card "Informações Pessoais" fixo no topo
+- Substituir as seções empilhadas (Endereços, Pedidos, Features) por `<Tabs>` do Radix
+- Aba **Geral**: conteúdo atual de endereços
+- Aba **Pedidos**: componente `UserOrdersTab`
+- Aba **Carteira**: componente `UserWalletTab`
+- Aba **Features**: componente `UserFeaturesSection` existente
+- Remover fetch de orders do modal (movido para UserOrdersTab)
 
----
+### 2. UserOrdersTab.tsx
+- Query `orders` filtrada por `user_id`
+- Filtro por status (select com os 15 status novos via `ORDER_STATUS_CONFIG`)
+- Busca por `order_number`
+- Paginação "Carregar mais" (10 por vez)
+- Card de pedido: número, data, status badge, itens count, valor, botão "Ver Pedido"
 
-## 1. Migracao SQL
+### 3. UserWalletTab.tsx
+- Buscar wallet do usuário via `wallets` table
+- Card de saldo com valor disponível
+- Listar `wallet_transactions` paginado (20 por vez)
+- Cada transação: ícone por tipo, descrição, valor com cor (verde/vermelho), data
+- Botão "+ Adicionar Saldo" abre `AdminWalletAdjustModal`
 
-- Migrar pedidos `em_preparacao` → `recebido`
-- Migrar `order_status_history` com os mesmos mapeamentos
-- Adicionar novos campos na tabela `orders`: `motivo_atraso`, `motivo_falta`, `cancelamento_solicitado_em`, `cancelamento_solicitado_por`, `cancelado_em`, `devolucao_iniciada_em`, `devolucao_recebida_em`, `devolucao_analisada_em`, `devolucao_aprovada_em`, `valor_reembolso`, `reembolso_parcial`, `observacao_aprovacao`, `reembolsado_em`, `credito_carteira_id`, `observacao_interna`
-- Remover constraint antiga de status e criar nova com os 15 status corretos
-- Atualizar triggers de notificacao se referenciam status antigos
+### 4. AdminWalletAdjustModal.tsx
+- Radio: Crédito ou Débito
+- Input valor
+- Input motivo (obrigatório)
+- Checkbox "Cobrar taxa" (só para crédito)
+- Preview do novo saldo
+- Validação: débito não pode exceder saldo
+- Executa via `creditar_carteira` ou `debitar_carteira` stored procedures
+- Tipo transação: `ajuste_credito` ou `ajuste_debito`
 
-## 2. Frontend — `src/constants/orderStatus.ts`
-
-Reescrever completamente com:
-- Novo `OrderStatus` type com 15 status da documentacao
-- Novo `ORDER_STATUS_CONFIG` com labels/emojis conforme doc
-- Novo `STATUS_TRANSITIONS` conforme regras de transicao da doc
-- Novo `SUPPLIER_QUICK_ACTIONS` sem `em_preparacao`, sem troca, com novos fluxos de devolucao
-- Remover `EXCHANGE_REASONS` (troca removida)
-- Adicionar motivos de cancelamento: `cliente_recusou_atraso`, `solicitacao_revendedor`, `devolucao_negada`
-- Atualizar `SUPPLIER_STATUSES`, `RESELLER_NOTIFY_STATUSES`
-
-## 3. Frontend — Paginas afetadas
-
-| Arquivo | Mudanca |
-|---------|---------|
-| `src/pages/reseller/Orders.tsx` | Atualizar `visibleTabs` com novos status |
-| `src/pages/supplier/OrderManagement.tsx` | Remover refs a `em_preparacao`, `troca_*`; ajustar quick actions |
-| `src/pages/customer/Orders.tsx` | Sem mudanca funcional (usa helper functions) |
-| `src/data/apiEndpointsData.ts` | Atualizar documentacao de status e transicoes |
-| `src/components/supplier/TrocaModal.tsx` | Remover (nao mais necessario) |
-
-## 4. Edge Functions
-
-| Funcao | Mudanca |
-|--------|---------|
-| `api-pedidos-atualizar-status` | Atualizar `VALID_STATUSES` com novos 15, remover troca, ajustar validacoes |
-| `api-pedidos-listar` | Verificar se referencia status antigos |
-| `webhook-n8n-payment` | Sem mudanca (usa `recebido`) |
-| `dispatch-order-webhook` | Sem mudanca |
-| `check-pending-payments` | Sem mudanca |
-
-## 5. Componentes Supplier
-
-| Componente | Mudanca |
-|------------|---------|
-| `DevolucaoModal.tsx` | Manter, agora dispara `devolucao_andamento` |
-| `TrocaModal.tsx` | Remover |
-| `ReposicaoModal.tsx` | Manter, adicionar campo `motivo_atraso` obrigatorio |
-| `EmFaltaModal.tsx` | Manter |
-| `CancelamentoModal.tsx` | Manter, adicionar novos motivos |
+### Sem migração SQL necessária
+As stored procedures `creditar_carteira` e `debitar_carteira` já existem. As tabelas `wallets` e `wallet_transactions` já existem.
 
