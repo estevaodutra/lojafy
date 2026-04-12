@@ -1,72 +1,64 @@
 
+## Diagnóstico
+O fluxo novo de solicitação já existe no `src/components/order-details/CancelOrderModal.tsx`, mas ainda há caminhos paralelos que continuam cancelando direto:
 
-# Fluxo de Aprovação de Cancelamento pelo Super Admin
+- `src/pages/supplier/OrderManagement.tsx` ainda chama `updateOrderStatus(..., 'cancelado')`
+- `src/components/supplier/CancelamentoModal.tsx` ainda é um modal de cancelamento direto
+- `src/components/order-details/UpdateStatusModal.tsx` ainda permite selecionar `cancelado`
+- `src/constants/orderStatus.ts` ainda expõe transições diretas para `cancelado` em vários status
 
-## Problema
-Atualmente, o `CancelOrderModal` cancela o pedido e credita a carteira imediatamente. Qualquer usuário com acesso (reseller, supplier, admin) pode executar o cancelamento diretamente. O correto é que todos os usuários apenas **solicitem** o cancelamento, e o **super_admin aprove** (momento em que o valor é creditado).
+Por isso o pedido ainda pode ser finalizado sem passar pela aprovação do super admin.
 
-## Mudanças
+## O que vou ajustar
+### 1. Bloquear cancelamento direto para usuários comuns
+Refatorar todos os fluxos de cancelamento para que `admin`, `supplier` e `reseller` façam apenas:
+- `status = 'cancelamento_solicitado'`
+- salvem motivo/observação
+- registrem histórico
+- nunca chamem `creditar_carteira`
 
-### 1. `CancelOrderModal.tsx` - Transformar em solicitação
-- Para **todos os usuários** (inclusive admin/supplier): ao invés de setar `status: 'cancelado'`, setar `status: 'cancelamento_solicitado'`
-- Gravar `cancelamento_motivo`, `cancelamento_observacao`, `cancelamento_solicitado_em`, `cancelamento_solicitado_por`
-- Remover a chamada a `creditar_carteira` deste modal
-- Atualizar textos: "Solicitar Cancelamento" em vez de "Confirmar Cancelamento"
-- Exceção: `super_admin` pode aprovar diretamente (cancelar + creditar) via botão separado
+### 2. Remover os bypasses existentes
+Editar:
+- `src/pages/supplier/OrderManagement.tsx`
+- `src/components/supplier/CancelamentoModal.tsx`
+- `src/components/order-details/UpdateStatusModal.tsx`
+- `src/constants/orderStatus.ts`
 
-### 2. `RequestCancelModal.tsx` - Mantém como está
-Já faz solicitação para pedidos `enviado`. Sem mudança.
+Ajustes:
+- trocar ação de “Cancelar” por “Solicitar Cancelamento”
+- impedir que o modal de atualização de status mostre `cancelado` para perfis não super admin
+- impedir quick actions que mandam direto para `cancelado`
+- manter reembolso somente na aprovação do super admin
 
-### 3. `RequestReturnModal.tsx` - Mantém como está  
-Já é uma solicitação. Sem mudança.
+### 3. Manter aprovação centralizada no super admin
+Revisar `src/components/admin/OrderSolicitations.tsx` para garantir que:
+- aprovação = muda para `cancelado` + credita carteira
+- recusa = volta ao status anterior
+- histórico fique claro com “solicitado”, “aprovado” e “recusado”
 
-### 4. `OrderActionBar.tsx` - Ajustar lógica de botões
-- Para reseller/supplier/admin: botão "Cancelar" vira "Solicitar Cancelamento" (usa o mesmo `CancelOrderModal` refatorado)
-- O botão "Solicitar Cancelamento" (para `enviado`) permanece como está
+### 4. Ajustar UX para não confundir
+Atualizar textos/botões onde ainda aparecer:
+- “Cancelar Pedido”
+- “Confirmar Cancelamento”
 
-### 5. Nova aba "Solicitações" na página `AdminOrders.tsx`
-- Adicionar `Tabs` (Todos os Pedidos | Solicitações)
-- Aba "Solicitações" lista pedidos com status `cancelamento_solicitado`, `devolucao_andamento`, `devolucao_analise`
-- Cada item mostra: número do pedido, cliente, motivo, data da solicitação, valor
-- Botões de ação: **Aprovar** (cancela + credita carteira) e **Recusar** (volta ao status anterior)
+Para:
+- “Solicitar Cancelamento”
+- “Enviar Solicitação”
 
-### 6. Novo componente `OrderSolicitations.tsx`
-- Query pedidos com status de solicitação
-- Para cada solicitação, mostrar card com dados e ações
-- Botão "Aprovar Cancelamento":
-  - Atualiza status para `cancelado`
-  - Chama `creditar_carteira` com o valor total
-  - Insere histórico
-- Botão "Recusar":
-  - Volta status para o anterior (guardado no histórico ou inferido)
-  - Insere histórico com nota de recusa
+Também vou garantir que o modal informe claramente que o valor só será creditado após aprovação do super admin.
 
-### 7. `handleMarkFraud` no `OrderActionBar.tsx`
-- Manter como está (super_admin pode cancelar diretamente por fraude e creditar)
+## Arquivos principais
+- `src/components/order-details/CancelOrderModal.tsx`
+- `src/components/order-details/UpdateStatusModal.tsx`
+- `src/components/supplier/CancelamentoModal.tsx`
+- `src/pages/supplier/OrderManagement.tsx`
+- `src/components/admin/OrderSolicitations.tsx`
+- `src/constants/orderStatus.ts`
 
-## Arquivos
-
-| Arquivo | Ação |
-|---------|------|
-| `src/components/order-details/CancelOrderModal.tsx` | Refatorar: solicitar em vez de cancelar diretamente |
-| `src/components/order-details/OrderActionBar.tsx` | Ajustar labels dos botões |
-| `src/pages/admin/Orders.tsx` | Adicionar Tabs com aba "Solicitações" |
-| `src/components/admin/OrderSolicitations.tsx` | Criar: lista de solicitações pendentes com aprovação/recusa |
-
-## Fluxo resumido
-
-```text
-Usuário clica "Solicitar Cancelamento"
-  → status = cancelamento_solicitado
-  → Aparece na aba "Solicitações" do super admin
-  
-Super Admin aprova
-  → status = cancelado
-  → creditar_carteira(valor)
-  → Notificação ao cliente
-
-Super Admin recusa
-  → status volta ao anterior
-  → Notificação ao cliente
-```
-
+## Resultado esperado
+Depois desse ajuste:
+- nenhum usuário comum conseguirá cancelar direto
+- toda solicitação ficará em `cancelamento_solicitado`
+- o pedido só será cancelado de fato quando o super admin aprovar
+- o crédito na carteira acontecerá somente na aprovação
+- a aba “Solicitações” continuará sendo o ponto central de decisão
