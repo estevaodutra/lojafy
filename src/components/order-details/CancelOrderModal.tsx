@@ -36,37 +36,31 @@ export const CancelOrderModal = ({
     if (!canSubmit) return;
     setLoading(true);
     try {
+      // Get current user id for tracking who requested
+      const { data: { user } } = await supabase.auth.getUser();
+
       const { error } = await supabase.from('orders').update({
-        status: 'cancelado',
+        status: 'cancelamento_solicitado',
         cancelamento_motivo: motivo,
         cancelamento_observacao: observacao.trim() || null,
-        cancelado_em: new Date().toISOString(),
       }).eq('id', orderId);
       if (error) throw error;
 
       await supabase.from('order_status_history').insert({
         order_id: orderId,
-        status: 'cancelado',
-        notes: `Motivo: ${CANCELLATION_REASONS.find(r => r.code === motivo)?.label || motivo}${observacao ? ` - ${observacao}` : ''}`,
+        status: 'cancelamento_solicitado',
+        notes: `Solicitação de cancelamento - Motivo: ${CANCELLATION_REASONS.find(r => r.code === motivo)?.label || motivo}${observacao ? ` - ${observacao}` : ''}`,
+        changed_by: user?.id || null,
       });
 
-      // Credit wallet
-      await supabase.rpc('creditar_carteira' as any, {
-        p_user_id: userId,
-        p_valor: totalAmount,
-        p_taxa: 0,
-        p_descricao: `Reembolso do pedido #${orderNumber} (cancelamento)`,
-        p_referencia_tipo: 'cancelamento_pedido',
-        p_referencia_id: orderId,
-        p_tipo: 'estorno',
-      });
-
-      toast.success('Pedido cancelado com sucesso. Valor creditado na carteira.');
+      toast.success('Solicitação de cancelamento enviada. Aguardando aprovação.');
       onOpenChange(false);
+      setMotivo('');
+      setObservacao('');
       onSuccess();
     } catch (error: any) {
-      console.error('Erro ao cancelar pedido:', error);
-      toast.error(error.message || 'Erro ao cancelar pedido.');
+      console.error('Erro ao solicitar cancelamento:', error);
+      toast.error(error.message || 'Erro ao solicitar cancelamento.');
     } finally {
       setLoading(false);
     }
@@ -78,7 +72,7 @@ export const CancelOrderModal = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-destructive" />
-            Cancelar Pedido
+            Solicitar Cancelamento
           </DialogTitle>
           <DialogDescription>
             Pedido #{orderNumber} • {formatPrice(totalAmount)}
@@ -86,8 +80,8 @@ export const CancelOrderModal = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">
-            ⚠️ Esta ação não pode ser desfeita.
+          <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
+            ⚠️ A solicitação será enviada para aprovação do administrador. O valor só será creditado após a aprovação.
           </div>
 
           <div className="space-y-2">
@@ -110,7 +104,7 @@ export const CancelOrderModal = ({
           <div className="p-3 rounded-lg bg-muted border text-sm">
             <p className="font-medium">💰 Reembolso</p>
             <p className="text-muted-foreground mt-1">
-              O valor de <strong>{formatPrice(totalAmount)}</strong> será creditado automaticamente na carteira do cliente.
+              O valor de <strong>{formatPrice(totalAmount)}</strong> será creditado na carteira do cliente <strong>após aprovação</strong> do administrador.
             </p>
           </div>
         </div>
@@ -118,7 +112,7 @@ export const CancelOrderModal = ({
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Voltar</Button>
           <Button variant="destructive" onClick={handleSubmit} disabled={!canSubmit || loading}>
-            {loading ? 'Cancelando...' : 'Confirmar Cancelamento'}
+            {loading ? 'Enviando...' : 'Solicitar Cancelamento'}
           </Button>
         </DialogFooter>
       </DialogContent>

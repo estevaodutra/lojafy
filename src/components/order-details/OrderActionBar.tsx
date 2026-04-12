@@ -17,7 +17,6 @@ import {
   Tag,
   Zap,
   AlertTriangle,
-  MessageSquarePlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { OpenTicketButton } from '@/components/order-tickets/OpenTicketButton';
@@ -88,7 +87,18 @@ export const OrderActionBar = ({
         notes: 'Pedido cancelado por fraude detectada',
       });
 
-      toast.success('Pedido marcado como fraude e cancelado.');
+      // Super admin fraud = direct cancel + credit
+      await supabase.rpc('creditar_carteira' as any, {
+        p_user_id: order.user_id,
+        p_valor: order.total_amount,
+        p_taxa: 0,
+        p_descricao: `Reembolso do pedido #${order.order_number} (fraude)`,
+        p_referencia_tipo: 'cancelamento_pedido',
+        p_referencia_id: order.id,
+        p_tipo: 'estorno',
+      });
+
+      toast.success('Pedido marcado como fraude, cancelado e valor creditado.');
       onRefresh();
     } catch (error: any) {
       toast.error(error.message || 'Erro ao marcar fraude.');
@@ -111,7 +121,7 @@ export const OrderActionBar = ({
         {showCancel && (
           <Button variant="outline" size="sm" onClick={() => setCancelOpen(true)} className="text-destructive hover:text-destructive">
             <Ban className="h-4 w-4 mr-1" />
-            Cancelar Pedido
+            Solicitar Cancelamento
           </Button>
         )}
 
@@ -175,7 +185,6 @@ export const OrderActionBar = ({
         </DropdownMenu>
       </div>
 
-      {/* Modals */}
       <CancelOrderModal
         open={cancelOpen}
         onOpenChange={setCancelOpen}
