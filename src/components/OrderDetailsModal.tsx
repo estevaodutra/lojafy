@@ -13,6 +13,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { OpenTicketButton } from '@/components/order-tickets/OpenTicketButton';
 import { getAvailableTicketTypes } from '@/types/orderTickets';
 import { getStatusConfig, getStatusLabel as gslFn, getStatusVariant as gsvFn } from '@/constants/orderStatus';
+import { OrderActionBar } from '@/components/order-details/OrderActionBar';
+import { RelatedTickets } from '@/components/order-details/RelatedTickets';
 interface OrderItem {
   id: string;
   product_id: string;
