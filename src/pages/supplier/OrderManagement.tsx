@@ -517,7 +517,7 @@ const SupplierOrderManagement = () => {
         onClose={() => setCancelamentoOrder(null)}
         orderNumber={cancelamentoOrder?.order_number || ''}
         onConfirm={(motivo, observacao) => {
-          updateOrderStatus(cancelamentoOrder.id, 'cancelado', {
+          updateOrderStatus(cancelamentoOrder.id, 'cancelamento_solicitado', {
             cancelamento_motivo: motivo,
             cancelamento_observacao: observacao,
           });
