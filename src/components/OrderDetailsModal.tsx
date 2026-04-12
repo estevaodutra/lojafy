@@ -620,6 +620,22 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           </DialogTitle>
         </DialogHeader>
 
+        {/* Action Bar */}
+        {order && profile && (
+          <OrderActionBar
+            order={order}
+            userRole={profile.role || 'customer'}
+            deliveredAt={deliveredAt}
+            existingTicketId={existingTicketId}
+            onRefresh={() => {
+              fetchOrderDetails();
+              fetchStatusHistory();
+              fetchExistingTicket();
+              fetchDeliveredAt();
+            }}
+          />
+        )}
+
         {loading ? <div className="text-center py-12">
             <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
             <p className="text-muted-foreground mt-2">Carregando detalhes...</p>
