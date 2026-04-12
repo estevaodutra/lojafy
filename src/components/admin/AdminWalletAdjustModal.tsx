@@ -58,11 +58,10 @@ export const AdminWalletAdjustModal = ({
           p_user_id: userId,
           p_valor: valorNum,
           p_taxa: taxa,
-          p_valor_pago: valorNum + taxa,
           p_descricao: motivo.trim(),
           p_referencia_tipo: "ajuste_credito",
           p_referencia_id: null,
-          p_payment_id: null,
+          p_tipo: "recarga",
         });
         if (error) throw error;
         const result = typeof data === "string" ? JSON.parse(data) : data;
