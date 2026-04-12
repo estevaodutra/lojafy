@@ -292,11 +292,30 @@ serve(async (req) => {
 
     console.log(`📊 Verificação concluída: ${results.checked} verificados, ${results.updated} atualizados, ${results.errors} erros`);
 
+    // Cancel expired wallet recharges (pending > 1 hour)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+    const { data: expiredRecharges, error: rechargeError } = await supabase
+      .from('wallet_transactions')
+      .update({ status: 'cancelled' })
+      .eq('status', 'pending')
+      .eq('tipo', 'recarga')
+      .lt('created_at', oneHourAgo)
+      .select('id');
+
+    const cancelledRecharges = expiredRecharges?.length || 0;
+    if (rechargeError) {
+      console.error('❌ Erro ao cancelar recargas expiradas:', rechargeError);
+    } else if (cancelledRecharges > 0) {
+      console.log(`🗑️ ${cancelledRecharges} recarga(s) de carteira expirada(s) cancelada(s)`);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         message: `Verificação concluída`,
-        ...results
+        ...results,
+        cancelled_recharges: cancelledRecharges
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
