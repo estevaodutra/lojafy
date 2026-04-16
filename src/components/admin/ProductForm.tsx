@@ -1186,6 +1186,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
           variants={variants}
           onVariantsChange={setVariants}
           platformSettings={settings}
+          productCostPrice={Number(watchedCostPrice) || 0}
+          useAutoPricing={isSuperAdmin() && !!watchedUseAutoPricing}
         />
 
         {/* Settings */}
