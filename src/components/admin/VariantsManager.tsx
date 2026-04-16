@@ -97,6 +97,20 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
     active: true
   });
   const [isAddingNew, setIsAddingNew] = useState(false);
+  const prevCostPriceRef = useRef(productCostPrice);
+
+  // Sync all variant costs when product cost price changes and auto pricing is active
+  useEffect(() => {
+    if (useAutoPricing && variants.length > 0 && productCostPrice !== prevCostPriceRef.current) {
+      prevCostPriceRef.current = productCostPrice;
+      const updatedVariants = variants.map(variant => ({
+        ...variant,
+        costPrice: productCostPrice,
+        priceModifier: calculateSellingPrice(productCostPrice, platformSettings)
+      }));
+      onVariantsChange(updatedVariants);
+    }
+  }, [productCostPrice, useAutoPricing, platformSettings]);
 
   const variantTypeLabels = {
     color: 'Cor',
@@ -107,7 +121,7 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
   const addVariant = () => {
     if (!newVariant.name || !newVariant.value) return;
 
-    const costPrice = newVariant.costPrice || 0;
+    const costPrice = useAutoPricing ? productCostPrice : (newVariant.costPrice || 0);
     const sellingPrice = calculateSellingPrice(costPrice, platformSettings);
 
     const variant: ProductVariant = {
@@ -229,22 +243,39 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Preço de Custo (R$)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={newVariant.costPrice || ''}
-                  onChange={(e) => setNewVariant({ ...newVariant, costPrice: parseFloat(e.target.value) || 0 })}
-                />
-                {platformSettings && (newVariant.costPrice || 0) > 0 && (
-                  <div className="flex items-center gap-1 text-xs text-green-600">
+              {!useAutoPricing && (
+                <div className="space-y-2">
+                  <Label>Preço de Custo (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={newVariant.costPrice || ''}
+                    onChange={(e) => setNewVariant({ ...newVariant, costPrice: parseFloat(e.target.value) || 0 })}
+                  />
+                  {platformSettings && (newVariant.costPrice || 0) > 0 && (
+                    <div className="flex items-center gap-1 text-xs text-green-600">
+                      <Calculator className="h-3 w-3" />
+                      Preço de venda: {formatCurrency(newVariantSellingPrice)}
+                    </div>
+                  )}
+                </div>
+              )}
+              {useAutoPricing && (
+                <div className="space-y-2">
+                  <Label>Preço de Custo (R$)</Label>
+                  <Input
+                    type="number"
+                    value={productCostPrice}
+                    readOnly
+                    className="bg-muted cursor-not-allowed"
+                  />
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Calculator className="h-3 w-3" />
-                    Preço de venda: {formatCurrency(newVariantSellingPrice)}
+                    Herdado do produto - Venda: {formatCurrency(calculateSellingPrice(productCostPrice, platformSettings))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>Estoque</Label>
@@ -340,17 +371,34 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label>Preço de Custo (R$)</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={variant.costPrice || ''}
-                            onChange={(e) => updateVariant(variant.id, { costPrice: parseFloat(e.target.value) || 0 })}
-                          />
-                          {platformSettings && variant.costPrice > 0 && (
-                            <div className="flex items-center gap-1 text-xs text-green-600">
-                              <Calculator className="h-3 w-3" />
-                              Preço de venda: {formatCurrency(variant.priceModifier)}
-                            </div>
+                          {useAutoPricing ? (
+                            <>
+                              <Input
+                                type="number"
+                                value={productCostPrice}
+                                readOnly
+                                className="bg-muted cursor-not-allowed"
+                              />
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Calculator className="h-3 w-3" />
+                                Herdado do produto - Venda: {formatCurrency(variant.priceModifier)}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={variant.costPrice || ''}
+                                onChange={(e) => updateVariant(variant.id, { costPrice: parseFloat(e.target.value) || 0 })}
+                              />
+                              {platformSettings && variant.costPrice > 0 && (
+                                <div className="flex items-center gap-1 text-xs text-green-600">
+                                  <Calculator className="h-3 w-3" />
+                                  Preço de venda: {formatCurrency(variant.priceModifier)}
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
 
