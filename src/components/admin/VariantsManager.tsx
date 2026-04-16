@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, Edit2, Check, X, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +37,8 @@ interface VariantsManagerProps {
   variants: ProductVariant[];
   onVariantsChange: (variants: ProductVariant[]) => void;
   platformSettings?: PlatformSettings | null;
+  productCostPrice?: number;
+  useAutoPricing?: boolean;
 }
 
 // Calculate selling price based on cost and platform fees
@@ -79,7 +81,9 @@ const calculateSellingPrice = (
 export const VariantsManager: React.FC<VariantsManagerProps> = ({
   variants,
   onVariantsChange,
-  platformSettings
+  platformSettings,
+  productCostPrice = 0,
+  useAutoPricing = false
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newVariant, setNewVariant] = useState<Partial<ProductVariant>>({
