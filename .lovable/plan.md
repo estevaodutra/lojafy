@@ -1,26 +1,30 @@
 
 
-# Remover Emojis dos Produtos (Round 2)
+# Sincronizar Preço de Custo das Variações com o Produto
 
 ## Problema
-A limpeza anterior não funcionou completamente — ainda restam **194 produtos** com emojis nas descrições (📦, ✅, ⭐, 🎯, 📋, ⚠️, 🔥, 💡, etc).
-
-## Causa provável
-O script anterior pode ter falhado silenciosamente em alguns produtos, ou a regex/biblioteca `emoji` não cobriu todos os caracteres Unicode especiais presentes.
+Cada variação tem seu próprio campo `costPrice` independente. Quando a precificação automática está ativa, o preço de custo das variações deveria herdar automaticamente o "Preço de Custo" definido no produto principal, garantindo consistência.
 
 ## Solução
-Executar um novo script Python mais robusto que:
-1. Busca **todos** os produtos via API REST do Supabase (usando service_role ou anon key com paginação)
-2. Remove emojis usando uma regex abrangente que cobre todos os blocos Unicode de emojis: `[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\U00002702-\U000027B0\U0000FE00-\U0000FE0F\U0001F900-\U0001F9FF\U0001FA00-\U0001FA6F\U0001FA70-\U0001FAFF\U00002600-\U000026FF\U00002B50-\U00002B55\U0000200D\U00002300-\U000023FF\U0000231A-\U0000231B]` e variantes de selector
-3. Normaliza espaçamento (remove espaços duplos, trim)
-4. Atualiza cada produto modificado via PATCH na API REST do Supabase
-5. Loga quantos produtos foram atualizados
 
-## Escopo
-- Tabela: `products`
-- Campos: `name` e `description`
-- Todos os registros (paginados em lotes de 100)
+### 1. Passar `cost_price` do produto para o VariantsManager
+- Em `ProductForm.tsx`, passar o `watchedCostPrice` e `watchedUseAutoPricing` como novas props para `<VariantsManager>`
 
-## Execução
-Script Python único rodando via `code--exec`, usando `requests` + API REST do Supabase com a anon key para leitura e service_role (ou anon com RLS bypass) para escrita.
+### 2. Atualizar VariantsManager.tsx
+- Adicionar props `productCostPrice` e `useAutoPricing` na interface `VariantsManagerProps`
+- Quando `useAutoPricing` estiver ativo:
+  - Ocultar o campo de custo individual de cada variação (já que todas usam o custo do produto)
+  - Ao adicionar uma nova variação, usar `productCostPrice` como `costPrice` automaticamente
+  - Ao atualizar variações existentes, sincronizar o `costPrice` quando o custo do produto mudar
+  - Calcular o `priceModifier` (preço de venda) baseado no custo do produto
+- Quando `useAutoPricing` estiver desativado, manter o comportamento atual (custo individual por variação)
+
+### 3. useEffect para sincronização
+- Adicionar um `useEffect` no VariantsManager que, quando `productCostPrice` mudar e `useAutoPricing` estiver ativo, recalcule o `costPrice` e `priceModifier` de todas as variações existentes
+
+### Arquivos
+| Arquivo | Alteração |
+|---|---|
+| `src/components/admin/VariantsManager.tsx` | Adicionar props, lógica de sincronização, ocultar campo custo quando auto |
+| `src/components/admin/ProductForm.tsx` | Passar `productCostPrice` e `useAutoPricing` para VariantsManager |
 
