@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+import { buildOrderItemsPayload } from '../_shared/build-order-items-payload.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -137,14 +138,7 @@ async function fetchLastPaidOrder(supabase: any): Promise<Record<string, any> | 
       user_id: null,
       store_name: null,
     },
-    items: (items || []).map((item: any) => ({
-      product_id: item.product_id,
-      name: item.product_snapshot?.name || 'Produto',
-      sku: item.product_snapshot?.sku || null,
-      image_url: item.product_snapshot?.image_url || null,
-      quantity: item.quantity,
-      unit_price: item.unit_price,
-    })),
+    items: await buildOrderItemsPayload(supabase, items || []),
     shipping_label: shippingLabel,
   };
 }
