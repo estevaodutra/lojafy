@@ -19,6 +19,7 @@ interface VariationOutput {
 
 interface EnrichedItem {
   product_id: string;
+  product_url: string;
   name: string;
   sku: string | null;
   image_url: string | null;
@@ -108,6 +109,8 @@ export async function buildOrderItemsPayload(
 ): Promise<EnrichedItem[]> {
   if (!orderItems || orderItems.length === 0) return [];
 
+  const baseUrl = (Deno.env.get('PUBLIC_SITE_URL') || 'https://lojafy.app').replace(/\/$/, '');
+
   const productIds = Array.from(
     new Set(orderItems.map((i) => i.product_id).filter(Boolean))
   );
@@ -147,6 +150,7 @@ export async function buildOrderItemsPayload(
 
     return {
       product_id: item.product_id,
+      product_url: `${baseUrl}/produto/${item.product_id}`,
       name: snapshot?.name || product?.name || 'Produto',
       sku: snapshot?.sku || product?.sku || null,
       image_url: imageUrl,
