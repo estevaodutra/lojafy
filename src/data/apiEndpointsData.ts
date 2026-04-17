@@ -416,6 +416,77 @@ const ordersEndpoints: EndpointData[] = [
       data: [],
       pagination: { page: 1, total: 0 }
     }
+  },
+  {
+    title: 'Buscar Pedido',
+    method: 'GET',
+    url: '/functions/v1/api-pedidos-buscar',
+    description: 'Busca um pedido específico com todos os detalhes (cliente, itens enriquecidos, breakdown financeiro). Forneça pelo menos um identificador.',
+    headers: [
+      { name: 'X-API-Key', description: 'Chave de API com permissão pedidos.read', example: 'sk_...', required: true }
+    ],
+    queryParams: [
+      { name: 'order_number', description: 'Número do pedido', example: 'ORD-12345' },
+      { name: 'id', description: 'ID (UUID) do pedido', example: 'a1b2c3d4-...' },
+      { name: 'external_reference', description: 'Referência externa (Mercado Pago)', example: 'ext-ref-001' },
+      { name: 'payment_id', description: 'ID do pagamento', example: 'mp_1234567890' }
+    ],
+    responseExample: {
+      success: true,
+      data: {
+        id: 'a1b2c3d4-uuid',
+        order_number: 'ORD-12345',
+        status: 'confirmed',
+        payment_status: 'approved',
+        payment_method: 'pix',
+        total_amount: 299.90,
+        shipping_amount: 19.90,
+        tax_amount: 0,
+        created_at: '2026-04-17T10:00:00Z',
+        tracking_number: 'BR123456789',
+        customer: {
+          user_id: 'user-uuid',
+          full_name: 'João Silva',
+          cpf: '123.456.789-00',
+          phone: '(11) 98765-4321'
+        },
+        shipping_address: { street: 'Rua X', number: '100', city: 'São Paulo', state: 'SP' },
+        items: [
+          {
+            id: 'item-uuid',
+            product_id: 'prod-uuid',
+            product_name: 'Camiseta Básica',
+            product_sku: 'CAM-001',
+            product_image: 'https://...',
+            quantity: 2,
+            unit_price: 140.00,
+            total_price: 280.00,
+            price_breakdown: {
+              cost_price: 50.00,
+              sale_price: 140.00,
+              transaction_fee: { percentage: 4.5, amount: 6.30 },
+              contingency_fee: { percentage: 1.0, amount: 1.34 },
+              profit: 82.36,
+              profit_margin: 58.83
+            }
+          }
+        ],
+        financial_summary: {
+          subtotal: 280.00,
+          shipping_amount: 19.90,
+          total_revenue: 299.90,
+          total_cost: 100.00,
+          net_profit: 164.72,
+          profit_margin: 54.92
+        }
+      }
+    },
+    errorExamples: [
+      { code: 400, title: 'Identificador ausente', description: 'Nenhum parâmetro de busca foi informado', example: { success: false, error: 'Forneça pelo menos um identificador: order_number, id, external_reference ou payment_id' } },
+      { code: 401, title: 'API Key inválida', description: 'Chave não fornecida ou inativa', example: { success: false, error: 'API Key inválida ou inativa' } },
+      { code: 403, title: 'Sem permissão', description: 'API Key sem permissão pedidos.read', example: { success: false, error: 'Esta API Key não possui permissão de leitura de pedidos' } },
+      { code: 404, title: 'Pedido não encontrado', description: 'Nenhum pedido corresponde ao identificador informado', example: { success: false, error: 'Pedido não encontrado' } }
+    ]
   }
 ];
 
