@@ -1,51 +1,65 @@
 
 
-## Plano: Adicionar link do produto no payload do `order.paid`
+## Plano: Criar e documentar endpoint "Buscar Pedido"
 
 ### Objetivo
-Incluir em cada item do payload do webhook `order.paid` o **link público do produto** (URL acessível para o cliente/sistema externo abrir a página do produto).
+Criar um novo endpoint REST para buscar **um pedido específico** (com todos os detalhes do payload completo do `api-pedidos-listar`, incluindo cliente, itens enriquecidos, breakdown financeiro e variações) e adicioná-lo na documentação da API.
 
-### Investigação
-Preciso confirmar 2 coisas:
-1. Qual a rota pública do produto na aplicação (provavelmente `/produto/:slug` ou `/produto/:id`)
-2. Se o produto tem campo `slug` ou se devemos usar o `id`
-
-Olhando rapidamente a estrutura, a app está publicada em `https://lojafy.app`. A URL final do produto seria algo como `https://lojafy.app/produto/<slug-ou-id>`.
+### Investigação realizada
+- Já existem `api-pedidos-listar` (lista paginada), `api-pedidos-recentes` (recentes) e `api-pedidos-atualizar-status` (PUT)
+- **Não existe** endpoint para buscar 1 pedido específico — vamos criar `api-pedidos-buscar`
+- Padrão de autenticação: header `X-API-Key`, validação na tabela `api_keys`, permissão `pedidos.read` ou `orders.read`
+- Estrutura de retorno vai espelhar o item retornado pelo `api-pedidos-listar` (mesmo enriquecimento financeiro, customer formatado, items com breakdown)
 
 ### Solução
 
-#### 1. Atualizar `supabase/functions/_shared/build-order-items-payload.ts`
-- Adicionar `slug` ao SELECT da tabela `products` (se a coluna existir; senão usar `id`)
-- Adicionar campo `product_url` ao retorno de cada item:
-```
-product_url: `https://lojafy.app/produto/${product.slug ?? product.id}`
-```
-- Tornar a base URL configurável via variável de ambiente `PUBLIC_SITE_URL` com fallback para `https://lojafy.app`
+#### 1. Criar Edge Function `supabase/functions/api-pedidos-buscar/index.ts`
+- Método: `GET`
+- Aceita query params (qualquer um identifica o pedido):
+  - `order_number` → busca por número (ex: `ORD-12345`)
+  - `id` → busca por UUID
+  - `external_reference` → busca por referência externa (Mercado Pago)
+  - `payment_id` → busca por ID de pagamento
+- Validação: **pelo menos um** identificador deve ser fornecido
+- Reaproveita as funções `formatCPF`, `formatPhone`, `calculatePriceBreakdown`, `calculateFinancialSummary` (mesmo padrão do `api-pedidos-listar`)
+- Retorna `404` quando não encontrar
+- Retorna o mesmo objeto enriquecido (single, não array)
 
-#### 2. Atualizar documentação
-- `src/data/apiEndpointsData.ts` → adicionar `product_url` no `responseExample` do evento `order.paid`
+#### 2. Registrar a função em `supabase/config.toml`
+- Adicionar `[functions.api-pedidos-buscar]` com `verify_jwt = false` (autentica por X-API-Key)
 
-### Estrutura final de cada item
+#### 3. Documentar em `src/data/apiEndpointsData.ts`
+- Adicionar novo endpoint na categoria de pedidos (após "Listar Pedidos Completos"):
+  - Título: "Buscar Pedido"
+  - Method: `GET`
+  - URL: `/functions/v1/api-pedidos-buscar`
+  - QueryParams: `order_number`, `id`, `external_reference`, `payment_id` (todos opcionais, mas pelo menos um obrigatório)
+  - Headers: `X-API-Key`
+  - responseExample: pedido completo (customer, items com `image_url`/`product_url`/`cost_price`/`variation`, financial_summary)
+  - errorExamples: 400 (sem identificador), 401 (api key), 403 (sem permissão), 404 (não encontrado)
+
+### Estrutura do retorno (resumo)
 ```json
 {
-  "product_id": "...",
-  "product_url": "https://lojafy.app/produto/camiseta-basica",
-  "name": "...",
-  "sku": "...",
-  "image_url": "...",
-  "cost_price": 12.50,
-  "quantity": 2,
-  "unit_price": 29.90,
-  "variation": { ... } | null
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "order_number": "ORD-12345",
+    "status": "confirmed",
+    "payment_status": "approved",
+    "total_amount": 299.90,
+    "customer": { "full_name": "...", "cpf": "...", "phone": "..." },
+    "shipping_address": {...},
+    "items": [{ "product_id": "...", "product_url": "...", "image_url": "...", "cost_price": 12.5, "variation": {...}, "price_breakdown": {...} }],
+    "financial_summary": {...}
+  }
 }
 ```
 
-### Arquivos alterados
-| Arquivo | Alteração |
+### Arquivos
+| Arquivo | Ação |
 |---|---|
-| `supabase/functions/_shared/build-order-items-payload.ts` | adicionar `slug` no SELECT e campo `product_url` no retorno |
-| `src/data/apiEndpointsData.ts` | atualizar exemplo do payload |
-
-### Observação
-Antes de implementar, vou confirmar no código a rota pública correta do produto e se a tabela `products` tem coluna `slug`. Caso não tenha, usaremos o `id` como fallback na URL.
+| `supabase/functions/api-pedidos-buscar/index.ts` | criar (Edge Function) |
+| `supabase/config.toml` | registrar função (`verify_jwt = false`) |
+| `src/data/apiEndpointsData.ts` | adicionar entrada de documentação |
 
