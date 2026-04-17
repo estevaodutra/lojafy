@@ -39,6 +39,9 @@ verify_jwt = false
 [functions.api-pedidos-listar]
 verify_jwt = false
 
+[functions.api-pedidos-buscar]
+verify_jwt = false
+
 [functions.api-pedidos-atualizar-status]
 verify_jwt = false
 
