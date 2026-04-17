@@ -1314,6 +1314,7 @@ const webhookEventsEndpoints: EndpointData[] = [
         items: [
           {
             product_id: 'uuid',
+            product_url: 'https://lojafy.app/produto/uuid',
             name: 'Colete Postural - GG',
             sku: 'SKU-001',
             image_url: 'https://.../produto.jpg',
@@ -1331,6 +1332,7 @@ const webhookEventsEndpoints: EndpointData[] = [
           },
           {
             product_id: 'uuid',
+            product_url: 'https://lojafy.app/produto/uuid',
             name: 'Caneca Branca',
             sku: 'SKU-002',
             image_url: 'https://.../caneca.jpg',
