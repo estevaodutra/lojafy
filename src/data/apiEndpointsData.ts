@@ -1312,7 +1312,33 @@ const webhookEventsEndpoints: EndpointData[] = [
           phone: '11999999999'
         },
         items: [
-          { name: 'Colete Postural', sku: 'SKU-001', quantity: 2, unit_price: 99.95, image_url: 'https://...' }
+          {
+            product_id: 'uuid',
+            name: 'Colete Postural - GG',
+            sku: 'SKU-001',
+            image_url: 'https://.../produto.jpg',
+            cost_price: 45.00,
+            quantity: 2,
+            unit_price: 99.95,
+            variation: {
+              name: 'GG',
+              sku: 'SKU-001-GG',
+              attributes: { Tamanho: 'GG', Cor: 'Preto' },
+              price: 99.95,
+              cost_price: 45.00,
+              image: 'https://.../variacao-gg.jpg'
+            }
+          },
+          {
+            product_id: 'uuid',
+            name: 'Caneca Branca',
+            sku: 'SKU-002',
+            image_url: 'https://.../caneca.jpg',
+            cost_price: 8.50,
+            quantity: 1,
+            unit_price: 24.90,
+            variation: null
+          }
         ],
         reseller: {
           name: 'João Revendedor',

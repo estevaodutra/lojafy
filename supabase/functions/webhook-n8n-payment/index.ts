@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+import { buildOrderItemsPayload } from '../_shared/build-order-items-payload.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -390,14 +391,7 @@ serve(async (req) => {
           payment_method: fullOrder?.payment_method || 'pix',
           customer: customerData,
           reseller: resellerData,
-          items: fullOrder?.order_items?.map((item: any) => ({
-            product_id: item.product_id,
-            name: item.product_snapshot?.name || 'Produto',
-            sku: item.product_snapshot?.sku || null,
-            image_url: item.product_snapshot?.image_url || null,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-          })) || [],
+          items: await buildOrderItemsPayload(supabase, fullOrder?.order_items || []),
           shipping_label: shippingLabel,
         };
 
