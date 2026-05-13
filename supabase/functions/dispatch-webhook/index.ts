@@ -462,6 +462,24 @@ Deno.serve(async (req) => {
 
     const success = statusCode >= 200 && statusCode < 300;
 
+    // Marcar status do envio do webhook no pedido (apenas order.paid em produção)
+    if (event_type === 'order.paid' && !is_test && payload?.order_id) {
+      const updatePayload: Record<string, any> = {
+        webhook_paid_status: success ? 'sent' : 'failed',
+        webhook_paid_dispatched_at: new Date().toISOString(),
+        webhook_paid_error: success
+          ? null
+          : `${statusCode} - ${(errorMessage || responseBody || '').toString().substring(0, 500)}`,
+      };
+      const { error: updErr } = await supabase
+        .from('orders')
+        .update(updatePayload)
+        .eq('id', payload.order_id);
+      if (updErr) {
+        console.error('[dispatch-webhook] Erro ao atualizar webhook_paid_status:', updErr.message);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success,
