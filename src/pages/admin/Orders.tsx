@@ -25,6 +25,9 @@ interface Order {
   created_at: string;
   user_id: string;
   has_shipping_file: boolean;
+  webhook_paid_status?: string | null;
+  webhook_paid_dispatched_at?: string | null;
+  webhook_paid_error?: string | null;
   profiles: {
     first_name: string;
     last_name: string;
@@ -301,9 +304,27 @@ const AdminOrders = () => {
                        </TableCell>
                      </TableRow>
                    ) : (
-                    currentOrders.map((order) => (
-                       <TableRow key={order.id}>
-                         <TableCell className="font-medium">{order.order_number}</TableCell>
+                    currentOrders.map((order) => {
+                      const webhookFailed = order.webhook_paid_status === 'failed';
+                      return (
+                       <TableRow
+                         key={order.id}
+                         className={webhookFailed ? 'bg-destructive/10 hover:bg-destructive/15' : undefined}
+                       >
+                         <TableCell className="font-medium">
+                           <div className="flex items-center gap-2">
+                             <span>{order.order_number}</span>
+                             {webhookFailed && (
+                               <Badge
+                                 variant="destructive"
+                                 className="text-[10px] px-1.5 py-0"
+                                 title={`Webhook order.paid falhou${order.webhook_paid_dispatched_at ? ' em ' + format(new Date(order.webhook_paid_dispatched_at), "dd/MM/yyyy HH:mm", { locale: ptBR }) : ''}${order.webhook_paid_error ? '\n' + order.webhook_paid_error : ''}`}
+                               >
+                                 Webhook falhou
+                               </Badge>
+                             )}
+                           </div>
+                         </TableCell>
                          <TableCell>
                            {order.profiles.first_name} {order.profiles.last_name}
                          </TableCell>
@@ -347,8 +368,9 @@ const AdminOrders = () => {
                              </SelectContent>
                            </Select>
                          </TableCell>
-                      </TableRow>
-                    ))
+                       </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>

@@ -399,9 +399,10 @@ Deno.serve(async (req) => {
 
     console.log(`[dispatch-webhook] Enviando para: ${webhookConfig.webhook_url}`);
 
-    // Enviar webhook com timeout de 10 segundos
+    // Timeout: 60s para order.paid (n8n pode demorar), 10s para outros eventos
+    const timeoutMs = event_type === 'order.paid' ? 60000 : 10000;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     let statusCode = 0;
     let responseBody = '';
@@ -429,7 +430,7 @@ Deno.serve(async (req) => {
       clearTimeout(timeoutId);
       
       if (fetchError.name === 'AbortError') {
-        errorMessage = 'Timeout: webhook não respondeu em 10 segundos';
+        errorMessage = `Timeout: webhook não respondeu em ${timeoutMs / 1000} segundos`;
         statusCode = 408;
       } else {
         errorMessage = fetchError.message || 'Erro ao conectar com webhook';
@@ -460,6 +461,24 @@ Deno.serve(async (req) => {
       });
 
     const success = statusCode >= 200 && statusCode < 300;
+
+    // Marcar status do envio do webhook no pedido (apenas order.paid em produção)
+    if (event_type === 'order.paid' && !is_test && payload?.order_id) {
+      const updatePayload: Record<string, any> = {
+        webhook_paid_status: success ? 'sent' : 'failed',
+        webhook_paid_dispatched_at: new Date().toISOString(),
+        webhook_paid_error: success
+          ? null
+          : `${statusCode} - ${(errorMessage || responseBody || '').toString().substring(0, 500)}`,
+      };
+      const { error: updErr } = await supabase
+        .from('orders')
+        .update(updatePayload)
+        .eq('id', payload.order_id);
+      if (updErr) {
+        console.error('[dispatch-webhook] Erro ao atualizar webhook_paid_status:', updErr.message);
+      }
+    }
 
     return new Response(
       JSON.stringify({
