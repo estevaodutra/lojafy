@@ -1,12 +1,12 @@
 import React from 'react';
-import { useFeature } from '@/hooks/useFeature';
+import { useFeature, FeatureSlug } from '@/hooks/useFeature';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface FeatureRouteProps {
-  feature: string;
+  feature: FeatureSlug;
   children: React.ReactNode;
 }
 

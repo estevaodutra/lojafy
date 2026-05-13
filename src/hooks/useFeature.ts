@@ -2,7 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
-export const useFeature = (featureSlug: string) => {
+export type FeatureSlug = 'lojafy_academy' | 'top_10_produtos' | 'lojafy_integra';
+
+export const useFeature = (featureSlug: FeatureSlug) => {
   const { user, profile } = useAuth();
   const isSuperAdmin = profile?.role === 'super_admin';
 

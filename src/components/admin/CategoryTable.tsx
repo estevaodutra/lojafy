@@ -4,11 +4,22 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Edit, MoreHorizontal, Trash2, Copy, FolderOpen, Eye, EyeOff, Star, StarOff } from 'lucide-react';
+import {
+  Edit, MoreHorizontal, Trash2, Copy, FolderOpen, Eye, EyeOff, Star, StarOff,
+  Package, Laptop, Smartphone, Headphones, Watch,
+  Camera, Gamepad2, Book, Shirt, Home,
+  Car, Plane, Music, Video, Palette,
+  type LucideIcon,
+} from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import * as LucideIcons from 'lucide-react';
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  Package, Laptop, Smartphone, Headphones, Watch,
+  Camera, Gamepad2, Book, Shirt, Home,
+  Car, Plane, Music, Video, Palette,
+};
 
 interface CategoryTableProps {
   categories: any[];
@@ -119,7 +130,7 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
 
   const getIconComponent = (iconName: string) => {
     if (!iconName) return null;
-    const IconComponent = (LucideIcons as any)[iconName];
+    const IconComponent = ICON_MAP[iconName];
     return IconComponent ? <IconComponent className="h-4 w-4" /> : null;
   };
 

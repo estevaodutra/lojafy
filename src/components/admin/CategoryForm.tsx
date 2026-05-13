@@ -7,8 +7,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, Star } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
+import {
+  Loader2, Star,
+  Package, Laptop, Smartphone, Headphones, Watch,
+  Camera, Gamepad2, Book, Shirt, Home,
+  Car, Plane, Music, Video, Palette,
+  type LucideIcon,
+} from 'lucide-react';
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  Package, Laptop, Smartphone, Headphones, Watch,
+  Camera, Gamepad2, Book, Shirt, Home,
+  Car, Plane, Music, Video, Palette,
+};
 
 interface CategoryFormProps {
   category?: any;
@@ -169,7 +180,7 @@ const CategoryForm: React.FC<CategoryFormProps> = ({
 
   const getIconComponent = (iconName: string) => {
     if (!iconName) return null;
-    const IconComponent = (LucideIcons as any)[iconName];
+    const IconComponent = ICON_MAP[iconName];
     return IconComponent ? <IconComponent className="h-4 w-4" /> : null;
   };
 
@@ -216,7 +227,7 @@ const CategoryForm: React.FC<CategoryFormProps> = ({
             </SelectTrigger>
             <SelectContent>
               {POPULAR_ICONS.map((iconName) => {
-                const IconComponent = (LucideIcons as any)[iconName];
+                const IconComponent = ICON_MAP[iconName];
                 return (
                   <SelectItem key={iconName} value={iconName}>
                     <div className="flex items-center gap-2">
