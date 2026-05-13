@@ -399,9 +399,10 @@ Deno.serve(async (req) => {
 
     console.log(`[dispatch-webhook] Enviando para: ${webhookConfig.webhook_url}`);
 
-    // Enviar webhook com timeout de 10 segundos
+    // Timeout: 60s para order.paid (n8n pode demorar), 10s para outros eventos
+    const timeoutMs = event_type === 'order.paid' ? 60000 : 10000;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     let statusCode = 0;
     let responseBody = '';

@@ -2347,6 +2347,9 @@ export type Database = {
           updated_at: string
           user_id: string
           valor_reembolso: number | null
+          webhook_paid_dispatched_at: string | null
+          webhook_paid_error: string | null
+          webhook_paid_status: string | null
         }
         Insert: {
           billing_address?: Json | null
@@ -2396,6 +2399,9 @@ export type Database = {
           updated_at?: string
           user_id: string
           valor_reembolso?: number | null
+          webhook_paid_dispatched_at?: string | null
+          webhook_paid_error?: string | null
+          webhook_paid_status?: string | null
         }
         Update: {
           billing_address?: Json | null
@@ -2445,6 +2451,9 @@ export type Database = {
           updated_at?: string
           user_id?: string
           valor_reembolso?: number | null
+          webhook_paid_dispatched_at?: string | null
+          webhook_paid_error?: string | null
+          webhook_paid_status?: string | null
         }
         Relationships: [
           {
