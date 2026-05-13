@@ -1,65 +1,47 @@
+## Plano: Aguardar resposta do webhook `order.paid` e sinalizar falha em vermelho
 
+### Comportamento desejado
+1. Disparar o webhook `order.paid` e **aguardar até 60 segundos** pela resposta do n8n.
+2. Se a resposta for **HTTP 2xx**, marcar o pedido como "webhook enviado com sucesso".
+3. Se a resposta for **erro, status >= 300 ou timeout**, marcar o pedido como "webhook falhou" — esse pedido aparecerá em **vermelho** na listagem `/super-admin/pedidos` para sinalizar que o envio para o n8n não foi confirmado.
 
-## Plano: Criar e documentar endpoint "Buscar Pedido"
+### Mudanças
 
-### Objetivo
-Criar um novo endpoint REST para buscar **um pedido específico** (com todos os detalhes do payload completo do `api-pedidos-listar`, incluindo cliente, itens enriquecidos, breakdown financeiro e variações) e adicioná-lo na documentação da API.
+#### 1. Banco de dados (migration)
+Adicionar 3 colunas em `orders`:
+| Coluna | Tipo | Default | Função |
+|---|---|---|---|
+| `webhook_paid_status` | `text` | `null` | `null` (não disparado) / `sent` / `failed` |
+| `webhook_paid_dispatched_at` | `timestamptz` | `null` | última tentativa |
+| `webhook_paid_error` | `text` | `null` | mensagem de erro / status code para debug |
 
-### Investigação realizada
-- Já existem `api-pedidos-listar` (lista paginada), `api-pedidos-recentes` (recentes) e `api-pedidos-atualizar-status` (PUT)
-- **Não existe** endpoint para buscar 1 pedido específico — vamos criar `api-pedidos-buscar`
-- Padrão de autenticação: header `X-API-Key`, validação na tabela `api_keys`, permissão `pedidos.read` ou `orders.read`
-- Estrutura de retorno vai espelhar o item retornado pelo `api-pedidos-listar` (mesmo enriquecimento financeiro, customer formatado, items com breakdown)
+Sem CHECK constraint (apenas valores controlados pela edge function).
 
-### Solução
+#### 2. `supabase/functions/dispatch-webhook/index.ts`
+- Aumentar o timeout do `fetch` de **10s → 60s** (apenas para `order.paid`; outros eventos continuam 10s para não travar).
+- Após o `fetch`, quando `event_type === 'order.paid'` e `!is_test` e `payload?.order_id`:
+  - Se `statusCode >= 200 && statusCode < 300` → `update orders set webhook_paid_status='sent', webhook_paid_dispatched_at=now(), webhook_paid_error=null where id = order_id`.
+  - Caso contrário → `update orders set webhook_paid_status='failed', webhook_paid_dispatched_at=now(), webhook_paid_error='<status> - <errorMessage|responseBody truncado>'`.
+- Manter o registro em `webhook_dispatch_logs` (já existe).
 
-#### 1. Criar Edge Function `supabase/functions/api-pedidos-buscar/index.ts`
-- Método: `GET`
-- Aceita query params (qualquer um identifica o pedido):
-  - `order_number` → busca por número (ex: `ORD-12345`)
-  - `id` → busca por UUID
-  - `external_reference` → busca por referência externa (Mercado Pago)
-  - `payment_id` → busca por ID de pagamento
-- Validação: **pelo menos um** identificador deve ser fornecido
-- Reaproveita as funções `formatCPF`, `formatPhone`, `calculatePriceBreakdown`, `calculateFinancialSummary` (mesmo padrão do `api-pedidos-listar`)
-- Retorna `404` quando não encontrar
-- Retorna o mesmo objeto enriquecido (single, não array)
+> Observação: o disparo do `order.paid` continua chamado de dentro de `webhook-n8n-payment` e `dispatch-order-webhook` via `supabase.functions.invoke('dispatch-webhook', ...)`. Como `invoke` é assíncrono mas a função `dispatch-webhook` agora aguarda até 60s, a marcação do pedido fica garantida sem mudar os chamadores.
 
-#### 2. Registrar a função em `supabase/config.toml`
-- Adicionar `[functions.api-pedidos-buscar]` com `verify_jwt = false` (autentica por X-API-Key)
-
-#### 3. Documentar em `src/data/apiEndpointsData.ts`
-- Adicionar novo endpoint na categoria de pedidos (após "Listar Pedidos Completos"):
-  - Título: "Buscar Pedido"
-  - Method: `GET`
-  - URL: `/functions/v1/api-pedidos-buscar`
-  - QueryParams: `order_number`, `id`, `external_reference`, `payment_id` (todos opcionais, mas pelo menos um obrigatório)
-  - Headers: `X-API-Key`
-  - responseExample: pedido completo (customer, items com `image_url`/`product_url`/`cost_price`/`variation`, financial_summary)
-  - errorExamples: 400 (sem identificador), 401 (api key), 403 (sem permissão), 404 (não encontrado)
-
-### Estrutura do retorno (resumo)
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "order_number": "ORD-12345",
-    "status": "confirmed",
-    "payment_status": "approved",
-    "total_amount": 299.90,
-    "customer": { "full_name": "...", "cpf": "...", "phone": "..." },
-    "shipping_address": {...},
-    "items": [{ "product_id": "...", "product_url": "...", "image_url": "...", "cost_price": 12.5, "variation": {...}, "price_breakdown": {...} }],
-    "financial_summary": {...}
-  }
-}
-```
+#### 3. UI — `/super-admin/pedidos` (`src/pages/admin/Orders.tsx` e componentes da lista)
+- Incluir `webhook_paid_status` e `webhook_paid_error` no `select` da query de pedidos.
+- Quando `webhook_paid_status === 'failed'`:
+  - Aplicar uma classe vermelha discreta na linha (ex.: `bg-destructive/10 hover:bg-destructive/15`) usando token semântico.
+  - Mostrar um badge pequeno "Webhook falhou" com tooltip exibindo `webhook_paid_error` e a `webhook_paid_dispatched_at`.
+- Quando `webhook_paid_status === 'sent'`: nenhum destaque (comportamento atual).
+- Pedidos antigos (status `null`) não são afetados visualmente.
 
 ### Arquivos
 | Arquivo | Ação |
 |---|---|
-| `supabase/functions/api-pedidos-buscar/index.ts` | criar (Edge Function) |
-| `supabase/config.toml` | registrar função (`verify_jwt = false`) |
-| `src/data/apiEndpointsData.ts` | adicionar entrada de documentação |
+| migration SQL (novas colunas em `orders`) | criar |
+| `supabase/functions/dispatch-webhook/index.ts` | timeout 60s + update do pedido após resposta |
+| `src/pages/admin/Orders.tsx` (+ componente da linha/tabela) | incluir colunas no select e estilo vermelho + badge |
 
+### Fora de escopo
+- Retentativa automática (usuário optou por apenas sinalizar em vermelho).
+- Notificação ao admin (não solicitado).
+- Botão de reenvio dedicado — o reenvio manual já é possível via `dispatch-order-webhook` (existente).
