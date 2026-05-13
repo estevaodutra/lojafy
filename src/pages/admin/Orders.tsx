@@ -25,6 +25,9 @@ interface Order {
   created_at: string;
   user_id: string;
   has_shipping_file: boolean;
+  webhook_paid_status?: string | null;
+  webhook_paid_dispatched_at?: string | null;
+  webhook_paid_error?: string | null;
   profiles: {
     first_name: string;
     last_name: string;
