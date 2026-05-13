@@ -297,6 +297,11 @@ serve(async (req) => {
     // Log success for approved payments
     if (webhookData.status.toLowerCase() === 'approved') {
       console.log(`✅ Payment APPROVED for order ${orderData.order_number} - Payment ID: ${paymentId}`);
+
+      // Disparar split de pagamento de forma assíncrona (não bloqueia resposta)
+      supabase.functions.invoke('process-payment-split', {
+        body: { order_id: orderData.id },
+      }).catch((err: Error) => console.error('[webhook] Split failed:', err));
       
       // Disparar webhook order.paid
       try {
