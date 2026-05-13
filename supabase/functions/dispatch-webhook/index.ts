@@ -430,7 +430,7 @@ Deno.serve(async (req) => {
       clearTimeout(timeoutId);
       
       if (fetchError.name === 'AbortError') {
-        errorMessage = 'Timeout: webhook não respondeu em 10 segundos';
+        errorMessage = `Timeout: webhook não respondeu em ${timeoutMs / 1000} segundos`;
         statusCode = 408;
       } else {
         errorMessage = fetchError.message || 'Erro ao conectar com webhook';
