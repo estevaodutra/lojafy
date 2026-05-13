@@ -368,8 +368,9 @@ const AdminOrders = () => {
                              </SelectContent>
                            </Select>
                          </TableCell>
-                      </TableRow>
-                    ))
+                       </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
