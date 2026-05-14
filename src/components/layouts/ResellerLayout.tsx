@@ -25,7 +25,8 @@ import {
   ChevronRight,
   ChevronDown,
   MessageSquare,
-  Copy
+  Copy,
+  TrendingUp
 } from 'lucide-react';
 import { useFeature } from '@/hooks/useFeature';
 import { useMlUnreadCount } from '@/hooks/useMlMessages';
@@ -142,6 +143,7 @@ const ResellerSidebar = () => {
           { title: 'Anúncios ML', url: '/reseller/ml-anuncios', icon: ShoppingBag },
           { title: 'Mensagens ML', url: '/reseller/ml-mensagens', icon: MessageSquare },
           { title: 'Replicar Anúncios', url: '/reseller/ml-replicar', icon: Copy },
+          { title: 'Métricas ML', url: '/reseller/ml-metricas', icon: TrendingUp },
         ]
       });
     }

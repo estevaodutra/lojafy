@@ -131,6 +131,7 @@ const MlSuccess = lazy(() => import("./pages/reseller/MlSuccess"));
 const MlAnuncios = lazy(() => import("./pages/reseller/MlAnuncios"));
 const MlMensagens = lazy(() => import("./pages/reseller/MlMensagens"));
 const MlReplicar = lazy(() => import("./pages/reseller/MlReplicar"));
+const MlMetricas = lazy(() => import("./pages/reseller/MlMetricas"));
 const ResellerMeusAcessos = lazy(() => import("./pages/reseller/MeusAcessos"));
 const ResellerTopProdutosVencedores = lazy(() => import("./pages/reseller/TopProdutosVencedores"));
 
@@ -411,6 +412,7 @@ const App = () => {
                   <Route path="ml-anuncios" element={<MlAnuncios />} />
                   <Route path="ml-mensagens" element={<MlMensagens />} />
                   <Route path="ml-replicar" element={<MlReplicar />} />
+                  <Route path="ml-metricas" element={<MlMetricas />} />
                   <Route path="integracoes" element={
                     <FeatureRoute feature="lojafy_integra">
                       <ResellerLojafyIntegra />
