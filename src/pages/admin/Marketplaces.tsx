@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, RefreshCw, ShoppingBag, Users, MapPin, ChevronRight } from "lucide-react";
+import { Download, RefreshCw, ShoppingBag, Users, MapPin, ChevronRight, MessageSquare } from "lucide-react";
+import MlMensagens from "@/pages/reseller/MlMensagens";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -344,6 +345,10 @@ export default function Marketplaces() {
           <TabsTrigger value="listings" disabled={!selectedReseller}>
             Anúncios {selectedReseller ? `(${selectedReseller.name})` : ''}
           </TabsTrigger>
+          <TabsTrigger value="messages" disabled={!selectedReseller}>
+            <MessageSquare className="h-4 w-4 mr-1" />
+            Mensagens {selectedReseller ? `(${selectedReseller.name})` : ''}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="accounts">
@@ -385,6 +390,26 @@ export default function Marketplaces() {
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
                 Selecione um revendedor na aba "Contas Conectadas" para ver seus anúncios.
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="messages">
+          {selectedReseller ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Mensagens — {selectedReseller.name}</CardTitle>
+                <CardDescription>Perguntas e mensagens pós-venda deste revendedor no Mercado Livre.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <MlMensagens resellerUserId={selectedReseller.id} />
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                Selecione um revendedor na aba "Contas Conectadas" para ver suas mensagens.
               </CardContent>
             </Card>
           )}
