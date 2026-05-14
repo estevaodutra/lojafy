@@ -182,20 +182,18 @@ serve(async (req) => {
     console.log('Found order:', orderData.id);
 
     // Map Mercado Pago status to our system
-    let newStatus = 'pending';
-    let paymentStatus = 'pending';
+    let newStatus = orderData.status;
+    let paymentStatus = orderData.payment_status;
 
     switch (paymentData.status) {
       case 'approved':
-        newStatus = 'pending';
+        newStatus = 'recebido';
         paymentStatus = 'paid';
         break;
       case 'pending':
-        newStatus = 'pending';
         paymentStatus = 'pending';
         break;
       case 'in_process':
-        newStatus = 'pending';
         paymentStatus = 'processing';
         break;
       case 'rejected':
@@ -205,8 +203,6 @@ serve(async (req) => {
         break;
       default:
         console.log('Unknown payment status:', paymentData.status);
-        newStatus = orderData.status; // Keep current status
-        paymentStatus = 'pending';
     }
 
     // Verificar se o pedido já foi cancelado por expiração
@@ -253,9 +249,26 @@ serve(async (req) => {
 
     console.log('Order updated successfully');
 
-    // TODO: Send email notification to user if payment is approved
+    // Disparar split de pagamento e notificação quando aprovado
     if (paymentData.status === 'approved') {
-      console.log('Payment approved - should send confirmation email');
+      console.log(`✅ Payment approved for order ${orderData.order_number}`);
+
+      // Split assíncrono — não bloqueia resposta ao MP
+      supabase.functions.invoke('process-payment-split', {
+        body: { order_id: orderData.id },
+      }).catch((e: Error) => console.error('[mp-webhook] Split failed:', e));
+
+      // Notificar comprador
+      if (orderData.user_id) {
+        supabase.from('notifications').insert({
+          user_id: orderData.user_id,
+          title: '✅ Pagamento confirmado!',
+          message: `Seu pedido ${orderData.order_number} foi pago e está sendo processado.`,
+          type: 'order_paid',
+          action_url: '/minha-conta/pedidos',
+          action_label: 'Ver Pedido',
+        }).catch((e: Error) => console.error('[mp-webhook] Notification failed:', e));
+      }
     }
 
     return new Response('OK', { status: 200, headers: corsHeaders });

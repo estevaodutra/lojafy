@@ -1,4 +1,3 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
@@ -11,6 +10,9 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
+
+const MP_ACCESS_TOKEN = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN') ?? '';
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 
 interface PixPaymentRequest {
   amount: number;
@@ -28,348 +30,146 @@ interface PixPaymentRequest {
     unitPrice: number;
   }>;
   shippingAddress: any;
+  reseller_id?: string;
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    console.log('Iniciando criação de pagamento PIX');
-    
-    const { amount, description, payer, orderItems, shippingAddress }: PixPaymentRequest = await req.json();
-    
-    // Authentication is required for PIX payment
+    if (!MP_ACCESS_TOKEN) {
+      console.error('MERCADO_PAGO_ACCESS_TOKEN not configured');
+      return new Response(
+        JSON.stringify({ error: 'Payment service not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const authHeader = req.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(
-        JSON.stringify({ error: 'Authentication required to create a payment' }),
+        JSON.stringify({ error: 'Authentication required' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
     if (authError || !user) {
-      console.error('Authentication failed:', authError?.message);
       return new Response(
-        JSON.stringify({ error: 'Invalid or expired authentication token' }),
+        JSON.stringify({ error: 'Invalid or expired token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const userId = user.id;
-    console.log('Usuário autenticado:', userId);
-    
-    console.log('Dados recebidos:', { amount, description, payer: { ...payer, cpf: '***' } });
+    const { amount, description, payer, orderItems, shippingAddress, reseller_id }: PixPaymentRequest = await req.json();
 
-    // Validate required fields
-    if (!amount || !payer.email || !payer.cpf) {
-      console.error('Missing required fields');
+    if (!amount || !payer?.email || !payer?.cpf) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields: amount, email, cpf' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Generate unique external reference
-    const externalReference = `order_${Date.now()}_${userId.substring(0, 8)}`;
-    
-    // Fetch complete user profile data
-    let profileData = null;
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
+    const externalReference = `order_${Date.now()}_${user.id.substring(0, 8)}`;
+    const notificationUrl = `${SUPABASE_URL}/functions/v1/webhook-mercadopago`;
 
-    if (profileError) {
-      console.log('User profile not found, continuing without profile data:', profileError.message);
-    } else {
-      profileData = profile;
-    }
-
-    // Fetch complete product information
-    let completeProducts: any[] = [];
-    if (orderItems && orderItems.length > 0) {
-      const productIds = orderItems.map(item => item.productId);
-      
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
-        .select(`
-          *,
-          categories:category_id (
-            id,
-            name,
-            slug
-          ),
-          subcategories:subcategory_id (
-            id,
-            name,
-            slug
-          )
-        `)
-        .in('id', productIds);
-
-      if (productsError) {
-        console.error('Error fetching products:', productsError);
-      } else {
-        completeProducts = orderItems.map(orderItem => {
-          const product = productsData?.find(p => p.id === orderItem.productId);
-          return {
-            id: orderItem.productId,
-            nome: orderItem.productName,
-            descricao_completa: product?.description || '',
-            preco_unitario: orderItem.unitPrice,
-            quantidade: orderItem.quantity,
-            valor_total_item: orderItem.quantity * orderItem.unitPrice,
-            marca: product?.brand || '',
-            sku: product?.sku || '',
-            gtin_ean13: product?.gtin_ean13 || '',
-            categoria: product?.categories?.name || '',
-            subcategoria: product?.subcategories?.name || '',
-            especificacoes: '',
-            dimensoes: {
-              peso: product?.weight || 0,
-              altura: product?.height || 0,
-              largura: product?.width || 0,
-              comprimento: product?.length || 0
-            },
-            imagem_principal: product?.main_image_url || product?.image_url || '',
-            estoque_atual: product?.stock_quantity || 0,
-            avaliacao: product?.rating || 0,
-            numero_avaliacoes: product?.review_count || 0
-          };
-        });
-      }
-    }
-
-    // Prepare complete payload for N8N webhook
-    const n8nPayload = {
-      pedido: {
-        external_reference: externalReference,
-        timestamp: new Date().toISOString(),
-        valor_total: amount,
-        descricao: description || `Pedido - ${externalReference}`,
-        quantidade_itens: orderItems?.length || 0
-      },
-      cliente: {
-        user_id: userId,
-        nome_completo: `${payer.firstName || ''} ${payer.lastName || ''}`.trim(),
+    // Chamar MP API diretamente
+    const mpPayload = {
+      transaction_amount: Number(amount),
+      description: description || `Pedido Lojafy - ${externalReference}`,
+      payment_method_id: 'pix',
+      payer: {
         email: payer.email,
-        telefone: profileData?.phone || '',
-        cpf: payer.cpf.replace(/\D/g, ''),
-        endereco: shippingAddress ? {
-          rua: shippingAddress.street || '',
-          numero: shippingAddress.number || '',
-          complemento: shippingAddress.complement || '',
-          bairro: shippingAddress.neighborhood || '',
-          cidade: shippingAddress.city || '',
-          estado: shippingAddress.state || '',
-          uf: shippingAddress.state || '',
-          cep: shippingAddress.zip_code || ''
-        } : null
+        first_name: payer.firstName || '',
+        last_name: payer.lastName || '',
+        identification: {
+          type: 'CPF',
+          number: payer.cpf.replace(/\D/g, ''),
+        },
       },
-      produtos: completeProducts,
-      pagamento: {
-        metodo: 'pix',
-        valor: amount
-      }
+      external_reference: externalReference,
+      notification_url: notificationUrl,
+      date_of_expiration: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min
     };
 
-    console.log('Enviando para N8N webhook:', { 
-      ...n8nPayload, 
-      cliente: { ...n8nPayload.cliente, cpf: '***' } 
+    console.log('[pix] Calling MP API for PIX payment, amount:', amount);
+
+    const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${MP_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+        'X-Idempotency-Key': externalReference,
+      },
+      body: JSON.stringify(mpPayload),
     });
 
-    // URLs do webhook N8N (configuráveis via secrets)
-    const primaryWebhookUrl = Deno.env.get('N8N_WEBHOOK_URL') || 'https://n8n-n8n.nuwfic.easypanel.host/webhook/gerar_pix';
-    const testWebhookUrl = Deno.env.get('N8N_WEBHOOK_TEST_URL') || 'https://n8n-n8n.nuwfic.easypanel.host/webhook-test/gerar_pix';
-    
-    console.log('Primary webhook URL:', primaryWebhookUrl);
-    console.log('Test webhook URL:', testWebhookUrl);
-    
-    let n8nResult: any;
-    let lastError = null;
-    
-    // Tentativa 1: Webhook de produção
-    try {
-      console.log('Tentando webhook de produção...');
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-      
-      const n8nResponse = await fetch(primaryWebhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(n8nPayload),
-        signal: controller.signal
-      });
+    const mpData = await mpRes.json();
 
-      clearTimeout(timeoutId);
-
-      console.log('N8N Response Status (Primary):', n8nResponse.status);
-      console.log('N8N Response Headers (Primary):', Object.fromEntries(n8nResponse.headers.entries()));
-
-      const responseText = await n8nResponse.text();
-      console.log('N8N Raw Response (Primary):', responseText);
-      
-      try {
-        n8nResult = JSON.parse(responseText);
-        console.log('N8N Parsed Response (Primary):', n8nResult);
-      } catch (parseError) {
-        console.error('Erro ao fazer parse da resposta do N8N (Primary):', parseError);
-        throw new Error('N8N retornou resposta inválida');
-      }
-
-      // Se foi sucesso, seguir em frente
-      if (n8nResponse.ok) {
-        console.log('Webhook de produção respondeu com sucesso');
-      } else if (n8nResponse.status === 404 && (n8nResult.message?.includes('not registered') || n8nResult.code === 404)) {
-        // Webhook não registrado, tentar o de teste
-        console.log('Webhook de produção não registrado, tentando webhook de teste...');
-        throw new Error('WEBHOOK_NOT_REGISTERED');
-      } else {
-        // Outro erro, não tentar fallback
-        console.error('N8N webhook error (Primary). Status:', n8nResponse.status);
-        console.error('N8N error response (Primary):', n8nResult);
-        throw new Error(`N8N webhook failed with status ${n8nResponse.status}`);
-      }
-      
-    } catch (error) {
-      lastError = error;
-      console.log('Erro no webhook primário:', error instanceof Error ? error.message : String(error));
-      
-      // Se foi erro de webhook não registrado, tentar o de teste
-      if (error instanceof Error && error.message === 'WEBHOOK_NOT_REGISTERED') {
-        try {
-          console.log('Tentando webhook de teste...');
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 30000);
-          
-          const n8nResponse = await fetch(testWebhookUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(n8nPayload),
-            signal: controller.signal
-          });
-
-          clearTimeout(timeoutId);
-
-          console.log('N8N Response Status (Test):', n8nResponse.status);
-          console.log('N8N Response Headers (Test):', Object.fromEntries(n8nResponse.headers.entries()));
-
-          const responseText = await n8nResponse.text();
-          console.log('N8N Raw Response (Test):', responseText);
-          
-          try {
-            n8nResult = JSON.parse(responseText);
-            console.log('N8N Parsed Response (Test):', n8nResult);
-          } catch (parseError) {
-            console.error('Erro ao fazer parse da resposta do N8N (Test):', parseError);
-            throw new Error('N8N retornou resposta inválida');
-          }
-
-          if (!n8nResponse.ok) {
-            if (n8nResponse.status === 404 && (n8nResult.message?.includes('not registered') || n8nResult.code === 404)) {
-              // Ambos webhooks não estão registrados
-              throw new Error('WEBHOOK_NOT_REGISTERED');
-            } else {
-              console.error('N8N webhook error (Test). Status:', n8nResponse.status);
-              console.error('N8N error response (Test):', n8nResult);
-              throw new Error(`N8N webhook failed with status ${n8nResponse.status}`);
-            }
-          } else {
-            console.log('Webhook de teste respondeu com sucesso');
-          }
-          
-        } catch (testError) {
-          console.error('Erro também no webhook de teste:', testError instanceof Error ? testError.message : String(testError));
-          throw testError;
-        }
-      } else if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error('PIX_SERVICE_TIMEOUT');
-      } else {
-        // Outro tipo de erro, não tentar fallback
-        throw error;
-      }
-    }
-
-    // N8N returns an array, extract the first PIX data
-    let pixData;
-    if (Array.isArray(n8nResult) && n8nResult.length > 0) {
-      pixData = n8nResult[0];
-    } else if (n8nResult && typeof n8nResult === 'object') {
-      pixData = n8nResult;
-    } else {
-      console.error('Invalid N8N response format:', n8nResult);
+    if (!mpRes.ok) {
+      console.error('[pix] MP API error:', mpRes.status, JSON.stringify(mpData));
       return new Response(
-        JSON.stringify({ error: 'Invalid PIX response format from N8N' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: mpData?.message ?? 'Mercado Pago API error', mp_error: mpData }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validate N8N response has required PIX data
-    if (!pixData.qrCodeBase64 || !pixData.qrCodeCopyPaste) {
-      console.error('Missing PIX data in N8N response:', pixData);
+    const qrCode = mpData.point_of_interaction?.transaction_data?.qr_code ?? null;
+    const qrCodeBase64 = mpData.point_of_interaction?.transaction_data?.qr_code_base64 ?? null;
+    const paymentId = String(mpData.id);
+    const expiresAt = mpData.date_of_expiration ?? new Date(Date.now() + 30 * 60 * 1000).toISOString();
+
+    if (!qrCode) {
+      console.error('[pix] No QR code in MP response:', JSON.stringify(mpData));
       return new Response(
-        JSON.stringify({ error: 'PIX QR code data not available from N8N' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'PIX QR code not returned by Mercado Pago' }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Generate order number
+    // Gerar order number
     const orderNumber = externalReference.toUpperCase().replace('ORDER_', 'ORD-');
-    console.log('Generated order number:', orderNumber);
 
-    // Create order in database with N8N response data
-    const orderInsertData: any = {
-      order_number: orderNumber,
-      user_id: user.id,
-      total_amount: amount,
-      payment_method: 'pix',
-      payment_status: 'pending',
-      status: 'pendente',
-      payment_id: pixData.paymentId || externalReference,
-      pix_qr_code: pixData.qrCodeCopyPaste,
-      pix_qr_code_base64: pixData.qrCodeBase64,
-      shipping_address: shippingAddress,
-      external_reference: externalReference,
-      payment_expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutos
-    };
-
+    // Criar pedido no banco
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
-      .insert(orderInsertData)
+      .insert({
+        order_number: orderNumber,
+        user_id: user.id,
+        reseller_id: reseller_id ?? null,
+        total_amount: amount,
+        payment_method: 'pix',
+        payment_status: 'pending',
+        status: 'pendente',
+        payment_id: paymentId,
+        pix_qr_code: qrCode,
+        pix_qr_code_base64: qrCodeBase64,
+        shipping_address: shippingAddress ?? null,
+        external_reference: externalReference,
+        payment_expires_at: expiresAt,
+      })
       .select()
       .single();
 
     if (orderError) {
-      console.error('Error creating order:', orderError);
+      console.error('[pix] Failed to create order:', orderError);
       return new Response(
         JSON.stringify({ error: 'Failed to create order' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Create order items with cost information
-    if (orderItems && orderItems.length > 0) {
-      // Fetch cost_price and additional product data for snapshot
-      const productIds = orderItems.map(item => item.productId);
-      const { data: productsWithCost } = await supabase
+    // Criar order items
+    if (orderItems?.length > 0) {
+      const productIds = orderItems.map(i => i.productId);
+      const { data: products } = await supabase
         .from('products')
-        .select('id, cost_price, image_url, brand, sku')
+        .select('id, cost_price, image_url, brand, sku, supplier_id')
         .in('id', productIds);
 
-      const orderItemsData = orderItems.map(item => {
-        const productData = productsWithCost?.find(p => p.id === item.productId);
-        
+      const itemsData = orderItems.map(item => {
+        const p = products?.find(x => x.id === item.productId);
         return {
           order_id: orderData.id,
           product_id: item.productId,
@@ -379,85 +179,40 @@ serve(async (req) => {
           product_snapshot: {
             name: item.productName,
             price: item.unitPrice,
-            cost_price: productData?.cost_price || 0,
-            image_url: productData?.image_url,
-            brand: productData?.brand,
-            sku: productData?.sku
-          }
+            cost_price: p?.cost_price ?? 0,
+            image_url: p?.image_url ?? null,
+            brand: p?.brand ?? null,
+            sku: p?.sku ?? null,
+            supplier_id: p?.supplier_id ?? null,
+          },
         };
       });
 
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItemsData);
-
-      if (itemsError) {
-        console.error('Error creating order items:', itemsError);
-      }
+      const { error: itemsError } = await supabase.from('order_items').insert(itemsData);
+      if (itemsError) console.error('[pix] Failed to create order items:', itemsError);
     }
 
-    // Return PIX payment data from N8N
-    const responseData = {
-      order_id: orderData.id,
-      payment_id: pixData.paymentId || externalReference,
-      status: 'pending',
-      qr_code: pixData.qrCodeCopyPaste,
-      qr_code_base64: pixData.qrCodeBase64,
-      ticket_url: '',
-      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 min expiration
-      external_reference: externalReference
-    };
-
-    console.log('PIX payment criado com sucesso via N8N:', { order_id: responseData.order_id, payment_id: responseData.payment_id });
+    console.log(`✅ [pix] PIX created — order ${orderData.order_number}, payment_id ${paymentId}`);
 
     return new Response(
-      JSON.stringify(responseData),
+      JSON.stringify({
+        order_id: orderData.id,
+        payment_id: paymentId,
+        status: 'pending',
+        qr_code: qrCode,
+        qr_code_base64: qrCodeBase64,
+        ticket_url: mpData.point_of_interaction?.transaction_data?.ticket_url ?? '',
+        expires_at: expiresAt,
+        external_reference: externalReference,
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('Error in create-pix-payment:', error);
-    
-    // Mapear erros específicos para códigos mais informativos
-    if (error instanceof Error && error.message === 'WEBHOOK_NOT_REGISTERED') {
-      return new Response(
-        JSON.stringify({ 
-          code: 'WEBHOOK_NOT_REGISTERED',
-          error: 'Webhook do N8N não está ativo',
-          message: 'O webhook do N8N não está registrado ou ativo. Ative o workflow no N8N ou clique em "Execute workflow" para testar.',
-          hint: 'Verifique se o workflow está ativo no N8N ou execute manualmente para teste.'
-        }),
-        { 
-          status: 502, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-    
-    if (error instanceof Error && error.message === 'PIX_SERVICE_TIMEOUT') {
-      return new Response(
-        JSON.stringify({ 
-          code: 'PIX_SERVICE_TIMEOUT',
-          error: 'Timeout do serviço PIX',
-          message: 'A requisição para o N8N excedeu o tempo limite de 30 segundos.',
-          hint: 'Tente novamente em alguns instantes.'
-        }),
-        { 
-          status: 504, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-    
+    console.error('[pix] Unexpected error:', error);
     return new Response(
-      JSON.stringify({ 
-        error: 'Falha na criação do pagamento PIX', 
-        details: error instanceof Error ? error.message : String(error)
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
