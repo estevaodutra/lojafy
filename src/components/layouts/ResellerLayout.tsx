@@ -136,6 +136,7 @@ const ResellerSidebar = () => {
         label: 'Avançado',
         items: [
           { title: 'Lojafy Integra', url: '/reseller/integracoes', icon: Plug },
+          { title: 'Anúncios ML', url: '/reseller/ml-anuncios', icon: ShoppingBag },
         ]
       });
     }
