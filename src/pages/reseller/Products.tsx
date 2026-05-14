@@ -261,12 +261,25 @@ const ResellerProducts = () => {
                           <h4 className="font-semibold text-base line-clamp-2 break-words overflow-hidden">
                             {product.product?.name || `Produto não encontrado (ID: ${product.product_id})`}
                           </h4>
-                        <Badge 
-                          variant={product.active ? "default" : "secondary"}
-                          className={product.active ? "bg-green-100 text-green-800 hover:bg-green-100 border-green-200" : ""}
-                        >
-                          {product.active ? "Ativo" : "Inativo"}
-                        </Badge>
+                          <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                            <Badge
+                              variant={product.active ? "default" : "secondary"}
+                              className={product.active ? "bg-green-100 text-green-800 hover:bg-green-100 border-green-200" : ""}
+                            >
+                              {product.active ? "Ativo" : "Inativo"}
+                            </Badge>
+                            {hasActiveIntegration && product.product && (
+                              isProductPublished(product.product_id) ? (
+                                <Badge className="bg-yellow-400 text-yellow-900 hover:bg-yellow-400 text-xs px-1.5">
+                                  ML ✓
+                                </Badge>
+                              ) : product.product.product_marketplace_data?.some((mp: any) => mp.marketplace === 'mercadolivre' && mp.is_validated) ? (
+                                <Badge variant="outline" className="border-yellow-400 text-yellow-700 text-xs px-1.5">
+                                  ML pronto
+                                </Badge>
+                              ) : null
+                            )}
+                          </div>
                         </div>
                         
                         {!product.product && (
@@ -390,7 +403,7 @@ const ResellerProducts = () => {
                           </DropdownMenu>
                         )}
                         
-                        {hasActiveIntegration && product.active && product.product && product.product.product_marketplace_data?.some((mp: any) => mp.marketplace === 'mercadolivre') && (
+                        {hasActiveIntegration && product.active && product.product && (
                           <MercadoLivreButton
                             productId={product.product_id}
                             isPublished={isProductPublished(product.product_id)}

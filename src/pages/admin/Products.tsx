@@ -9,6 +9,8 @@ import ProductForm from '@/components/admin/ProductForm';
 import { ProductComparisonView } from '@/components/admin/ProductComparisonView';
 import { RestoreOriginalButton } from '@/components/admin/RestoreOriginalButton';
 import { CloneFromMarketplace } from '@/components/admin/CloneFromMarketplace';
+import { ProductMlConfig } from '@/components/admin/ProductMlConfig';
+import { Separator } from '@/components/ui/separator';
 import StockAlert from '@/components/admin/StockAlert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -320,6 +322,18 @@ const Products = () => {
                 onCloneSuccess={() => {
                   setTimeout(() => refetchProducts(), 3000);
                 }}
+              />
+            </div>
+          )}
+          {editingProduct?.id && (
+            <div className="mt-4">
+              <Separator className="mb-4" />
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <span className="text-yellow-600">🛒</span> Configuração Mercado Livre
+              </h3>
+              <ProductMlConfig
+                productId={editingProduct.id}
+                productName={editingProduct.name ?? ''}
               />
             </div>
           )}

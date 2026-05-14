@@ -113,39 +113,57 @@ serve(async (req) => {
     }
     if (imageUrls.length === 0 && product.image_url) imageUrls.push(product.image_url);
 
+    // Se não tem categoria ML definida, buscar automaticamente pelo nome do produto
+    let categoryId = validated.category_id;
+    if (!categoryId) {
+      try {
+        const searchQuery = encodeURIComponent(product.name.substring(0, 50));
+        const catRes = await fetch(
+          `https://api.mercadolibre.com/sites/MLB/domain_discovery/search?q=${searchQuery}&limit=1`,
+          { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+        if (catRes.ok) {
+          const catData = await catRes.json();
+          categoryId = catData?.[0]?.category_id ?? null;
+          if (categoryId) console.log(`[ml-publish] Auto-detected category: ${categoryId} for "${product.name}"`);
+        }
+      } catch (e) {
+        console.warn('[ml-publish] Category auto-detection failed:', e);
+      }
+    }
+
+    // Construir atributos do produto usando os dados que temos
+    const attributes: unknown[] = Array.isArray(validated.attributes) && validated.attributes.length > 0
+      ? validated.attributes
+      : [];
+
+    // Adicionar peso e dimensões como atributos se disponíveis
+    if (product.weight && attributes.findIndex((a: any) => a.id === 'WEIGHT') === -1) {
+      attributes.push({ id: 'WEIGHT', value_name: `${product.weight} kg` });
+    }
+
     const mlPayload: Record<string, unknown> = {
-      title: product.name,
-      category_id: validated.category_id ?? 'MLB1051',
+      title: product.name.substring(0, 60), // ML limita título a 60 chars
+      category_id: categoryId ?? 'MLB1051',  // fallback: Outros
       price: Number(price),
       currency_id: 'BRL',
       available_quantity: Number(product.stock_quantity ?? 10),
       buying_mode: 'buy_it_now',
       listing_type_id: validated.listing_type_id ?? 'gold_special',
       condition: validated.condition ?? 'new',
-      description: { plain_text: product.description ?? product.name },
+      description: { plain_text: (product.description ?? product.name).substring(0, 50000) },
       pictures: imageUrls.slice(0, 12).map((url) => ({ source: url })),
     };
 
     // Shipping
-    if (validated.shipping) {
-      mlPayload.shipping = validated.shipping;
-    } else {
-      mlPayload.shipping = { mode: 'me2', free_shipping: false };
-    }
+    mlPayload.shipping = validated.shipping ?? { mode: 'me2', free_shipping: false };
 
     // Attributes
-    if (Array.isArray(validated.attributes) && validated.attributes.length > 0) {
-      mlPayload.attributes = validated.attributes;
+    if (attributes.length > 0) {
+      mlPayload.attributes = attributes;
     }
 
-    // Dimensions / weight
-    if (product.weight || product.height || product.length || product.width) {
-      mlPayload.sale_terms = [
-        ...(mlPayload.sale_terms as unknown[] ?? []),
-      ];
-    }
-
-    console.log('[ml-publish] Creating item:', product.name, 'price:', price);
+    console.log('[ml-publish] Creating item:', product.name, 'category:', mlPayload.category_id, 'price:', price);
 
     const publishRes = await fetch('https://api.mercadolibre.com/items', {
       method: 'POST',
@@ -158,8 +176,9 @@ serve(async (req) => {
     if (!publishRes.ok) {
       console.error('[ml-publish] ML API error:', publishRes.status, JSON.stringify(responseBody));
       const message = responseBody?.message ?? responseBody?.error ?? `ML API error ${publishRes.status}`;
-      const cause = responseBody?.cause ?? [];
-      return new Response(JSON.stringify({ error: message, cause, ml_response: responseBody }), {
+      const causes: string[] = (responseBody?.cause ?? []).map((c: any) => c.message ?? JSON.stringify(c));
+      const fullMessage = causes.length > 0 ? `${message} — cause: ${causes.join('; ')}` : message;
+      return new Response(JSON.stringify({ error: fullMessage, cause: causes, ml_response: responseBody }), {
         status: publishRes.status >= 400 && publishRes.status < 500 ? 422 : 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

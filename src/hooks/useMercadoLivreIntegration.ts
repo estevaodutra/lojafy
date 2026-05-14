@@ -207,10 +207,19 @@ export const useMercadoLivreIntegration = () => {
       queryClient.invalidateQueries({ queryKey: ['ml-published-products'] });
     },
     onError: (error, { productId }) => {
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+
+      // Extrair causas específicas do ML (ex: atributo obrigatório, categoria inválida)
+      const causesMatch = message.match(/cause: (.+)/);
+      const causes = causesMatch ? causesMatch[1] : null;
+
       toast({
-        title: 'Erro ao publicar',
-        description: error instanceof Error ? error.message : 'Tente novamente mais tarde.',
+        title: 'Erro ao publicar no Mercado Livre',
+        description: causes
+          ? `${message.replace(/ — cause:.+/, '')}\n\nDetalhes: ${causes}`
+          : message,
         variant: 'destructive',
+        duration: 10000,
       });
     },
     onSettled: (_, __, { productId }) => {
