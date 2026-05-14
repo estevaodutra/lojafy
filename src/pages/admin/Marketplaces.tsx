@@ -8,10 +8,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, RefreshCw, ShoppingBag, Users, MapPin, ChevronRight, MessageSquare, TrendingUp, Tag } from "lucide-react";
+import { Download, RefreshCw, ShoppingBag, Users, MapPin, ChevronRight, MessageSquare, TrendingUp, Tag, Megaphone } from "lucide-react";
 import MlMensagens from "@/pages/reseller/MlMensagens";
 import MlMetricas from "@/pages/reseller/MlMetricas";
 import MlPromocoes from "@/pages/reseller/MlPromocoes";
+import MlPublicidade from "@/pages/reseller/MlPublicidade";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -359,6 +360,10 @@ export default function Marketplaces() {
             <Tag className="h-4 w-4 mr-1" />
             Promoções
           </TabsTrigger>
+          <TabsTrigger value="ads" disabled={!selectedReseller}>
+            <Megaphone className="h-4 w-4 mr-1" />
+            Publicidade
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="accounts">
@@ -458,6 +463,25 @@ export default function Marketplaces() {
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
                 Selecione um revendedor para ver suas promoções.
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+        <TabsContent value="ads">
+          {selectedReseller ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Publicidade — {selectedReseller.name}</CardTitle>
+                <CardDescription>Product Ads do Mercado Livre deste revendedor.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <MlPublicidade resellerUserId={selectedReseller.id} />
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                Selecione um revendedor para ver sua publicidade.
               </CardContent>
             </Card>
           )}

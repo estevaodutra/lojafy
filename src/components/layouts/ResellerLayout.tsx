@@ -27,7 +27,8 @@ import {
   MessageSquare,
   Copy,
   TrendingUp,
-  Tag
+  Tag,
+  Megaphone
 } from 'lucide-react';
 import { useFeature } from '@/hooks/useFeature';
 import { useMlUnreadCount } from '@/hooks/useMlMessages';
@@ -146,6 +147,7 @@ const ResellerSidebar = () => {
           { title: 'Replicar Anúncios', url: '/reseller/ml-replicar', icon: Copy },
           { title: 'Métricas ML', url: '/reseller/ml-metricas', icon: TrendingUp },
           { title: 'Promoções ML', url: '/reseller/ml-promocoes', icon: Tag },
+          { title: 'Publicidade ML', url: '/reseller/ml-publicidade', icon: Megaphone },
         ]
       });
     }
