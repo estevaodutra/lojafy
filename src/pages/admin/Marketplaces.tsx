@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, RefreshCw, ShoppingBag, Users, MapPin, ChevronRight, MessageSquare, TrendingUp, Tag, Megaphone, Receipt } from "lucide-react";
+import { Download, RefreshCw, ShoppingBag, Users, MapPin, ChevronRight, MessageSquare, TrendingUp, Tag, Megaphone, Receipt, RotateCcw } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 import MlMensagens from "@/pages/reseller/MlMensagens";
 import MlMetricas from "@/pages/reseller/MlMetricas";
 import MlPromocoes from "@/pages/reseller/MlPromocoes";
@@ -50,7 +51,19 @@ async function callMlProxy(resellerUserId: string, mlPath: string, method = 'GET
 
 // ── Seção A: Contas conectadas ───────────────────────────────────────────────
 
+async function triggerBulkResync(resellerUserId?: string) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not authenticated');
+  const { data, error } = await supabase.functions.invoke('ml-bulk-resync', {
+    body: resellerUserId ? { reseller_user_id: resellerUserId } : {},
+  });
+  if (error) throw error;
+  return data;
+}
+
 function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string, name: string) => void }) {
+  const [syncing, setSyncing] = useState<string | null>(null);
+
   const { data: integrations = [], isLoading, refetch } = useQuery({
     queryKey: ['admin-ml-integrations'],
     queryFn: async () => {
@@ -67,15 +80,37 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
     },
   });
 
+  const handleResync = async (resellerUserId?: string, name?: string) => {
+    const key = resellerUserId ?? 'all';
+    setSyncing(key);
+    try {
+      const result = await triggerBulkResync(resellerUserId);
+      toast({
+        title: 'Re-sincronização concluída',
+        description: `${result.success} anúncio(s) re-sincronizados${result.failed > 0 ? `, ${result.failed} falha(s)` : ''}${name ? ` para ${name}` : ''}.`,
+      });
+    } catch (err) {
+      toast({ title: 'Erro ao re-sincronizar', description: String(err), variant: 'destructive' });
+    } finally {
+      setSyncing(null);
+    }
+  };
+
   if (isLoading) return <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{integrations.length} conta(s) conectada(s)</p>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4 mr-2" />Atualizar
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" disabled={!!syncing} onClick={() => handleResync(undefined)}>
+            <RotateCcw className={`h-4 w-4 mr-2 ${syncing === 'all' ? 'animate-spin' : ''}`} />
+            {syncing === 'all' ? 'Sincronizando...' : 'Re-sincronizar Todos'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />Atualizar
+          </Button>
+        </div>
       </div>
       <div className="rounded-md border overflow-x-auto">
         <Table>
@@ -93,6 +128,7 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
               const name = [intg.profile?.first_name, intg.profile?.last_name].filter(Boolean).join(' ') || 'Usuário';
               const expiresAt = intg.expires_at ? new Date(intg.expires_at) : null;
               const isExpired = expiresAt ? expiresAt < new Date() : false;
+              const isSyncingThis = syncing === intg.user_id;
               return (
                 <TableRow key={intg.user_id}>
                   <TableCell className="font-medium">{name}</TableCell>
@@ -107,9 +143,16 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
                     ) : '—'}
                   </TableCell>
                   <TableCell>
-                    <Button size="sm" variant="default" onClick={() => onSelectReseller(intg.user_id, name)}>
-                      Operar como <ChevronRight className="h-3 w-3 ml-1" />
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" disabled={!!syncing}
+                        onClick={() => handleResync(intg.user_id, name)}>
+                        <RotateCcw className={`h-3 w-3 mr-1 ${isSyncingThis ? 'animate-spin' : ''}`} />
+                        {isSyncingThis ? 'Sync...' : 'Re-sync'}
+                      </Button>
+                      <Button size="sm" variant="default" onClick={() => onSelectReseller(intg.user_id, name)}>
+                        Operar como <ChevronRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
