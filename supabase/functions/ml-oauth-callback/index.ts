@@ -91,7 +91,7 @@ serve(async (req) => {
     }
 
     console.log(`✅ [ml-oauth] Integration saved for user ${userId}, ML user ${mlUserId}`);
-    return Response.redirect(`${APP_URL}/reseller/integracoes?ml_connected=true`, 302);
+    return Response.redirect(`${APP_URL}/reseller/ml-sucesso`, 302);
 
   } catch (err) {
     console.error('[ml-oauth] Unexpected error:', err);
