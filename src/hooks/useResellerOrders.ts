@@ -11,6 +11,11 @@ export interface ResellerOrder {
   created_at: string;
   user_id: string;
   shipping_address: any;
+  payment_method?: string;
+  ml_shipment_id?: string | null;
+  ml_label_url?: string | null;
+  tracking_code?: string | null;
+  ml_order_id?: string | null;
   profiles?: {
     first_name: string;
     last_name: string;

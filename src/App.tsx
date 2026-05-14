@@ -97,6 +97,7 @@ const AdminAcademy = lazy(() => import("./pages/admin/Academy"));
 const ApiDocumentation = lazy(() => import("./pages/admin/ApiDocumentation"));
 const Features = lazy(() => import("./pages/admin/Features"));
 const Planos = lazy(() => import("./pages/admin/Planos"));
+const Marketplaces = lazy(() => import("./pages/admin/Marketplaces"));
 
 // ── Supplier panel ─────────────────────────────────────────────────────────
 const SupplierDashboard = lazy(() => import("./pages/supplier/Dashboard"));
@@ -334,6 +335,7 @@ const App = () => {
                   <Route path="academy" element={<AdminAcademy />} />
                   <Route path="features" element={<Features />} />
                   <Route path="planos" element={<Planos />} />
+                  <Route path="marketplaces" element={<Marketplaces />} />
 
                   {/* Rotas antigas mantidas para compatibilidade */}
                   <Route path="usuarios" element={<Clientes />} />

@@ -1,14 +1,40 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useResellerOrders } from "@/hooks/useResellerOrders";
-import { Search, Package } from "lucide-react";
+import { Search, Package, Download, MapPin } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ALL_STATUSES, ORDER_STATUS_CONFIG, getStatusConfig, type OrderStatus } from "@/constants/orderStatus";
+import { supabase } from "@/integrations/supabase/client";
+
+async function downloadLabel(orderId: string, orderNumber: string) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return;
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const url = `${supabaseUrl}/functions/v1/ml-get-label?order_id=${orderId}`;
+
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
+
+  if (!res.ok) {
+    console.error('Failed to download label:', res.status);
+    return;
+  }
+
+  const blob = await res.blob();
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `etiqueta-${orderNumber}.pdf`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
 
 function ResellerOrders() {
   const [statusFilter, setStatusFilter] = useState("all");
@@ -110,7 +136,7 @@ function ResellerOrders() {
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
+                          <div className="flex items-center gap-2 flex-wrap mb-2">
                             <h3 className="font-semibold text-lg">#{order.order_number}</h3>
                             <Badge className={statusInfo.color}>
                               <StatusIcon className="h-3 w-3 mr-1" />
@@ -121,13 +147,18 @@ function ResellerOrders() {
                                 Pago
                               </Badge>
                             )}
+                            {order.payment_method === 'mercadolivre' && (
+                              <Badge className="bg-yellow-400 text-yellow-900 hover:bg-yellow-400 text-xs">
+                                🛒 Mercado Livre
+                              </Badge>
+                            )}
                           </div>
                           <div className="space-y-1 text-sm text-muted-foreground">
                             <p>
                               <strong>Cliente:</strong>{" "}
                               {order.profiles
                                 ? `${order.profiles.first_name} ${order.profiles.last_name}`
-                                : "Cliente"}
+                                : order.payment_method === 'mercadolivre' ? 'Comprador ML' : "Cliente"}
                             </p>
                             <p>
                               <strong>Data:</strong>{" "}
@@ -141,12 +172,29 @@ function ResellerOrders() {
                                 {order.shipping_address.city}, {order.shipping_address.state}
                               </p>
                             )}
+                            {order.tracking_code && (
+                              <p className="flex items-center gap-1 text-blue-600">
+                                <MapPin className="h-3 w-3" />
+                                <strong>Rastreio:</strong> {order.tracking_code}
+                              </p>
+                            )}
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right space-y-2">
                           <p className="text-2xl font-bold text-primary">
                             R$ {Number(order.total_amount).toFixed(2)}
                           </p>
+                          {order.ml_shipment_id && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs gap-1"
+                              onClick={() => downloadLabel(order.id, order.order_number)}
+                            >
+                              <Download className="h-3 w-3" />
+                              Etiqueta
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </CardContent>

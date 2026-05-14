@@ -23,7 +23,8 @@ import {
   GraduationCap,
   Code,
   Sparkles,
-  CreditCard
+  CreditCard,
+  ShoppingBag
 } from 'lucide-react';
 import {
   Sidebar,
@@ -84,6 +85,11 @@ const superAdminMenuItems = [
     title: 'Planos',
     url: '/super-admin/planos',
     icon: CreditCard,
+  },
+  {
+    title: 'Marketplaces',
+    url: '/super-admin/marketplaces',
+    icon: ShoppingBag,
   },
   {
     title: 'API Docs',

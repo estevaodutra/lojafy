@@ -213,12 +213,46 @@ serve(async (req) => {
       body: { order_id: newOrder.id },
     }).catch((e: Error) => console.error('[ml-order-webhook] Split failed:', e));
 
+    // Salvar ml_order_id e buscar etiqueta de envio
+    const mlOrderIdStr = String(mlOrderId);
+    await supabase.from('orders').update({ ml_order_id: mlOrderIdStr }).eq('id', newOrder.id);
+
+    // Buscar shipment_id do pedido ML
+    const shipmentId = mlOrder.shipments?.id
+      ?? mlOrder.order_items?.[0]?.shipment?.id
+      ?? null;
+
+    if (shipmentId) {
+      try {
+        // Buscar dados do shipment para obter tracking
+        const shipmentRes = await fetch(`https://api.mercadolibre.com/shipments/${shipmentId}`, {
+          headers: { 'Authorization': `Bearer ${accessToken}` },
+        });
+
+        if (shipmentRes.ok) {
+          const shipment = await shipmentRes.json();
+          const trackingCode = shipment.tracking_number ?? null;
+
+          await supabase.from('orders').update({
+            ml_shipment_id: String(shipmentId),
+            ml_label_url: `https://api.mercadolibre.com/shipments/${shipmentId}/labels?response_type=pdf2`,
+            tracking_code: trackingCode,
+          }).eq('id', newOrder.id);
+
+          console.log(`[ml-order-webhook] Shipment ${shipmentId} saved, tracking: ${trackingCode}`);
+        }
+      } catch (e) {
+        console.error('[ml-order-webhook] Failed to fetch shipment:', e);
+      }
+    }
+
     // Notify reseller
     if (resellerUserId) {
+      const hasLabel = !!shipmentId;
       await supabase.from('notifications').insert({
         user_id: resellerUserId,
         title: '🛒 Novo pedido no Mercado Livre!',
-        message: `Pedido #${newOrder.order_number} — R$ ${Number(totalAmount).toFixed(2)} recebido.`,
+        message: `Pedido #${newOrder.order_number} — R$ ${Number(totalAmount).toFixed(2)} recebido.${hasLabel ? ' Etiqueta disponível!' : ''}`,
         type: 'new_order',
         action_url: '/reseller/pedidos',
         action_label: 'Ver Pedido',
