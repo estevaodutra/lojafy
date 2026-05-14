@@ -24,7 +24,8 @@ import {
   GraduationCap,
   ChevronRight,
   ChevronDown,
-  MessageSquare
+  MessageSquare,
+  Copy
 } from 'lucide-react';
 import { useFeature } from '@/hooks/useFeature';
 import { useMlUnreadCount } from '@/hooks/useMlMessages';
@@ -140,6 +141,7 @@ const ResellerSidebar = () => {
           { title: 'Lojafy Integra', url: '/reseller/integracoes', icon: Plug },
           { title: 'Anúncios ML', url: '/reseller/ml-anuncios', icon: ShoppingBag },
           { title: 'Mensagens ML', url: '/reseller/ml-mensagens', icon: MessageSquare },
+          { title: 'Replicar Anúncios', url: '/reseller/ml-replicar', icon: Copy },
         ]
       });
     }
