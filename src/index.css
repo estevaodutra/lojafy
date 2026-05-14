@@ -2,129 +2,134 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here.
 All colors MUST be HSL.
 */
 
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 215 25% 27%;
+    --foreground: 234 40% 18%;
 
     --card: 0 0% 100%;
-    --card-foreground: 215 25% 27%;
+    --card-foreground: 234 40% 18%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 27%;
+    --popover-foreground: 234 40% 18%;
 
-    --primary: 221 83% 53%;
+    /* Brand navy — matches Lojafy logo text color */
+    --primary: 234 75% 32%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 215 25% 27%;
+    --secondary: 221 60% 95%;
+    --secondary-foreground: 234 40% 18%;
 
-    --muted: 220 13% 95%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 220 15% 95%;
+    /* Improved from 47% lightness — passes WCAG AA at normal text sizes */
+    --muted-foreground: 215 20% 40%;
 
-    --accent: 221 83% 53%;
+    /* Teal/mint — differentiated accent (was identical to primary) */
+    --accent: 162 84% 38%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 221 83% 53%;
+    --border: 220 15% 89%;
+    --input: 220 15% 89%;
+    --ring: 234 75% 32%;
 
     --radius: 0.75rem;
 
-    /* Ecommerce Design System */
-    --hero-gradient: linear-gradient(135deg, hsl(221 83% 53%) 0%, hsl(221 83% 45%) 100%);
-    --card-shadow: 0 4px 6px -1px hsl(220 13% 91% / 0.4), 0 2px 4px -2px hsl(220 13% 91% / 0.4);
-    --card-shadow-hover: 0 10px 25px -3px hsl(220 13% 91% / 0.6), 0 4px 6px -4px hsl(220 13% 91% / 0.4);
+    /* Brand gradients — navy→teal mirrors the Lojafy "y" gradient */
+    --hero-gradient: linear-gradient(135deg, hsl(234 75% 32%) 0%, hsl(162 84% 38%) 100%);
+    --lojafy-gradient: linear-gradient(135deg, hsl(221 83% 53%) 0%, hsl(162 84% 38%) 100%);
+
+    /* Shadows — now use brand primary tones */
+    --card-shadow: 0 4px 6px -1px hsl(234 75% 32% / 0.08), 0 2px 4px -2px hsl(234 75% 32% / 0.06);
+    --card-shadow-hover: 0 10px 25px -3px hsl(234 75% 32% / 0.15), 0 4px 6px -4px hsl(234 75% 32% / 0.10);
+
     --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
+    /* Sidebar — fixed active state (was near-invisible HSL(240,4.8%,95.9%)) */
     --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-foreground: 234 30% 25%;
+    --sidebar-primary: 234 75% 32%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 221 70% 91%;
+    --sidebar-accent-foreground: 234 75% 32%;
+    --sidebar-border: 220 15% 89%;
+    --sidebar-ring: 221 83% 53%;
 
     /* E-commerce Custom Colors */
-    --cart-button-color: 130 52% 50%;
+    --cart-button-color: 162 84% 38%;
     --cart-button-text-color: 0 0% 100%;
     --buy-now-button-color: 142 76% 36%;
     --buy-now-button-text-color: 0 0% 100%;
-    --checkout-button-color: 221 83% 53%;
+    --checkout-button-color: 234 75% 32%;
     --checkout-button-text-color: 0 0% 100%;
-    --order-highlight-bg-color: 221 83% 95%;
+    --order-highlight-bg-color: 221 70% 94%;
     --security-text-color: 142 76% 36%;
-    --continue-shopping-text-color: 215 25% 27%;
+    --continue-shopping-text-color: 234 40% 18%;
     --whatsapp-color: 142 70% 49%;
     --whatsapp-foreground: 0 0% 100%;
   }
 
   .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
+    /* Brand-consistent dark: very dark navy instead of generic dark */
+    --background: 234 47% 9%;
+    --foreground: 210 40% 96%;
 
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
+    --card: 234 40% 12%;
+    --card-foreground: 210 40% 96%;
 
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 234 40% 12%;
+    --popover-foreground: 210 40% 96%;
 
-    --primary: 221 83% 53%;
+    /* Brighter primary in dark mode — maintains contrast on dark bg */
+    --primary: 221 83% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 234 33% 17%;
+    --secondary-foreground: 210 40% 96%;
 
-    --muted: 217 33% 17%;
+    --muted: 234 33% 17%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 221 83% 53%;
+    --accent: 162 84% 45%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 63% 31%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 221 83% 53%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --border: 234 33% 17%;
+    --input: 234 33% 17%;
+    --ring: 221 83% 60%;
+
+    /* Sidebar dark */
+    --sidebar-background: 234 47% 8%;
+    --sidebar-foreground: 210 40% 90%;
+    --sidebar-primary: 221 83% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 234 50% 18%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 234 33% 17%;
+    --sidebar-ring: 221 83% 60%;
 
     /* E-commerce Custom Colors - Dark Mode */
-    --cart-button-color: 130 52% 50%;
+    --cart-button-color: 162 84% 45%;
     --cart-button-text-color: 0 0% 100%;
     --buy-now-button-color: 142 76% 36%;
     --buy-now-button-text-color: 0 0% 100%;
-    --checkout-button-color: 221 83% 53%;
+    --checkout-button-color: 221 83% 60%;
     --checkout-button-text-color: 0 0% 100%;
     --order-highlight-bg-color: 221 83% 15%;
-    --security-text-color: 142 76% 36%;
-    --continue-shopping-text-color: 210 40% 98%;
+    --security-text-color: 142 76% 45%;
+    --continue-shopping-text-color: 210 40% 96%;
     --whatsapp-color: 142 70% 49%;
     --whatsapp-foreground: 0 0% 100%;
   }
@@ -140,6 +145,12 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
     overflow-x: hidden;
     max-width: 100vw;
+    font-family: 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+    font-weight: 700;
   }
 
   img, video, iframe {
@@ -149,21 +160,27 @@ All colors MUST be HSL.
 }
 
 @layer components {
-  /* E-commerce Custom Button Classes */
   .btn-cart {
     @apply bg-cart-button text-cart-button-foreground hover:bg-cart-button/90 transition-colors;
   }
-  
+
   .btn-buy-now {
     @apply bg-buy-now-button text-buy-now-button-foreground hover:bg-buy-now-button/90 transition-colors;
   }
-  
+
   .btn-checkout {
     @apply bg-checkout-button text-checkout-button-foreground hover:bg-checkout-button/90 transition-colors;
   }
-  
-  /* Helper text class mapping security color token */
+
   .text-security {
     color: hsl(var(--security-text-color));
+  }
+
+  /* Brand gradient text utility — use on logo/headline spans */
+  .text-gradient-brand {
+    background: var(--lojafy-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 }

@@ -26,7 +26,6 @@ import {
   ChevronDown,
   MessageSquare,
   Copy,
-  TrendingUp,
   Tag,
   Megaphone,
   Receipt

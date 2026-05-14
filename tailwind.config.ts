@@ -13,6 +13,11 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['"Plus Jakarta Sans"', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        body: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -98,6 +103,10 @@ export default {
       boxShadow: {
         'card': 'var(--card-shadow)',
         'card-hover': 'var(--card-shadow-hover)',
+        'xs': '0 1px 2px 0 hsl(var(--primary) / 0.06)',
+        'soft': '0 4px 16px -2px hsl(var(--primary) / 0.12)',
+        'soft-lg': '0 8px 32px -4px hsl(var(--primary) / 0.18)',
+        'brand': '0 4px 14px 0 hsl(var(--primary) / 0.25)',
       },
       transitionTimingFunction: {
         'smooth': 'var(--transition-smooth)',
