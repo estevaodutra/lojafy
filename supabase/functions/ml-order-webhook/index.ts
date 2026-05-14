@@ -141,7 +141,7 @@ serve(async (req) => {
         total_amount: totalAmount,
         payment_method: 'mercadolivre',
         payment_status: 'paid',
-        status: 'recebido',
+        status: 'pendente',
         payment_id: `ml_${mlOrderId}`,
         external_reference: `ml_order_${mlOrderId}`,
         notes: `Pedido via Mercado Livre #${mlOrderId}`,
@@ -201,11 +201,11 @@ serve(async (req) => {
       }
     }
 
-    // Status history
+    // Status history — começa como pendente; split atualiza para recebido se saldo OK
     await supabase.from('order_status_history').insert({
       order_id: newOrder.id,
-      status: 'recebido',
-      notes: `Pedido recebido via Mercado Livre #${mlOrderId}`,
+      status: 'pendente',
+      notes: `Pedido recebido via Mercado Livre #${mlOrderId} — aguardando confirmação de saldo`,
     });
 
     // Dispatch split payment

@@ -95,6 +95,65 @@ serve(async (req) => {
 
     const productsMap = new Map((products ?? []).map((p: any) => [p.id, p]));
 
+    // ── Verificação de saldo do revendedor ────────────────────────────────────
+    // Calcular custo total que será debitado do revendedor para pagar fornecedores
+    let totalCusto = 0;
+    for (const item of order.order_items) {
+      const product = productsMap.get(item.product_id);
+      if (!product) continue;
+      const qty = Number(item.quantity);
+      const costPrice = Number(product.cost_price ?? 0);
+      const splitPct = splitFornecedorPct > 0 ? splitFornecedorPct / 100 : null;
+      totalCusto += splitPct != null
+        ? Number(item.unit_price) * qty * splitPct
+        : costPrice * qty;
+    }
+    totalCusto = Math.round(totalCusto * 100) / 100;
+
+    if (totalCusto > 0 && order.reseller_id) {
+      const { data: wallet } = await supabase
+        .from('wallets')
+        .select('saldo')
+        .eq('user_id', order.reseller_id)
+        .single();
+
+      const saldoAtual = Number(wallet?.saldo ?? 0);
+
+      if (saldoAtual < totalCusto) {
+        // Saldo insuficiente — manter pedido como pendente e notificar revendedor
+        await supabase.from('notifications').insert({
+          user_id: order.reseller_id,
+          title: '⚠️ Saldo insuficiente para confirmar pedido',
+          message: `Um pedido precisa de R$ ${totalCusto.toFixed(2)} na carteira para pagar o fornecedor. Saldo atual: R$ ${saldoAtual.toFixed(2)}.`,
+          type: 'wallet_alert',
+          action_url: '/reseller/financeiro',
+          action_label: 'Adicionar Saldo',
+        });
+        console.log(`[split] Insufficient balance for order ${order_id}: need ${totalCusto}, have ${saldoAtual}`);
+        return new Response(
+          JSON.stringify({ success: false, reason: 'insufficient_balance', required: totalCusto, available: saldoAtual }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Saldo suficiente — debitar revendedor pelo custo total do fornecedor
+      const debitResult = await supabase.rpc('debitar_carteira', {
+        p_user_id: order.reseller_id,
+        p_valor: totalCusto,
+        p_descricao: `Pagamento fornecedor - Pedido #${order_id.slice(-8).toUpperCase()}`,
+        p_referencia_tipo: 'custo_pedido',
+        p_referencia_id: order_id,
+      });
+      if (debitResult.error || !debitResult.data?.success) {
+        console.error('[split] Failed to debit reseller wallet:', debitResult.error || debitResult.data);
+        return new Response(
+          JSON.stringify({ error: 'Failed to debit reseller wallet' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      console.log(`[split] Debited R$ ${totalCusto} from reseller ${order.reseller_id}`);
+    }
+
     // Calcular splits por item
     type SplitEntry = {
       recipientUserId: string;
@@ -143,6 +202,13 @@ serve(async (req) => {
 
     if (splits.length === 0) {
       console.log(`[split] No splits to process for order ${order_id}`);
+      // Sem splits mas pagamento ok → confirmar pedido
+      await supabase.from('orders').update({ status: 'recebido' }).eq('id', order_id);
+      await supabase.from('order_status_history').insert({
+        order_id,
+        status: 'recebido',
+        notes: 'Pedido confirmado (sem split aplicável)',
+      }).catch(() => {});
       return new Response(
         JSON.stringify({ success: true, message: 'No splits applicable', splits_creditados: 0 }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -235,6 +301,16 @@ serve(async (req) => {
 
       console.log(`[split] ✅ Credited R$ ${valor} to ${entry.role} ${entry.recipientUserId}`);
       creditados++;
+    }
+
+    // Se ao menos algum split foi creditado, confirmar pedido como recebido
+    if (creditados > 0) {
+      await supabase.from('orders').update({ status: 'recebido' }).eq('id', order_id);
+      await supabase.from('order_status_history').insert({
+        order_id,
+        status: 'recebido',
+        notes: 'Saldo confirmado — fornecedor pago e pedido em processamento',
+      }).catch(() => {});
     }
 
     return new Response(
