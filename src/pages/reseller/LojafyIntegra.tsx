@@ -56,7 +56,10 @@ const LojafyIntegra = () => {
 
   const getMercadoLivreAuthUrl = () => {
     const userId = user?.id || '';
-    return `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=2003351424267574&redirect_uri=https://n8n-n8n.nuwfic.easypanel.host/webhook/MercadoLivre_Callback&state=${userId}`;
+    const clientId = import.meta.env.VITE_ML_CLIENT_ID;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const redirectUri = `${supabaseUrl}/functions/v1/ml-oauth-callback`;
+    return `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${userId}`;
   };
 
   const handleConfirmBeta = () => {

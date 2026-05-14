@@ -123,19 +123,7 @@ export const useMercadoLivreIntegration = () => {
         .eq('product_id', productId)
         .maybeSingle();
 
-      // 2. Buscar dados da integração (incluindo access_token)
-      const { data: integrationData, error: integrationError } = await supabase
-        .from('mercadolivre_integrations')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .single();
-
-      if (integrationError || !integrationData) {
-        throw new Error('Integração Mercado Livre não encontrada');
-      }
-
-      // 3. Buscar dados específicos do marketplace
+      // 2. Buscar dados específicos do marketplace
       const { data: marketplaceData } = await supabase
         .from('product_marketplace_data')
         .select('*')
@@ -143,49 +131,38 @@ export const useMercadoLivreIntegration = () => {
         .eq('marketplace', 'mercadolivre')
         .maybeSingle();
 
-      // 4. Enviar payload via Edge Function proxy
-      const webhookPayload = {
+      // 4. Buscar ml_item_id existente (para re-ativar anúncio pausado)
+      const { data: existingPublished } = await supabase
+        .from('mercadolivre_published_products')
+        .select('ml_item_id')
+        .eq('user_id', user.id)
+        .eq('product_id', productId)
+        .maybeSingle();
+
+      // 5. Publicar direto na ML API via edge function (sem n8n)
+      const publishPayload = {
         product: productData,
-        reseller_price: resellerProduct?.custom_price || null,
-        marketplace_data: marketplaceData?.validated_body || null,
-        is_validated: marketplaceData?.is_validated ?? false,
-        marketplace_listing: {
-          listing_id: marketplaceData?.listing_id ?? null,
-          listing_status: marketplaceData?.listing_status ?? null,
-        },
-        integration: {
-          access_token: integrationData.access_token,
-          refresh_token: integrationData.refresh_token,
-          token_type: integrationData.token_type,
-          expires_at: integrationData.expires_at,
-          ml_user_id: integrationData.ml_user_id,
-          scope: integrationData.scope
-        },
-        user_id: user.id
+        reseller_price: resellerProduct?.custom_price ?? null,
+        marketplace_data: marketplaceData ?? null,
+        user_id: user.id,
+        ml_item_id: existingPublished?.ml_item_id ?? null,
       };
 
-      const { data: webhookResponse, error: webhookError } = await supabase.functions.invoke('ml-publish-proxy', {
-        body: webhookPayload,
+      const { data: publishResponse, error: publishError } = await supabase.functions.invoke('ml-publish-product', {
+        body: publishPayload,
       });
 
-      if (webhookError) {
-        throw new Error(`Erro ao publicar: ${webhookError.message}`);
+      if (publishError) {
+        throw new Error(`Erro ao publicar: ${publishError.message}`);
       }
 
-      // Parse response to extract permalink and ml_item_id
-      let permalink: string | null = null;
-      let mlItemId: string | null = null;
-
-      try {
-        const responseData = Array.isArray(webhookResponse) ? webhookResponse : [webhookResponse];
-        const advertise = responseData[0]?.advertise;
-        if (advertise) {
-          permalink = advertise.permalink || null;
-          mlItemId = advertise.id || null;
-        }
-      } catch (e) {
-        console.warn('Could not parse webhook response for permalink:', e);
+      if (!publishResponse?.success) {
+        const cause = publishResponse?.cause?.map((c: any) => c.message).join(', ');
+        throw new Error(publishResponse?.error ?? 'Erro desconhecido ao publicar no Mercado Livre' + (cause ? `: ${cause}` : ''));
       }
+
+      const permalink: string | null = publishResponse.permalink ?? null;
+      const mlItemId: string | null = publishResponse.ml_item_id ?? null;
 
       // Save the published record with permalink and ml_item_id
       const { error: insertError } = await supabase
@@ -264,17 +241,32 @@ export const useMercadoLivreIntegration = () => {
     mutationFn: async ({ productId }: { productId: string }) => {
       if (!user?.id) throw new Error('Usuário não autenticado');
 
+      // Buscar ml_item_id para pausar o anúncio no ML
+      const { data: published } = await supabase
+        .from('mercadolivre_published_products')
+        .select('ml_item_id')
+        .eq('user_id', user.id)
+        .eq('product_id', productId)
+        .single();
+
+      if (published?.ml_item_id) {
+        const { data: unpubResponse, error: unpubError } = await supabase.functions.invoke('ml-publish-product', {
+          body: { action: 'unpublish', ml_item_id: published.ml_item_id, user_id: user.id },
+        });
+
+        if (unpubError || !unpubResponse?.success) {
+          throw new Error(unpubError?.message ?? unpubResponse?.error ?? 'Erro ao pausar anúncio no Mercado Livre');
+        }
+      }
+
+      // Atualizar status local
       const { error: updateError } = await supabase
         .from('mercadolivre_published_products')
         .update({ status: 'unpublished' })
         .eq('user_id', user.id)
         .eq('product_id', productId);
 
-      if (updateError) {
-        console.error('Error updating published product status:', updateError);
-        throw new Error('Erro ao atualizar status de publicação');
-      }
-
+      if (updateError) throw new Error('Erro ao atualizar status de publicação');
       return { productId };
     },
     onMutate: async ({ productId }) => {
