@@ -595,17 +595,11 @@ const Checkout = ({
       if (debitError) throw debitError;
       const result = debitResult as any;
       if (!result?.success) throw new Error(result?.error || 'Erro ao debitar saldo');
-      // Mark order as paid
-      await supabase.from('orders').update({
-        status: 'recebido',
-        payment_status: 'paid',
-        payment_method: 'wallet',
-      }).eq('id', orderId);
-      await supabase.from('order_status_history').insert({
-        order_id: orderId,
-        status: 'recebido',
-        notes: 'Pagamento com saldo da carteira',
+      // Confirmar pedido via edge function (service role bypassa RLS)
+      const { error: confirmError } = await supabase.functions.invoke('complete-wallet-payment', {
+        body: { order_id: orderId },
       });
+      if (confirmError) throw confirmError;
       clearCart();
       toast({ title: "Pedido confirmado!", description: "Pagamento realizado com saldo da carteira." });
       navigate("/minha-conta/pedidos");
