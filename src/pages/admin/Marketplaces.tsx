@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, RefreshCw, ShoppingBag, Users, MapPin, ChevronRight, MessageSquare, TrendingUp, Tag, Megaphone, Receipt, RotateCcw } from "lucide-react";
+import { Download, RefreshCw, ShoppingBag, Users, MapPin, ChevronRight, MessageSquare, TrendingUp, Tag, Megaphone, Receipt, RotateCcw, Play, Trash2, Clock } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
 import MlMensagens from "@/pages/reseller/MlMensagens";
 import MlMetricas from "@/pages/reseller/MlMetricas";
@@ -161,6 +162,152 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
         </Table>
       </div>
     </div>
+  );
+}
+
+// ── Painel de Fila de Integração ─────────────────────────────────────────────
+
+function IntegrationQueue() {
+  const [starting, setStarting] = useState(false);
+  const [clearing, setClearing] = useState(false);
+
+  const { data: queueStats, isLoading, refetch } = useQuery({
+    queryKey: ['ml-sync-queue-stats'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('ml_sync_queue')
+        .select('status');
+      const rows = data ?? [];
+      return {
+        pending: rows.filter(r => r.status === 'pending').length,
+        processing: rows.filter(r => r.status === 'processing').length,
+        done: rows.filter(r => r.status === 'done').length,
+        failed: rows.filter(r => r.status === 'failed').length,
+        total: rows.length,
+      };
+    },
+    refetchInterval: 30000,
+  });
+
+  const handleStart = async () => {
+    setStarting(true);
+    try {
+      // Buscar todos os revendedores com integração ativa
+      const { data: integrations } = await supabase
+        .from('mercadolivre_integrations')
+        .select('user_id')
+        .eq('is_active', true);
+
+      if (!integrations?.length) {
+        toast({ title: 'Nenhuma integração ativa encontrada' });
+        return;
+      }
+
+      // Verificar quem já está na fila (pending ou processing)
+      const { data: existing } = await supabase
+        .from('ml_sync_queue')
+        .select('user_id')
+        .in('status', ['pending', 'processing']);
+
+      const existingIds = new Set((existing ?? []).map(r => r.user_id));
+      const toInsert = integrations
+        .filter(i => !existingIds.has(i.user_id))
+        .map(i => ({ user_id: i.user_id, status: 'pending' }));
+
+      if (!toInsert.length) {
+        toast({ title: 'Todos os revendedores já estão na fila' });
+        return;
+      }
+
+      await supabase.from('ml_sync_queue').insert(toInsert);
+      toast({
+        title: 'Fila iniciada',
+        description: `${toInsert.length} revendedor(es) adicionados. Processamento a cada 10 minutos.`,
+      });
+      refetch();
+    } catch (err) {
+      toast({ title: 'Erro ao iniciar fila', description: String(err), variant: 'destructive' });
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  const handleClear = async () => {
+    setClearing(true);
+    try {
+      await supabase.from('ml_sync_queue').delete().in('status', ['done', 'failed']);
+      toast({ title: 'Fila limpa', description: 'Itens concluídos e com falha removidos.' });
+      refetch();
+    } catch (err) {
+      toast({ title: 'Erro ao limpar fila', variant: 'destructive' });
+    } finally {
+      setClearing(false);
+    }
+  };
+
+  const stats = queueStats ?? { pending: 0, processing: 0, done: 0, failed: 0, total: 0 };
+  const processed = stats.done + stats.failed;
+  const progress = stats.total > 0 ? Math.round((processed / stats.total) * 100) : 0;
+  const isRunning = stats.pending > 0 || stats.processing > 0;
+
+  return (
+    <Card className="mt-4">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary" />
+              Fila de Integração em Lote
+            </CardTitle>
+            <CardDescription className="text-xs mt-0.5">
+              Processa 1 revendedor a cada 10 minutos via pg_cron
+            </CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => refetch()}>
+              <RefreshCw className="h-3.5 w-3.5" />
+            </Button>
+            {processed > 0 && (
+              <Button size="sm" variant="outline" disabled={clearing} onClick={handleClear}>
+                <Trash2 className="h-3.5 w-3.5 mr-1" />
+                Limpar
+              </Button>
+            )}
+            <Button size="sm" disabled={starting || isRunning} onClick={handleStart}>
+              <Play className="h-3.5 w-3.5 mr-1" />
+              {starting ? 'Iniciando...' : isRunning ? 'Em andamento' : 'Iniciar Fila'}
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {isLoading ? (
+          <Skeleton className="h-16 w-full" />
+        ) : stats.total === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Fila vazia. Clique em "Iniciar Fila" para sincronizar todos os revendedores.
+          </p>
+        ) : (
+          <>
+            <div className="flex gap-4 text-sm">
+              <span className="text-amber-600 font-medium">⏳ {stats.pending} aguardando</span>
+              {stats.processing > 0 && <span className="text-blue-600 font-medium">🔄 {stats.processing} processando</span>}
+              <span className="text-green-600 font-medium">✅ {stats.done} concluídos</span>
+              {stats.failed > 0 && <span className="text-destructive font-medium">❌ {stats.failed} falhas</span>}
+            </div>
+            <div className="space-y-1">
+              <Progress value={progress} className="h-2" />
+              <p className="text-xs text-muted-foreground text-right">{progress}% — {processed}/{stats.total}</p>
+            </div>
+            {isRunning && (
+              <p className="text-xs text-muted-foreground">
+                Próximo processamento em até 10 minutos (pg_cron automático)
+              </p>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -424,6 +571,7 @@ export default function Marketplaces() {
               <ConnectedAccounts onSelectReseller={handleSelectReseller} />
             </CardContent>
           </Card>
+          <IntegrationQueue />
         </TabsContent>
 
         <TabsContent value="orders">
