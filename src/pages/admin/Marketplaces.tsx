@@ -64,9 +64,12 @@ async function triggerBulkResync(resellerUserId?: string) {
   return data;
 }
 
+const PAGE_SIZE = 10;
+
 function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string, name: string) => void }) {
   const [syncing, setSyncing] = useState<string | null>(null);
   const [queueing, setQueueing] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
 
   const { data: integrations = [], isLoading, refetch } = useQuery({
     queryKey: ['admin-ml-integrations'],
@@ -144,7 +147,7 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
             <RotateCcw className={`h-4 w-4 mr-2 ${syncing === 'all' ? 'animate-spin' : ''}`} />
             {syncing === 'all' ? 'Sincronizando...' : 'Re-sincronizar Todos'}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
+          <Button variant="outline" size="sm" onClick={() => { setPage(0); refetch(); }}>
             <RefreshCw className="h-4 w-4 mr-2" />Atualizar
           </Button>
         </div>
@@ -161,7 +164,7 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
             </TableRow>
           </TableHeader>
           <TableBody>
-            {integrations.map((intg: any) => {
+            {integrations.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((intg: any) => {
               const name = [intg.profile?.first_name, intg.profile?.last_name].filter(Boolean).join(' ') || 'Usuário';
               const expiresAt = intg.expires_at ? new Date(intg.expires_at) : null;
               const isExpired = expiresAt ? expiresAt < new Date() : false;
@@ -197,6 +200,21 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
           </TableBody>
         </Table>
       </div>
+      {integrations.length > PAGE_SIZE && (
+        <div className="flex items-center justify-between pt-1 text-sm text-muted-foreground">
+          <span>
+            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, integrations.length)} de {integrations.length}
+          </span>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
+              Anterior
+            </Button>
+            <Button size="sm" variant="outline" disabled={(page + 1) * PAGE_SIZE >= integrations.length} onClick={() => setPage(p => p + 1)}>
+              Próximo
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
