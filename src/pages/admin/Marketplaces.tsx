@@ -66,20 +66,29 @@ async function triggerBulkResync(resellerUserId?: string) {
 
 function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string, name: string) => void }) {
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [queueing, setQueueing] = useState<string | null>(null);
 
   const { data: integrations = [], isLoading, refetch } = useQuery({
     queryKey: ['admin-ml-integrations'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Two separate queries to avoid PostgREST nested JOIN + RLS blocking
+      const { data: intgData, error } = await supabase
         .from('mercadolivre_integrations')
-        .select(`
-          user_id, ml_user_id, is_active, last_refreshed_at, expires_at,
-          profile:profiles!mercadolivre_integrations_user_id_fkey(first_name, last_name, role)
-        `)
+        .select('user_id, ml_user_id, is_active, last_refreshed_at, expires_at')
         .eq('is_active', true)
         .order('last_refreshed_at', { ascending: false });
       if (error) throw error;
-      return data ?? [];
+
+      const userIds = (intgData ?? []).map(i => i.user_id);
+      if (userIds.length === 0) return [];
+
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name, role')
+        .in('user_id', userIds);
+
+      const profileMap = new Map((profileData ?? []).map(p => [p.user_id, p]));
+      return (intgData ?? []).map(i => ({ ...i, profile: profileMap.get(i.user_id) }));
     },
   });
 
@@ -96,6 +105,31 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
       toast({ title: 'Erro ao re-sincronizar', description: String(err), variant: 'destructive' });
     } finally {
       setSyncing(null);
+    }
+  };
+
+  const handleQueueSync = async (resellerUserId: string, name: string) => {
+    setQueueing(resellerUserId);
+    try {
+      const { data: existing } = await supabase
+        .from('ml_sync_queue')
+        .select('id')
+        .eq('user_id', resellerUserId)
+        .in('status', ['pending', 'processing'])
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        toast({ title: 'Já na fila', description: `${name} já tem sincronização pendente.` });
+        return;
+      }
+
+      const { error } = await supabase.from('ml_sync_queue').insert({ user_id: resellerUserId, status: 'pending' });
+      if (error) throw error;
+      toast({ title: 'Adicionado à fila', description: `${name} será sincronizado nos próximos 10 minutos.` });
+    } catch (err) {
+      toast({ title: 'Erro ao enfileirar', description: String(err), variant: 'destructive' });
+    } finally {
+      setQueueing(null);
     }
   };
 
@@ -147,10 +181,10 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="outline" disabled={!!syncing}
-                        onClick={() => handleResync(intg.user_id, name)}>
-                        <RotateCcw className={`h-3 w-3 mr-1 ${isSyncingThis ? 'animate-spin' : ''}`} />
-                        {isSyncingThis ? 'Sync...' : 'Re-sync'}
+                      <Button size="sm" variant="outline" disabled={!!queueing || queueing === intg.user_id}
+                        onClick={() => handleQueueSync(intg.user_id, name)}>
+                        <Play className={`h-3 w-3 mr-1 ${queueing === intg.user_id ? 'animate-spin' : ''}`} />
+                        {queueing === intg.user_id ? '...' : 'Sincronizar'}
                       </Button>
                       <Button size="sm" variant="default" onClick={() => onSelectReseller(intg.user_id, name)}>
                         Operar como <ChevronRight className="h-3 w-3 ml-1" />
