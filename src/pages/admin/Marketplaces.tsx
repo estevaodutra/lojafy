@@ -8,7 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, RefreshCw, ShoppingBag, Users, MapPin, ChevronRight, MessageSquare, TrendingUp, Tag, Megaphone, Receipt, RotateCcw, Play, Trash2, Clock } from "lucide-react";
+import { Download, RefreshCw, ShoppingBag, Users, MapPin, ChevronRight, MessageSquare, TrendingUp, Tag, Megaphone, Receipt, RotateCcw, Play, Trash2, Clock, LayoutList, ToggleLeft, ToggleRight, ExternalLink, Copy, Pencil } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
 import MlMensagens from "@/pages/reseller/MlMensagens";
@@ -161,6 +163,172 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
           </TableBody>
         </Table>
       </div>
+    </div>
+  );
+}
+
+// ── Gerenciador Global de Anúncios ───────────────────────────────────────────
+
+function GlobalListings() {
+  const [search, setSearch] = useState('');
+  const [toggling, setToggling] = useState<string | null>(null);
+
+  const { data: listings = [], isLoading, refetch } = useQuery({
+    queryKey: ['admin-global-listings'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ml_listing_variants')
+        .select(`
+          id, ml_item_id, variant_title, price, status, visits, sales,
+          permalink, thumbnail, user_id, product_id, last_synced_at,
+          product:products(sku, cost_price, name),
+          seller:profiles!ml_listing_variants_user_id_fkey(first_name, last_name)
+        `)
+        .not('ml_item_id', 'is', null)
+        .order('last_synced_at', { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const handleToggle = async (listing: any) => {
+    if (toggling) return;
+    setToggling(listing.id);
+    try {
+      const newStatus = listing.status === 'published' ? 'paused' : 'published';
+      const mlAction = newStatus === 'published' ? 'active' : 'paused';
+
+      const { data: integration } = await supabase
+        .from('mercadolivre_integrations')
+        .select('access_token')
+        .eq('user_id', listing.user_id)
+        .eq('is_active', true)
+        .single();
+
+      if (integration?.access_token) {
+        await fetch(`https://api.mercadolibre.com/items/${listing.ml_item_id}`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${integration.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: mlAction }),
+        });
+      }
+
+      await supabase.from('ml_listing_variants').update({ status: newStatus }).eq('id', listing.id);
+      refetch();
+    } catch (err) {
+      toast({ title: 'Erro ao alterar status', description: String(err), variant: 'destructive' });
+    } finally {
+      setToggling(null);
+    }
+  };
+
+  const filtered = listings.filter(l =>
+    !search || l.variant_title?.toLowerCase().includes(search.toLowerCase()) ||
+    l.product?.sku?.toLowerCase().includes(search.toLowerCase()) ||
+    l.seller?.first_name?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const formatBRL = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <Input
+          placeholder="Buscar por anúncio, SKU ou seller..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="max-w-xs"
+        />
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>{filtered.length} anúncio(s)</span>
+          <Button size="sm" variant="outline" onClick={() => refetch()}>
+            <RefreshCw className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <LayoutList className="h-10 w-10 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">Nenhum anúncio encontrado. Execute a fila de integração para importar.</p>
+        </div>
+      ) : (
+        <div className="rounded-md border overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">Ativo</TableHead>
+                <TableHead>Anúncio</TableHead>
+                <TableHead>SKU</TableHead>
+                <TableHead>Seller</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+                <TableHead className="text-right">Lucro</TableHead>
+                <TableHead className="text-right">Visitas</TableHead>
+                <TableHead className="text-right">Vendas</TableHead>
+                <TableHead className="w-20">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((listing: any) => {
+                const price = Number(listing.price ?? 0);
+                const cost = Number(listing.product?.cost_price ?? 0);
+                const profit = price - cost;
+                const isActive = listing.status === 'published';
+                const sellerName = [listing.seller?.first_name, listing.seller?.last_name].filter(Boolean).join(' ') || '—';
+
+                return (
+                  <TableRow key={listing.id}>
+                    <TableCell>
+                      <Switch
+                        checked={isActive}
+                        disabled={toggling === listing.id}
+                        onCheckedChange={() => handleToggle(listing)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {listing.thumbnail && (
+                          <img src={listing.thumbnail} alt="" className="h-8 w-8 rounded object-cover flex-shrink-0" />
+                        )}
+                        <div>
+                          <p className="text-sm font-medium line-clamp-1 max-w-xs">{listing.variant_title}</p>
+                          <Badge variant="outline" className={`text-xs mt-0.5 ${isActive ? 'border-green-300 text-green-700' : 'border-gray-300 text-gray-500'}`}>
+                            {isActive ? 'Ativo' : 'Pausado'}
+                          </Badge>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {listing.product?.sku ?? '—'}
+                    </TableCell>
+                    <TableCell className="text-sm">{sellerName}</TableCell>
+                    <TableCell className="text-right font-medium">{price > 0 ? formatBRL(price) : '—'}</TableCell>
+                    <TableCell className={`text-right text-sm font-medium ${profit >= 0 ? 'text-green-600' : 'text-destructive'}`}>
+                      {cost > 0 ? formatBRL(profit) : '—'}
+                    </TableCell>
+                    <TableCell className="text-right text-sm text-muted-foreground">{listing.visits ?? 0}</TableCell>
+                    <TableCell className="text-right text-sm text-muted-foreground">{listing.sales ?? 0}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        {listing.permalink && (
+                          <Button size="icon" variant="ghost" className="h-7 w-7"
+                            onClick={() => window.open(listing.permalink, '_blank')}>
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   );
 }
@@ -533,6 +701,9 @@ export default function Marketplaces() {
           <TabsTrigger value="accounts">
             <Users className="h-4 w-4 mr-2" />Contas Conectadas
           </TabsTrigger>
+          <TabsTrigger value="global-listings">
+            <LayoutList className="h-4 w-4 mr-2" />Todos os Anúncios
+          </TabsTrigger>
           <TabsTrigger value="orders">
             <ShoppingBag className="h-4 w-4 mr-2" />Pedidos ML
           </TabsTrigger>
@@ -572,6 +743,23 @@ export default function Marketplaces() {
             </CardContent>
           </Card>
           <IntegrationQueue />
+        </TabsContent>
+
+        <TabsContent value="global-listings">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <LayoutList className="h-5 w-5 text-primary" />
+                Todos os Anúncios ML
+              </CardTitle>
+              <CardDescription>
+                Gerencie anúncios de todos os revendedores. Execute a fila de integração para importar.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <GlobalListings />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="orders">

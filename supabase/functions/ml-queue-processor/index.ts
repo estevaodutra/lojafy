@@ -11,25 +11,66 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
-async function getTokenForUser(userId: string): Promise<string | null> {
+async function getIntegration(userId: string) {
   const { data } = await supabase
     .from('mercadolivre_integrations')
-    .select('access_token, refresh_token, expires_at')
+    .select('access_token, refresh_token, expires_at, ml_user_id')
     .eq('user_id', userId)
     .eq('is_active', true)
     .single();
+  return data;
+}
 
-  if (!data) return null;
+async function getToken(userId: string): Promise<{ token: string; mlUserId: number } | null> {
+  const integration = await getIntegration(userId);
+  if (!integration) return null;
 
-  const expiresAt = data.expires_at ? new Date(data.expires_at) : null;
+  const expiresAt = integration.expires_at ? new Date(integration.expires_at) : null;
+  let token = integration.access_token;
+
   if (expiresAt && expiresAt.getTime() < Date.now() + 10 * 60 * 1000) {
     const { data: refreshData } = await supabase.functions.invoke('ml-token-refresh', {
       body: { user_id: userId },
     });
-    return refreshData?.access_token ?? data.access_token;
+    token = refreshData?.access_token ?? token;
   }
 
-  return data.access_token;
+  return { token, mlUserId: integration.ml_user_id };
+}
+
+async function fetchAllItems(token: string, mlUserId: number): Promise<string[]> {
+  const ids: string[] = [];
+  for (const status of ['active', 'paused']) {
+    let offset = 0;
+    while (true) {
+      const res = await fetch(
+        `https://api.mercadolibre.com/users/${mlUserId}/items/search?status=${status}&limit=100&offset=${offset}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      if (!res.ok) break;
+      const data = await res.json();
+      const results: string[] = data?.results ?? [];
+      ids.push(...results);
+      if (results.length < 100) break;
+      offset += 100;
+    }
+  }
+  return ids;
+}
+
+async function fetchItemDetails(token: string, ids: string[]): Promise<any[]> {
+  const chunks: any[] = [];
+  for (let i = 0; i < ids.length; i += 20) {
+    const chunk = ids.slice(i, i + 20);
+    const res = await fetch(
+      `https://api.mercadolibre.com/items?ids=${chunk.join(',')}`,
+      { headers: { 'Authorization': `Bearer ${token}` } }
+    );
+    if (!res.ok) continue;
+    const data = await res.json();
+    chunks.push(...(data ?? []));
+  }
+  return chunks;
 }
 
 serve(async (req) => {
@@ -49,71 +90,79 @@ serve(async (req) => {
 
     console.log(`[ml-queue-processor] Processing queue_id=${queue_id} for user=${reseller_user_id}`);
 
-    // Buscar token ML do revendedor
-    const token = await getTokenForUser(reseller_user_id);
-    if (!token) {
+    // Buscar token e ml_user_id
+    const integration = await getToken(reseller_user_id);
+    if (!integration) {
       await supabase.from('ml_sync_queue').update({
         status: 'failed',
         error_message: 'Token ML não encontrado ou integração inativa',
         processed_at: new Date().toISOString(),
       }).eq('id', queue_id);
-
       return new Response(JSON.stringify({ error: 'No active ML integration' }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Buscar produtos publicados do revendedor
-    const { data: published } = await supabase
+    const { token, mlUserId } = integration;
+
+    // 1. Buscar TODOS os IDs de anúncios do revendedor (ativos + pausados)
+    const allItemIds = await fetchAllItems(token, mlUserId);
+    console.log(`[ml-queue-processor] Found ${allItemIds.length} items for user ${reseller_user_id}`);
+
+    // 2. Buscar detalhes dos itens em chunks de 20
+    const itemDetails = await fetchItemDetails(token, allItemIds);
+
+    // 3. Buscar mapeamento ml_item_id → product_id do nosso banco
+    const { data: publishedProducts } = await supabase
       .from('mercadolivre_published_products')
-      .select('id, product_id, ml_item_id')
+      .select('ml_item_id, product_id')
       .eq('user_id', reseller_user_id)
-      .eq('status', 'published')
       .not('ml_item_id', 'is', null);
 
-    const items = published ?? [];
-    let success = 0;
+    const productMap = new Map<string, string>(
+      (publishedProducts ?? []).map((p: any) => [p.ml_item_id, p.product_id])
+    );
+
+    // 4. Upsert em ml_listing_variants
+    let imported = 0;
     let failed = 0;
     const errors: string[] = [];
 
-    for (const item of items) {
-      const mlItemId = item.ml_item_id;
+    for (const itemWrapper of itemDetails) {
+      const item = itemWrapper?.body ?? itemWrapper;
+      if (!item?.id) continue;
+
+      const mlItemId = String(item.id);
+      const productId = productMap.get(mlItemId) ?? null;
+
+      const mlStatus = item.status === 'active' ? 'published' : item.status === 'paused' ? 'paused' : 'closed';
+
       try {
-        // Pausar
-        const pauseRes = await fetch(`https://api.mercadolibre.com/items/${mlItemId}`, {
-          method: 'PUT',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'paused' }),
-        });
+        const { error } = await supabase
+          .from('ml_listing_variants')
+          .upsert({
+            user_id: reseller_user_id,
+            product_id: productId,
+            ml_item_id: mlItemId,
+            variant_title: item.title ?? 'Sem título',
+            price: Number(item.price ?? 0),
+            status: mlStatus,
+            permalink: item.permalink ?? null,
+            thumbnail: item.thumbnail ?? null,
+            category_id: item.category_id ?? null,
+            visits: Number(item.visits?.quantity ?? 0),
+            sales: Number(item.sold_quantity ?? 0),
+            last_synced_at: new Date().toISOString(),
+          }, {
+            onConflict: 'user_id,ml_item_id',
+          });
 
-        if (!pauseRes.ok && pauseRes.status !== 400) {
-          errors.push(`${mlItemId}: pause falhou (${pauseRes.status})`);
+        if (error) {
+          errors.push(`${mlItemId}: ${error.message}`);
           failed++;
-          continue;
+        } else {
+          imported++;
         }
-
-        await new Promise(r => setTimeout(r, 800));
-
-        // Reativar
-        const activateRes = await fetch(`https://api.mercadolibre.com/items/${mlItemId}`, {
-          method: 'PUT',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'active' }),
-        });
-
-        if (!activateRes.ok) {
-          const body = await activateRes.json().catch(() => ({}));
-          errors.push(`${mlItemId}: activate falhou (${body?.message ?? activateRes.status})`);
-          failed++;
-          continue;
-        }
-
-        // Atualizar timestamp
-        await supabase.from('mercadolivre_published_products')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', item.id);
-
-        success++;
       } catch (err) {
         errors.push(`${mlItemId}: ${String(err)}`);
         failed++;
@@ -121,39 +170,27 @@ serve(async (req) => {
     }
 
     const result = {
-      total: items.length,
-      success,
+      total: allItemIds.length,
+      imported,
       failed,
-      errors,
+      linked_to_product: productMap.size,
+      errors: errors.slice(0, 10),
       duration_ms: Date.now() - startTime,
     };
 
-    // Atualizar status da fila
     await supabase.from('ml_sync_queue').update({
-      status: failed === items.length && items.length > 0 ? 'failed' : 'done',
+      status: failed === allItemIds.length && allItemIds.length > 0 ? 'failed' : 'done',
       result,
       processed_at: new Date().toISOString(),
     }).eq('id', queue_id);
 
-    console.log(`[ml-queue-processor] ✅ Done: ${success} ok, ${failed} failed`);
+    console.log(`[ml-queue-processor] ✅ ${imported} imported, ${failed} failed`);
     return new Response(JSON.stringify({ success: true, ...result }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (err) {
     console.error('[ml-queue-processor] Error:', err);
-    if (req.body) {
-      try {
-        const { queue_id } = await req.json().catch(() => ({}));
-        if (queue_id) {
-          await supabase.from('ml_sync_queue').update({
-            status: 'failed',
-            error_message: String(err),
-            processed_at: new Date().toISOString(),
-          }).eq('id', queue_id);
-        }
-      } catch { /* ignore */ }
-    }
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
