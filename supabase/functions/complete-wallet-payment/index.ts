@@ -85,6 +85,18 @@ serve(async (req) => {
       body: { order_id },
     }).catch((e: Error) => console.error('[complete-wallet-payment] Split failed:', e));
 
+    // Disparar evento order.paid para webhooks registrados (n8n, etc.)
+    supabase.functions.invoke('dispatch-webhook', {
+      body: {
+        event_type: 'order.paid',
+        payload: {
+          order_id,
+          order_number: order.order_number,
+          payment_method: 'wallet',
+        },
+      },
+    }).catch((e: Error) => console.error('[complete-wallet-payment] Webhook dispatch failed:', e));
+
     console.log(`[complete-wallet-payment] ✅ Order ${order.order_number} confirmed as wallet payment`);
     return new Response(
       JSON.stringify({ success: true, order_id, order_number: order.order_number }),
