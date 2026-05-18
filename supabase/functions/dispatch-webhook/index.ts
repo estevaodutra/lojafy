@@ -417,7 +417,7 @@ Deno.serve(async (req) => {
       console.log(`[dispatch-webhook] Webhook ${event_type} está inativo, ignorando`);
       return new Response(
         JSON.stringify({ success: false, error: 'Webhook desativado' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
