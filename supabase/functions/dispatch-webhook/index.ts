@@ -143,6 +143,80 @@ async function fetchLastPaidOrder(supabase: any): Promise<Record<string, any> | 
   };
 }
 
+// Fetch a specific order by id — used to enrich sparse order.paid payloads
+async function fetchOrderById(supabase: any, orderId: string): Promise<Record<string, any> | null> {
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .select('id, order_number, total_amount, payment_method, user_id, reseller_id, created_at')
+    .eq('id', orderId)
+    .single();
+
+  if (orderError || !order) return null;
+
+  const { data: usersWithEmail } = await supabase.rpc('get_users_with_email');
+  const customerData = usersWithEmail?.find((u: any) => u.user_id === order.user_id);
+  const customerProfile = customerData ? {
+    first_name: customerData.first_name,
+    last_name: customerData.last_name,
+    phone: customerData.phone,
+  } : null;
+
+  let resellerData = null;
+  if (order.reseller_id) {
+    const { data: store } = await supabase
+      .from('reseller_stores')
+      .select('store_name')
+      .eq('user_id', order.reseller_id)
+      .single();
+    if (store) resellerData = { user_id: order.reseller_id, store_name: store.store_name };
+  }
+
+  const { data: items } = await supabase
+    .from('order_items')
+    .select('product_id, quantity, unit_price, product_snapshot')
+    .eq('order_id', order.id);
+
+  const { data: shippingFile } = await supabase
+    .from('order_shipping_files')
+    .select('file_name, file_path, file_size, uploaded_at')
+    .eq('order_id', order.id)
+    .limit(1)
+    .maybeSingle();
+
+  let shippingLabel = null;
+  if (shippingFile?.file_path) {
+    const { data: signedUrlData } = await supabase.storage
+      .from('shipping-files')
+      .createSignedUrl(shippingFile.file_path, 604800);
+    shippingLabel = {
+      file_name: shippingFile.file_name,
+      file_size: shippingFile.file_size,
+      uploaded_at: shippingFile.uploaded_at,
+      download_url: signedUrlData?.signedUrl || null,
+    };
+  }
+
+  const customerName = customerProfile
+    ? `${customerProfile.first_name || ''} ${customerProfile.last_name || ''}`.trim() || 'Cliente'
+    : 'Cliente';
+
+  return {
+    order_id: order.id,
+    order_number: order.order_number,
+    total_amount: order.total_amount,
+    payment_method: order.payment_method,
+    customer: {
+      user_id: order.user_id,
+      email: customerData?.email || 'email@exemplo.com',
+      name: customerName,
+      phone: customerProfile?.phone || null,
+    },
+    reseller: resellerData || { user_id: null, store_name: null },
+    items: await buildOrderItemsPayload(supabase, items || []),
+    shipping_label: shippingLabel,
+  };
+}
+
 // Fetch last created user
 async function fetchLastCreatedUser(supabase: any): Promise<Record<string, any> | null> {
   console.log('[dispatch-webhook] Buscando último usuário criado...');
@@ -293,8 +367,17 @@ Deno.serve(async (req) => {
 
     console.log(`[dispatch-webhook] Disparando evento: ${event_type}, is_test: ${is_test}, use_real_data: ${use_real_data}`);
 
-    // Fetch real data if requested for test
+    // Auto-enrich order.paid payload quando vier incompleto (sem customer)
     let payload = providedPayload;
+    if (event_type === 'order.paid' && !is_test && payload?.order_id && !payload?.customer) {
+      console.log(`[dispatch-webhook] Enriquecendo payload para order ${payload.order_id}`);
+      const enriched = await fetchOrderById(supabase, payload.order_id);
+      if (enriched) {
+        payload = { ...enriched, ...payload }; // campos do caller têm precedência
+      }
+    }
+
+    // Fetch real data if requested for test
     if (is_test && use_real_data) {
       console.log(`[dispatch-webhook] Buscando dados reais para teste de ${event_type}...`);
       const { data: realData, error: realDataError } = await fetchRealTestData(supabase, event_type);
