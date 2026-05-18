@@ -284,6 +284,7 @@ const AdminOrders = () => {
                     <TableHead>Cliente</TableHead>
                     <TableHead>Data</TableHead>
                     <TableHead>Pagamento</TableHead>
+                    <TableHead>Webhook</TableHead>
                     <TableHead>Etiqueta</TableHead>
                     <TableHead>Total</TableHead>
                     <TableHead>Ações</TableHead>
@@ -293,37 +294,22 @@ const AdminOrders = () => {
                 <TableBody>
                   {loading ? (
                      <TableRow>
-                       <TableCell colSpan={8} className="text-center py-8">
+                       <TableCell colSpan={9} className="text-center py-8">
                          Carregando pedidos...
                        </TableCell>
                      </TableRow>
                   ) : filteredOrders.length === 0 ? (
                      <TableRow>
-                       <TableCell colSpan={8} className="text-center py-8">
+                       <TableCell colSpan={9} className="text-center py-8">
                          Nenhum pedido encontrado
                        </TableCell>
                      </TableRow>
                    ) : (
                     currentOrders.map((order) => {
-                      const webhookFailed = order.webhook_paid_status === 'failed';
                       return (
-                       <TableRow
-                         key={order.id}
-                         className={webhookFailed ? 'bg-destructive/10 hover:bg-destructive/15' : undefined}
-                       >
+                       <TableRow key={order.id}>
                          <TableCell className="font-medium">
-                           <div className="flex items-center gap-2">
-                             <span>{order.order_number}</span>
-                             {webhookFailed && (
-                               <Badge
-                                 variant="destructive"
-                                 className="text-[10px] px-1.5 py-0"
-                                 title={`Webhook order.paid falhou${order.webhook_paid_dispatched_at ? ' em ' + format(new Date(order.webhook_paid_dispatched_at), "dd/MM/yyyy HH:mm", { locale: ptBR }) : ''}${order.webhook_paid_error ? '\n' + order.webhook_paid_error : ''}`}
-                               >
-                                 Webhook falhou
-                               </Badge>
-                             )}
-                           </div>
+                           {order.order_number}
                          </TableCell>
                          <TableCell>
                            {order.profiles.first_name} {order.profiles.last_name}
@@ -332,6 +318,19 @@ const AdminOrders = () => {
                            {format(new Date(order.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                          </TableCell>
                          <TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
+                         <TableCell>
+                           {order.payment_status === 'paid' ? (
+                             order.webhook_paid_status === 'sent' ? (
+                               <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">✓ Enviado</Badge>
+                             ) : order.webhook_paid_status === 'failed' ? (
+                               <Badge variant="destructive" className="text-xs" title={order.webhook_paid_error ?? ''}>✗ Falhou</Badge>
+                             ) : (
+                               <Badge variant="outline" className="text-xs text-muted-foreground">Não enviado</Badge>
+                             )
+                           ) : (
+                             <span className="text-xs text-muted-foreground">—</span>
+                           )}
+                         </TableCell>
                          <TableCell>
                            {order.has_shipping_file ? (
                              <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
