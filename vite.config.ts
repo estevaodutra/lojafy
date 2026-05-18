@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "robots.txt"],
+      includeAssets: ["favicon.ico", "favicon.png", "robots.txt"],
       manifest: {
         name: "Lojafy - Sua Loja Descomplicada",
         short_name: "Lojafy",
