@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
     }
 
     // Build access link
-    const baseUrl = 'https://lojafy.lovable.app';
+    const baseUrl = 'https://lojafy.app';
     const accessLink = `${baseUrl}/auth/onetime?token=${token}`;
 
     const responseData = {

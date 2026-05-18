@@ -193,7 +193,7 @@ Deno.serve(async (req) => {
         .single();
 
       if (!linkError && linkData) {
-        accessLink = `https://lojafy.lovable.app/auth/one-time?token=${linkData.token}`;
+        accessLink = `https://lojafy.app/auth/onetime?token=${linkData.token}`;
       }
     } catch (e) {
       console.error('Error generating access link:', e);

@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
     if (tokenError) {
       console.error('Erro ao gerar token de acesso:', tokenError);
     } else {
-      accessLink = `https://lojafy.lovable.app/auth/onetime?token=${accessToken}`;
+      accessLink = `https://lojafy.app/auth/onetime?token=${accessToken}`;
       accessLinkExpiresAt = tokenExpiresAt.toISOString();
     }
 
