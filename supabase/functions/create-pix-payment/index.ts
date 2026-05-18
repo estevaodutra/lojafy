@@ -128,8 +128,9 @@ serve(async (req) => {
       );
     }
 
-    // Gerar order number
-    const orderNumber = externalReference.toUpperCase().replace('ORDER_', 'ORD-');
+    // Gerar order number sequencial via banco
+    const { data: orderNumData } = await supabase.rpc('generate_order_number');
+    const orderNumber = orderNumData as string;
 
     // Criar pedido no banco
     const { data: orderData, error: orderError } = await supabase
