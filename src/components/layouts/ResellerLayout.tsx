@@ -142,13 +142,6 @@ const ResellerSidebar = () => {
         label: 'Avançado',
         items: [
           { title: 'Lojafy Integra', url: '/reseller/integracoes', icon: Plug },
-          { title: 'Anúncios ML', url: '/reseller/ml-anuncios', icon: ShoppingBag },
-          { title: 'Mensagens ML', url: '/reseller/ml-mensagens', icon: MessageSquare },
-          { title: 'Replicar Anúncios', url: '/reseller/ml-replicar', icon: Copy },
-          { title: 'Métricas ML', url: '/reseller/ml-metricas', icon: TrendingUp },
-          { title: 'Promoções ML', url: '/reseller/ml-promocoes', icon: Tag },
-          { title: 'Publicidade ML', url: '/reseller/ml-publicidade', icon: Megaphone },
-          { title: 'Faturamento ML', url: '/reseller/ml-faturamento', icon: Receipt },
         ]
       });
     }
