@@ -9,7 +9,7 @@ const supabase = createClient(
 const ML_CLIENT_ID = Deno.env.get('ML_CLIENT_ID') ?? '';
 const ML_CLIENT_SECRET = Deno.env.get('ML_CLIENT_SECRET') ?? '';
 const ML_REDIRECT_URI = Deno.env.get('ML_REDIRECT_URI') ?? `${Deno.env.get('SUPABASE_URL')}/functions/v1/ml-oauth-callback`;
-const APP_URL = Deno.env.get('APP_URL') ?? 'https://lojafy.vercel.app';
+const APP_URL = Deno.env.get('APP_URL') ?? 'https://lojafy.app';
 
 serve(async (req) => {
   const url = new URL(req.url);

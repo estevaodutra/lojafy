@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
       type: "magiclink",
       email: userData.user.email,
       options: {
-        redirectTo: `https://lojafy.lovable.app${tokenRecord.redirect_url || '/reseller/first-access'}`,
+        redirectTo: `https://lojafy.app${tokenRecord.redirect_url || '/reseller/first-access'}`,
       },
     });
 

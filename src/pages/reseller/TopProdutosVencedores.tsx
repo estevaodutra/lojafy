@@ -51,7 +51,7 @@ const strategies = [{
   tip: 'Impulsionar é tração inicial.',
   color: 'bg-pink-500'
 }];
-const PUBLISHED_DOMAIN = 'https://lojafy.lovable.app';
+const PUBLISHED_DOMAIN = 'https://lojafy.app';
 
 const TopProdutosVencedores: React.FC = () => {
   // Fetch feature id for top_10_produtos
