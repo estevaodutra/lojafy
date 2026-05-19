@@ -258,6 +258,11 @@ serve(async (req) => {
         body: { order_id: orderData.id },
       }).catch((e: Error) => console.error('[mp-webhook] Split failed:', e));
 
+      // Disparar evento order.paid para webhooks registrados (n8n, etc.)
+      supabase.functions.invoke('dispatch-webhook', {
+        body: { event_type: 'order.paid', payload: { order_id: orderData.id } },
+      }).catch((e: Error) => console.error('[mp-webhook] Webhook dispatch failed:', e));
+
       // Notificar comprador
       if (orderData.user_id) {
         supabase.from('notifications').insert({
