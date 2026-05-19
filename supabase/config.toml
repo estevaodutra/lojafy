@@ -209,3 +209,6 @@ verify_jwt = false
 
 [functions.atribuir-plano]
 verify_jwt = false
+
+[functions.ml-oauth-callback]
+verify_jwt = false
