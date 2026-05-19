@@ -1,15 +1,38 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, ShoppingBag, ArrowRight } from "lucide-react";
+import { CheckCircle2, ShoppingBag, ArrowRight, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
-const REDIRECT_SECONDS = 5;
+const REDIRECT_SECONDS = 8;
 
 const MlSuccess = () => {
   const navigate = useNavigate();
   const [seconds, setSeconds] = useState(REDIRECT_SECONDS);
+  const [mlUserId, setMlUserId] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase
+        .from("mercadolivre_integrations")
+        .select("ml_user_id, expires_at")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setMlUserId(String(data.ml_user_id));
+            setExpiresAt(data.expires_at ?? null);
+          }
+        });
+    });
+  }, []);
 
   useEffect(() => {
     if (seconds <= 0) {
@@ -26,7 +49,6 @@ const MlSuccess = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-50 to-white p-4">
       <Card className="w-full max-w-md shadow-lg border-yellow-200">
         <CardContent className="pt-10 pb-8 flex flex-col items-center text-center gap-6">
-          {/* Ícone animado */}
           <div className="relative flex items-center justify-center">
             <div className="absolute inset-0 rounded-full bg-green-100 animate-ping opacity-30" />
             <div className="relative rounded-full bg-green-100 p-5">
@@ -34,13 +56,11 @@ const MlSuccess = () => {
             </div>
           </div>
 
-          {/* Logo ML */}
           <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-100 border border-yellow-300">
             <ShoppingBag className="h-5 w-5 text-yellow-600" />
             <span className="font-semibold text-yellow-800 text-sm">Mercado Livre</span>
           </div>
 
-          {/* Título */}
           <div className="space-y-2">
             <h1 className="text-2xl font-bold text-gray-900">
               Integração Realizada com Sucesso!
@@ -51,7 +71,24 @@ const MlSuccess = () => {
             </p>
           </div>
 
-          {/* Benefícios */}
+          {mlUserId && (
+            <div className="w-full rounded-lg bg-yellow-50 border border-yellow-200 p-4 text-left space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <User className="h-4 w-4 text-yellow-600 shrink-0" />
+                <span className="text-gray-700">
+                  Conta ML conectada: <span className="font-mono font-semibold">#{mlUserId}</span>
+                </span>
+              </div>
+              {expiresAt && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground pl-6">
+                  <span>
+                    Token válido até {format(new Date(expiresAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="w-full rounded-lg bg-muted/50 p-4 text-left space-y-2">
             {[
               "Publique produtos com 1 clique",
@@ -65,16 +102,11 @@ const MlSuccess = () => {
             ))}
           </div>
 
-          {/* Botão */}
-          <Button
-            className="w-full gap-2"
-            onClick={() => navigate("/reseller/integracoes")}
-          >
+          <Button className="w-full gap-2" onClick={() => navigate("/reseller/integracoes")}>
             Ir para Integrações
             <ArrowRight className="h-4 w-4" />
           </Button>
 
-          {/* Contador de redirect */}
           <div className="w-full space-y-1">
             <Progress value={progress} className="h-1" />
             <p className="text-xs text-muted-foreground">
