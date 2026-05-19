@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ShoppingBag, Store, Package, Link2, Sparkles, CheckCircle2 } from 'lucide-react';
+import { ShoppingBag, Store, Package, Link2, Sparkles, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -90,6 +90,13 @@ const LojafyIntegra = () => {
 
   const isConnected = !!mlIntegration;
 
+  // Auto-redirect para integracoes se não conectado e tenta acessar aba ML
+  useEffect(() => {
+    if (!isConnected && activeTab !== 'integracoes') {
+      setSearchParams({});
+    }
+  }, [isConnected, activeTab]);
+
   const getMercadoLivreAuthUrl = () => {
     const userId = user?.id || '';
     const clientId = import.meta.env.VITE_ML_CLIENT_ID || '2003351424267574';
@@ -134,14 +141,29 @@ const LojafyIntegra = () => {
 
         {/* ── Aba Integrações ─────────────────────────────── */}
         <TabsContent value="integracoes" className="space-y-6 mt-6">
-          <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
-            <Sparkles className="h-4 w-4 text-amber-600" />
-            <AlertTitle className="text-amber-900 dark:text-amber-100">Novidades chegando!</AlertTitle>
-            <AlertDescription className="text-amber-800 dark:text-amber-200">
-              Estamos trabalhando para trazer as melhores integrações com marketplaces para sua loja.
-              Em breve você poderá gerenciar tudo em um só lugar.
-            </AlertDescription>
-          </Alert>
+          {!isConnected && (
+            <Alert className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
+              <AlertTriangle className="h-4 w-4 text-yellow-600" />
+              <AlertTitle className="text-yellow-900 dark:text-yellow-100 font-semibold">
+                ⚡ Conecte sua conta Mercado Livre
+              </AlertTitle>
+              <AlertDescription className="text-yellow-800 dark:text-yellow-200">
+                Conecte sua conta ML para desbloquear <strong>Anúncios, Mensagens, Métricas, Promoções</strong> e muito mais.
+                Clique em <strong>"Integrar"</strong> no card abaixo para começar.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {isConnected && (
+            <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+              <Sparkles className="h-4 w-4 text-amber-600" />
+              <AlertTitle className="text-amber-900 dark:text-amber-100">Novidades chegando!</AlertTitle>
+              <AlertDescription className="text-amber-800 dark:text-amber-200">
+                Estamos trabalhando para trazer as melhores integrações com marketplaces para sua loja.
+                Em breve você poderá gerenciar tudo em um só lugar.
+              </AlertDescription>
+            </Alert>
+          )}
 
           <div>
             <h2 className="text-xl font-semibold mb-4">Benefícios das Integrações</h2>

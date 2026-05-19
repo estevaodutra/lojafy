@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, RefreshCw, ShoppingBag, Users, MapPin, ChevronRight, MessageSquare, TrendingUp, Tag, Megaphone, Receipt, RotateCcw, Play, Trash2, Clock, LayoutList, ToggleLeft, ToggleRight, ExternalLink, Copy, Pencil } from "lucide-react";
+import { Download, RefreshCw, ShoppingBag, Users, MapPin, ChevronRight, MessageSquare, TrendingUp, Tag, Megaphone, Receipt, RotateCcw, Play, Trash2, Clock, LayoutList, ToggleLeft, ToggleRight, ExternalLink, Copy, Pencil, AlertTriangle } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -69,6 +70,7 @@ const PAGE_SIZE = 10;
 function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string, name: string) => void }) {
   const [syncing, setSyncing] = useState<string | null>(null);
   const [queueing, setQueueing] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
   const [page, setPage] = useState(0);
 
   const { data: integrations = [], isLoading, refetch } = useQuery({
@@ -136,6 +138,27 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
     }
   };
 
+  const handleResetAll = async () => {
+    setResetting(true);
+    const count = integrations.length;
+    try {
+      // Deletar integrações, fila e listings (neq UUID impossível = deleta tudo)
+      await supabase.from('mercadolivre_integrations').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('ml_sync_queue').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('ml_listing_variants').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      toast({
+        title: 'Integrações removidas',
+        description: `${count} conta(s) desconectadas. Revendedores precisarão reconectar.`,
+      });
+      setPage(0);
+      refetch();
+    } catch (err) {
+      toast({ title: 'Erro ao resetar', description: String(err), variant: 'destructive' });
+    } finally {
+      setResetting(false);
+    }
+  };
+
   if (isLoading) return <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>;
 
   return (
@@ -150,6 +173,35 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
           <Button variant="outline" size="sm" onClick={() => { setPage(0); refetch(); }}>
             <RefreshCw className="h-4 w-4 mr-2" />Atualizar
           </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" disabled={resetting || integrations.length === 0}>
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Resetar Todas
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Resetar todas as integrações ML?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Isso desconectará <strong>{integrations.length} conta(s)</strong> do Mercado Livre,
+                  limpará a fila de sincronização e removerá todos os anúncios importados.
+                  Os revendedores precisarão reconectar suas contas.
+                  <br /><br />
+                  <strong>Esta ação não pode ser desfeita.</strong>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive hover:bg-destructive/90"
+                  onClick={handleResetAll}
+                >
+                  {resetting ? 'Resetando...' : 'Sim, resetar todas'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
       <div className="rounded-md border overflow-x-auto">
