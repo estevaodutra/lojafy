@@ -56,7 +56,7 @@ const LojafyIntegra = () => {
 
   const getMercadoLivreAuthUrl = () => {
     const userId = user?.id || '';
-    const clientId = import.meta.env.VITE_ML_CLIENT_ID;
+    const clientId = import.meta.env.VITE_ML_CLIENT_ID || '2003351424267574';
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const redirectUri = `${supabaseUrl}/functions/v1/ml-oauth-callback`;
     return `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${userId}`;
