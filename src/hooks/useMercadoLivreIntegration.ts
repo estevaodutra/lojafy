@@ -153,7 +153,23 @@ export const useMercadoLivreIntegration = () => {
       });
 
       if (publishError) {
-        throw new Error(`Erro ao publicar: ${publishError.message}`);
+        let errorMessage = publishError.message;
+        let cause = '';
+        try {
+          if ('context' in publishError && typeof publishError.context === 'object' && publishError.context !== null) {
+            const errorBody = await (publishError.context as Response).json();
+            if (errorBody?.error) {
+              errorMessage = errorBody.error;
+            }
+            if (Array.isArray(errorBody?.cause)) {
+              cause = errorBody.cause.map((c: any) => c.message || JSON.stringify(c)).join(', ');
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing edge function error body:', e);
+        }
+        const fullMsg = cause ? `${errorMessage} — cause: ${cause}` : errorMessage;
+        throw new Error(`Erro ao publicar: ${fullMsg}`);
       }
 
       if (!publishResponse?.success) {

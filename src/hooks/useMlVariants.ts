@@ -111,8 +111,28 @@ export function useMlVariants(productId?: string) {
         },
       });
 
-      if (error || !publishRes?.success) {
-        throw new Error(publishRes?.error ?? error?.message ?? 'Erro ao publicar');
+      if (error) {
+        let errorMessage = error.message;
+        let cause = '';
+        try {
+          if ('context' in error && typeof error.context === 'object' && error.context !== null) {
+            const errorBody = await (error.context as Response).json();
+            if (errorBody?.error) {
+              errorMessage = errorBody.error;
+            }
+            if (Array.isArray(errorBody?.cause)) {
+              cause = errorBody.cause.map((c: any) => c.message || JSON.stringify(c)).join(', ');
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing edge function error body:', e);
+        }
+        throw new Error(cause ? `${errorMessage} — cause: ${cause}` : errorMessage);
+      }
+
+      if (!publishRes?.success) {
+        const cause = publishRes?.cause?.map((c: any) => c.message).join(', ');
+        throw new Error(publishRes?.error ?? 'Erro ao publicar' + (cause ? `: ${cause}` : ''));
       }
 
       // Atualizar variante no banco

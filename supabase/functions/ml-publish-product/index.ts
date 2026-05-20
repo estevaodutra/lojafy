@@ -151,7 +151,6 @@ serve(async (req) => {
       buying_mode: 'buy_it_now',
       listing_type_id: validated.listing_type_id ?? 'gold_special',
       condition: validated.condition ?? 'new',
-      description: { plain_text: (product.description ?? product.name).substring(0, 50000) },
       pictures: imageUrls.slice(0, 12).map((url) => ({ source: url })),
     };
 
@@ -185,6 +184,32 @@ serve(async (req) => {
     }
 
     console.log(`[ml-publish] ✅ Published item ${responseBody.id}: ${responseBody.permalink}`);
+
+    // Adicionar descrição em chamada separada
+    const descriptionText = (product.description ?? product.name).substring(0, 50000);
+    if (descriptionText) {
+      console.log(`[ml-publish] Adding description to item ${responseBody.id}`);
+      try {
+        const descRes = await fetch(`https://api.mercadolibre.com/items/${responseBody.id}/description`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ plain_text: descriptionText }),
+        });
+        if (!descRes.ok) {
+          const descErrBody = await descRes.json().catch(() => ({}));
+          console.error('[ml-publish] Failed to add description to ML item:', descRes.status, descErrBody);
+        } else {
+          console.log(`[ml-publish] ✅ Description added to item ${responseBody.id}`);
+        }
+      } catch (e) {
+        console.error('[ml-publish] Error adding description to ML item:', e);
+      }
+    }
+
     return new Response(
       JSON.stringify({ success: true, ml_item_id: responseBody.id, permalink: responseBody.permalink, status: responseBody.status }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
