@@ -81,14 +81,16 @@ serve(async (req) => {
     }
 
     const validated = marketplace_data?.validated_body ?? {};
-    const price = reseller_price ?? product.price;
+    // Arredondar preco para 2 casas decimais (exigencia da API do ML)
+    const rawPrice = reseller_price ?? product.price;
+    const price = Math.round(Number(rawPrice) * 100) / 100;
 
     // Re-activate existing listing
     if (ml_item_id) {
       const activateRes = await fetch(`https://api.mercadolibre.com/items/${ml_item_id}`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'active', price }),
+        body: JSON.stringify({ status: 'active', price: Math.round(Number(price) * 100) / 100 }),
       });
 
       if (!activateRes.ok) {
@@ -145,11 +147,11 @@ serve(async (req) => {
     const mlPayload: Record<string, unknown> = {
       title: product.name.substring(0, 60), // ML limita título a 60 chars
       category_id: categoryId ?? 'MLB1051',  // fallback: Outros
-      price: Number(price),
+      price: Math.round(Number(price) * 100) / 100,
       currency_id: 'BRL',
       available_quantity: Number(product.stock_quantity ?? 10),
       buying_mode: 'buy_it_now',
-      listing_type_id: validated.listing_type_id ?? 'gold_special',
+      listing_type_id: validated.listing_type_id ?? 'gold_pro',
       condition: validated.condition ?? 'new',
       pictures: imageUrls.slice(0, 12).map((url) => ({ source: url })),
     };
