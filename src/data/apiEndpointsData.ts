@@ -639,7 +639,7 @@ const usersEndpoints: EndpointData[] = [
     responseExample: {
       success: true,
       data: {
-        link: 'https://lojafy.lovable.app/auth/onetime?token=abc123-uuid',
+        link: 'https://lojafy.app/auth/onetime?token=abc123-uuid',
         token: 'abc123-uuid',
         expires_at: '2026-02-06T12:00:00Z',
         expires_hours: 24,
