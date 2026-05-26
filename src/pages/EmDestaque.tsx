@@ -89,7 +89,7 @@ const EmDestaque = () => {
               <span className="font-semibold text-primary">Produtos em Destaque</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
-              Mais Barato que a Shopee 🔥
+              Produto Campeões 🏆
             </h1>
             <p className="text-xl text-muted-foreground">
               Todos os produtos mais procurados com os melhores preços

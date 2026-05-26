@@ -30,7 +30,7 @@ const ProductGrid = () => {
         <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Mais Barato que a Shopee 🔥
+              Produto Campeões 🏆
             </h2>
             <p className="text-lg text-muted-foreground">
               Os produtos mais procurados com os melhores preços
@@ -63,7 +63,7 @@ const ProductGrid = () => {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex-1 text-center sm:text-left">
                 <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
-                  Mais Barato que a Shopee 🔥
+                  Produto Campeões 🏆
                 </h2>
                 <p className="text-lg text-muted-foreground max-w-2xl sm:mx-0 mx-auto">
                   Os produtos mais procurados com os melhores preços
