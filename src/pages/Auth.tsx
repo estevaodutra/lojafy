@@ -82,20 +82,7 @@ const Auth = () => {
     
   setIsLoading(true);
 
-    // Validar nono dígito (celulares brasileiros começam com 9 após o DDD)
     const phoneNumbers = cleanPhone(signupPhone);
-    if (phoneNumbers.length === 13) { // 55 + DDD(2) + número(9)
-      const firstDigitAfterDDD = phoneNumbers.charAt(4); // posição após 55XX
-      if (firstDigitAfterDDD !== '9') {
-        toast({ 
-          title: 'Telefone inválido', 
-          description: 'Celulares devem começar com 9 após o DDD.',
-          variant: 'destructive' 
-        });
-        setIsLoading(false);
-        return;
-      }
-    }
 
     // Validação externa via webhook
     try {
@@ -120,17 +107,7 @@ const Auth = () => {
       // Resposta é um array - pegar o primeiro item
       const validation = Array.isArray(validationData) ? validationData[0] : validationData;
       
-      // Validação em cadeia: primeiro WhatsApp, depois email
-      // Se WhatsApp não existe, email nem foi validado
-      if (validation.exists === false) {
-        toast({ 
-          title: 'WhatsApp inválido', 
-          description: 'Por favor, forneça um novo número.',
-          variant: 'destructive' 
-        });
-        setIsLoading(false);
-        return;
-      }
+      
       
       // Se WhatsApp válido mas email inválido (caso o webhook retorne)
       if (validation.email_valid === false) {
