@@ -54,49 +54,7 @@ const AuthPremium = () => {
 
     const phoneNumbers = cleanPhone(phone);
 
-    // Validação externa via webhook
-    try {
-      const validationResponse = await fetch(
-        'https://n8n-n8n.nuwfic.easypanel.host/webhook/lojafy_data_validation',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: email,
-            phone: phoneNumbers,
-            first_name: firstName,
-            last_name: lastName,
-          }),
-        }
-      );
-      
-      const validationData = await validationResponse.json();
-      const validation = Array.isArray(validationData) ? validationData[0] : validationData;
-      
-      
-      
-      if (validation.email_valid === false) {
-        toast({ 
-          title: 'Email inválido', 
-          description: validation.reason || 'Por favor, verifique o email informado.',
-          variant: 'destructive' 
-        });
-        setIsLoading(false);
-        return;
-      }
-      
-    } catch (error) {
-      console.error('Erro na validação:', error);
-      toast({ 
-        title: 'Erro na validação', 
-        description: 'Não foi possível validar seus dados. Tente novamente.',
-        variant: 'destructive' 
-      });
-      setIsLoading(false);
-      return;
-    }
+    
 
     // Chamar Edge Function para criar usuário premium
     try {

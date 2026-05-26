@@ -84,52 +84,7 @@ const Auth = () => {
 
     const phoneNumbers = cleanPhone(signupPhone);
 
-    // Validação externa via webhook
-    try {
-      const validationResponse = await fetch(
-        'https://n8n-n8n.nuwfic.easypanel.host/webhook/lojafy_data_validation',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: signupEmail,
-            phone: phoneNumbers,
-            first_name: firstName,
-            last_name: lastName,
-          }),
-        }
-      );
-      
-      const validationData = await validationResponse.json();
-      
-      // Resposta é um array - pegar o primeiro item
-      const validation = Array.isArray(validationData) ? validationData[0] : validationData;
-      
-      
-      
-      // Se WhatsApp válido mas email inválido (caso o webhook retorne)
-      if (validation.email_valid === false) {
-        toast({ 
-          title: 'Email inválido', 
-          description: validation.reason || 'Por favor, verifique o email informado e tente novamente.',
-          variant: 'destructive' 
-        });
-        setIsLoading(false);
-        return;
-      }
-      
-    } catch (error) {
-      console.error('Erro na validação:', error);
-      toast({ 
-        title: 'Erro na validação', 
-        description: 'Não foi possível validar seus dados. Tente novamente.',
-        variant: 'destructive' 
-      });
-      setIsLoading(false);
-      return;
-    }
+    
 
     // Se validação passou, prosseguir com o cadastro
     const result = await signUp(signupEmail, signupPassword, firstName, lastName, signupPhone);
