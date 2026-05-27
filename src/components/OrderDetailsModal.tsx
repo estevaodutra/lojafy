@@ -1308,38 +1308,133 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               <CardContent>
                 <div className="space-y-4">
                   {(() => {
-                    const events = [
-                      {
+                    const dbEvents = statusHistory.map(item => ({
+                      id: item.id,
+                      type: 'status_change',
+                      status: item.status,
+                      title: getStatusLabel(item.status),
+                      timestamp: item.created_at,
+                      notes: item.notes,
+                      icon: getStatusIcon(item.status),
+                      iconBg: 'bg-primary/10'
+                    }));
+
+                    const events = [];
+
+                    // 1. Add "Pedido Gerado" milestone (if not already in dbEvents as 'pendente')
+                    const hasPendente = dbEvents.some(e => e.status === 'pendente');
+                    if (!hasPendente) {
+                      events.push({
                         id: 'creation-' + order.id,
                         type: 'creation',
+                        status: 'pendente',
                         title: 'Pedido Gerado',
                         timestamp: order.created_at,
                         notes: 'O pedido foi criado no sistema.',
                         icon: <Package className="h-4 w-4 text-blue-500" />,
                         iconBg: 'bg-blue-500/10'
-                      },
-                      ...statusHistory.map(item => ({
-                        id: item.id,
+                      });
+                    }
+
+                    // 2. Add "Pedido Pago" milestone (if active and not already in dbEvents as 'pago')
+                    const isPaid = order.payment_status === 'paid' || ['pago', 'recebido', 'embalado', 'enviado', 'finalizado', 'reembolsado'].includes(order.status);
+                    const hasPago = dbEvents.some(e => e.status === 'pago');
+                    if (isPaid && !hasPago) {
+                      events.push({
+                        id: 'synthesis-paid-' + order.id,
                         type: 'status_change',
-                        title: getStatusLabel(item.status),
-                        timestamp: item.created_at,
-                        notes: item.notes,
-                        icon: getStatusIcon(item.status),
+                        status: 'pago',
+                        title: getStatusLabel('pago'),
+                        timestamp: order.created_at, // fallback
+                        notes: 'Pagamento confirmado.',
+                        icon: getStatusIcon('pago'),
                         iconBg: 'bg-primary/10'
-                      })),
-                      ...tickets.map(ticket => ({
-                        id: ticket.id,
-                        type: 'ticket',
-                        title: `Ticket Aberto (${TICKET_TYPE_LABELS[ticket.tipo as keyof typeof TICKET_TYPE_LABELS] || ticket.tipo})`,
-                        timestamp: ticket.created_at,
-                        notes: `Ticket #${ticket.ticket_number} - Motivo: ${ticket.reason}`,
-                        icon: <Ticket className="h-4 w-4 text-red-500" />,
-                        iconBg: 'bg-red-500/10'
-                      }))
-                    ].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+                      });
+                    }
+
+                    // 3. Add other milestones if active and not in dbEvents
+                    const milestones = [
+                      { status: 'recebido', notes: 'Pedido recebido pelo fornecedor.' },
+                      { status: 'embalado', notes: 'Pedido embalado e aguardando envio.' },
+                      { status: 'enviado', notes: order.tracking_number ? `Pedido enviado. Código de rastreio: ${order.tracking_number}` : 'Pedido enviado.' },
+                      { status: 'finalizado', notes: 'Pedido entregue e finalizado.' },
+                      { status: 'cancelado', notes: 'Pedido cancelado.' },
+                      { status: 'reembolsado', notes: 'Pedido reembolsado.' }
+                    ];
+
+                    milestones.forEach(m => {
+                      let isActive = false;
+                      if (m.status === 'recebido') {
+                        isActive = ['recebido', 'embalado', 'enviado', 'finalizado'].includes(order.status);
+                      } else if (m.status === 'embalado') {
+                        isActive = ['embalado', 'enviado', 'finalizado'].includes(order.status);
+                      } else if (m.status === 'enviado') {
+                        isActive = ['enviado', 'finalizado'].includes(order.status);
+                      } else if (m.status === 'finalizado') {
+                        isActive = order.status === 'finalizado';
+                      } else if (m.status === 'cancelado') {
+                        isActive = order.status === 'cancelado';
+                      } else if (m.status === 'reembolsado') {
+                        isActive = order.status === 'reembolsado' || order.payment_status === 'refunded';
+                      }
+
+                      const hasStatus = dbEvents.some(e => e.status === m.status);
+                      if (isActive && !hasStatus) {
+                        events.push({
+                          id: `synthesis-${m.status}-${order.id}`,
+                          type: 'status_change',
+                          status: m.status,
+                          title: getStatusLabel(m.status),
+                          timestamp: m.status === order.status ? order.updated_at : order.created_at, // Use updated_at for current status as it represents the last update time
+                          notes: m.notes,
+                          icon: getStatusIcon(m.status),
+                          iconBg: 'bg-primary/10'
+                        });
+                      }
+                    });
+
+                    // 4. Add dbEvents
+                    events.push(...dbEvents);
+
+                    // 5. Add tickets
+                    events.push(...tickets.map(ticket => ({
+                      id: ticket.id,
+                      type: 'ticket',
+                      title: `Ticket Aberto (${TICKET_TYPE_LABELS[ticket.tipo as keyof typeof TICKET_TYPE_LABELS] || ticket.tipo})`,
+                      timestamp: ticket.created_at,
+                      notes: `Ticket #${ticket.ticket_number} - Motivo: ${ticket.reason}`,
+                      icon: <Ticket className="h-4 w-4 text-red-500" />,
+                      iconBg: 'bg-red-500/10'
+                    })));
+
+                    // 6. Sort all events
+                    const getStatusOrder = (evt) => {
+                      if (evt.type === 'creation') return 0;
+                      if (evt.type === 'ticket') return 100;
+                      switch (evt.status) {
+                        case 'pendente': return 1;
+                        case 'pago': return 2;
+                        case 'recebido': return 3;
+                        case 'embalado': return 4;
+                        case 'enviado': return 5;
+                        case 'finalizado': return 6;
+                        case 'cancelado': return 7;
+                        case 'reembolsado': return 8;
+                        default: return 50;
+                      }
+                    };
+
+                    events.sort((a, b) => {
+                      const timeA = new Date(a.timestamp).getTime();
+                      const timeB = new Date(b.timestamp).getTime();
+                      if (timeA !== timeB) {
+                        return timeA - timeB;
+                      }
+                      return getStatusOrder(a) - getStatusOrder(b);
+                    });
 
                     return events.map(event => (
-                      <div key={event.id} className="flex items-start gap-3">
+                      <div key={event.id} className="flex items-start gap-3 text-left">
                         <div className={`flex items-center justify-center w-8 h-8 rounded-full mt-0.5 ${event.iconBg}`}>
                           {event.icon}
                         </div>
