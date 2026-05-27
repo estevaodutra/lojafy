@@ -105,6 +105,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [refundUploadFile, setRefundUploadFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  
+  const paidEntry = statusHistory.find(h => h.status === 'pago');
+  const paidAt = paidEntry ? paidEntry.created_at : (order?.payment_status === 'paid' ? order.created_at : null);
   const [isRefundUploading, setIsRefundUploading] = useState(false);
   const [currentProductCosts, setCurrentProductCosts] = useState<Record<string, number>>({});
   const [existingTicketId, setExistingTicketId] = useState<string | null>(null);
@@ -645,6 +648,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             order={order}
             userRole={profile.role || 'customer'}
             deliveredAt={deliveredAt}
+            paidAt={paidAt}
             existingTicketId={existingTicketId}
             onRefresh={() => {
               fetchOrderDetails();
@@ -1116,6 +1120,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                       orderStatus={order.status}
                       paymentStatus={order.payment_status}
                       deliveredAt={deliveredAt}
+                      paidAt={paidAt}
                       existingTicketId={existingTicketId}
                       variant="default"
                       size="default"
@@ -1300,13 +1305,15 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             {/* Related Tickets */}
             <RelatedTickets orderId={order.id} />
             {/* Status History */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Histórico
-                </CardTitle>
-              </CardHeader>
+            {(() => {
+              return (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Histórico
+                    </CardTitle>
+                  </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {(() => {
@@ -1521,6 +1528,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     orderStatus={order.status}
                     paymentStatus={order.payment_status}
                     deliveredAt={deliveredAt}
+                    paidAt={paidAt}
                     existingTicketId={existingTicketId}
                     variant="default"
                     size="sm"
@@ -1543,6 +1551,8 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                 </div>
               </CardContent>
             </Card>
+              );
+            })()}
 
             {/* Order Notes */}
             {order.notes && <Card>

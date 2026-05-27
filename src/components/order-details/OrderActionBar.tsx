@@ -41,12 +41,13 @@ interface OrderActionBarProps {
   };
   userRole: string;
   deliveredAt?: string | null;
+  paidAt?: string | null;
   existingTicketId?: string | null;
   onRefresh: () => void;
 }
 
 export const OrderActionBar = ({
-  order, userRole, deliveredAt, existingTicketId, onRefresh,
+  order, userRole, deliveredAt, paidAt, existingTicketId, onRefresh,
 }: OrderActionBarProps) => {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [requestCancelOpen, setRequestCancelOpen] = useState(false);
@@ -113,6 +114,7 @@ export const OrderActionBar = ({
           orderStatus={order.status}
           paymentStatus={order.payment_status}
           deliveredAt={deliveredAt}
+          paidAt={paidAt}
           existingTicketId={existingTicketId}
           variant="outline"
           size="sm"

@@ -5075,7 +5075,7 @@ export type Database = {
         | "aguardando_cliente"
         | "resolvido"
         | "cancelado"
-      order_ticket_type: "reembolso" | "troca" | "cancelamento"
+      order_ticket_type: "reembolso" | "troca" | "cancelamento" | "verificacao_envio"
       origem_tipo: "lojafy" | "loja" | "importado" | "convite"
       subscription_plan: "free" | "premium"
       ticket_author_type:
@@ -5259,7 +5259,7 @@ export const Constants = {
         "resolvido",
         "cancelado",
       ],
-      order_ticket_type: ["reembolso", "troca", "cancelamento"],
+      order_ticket_type: ["reembolso", "troca", "cancelamento", "verificacao_envio"],
       origem_tipo: ["lojafy", "loja", "importado", "convite"],
       subscription_plan: ["free", "premium"],
       ticket_author_type: [

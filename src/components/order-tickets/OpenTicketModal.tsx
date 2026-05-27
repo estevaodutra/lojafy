@@ -30,6 +30,7 @@ interface OpenTicketModalProps {
   orderStatus: string;
   paymentStatus: string;
   deliveredAt?: string | null;
+  paidAt?: string | null;
 }
 
 const MIN_REASON_LENGTH = 20;
@@ -38,6 +39,7 @@ const typeDescriptions: Record<OrderTicketType, string> = {
   reembolso: 'Solicite a devolução do valor pago pelo pedido.',
   troca: 'Solicite a substituição de um produto por outro. Disponível até 7 dias após a entrega.',
   cancelamento: 'Cancele o pedido antes do envio.',
+  verificacao_envio: 'Verifique o status do envio se o seu pedido já foi pago há mais de 24 horas e ainda não foi enviado.',
 };
 
 export const OpenTicketModal = ({
@@ -47,6 +49,7 @@ export const OpenTicketModal = ({
   orderStatus,
   paymentStatus,
   deliveredAt,
+  paidAt,
 }: OpenTicketModalProps) => {
   const [tipo, setTipo] = useState<OrderTicketType | ''>('');
   const [reason, setReason] = useState('');
@@ -55,8 +58,8 @@ export const OpenTicketModal = ({
   const { createTicket, isCreating } = useOrderTickets();
 
   const availableTypes = useMemo(
-    () => getAvailableTicketTypes(orderStatus, paymentStatus, deliveredAt),
-    [orderStatus, paymentStatus, deliveredAt]
+    () => getAvailableTicketTypes(orderStatus, paymentStatus, deliveredAt, paidAt),
+    [orderStatus, paymentStatus, deliveredAt, paidAt]
   );
 
   const isValidReason = reason.trim().length >= MIN_REASON_LENGTH;

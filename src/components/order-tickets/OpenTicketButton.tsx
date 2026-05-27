@@ -11,6 +11,7 @@ interface OpenTicketButtonProps {
   orderStatus: string;
   paymentStatus: string;
   deliveredAt?: string | null;
+  paidAt?: string | null;
   existingTicketId?: string | null;
   variant?: 'default' | 'outline' | 'ghost' | 'link';
   size?: 'default' | 'sm' | 'lg' | 'icon';
@@ -22,6 +23,7 @@ export const OpenTicketButton = ({
   orderStatus,
   paymentStatus,
   deliveredAt,
+  paidAt,
   existingTicketId,
   variant = 'outline',
   size = 'sm',
@@ -52,7 +54,7 @@ export const OpenTicketButton = ({
   }
 
   // Check if any ticket types are available
-  const availableTypes = getAvailableTicketTypes(orderStatus, paymentStatus, deliveredAt);
+  const availableTypes = getAvailableTicketTypes(orderStatus, paymentStatus, deliveredAt, paidAt);
   
   if (availableTypes.length === 0) {
     return null;
@@ -77,6 +79,7 @@ export const OpenTicketButton = ({
         orderStatus={orderStatus}
         paymentStatus={paymentStatus}
         deliveredAt={deliveredAt}
+        paidAt={paidAt}
       />
     </>
   );

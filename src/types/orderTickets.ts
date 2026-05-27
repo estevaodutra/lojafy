@@ -1,6 +1,6 @@
 // Types for Order Tickets System
 
-export type OrderTicketType = 'reembolso' | 'troca' | 'cancelamento';
+export type OrderTicketType = 'reembolso' | 'troca' | 'cancelamento' | 'verificacao_envio';
 export type OrderTicketStatus = 'aberto' | 'em_analise' | 'aguardando_cliente' | 'resolvido' | 'cancelado';
 export type TicketAuthorType = 'cliente' | 'revendedor' | 'fornecedor' | 'superadmin' | 'sistema';
 
@@ -96,13 +96,15 @@ export const SLA_CONFIG: Record<OrderTicketType, { firstResponse: number; resolu
   cancelamento: { firstResponse: 4, resolution: 24 },     // hours
   reembolso: { firstResponse: 24, resolution: 72 },       // hours
   troca: { firstResponse: 24, resolution: 168 },          // hours (7 days)
+  verificacao_envio: { firstResponse: 12, resolution: 48 }, // hours (2 days)
 };
 
 // Get available ticket types based on order status
 export const getAvailableTicketTypes = (
   orderStatus: string, 
   paymentStatus: string,
-  deliveredAt?: string | null
+  deliveredAt?: string | null,
+  paidAt?: string | null
 ): OrderTicketType[] => {
   const types: OrderTicketType[] = [];
   
@@ -131,6 +133,16 @@ export const getAvailableTicketTypes = (
   if (isBeforeShipping && paymentStatus === 'paid') {
     types.push('cancelamento');
   }
+
+  // Verificação de status de envio: pago, antes do envio, e com mais de 24h passadas desde o pagamento
+  if (paymentStatus === 'paid' && isBeforeShipping && paidAt) {
+    const paidDate = new Date(paidAt);
+    const now = new Date();
+    const hoursSincePayment = (now.getTime() - paidDate.getTime()) / (1000 * 60 * 60);
+    if (hoursSincePayment >= 24) {
+      types.push('verificacao_envio');
+    }
+  }
   
   return types;
 };
@@ -149,6 +161,7 @@ export const TICKET_TYPE_LABELS: Record<OrderTicketType, string> = {
   reembolso: 'Reembolso',
   troca: 'Troca',
   cancelamento: 'Cancelamento',
+  verificacao_envio: 'Verificação de status de envio',
 };
 
 // Author type labels

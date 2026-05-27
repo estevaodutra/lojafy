@@ -2,7 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { OrderTicketType } from '@/types/orderTickets';
 import { TICKET_TYPE_LABELS } from '@/types/orderTickets';
-import { RefreshCw, DollarSign, Ban } from 'lucide-react';
+import { RefreshCw, DollarSign, Ban, Truck } from 'lucide-react';
 
 interface TicketTypeBadgeProps {
   tipo: OrderTicketType;
@@ -22,6 +22,10 @@ const typeConfig: Record<OrderTicketType, { icon: typeof DollarSign; className: 
   cancelamento: {
     icon: Ban,
     className: 'bg-red-100 text-red-700 hover:bg-red-200',
+  },
+  verificacao_envio: {
+    icon: Truck,
+    className: 'bg-blue-100 text-blue-700 hover:bg-blue-200',
   },
 };
 
