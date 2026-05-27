@@ -406,10 +406,12 @@ const ordersEndpoints: EndpointData[] = [
     title: 'Listar Pedidos Completos',
     method: 'GET',
     url: '/functions/v1/api-pedidos-listar',
-    description: 'Retorna lista completa de pedidos com todos os detalhes.',
+    description: 'Retorna lista completa de pedidos com todos os detalhes. O filtro de data considera o fuso horário de Brasília (UTC-3).',
     queryParams: [
-      { name: 'period', description: 'Período: today, 7days, 30days', example: '7days' },
-      { name: 'status', description: 'Filtrar por status', example: 'confirmed' }
+      { name: 'period', description: 'Período pré-definido: today, yesterday, 7days, 14days, 30days (sobrescrito por date)', example: '7days' },
+      { name: 'date', description: 'Busca por data específica (sobrescreve o period). Aceita formatos dd-mm-yyyy ou yyyy-mm-dd', example: '26-05-2026' },
+      { name: 'status', description: 'Filtrar por status do pedido', example: 'confirmed' },
+      { name: 'payment_status', description: 'Filtrar por status do pagamento', example: 'paid' }
     ],
     responseExample: {
       success: true,

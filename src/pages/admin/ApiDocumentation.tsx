@@ -69,7 +69,7 @@ const ApiDocumentation: React.FC = () => {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-full overflow-x-hidden">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -81,9 +81,9 @@ const ApiDocumentation: React.FC = () => {
       </div>
 
       {/* Two-column layout */}
-      <div className="flex gap-6 min-h-[calc(100vh-200px)]">
+      <div className="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-200px)]">
         {/* Left sidebar navigation */}
-        <div className="w-72 shrink-0">
+        <div className="w-full lg:w-72 shrink-0">
           <ApiDocsSidebar
             selectedSection={selectedSection}
             onSectionChange={handleSectionChange}
