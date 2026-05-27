@@ -32,7 +32,7 @@ async function generateHmacSignature(secret: string, payload: string): Promise<s
 
 // Fetch last paid order with customer, reseller, items and shipping label
 async function fetchLastPaidOrder(supabase: any): Promise<Record<string, any> | null> {
-  console.log('[dispatch-webhook] Buscando Ãºltimo pedido pago...');
+  console.log('[dispatch-webhook] Buscando último pedido pago...');
   
   // Get last paid order
   const { data: order, error: orderError } = await supabase
@@ -56,17 +56,22 @@ async function fetchLastPaidOrder(supabase: any): Promise<Record<string, any> | 
     return null;
   }
 
-  // Get users with email using RPC (includes auth.users data)
-  const { data: usersWithEmail } = await supabase.rpc('get_users_with_email');
-  
-  // Find customer data
-  const customerData = usersWithEmail?.find((u: any) => u.user_id === order.user_id);
-  const customerEmail = customerData?.email || null;
-  const customerProfile = customerData ? {
-    first_name: customerData.first_name,
-    last_name: customerData.last_name,
-    phone: customerData.phone,
-  } : null;
+  // Buscar email do cliente via admin API (service role, sem restricoes de RLS)
+  let customerEmail: string | null = null;
+  let customerProfile: { first_name: string; last_name: string; phone: string } | null = null;
+
+  if (order.user_id) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('first_name, last_name, phone')
+      .eq('user_id', order.user_id)
+      .single();
+    const { data: authUser } = await supabase.auth.admin.getUserById(order.user_id);
+    customerEmail = authUser?.user?.email || null;
+    if (profile) {
+      customerProfile = { first_name: profile.first_name, last_name: profile.last_name, phone: profile.phone };
+    }
+  }
   
   // Get reseller store info
   let resellerData = null;
@@ -130,7 +135,7 @@ async function fetchLastPaidOrder(supabase: any): Promise<Record<string, any> | 
     payment_method: order.payment_method,
     customer: {
       user_id: order.user_id,
-      email: customerEmail || 'email@exemplo.com',
+      email: customerEmail,
       name: customerName,
       phone: customerProfile?.phone || null,
     },
@@ -143,7 +148,7 @@ async function fetchLastPaidOrder(supabase: any): Promise<Record<string, any> | 
   };
 }
 
-// Fetch a specific order by id â€” used to enrich sparse order.paid payloads
+// Fetch a specific order by id — used to enrich sparse order.paid payloads
 async function fetchOrderById(supabase: any, orderId: string): Promise<Record<string, any> | null> {
   const { data: order, error: orderError } = await supabase
     .from('orders')
@@ -153,13 +158,22 @@ async function fetchOrderById(supabase: any, orderId: string): Promise<Record<st
 
   if (orderError || !order) return null;
 
-  const { data: usersWithEmail } = await supabase.rpc('get_users_with_email');
-  const customerData = usersWithEmail?.find((u: any) => u.user_id === order.user_id);
-  const customerProfile = customerData ? {
-    first_name: customerData.first_name,
-    last_name: customerData.last_name,
-    phone: customerData.phone,
-  } : null;
+  // Buscar email do cliente via admin API (service role, sem restricoes de RLS)
+  let customerProfile: { first_name: string; last_name: string; phone: string } | null = null;
+  let customerEmail: string | null = null;
+
+  if (order.user_id) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('first_name, last_name, phone')
+      .eq('user_id', order.user_id)
+      .single();
+    const { data: authUser } = await supabase.auth.admin.getUserById(order.user_id);
+    customerEmail = authUser?.user?.email || null;
+    if (profile) {
+      customerProfile = { first_name: profile.first_name, last_name: profile.last_name, phone: profile.phone };
+    }
+  }
 
   let resellerData = null;
   if (order.reseller_id) {
@@ -207,7 +221,7 @@ async function fetchOrderById(supabase: any, orderId: string): Promise<Record<st
     payment_method: order.payment_method,
     customer: {
       user_id: order.user_id,
-      email: customerData?.email || 'email@exemplo.com',
+      email: customerEmail,
       name: customerName,
       phone: customerProfile?.phone || null,
     },
@@ -219,18 +233,18 @@ async function fetchOrderById(supabase: any, orderId: string): Promise<Record<st
 
 // Fetch last created user
 async function fetchLastCreatedUser(supabase: any): Promise<Record<string, any> | null> {
-  console.log('[dispatch-webhook] Buscando Ãºltimo usuÃ¡rio criado...');
+  console.log('[dispatch-webhook] Buscando último usuário criado...');
   
   // Use RPC to get users with email (already ordered by created_at DESC)
   const { data: usersWithEmail, error } = await supabase.rpc('get_users_with_email');
 
   if (error || !usersWithEmail || usersWithEmail.length === 0) {
-    console.log('[dispatch-webhook] Nenhum usuÃ¡rio encontrado:', error?.message);
+    console.log('[dispatch-webhook] Nenhum usuário encontrado:', error?.message);
     return null;
   }
 
   const lastUser = usersWithEmail[0];
-  const userName = `${lastUser.first_name || ''} ${lastUser.last_name || ''}`.trim() || 'UsuÃ¡rio';
+  const userName = `${lastUser.first_name || ''} ${lastUser.last_name || ''}`.trim() || 'Usuário';
 
   return {
     user_id: lastUser.user_id,
@@ -249,7 +263,7 @@ async function fetchLastCreatedUser(supabase: any): Promise<Record<string, any> 
 
 // Fetch inactive user by days
 async function fetchInactiveUser(supabase: any, days: number): Promise<Record<string, any> | null> {
-  console.log(`[dispatch-webhook] Buscando usuÃ¡rio inativo hÃ¡ ${days}+ dias...`);
+  console.log(`[dispatch-webhook] Buscando usuário inativo há ${days}+ dias...`);
   
   // Calculate the date threshold
   const thresholdDate = new Date();
@@ -259,7 +273,7 @@ async function fetchInactiveUser(supabase: any, days: number): Promise<Record<st
   const { data: usersWithEmail, error } = await supabase.rpc('get_users_with_email');
 
   if (error || !usersWithEmail) {
-    console.log(`[dispatch-webhook] Erro ao buscar usuÃ¡rios:`, error?.message);
+    console.log(`[dispatch-webhook] Erro ao buscar usuários:`, error?.message);
     return null;
   }
 
@@ -271,7 +285,7 @@ async function fetchInactiveUser(supabase: any, days: number): Promise<Record<st
   });
 
   if (inactiveUsers.length === 0) {
-    console.log(`[dispatch-webhook] Nenhum usuÃ¡rio inativo hÃ¡ ${days}+ dias encontrado`);
+    console.log(`[dispatch-webhook] Nenhum usuário inativo há ${days}+ dias encontrado`);
     return null;
   }
 
@@ -281,7 +295,7 @@ async function fetchInactiveUser(supabase: any, days: number): Promise<Record<st
   );
 
   const user = inactiveUsers[0];
-  const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'UsuÃ¡rio';
+  const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Usuário';
   
   // Calculate actual days inactive
   const lastActivity = new Date(user.last_sign_in_at);
@@ -313,34 +327,34 @@ async function fetchRealTestData(supabase: any, eventType: string): Promise<{ da
       const userData = await fetchLastCreatedUser(supabase);
       return {
         data: userData,
-        error: userData ? null : 'Nenhum usuÃ¡rio encontrado para teste',
+        error: userData ? null : 'Nenhum usuário encontrado para teste',
       };
     
     case 'user.inactive.7days':
       const inactive7 = await fetchInactiveUser(supabase, 7);
       return {
         data: inactive7,
-        error: inactive7 ? null : 'Nenhum usuÃ¡rio inativo hÃ¡ 7+ dias encontrado',
+        error: inactive7 ? null : 'Nenhum usuário inativo há 7+ dias encontrado',
       };
     
     case 'user.inactive.15days':
       const inactive15 = await fetchInactiveUser(supabase, 15);
       return {
         data: inactive15,
-        error: inactive15 ? null : 'Nenhum usuÃ¡rio inativo hÃ¡ 15+ dias encontrado',
+        error: inactive15 ? null : 'Nenhum usuário inativo há 15+ dias encontrado',
       };
     
     case 'user.inactive.30days':
       const inactive30 = await fetchInactiveUser(supabase, 30);
       return {
         data: inactive30,
-        error: inactive30 ? null : 'Nenhum usuÃ¡rio inativo hÃ¡ 30+ dias encontrado',
+        error: inactive30 ? null : 'Nenhum usuário inativo há 30+ dias encontrado',
       };
     
     default:
       return {
         data: null,
-        error: `Evento ${eventType} nÃ£o suporta dados reais de teste`,
+        error: `Evento ${eventType} não suporta dados reais de teste`,
       };
   }
 }
@@ -356,24 +370,25 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const body = await req.json();
-    const { event_type, payload: providedPayload, is_test = false, use_real_data = false } = body;
+    const { event_type, payload: providedPayload, is_test = false, use_real_data = false, ignore_deduplication = false } = body;
 
     if (!event_type) {
       return new Response(
-        JSON.stringify({ success: false, error: 'event_type Ã© obrigatÃ³rio' }),
+        JSON.stringify({ success: false, error: 'event_type é obrigatório' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     console.log(`[dispatch-webhook] Disparando evento: ${event_type}, is_test: ${is_test}, use_real_data: ${use_real_data}`);
 
-    // Auto-enrich order.paid payload quando vier incompleto (sem customer)
+        // Auto-enrich order.paid payload sempre em producao para garantir dados consistentes e reais do cliente
     let payload = providedPayload;
-    if (event_type === 'order.paid' && !is_test && payload?.order_id && !payload?.customer) {
+    if (event_type === 'order.paid' && !is_test && !ignore_deduplication && payload?.order_id) {
       console.log(`[dispatch-webhook] Enriquecendo payload para order ${payload.order_id}`);
       const enriched = await fetchOrderById(supabase, payload.order_id);
       if (enriched) {
-        payload = { ...enriched, ...payload }; // campos do caller tÃªm precedÃªncia
+        // Dados reais do banco (com service role) sobrescrevem quaisquer fallbacks dos callers
+        payload = { ...payload, ...enriched }; 
       }
     }
 
@@ -397,7 +412,7 @@ Deno.serve(async (req) => {
       console.log(`[dispatch-webhook] Dados reais encontrados para ${event_type}`);
     }
 
-    // Buscar configuraÃ§Ã£o do webhook
+    // Buscar configuração do webhook
     const { data: webhookConfig, error: configError } = await supabase
       .from('webhook_settings')
       .select('*')
@@ -405,16 +420,16 @@ Deno.serve(async (req) => {
       .single();
 
     if (configError || !webhookConfig) {
-      console.error(`[dispatch-webhook] ConfiguraÃ§Ã£o nÃ£o encontrada para: ${event_type}`);
+      console.error(`[dispatch-webhook] Configuração não encontrada para: ${event_type}`);
       return new Response(
-        JSON.stringify({ success: false, error: 'ConfiguraÃ§Ã£o de webhook nÃ£o encontrada' }),
+        JSON.stringify({ success: false, error: 'Configuração de webhook não encontrada' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Verificar se estÃ¡ ativo
+    // Verificar se está ativo
     if (!webhookConfig.active && !is_test) {
-      console.log(`[dispatch-webhook] Webhook ${event_type} estÃ¡ inativo, ignorando`);
+      console.log(`[dispatch-webhook] Webhook ${event_type} está inativo, ignorando`);
       return new Response(
         JSON.stringify({ success: false, error: 'Webhook desativado' }),
         { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -425,15 +440,33 @@ Deno.serve(async (req) => {
     if (!webhookConfig.webhook_url) {
       console.log(`[dispatch-webhook] Webhook ${event_type} sem URL configurada`);
       return new Response(
-        JSON.stringify({ success: false, error: 'URL do webhook nÃ£o configurada' }),
+        JSON.stringify({ success: false, error: 'URL do webhook não configurada' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // DeduplicaÃ§Ã£o: verificar se order.paid jÃ¡ foi disparado para este pedido nos Ãºltimos 60 segundos
-    if (event_type === 'order.paid' && !is_test && payload?.order_id) {
+    // Deduplicacao robusta: checar webhook_paid_status na tabela orders (cobre qualquer intervalo de tempo)
+    if (event_type === 'order.paid' && !is_test && !ignore_deduplication && payload?.order_id) {
+      const { data: orderCheck } = await supabase
+        .from('orders')
+        .select('id, webhook_paid_status, order_number')
+        .eq('id', payload.order_id)
+        .maybeSingle();
+
+      if (orderCheck?.webhook_paid_status === 'sent') {
+        console.log(`[dispatch-webhook] Deduplicacao: order.paid para ${payload.order_id} (pedido ${orderCheck.order_number}) ja foi enviado com sucesso, ignorando`);
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            deduplicated: true,
+            message: 'Webhook ja disparado com sucesso para este pedido' 
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Fallback: verificar logs recentes (ultimos 60s) para evitar race conditions
       const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
-      
       const { data: recentDispatches } = await supabase
         .from('webhook_dispatch_logs')
         .select('id, payload')
@@ -446,19 +479,19 @@ Deno.serve(async (req) => {
       );
       
       if (duplicateFound) {
-        console.log(`[dispatch-webhook] DeduplicaÃ§Ã£o: order.paid para ${payload.order_id} jÃ¡ disparado hÃ¡ menos de 60s, ignorando`);
+        console.log(`[dispatch-webhook] Deduplicacao (60s): order.paid para ${payload.order_id} ja disparado recentemente, ignorando`);
         return new Response(
           JSON.stringify({ 
             success: true, 
             deduplicated: true,
-            message: 'Webhook jÃ¡ disparado recentemente para este pedido' 
+            message: 'Webhook ja disparado recentemente para este pedido' 
           }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
     }
 
-    // Montar payload final
+        // Montar payload final
     const webhookPayload: WebhookPayload = {
       event: event_type,
       timestamp: new Date().toISOString(),
@@ -469,7 +502,7 @@ Deno.serve(async (req) => {
       webhookPayload.data._test = true;
       webhookPayload.data._test_message = use_real_data 
         ? 'Dados reais do banco de dados (teste)' 
-        : 'Este Ã© um evento de teste';
+        : 'Este é um evento de teste';
     }
 
     const payloadString = JSON.stringify(webhookPayload);
@@ -513,7 +546,7 @@ Deno.serve(async (req) => {
       clearTimeout(timeoutId);
       
       if (fetchError.name === 'AbortError') {
-        errorMessage = `Timeout: webhook nÃ£o respondeu em ${timeoutMs / 1000} segundos`;
+        errorMessage = `Timeout: webhook não respondeu em ${timeoutMs / 1000} segundos`;
         statusCode = 408;
       } else {
         errorMessage = fetchError.message || 'Erro ao conectar com webhook';
@@ -545,7 +578,7 @@ Deno.serve(async (req) => {
 
     const success = statusCode >= 200 && statusCode < 300;
 
-    // Marcar status do envio do webhook no pedido (apenas order.paid em produÃ§Ã£o)
+    // Marcar status do envio do webhook no pedido (apenas order.paid em produção)
     if (event_type === 'order.paid' && !is_test && payload?.order_id) {
       const updatePayload: Record<string, any> = {
         webhook_paid_status: success ? 'sent' : 'failed',

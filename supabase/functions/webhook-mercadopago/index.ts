@@ -1,4 +1,4 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
+﻿import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
@@ -205,9 +205,21 @@ serve(async (req) => {
         console.log('Unknown payment status:', paymentData.status);
     }
 
-    // Verificar se o pedido já foi cancelado por expiração
+    // Idempotencia: se pedido ja esta pago, nao re-disparar webhook
+    if (orderData.payment_status === 'paid' && paymentData.status === 'approved') {
+      console.log('?? Order already paid, skipping duplicate processing for order:', orderData.id);
+      return new Response(
+        JSON.stringify({ 
+          message: 'Order already paid - skipping duplicate', 
+          order_id: orderData.id 
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verificar se o pedido ja foi cancelado por expiracao
     if (orderData.status === 'cancelled' && orderData.payment_status === 'expired') {
-      console.log('⚠️ Order was already cancelled due to expiration');
+      console.log('?? Order was already cancelled due to expiration');
       return new Response(
         JSON.stringify({ 
           message: 'Order expired and cancelled', 
@@ -219,16 +231,23 @@ serve(async (req) => {
 
     console.log('Updating order status:', { newStatus, paymentStatus });
 
-    // Update order status
-    const { error: updateError } = await supabase
+    // Update order status - atomic update para evitar duplicatas
+    const { data: updatedOrderData, error: updateError } = await supabase
       .from('orders')
       .update({
         status: newStatus,
         payment_status: paymentStatus,
         updated_at: new Date().toISOString()
       })
-      .eq('id', orderData.id);
+      .eq('id', orderData.id)
+      .neq('payment_status', 'paid')
+      .select('id')
+      .maybeSingle();
 
+    if (!updatedOrderData && !updateError) {
+      console.log('?? Order already marked as paid by another process, skipping webhook dispatch');
+      return new Response('OK', { status: 200, headers: corsHeaders });
+    }
     if (updateError) {
       console.error('Failed to update order:', updateError);
       return new Response('Failed to update order', { status: 500, headers: corsHeaders });

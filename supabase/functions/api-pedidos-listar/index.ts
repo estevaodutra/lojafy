@@ -237,6 +237,7 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url);
     const period = url.searchParams.get('period') || '30days';
+    const dateParam = url.searchParams.get('date');
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
     const page = Math.max(parseInt(url.searchParams.get('page') || '1'), 1);
     const status = url.searchParams.get('status');
@@ -244,6 +245,7 @@ Deno.serve(async (req) => {
 
     console.log('[api-pedidos-listar] Request received', {
       period,
+      dateParam,
       limit,
       page,
       status,
@@ -251,7 +253,63 @@ Deno.serve(async (req) => {
       apiKeyUserId: apiKeyData.user_id
     });
 
-    const { startDate, endDate } = getPeriodFilter(period);
+    let startDate: Date;
+    let endDate: Date | null = null;
+
+    if (dateParam) {
+      const dmyRegex = /^(\d{2})-(\d{2})-(\d{4})$/;
+      const ymdRegex = /^(\d{4})-(\d{2})-(\d{2})$/;
+      
+      let day = 0, month = 0, year = 0;
+      let isValidFormat = false;
+      
+      if (dmyRegex.test(dateParam)) {
+        const matches = dateParam.match(dmyRegex)!;
+        day = parseInt(matches[1], 10);
+        month = parseInt(matches[2], 10) - 1; // 0-indexed
+        year = parseInt(matches[3], 10);
+        isValidFormat = true;
+      } else if (ymdRegex.test(dateParam)) {
+        const matches = dateParam.match(ymdRegex)!;
+        year = parseInt(matches[1], 10);
+        month = parseInt(matches[2], 10) - 1;
+        day = parseInt(matches[3], 10);
+        isValidFormat = true;
+      }
+      
+      if (!isValidFormat) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Formato de data inválido. Use dd-mm-yyyy ou yyyy-mm-dd' 
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Validar limites reais do calendário
+      const dateCheck = new Date(year, month, day);
+      if (dateCheck.getFullYear() !== year || dateCheck.getMonth() !== month || dateCheck.getDate() !== day) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Data inválida no calendário' 
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Como o banco armazena em UTC e as vendas ocorrem no horário de Brasília (UTC-3):
+      // - O dia começa às 00:00:00 local, que equivale a 03:00:00 UTC do mesmo dia.
+      // - O dia termina às 23:59:59.999 local, que equivale a 02:59:59.999 UTC do dia seguinte.
+      startDate = new Date(Date.UTC(year, month, day, 3, 0, 0, 0));
+      endDate = new Date(Date.UTC(year, month, day + 1, 2, 59, 59, 999));
+    } else {
+      const periodResult = getPeriodFilter(period);
+      startDate = periodResult.startDate;
+      endDate = periodResult.endDate;
+    }
+
     const offset = (page - 1) * limit;
 
     let query = supabaseClient
@@ -414,7 +472,8 @@ Deno.serve(async (req) => {
           hasNext: page < totalPages,
           hasPrev: page > 1
         },
-        period,
+        period: dateParam ? null : period,
+        date: dateParam || null,
         filters: {
           status: status || null,
           payment_status: paymentStatus || null

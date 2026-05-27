@@ -157,6 +157,7 @@ serve(async (req) => {
     const { data: dispatchResult, error: dispatchError } = await supabase.functions.invoke('dispatch-webhook', {
       body: {
         event_type: 'order.paid',
+        ignore_deduplication: true,
         payload: webhookPayload,
       },
     });
