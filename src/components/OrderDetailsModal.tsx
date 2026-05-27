@@ -1312,7 +1312,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                       id: item.id,
                       type: 'status_change',
                       status: item.status,
-                      title: getStatusLabel(item.status),
+                      title: item.status === 'pago' ? 'Aguardando Recebimento' : getStatusLabel(item.status),
                       timestamp: item.created_at,
                       notes: item.notes,
                       icon: getStatusIcon(item.status),
@@ -1321,82 +1321,145 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
                     const events = [];
 
-                    // 1. Add "Pedido Gerado" milestone (if not already in dbEvents as 'pendente')
-                    const hasPendente = dbEvents.some(e => e.status === 'pendente');
-                    if (!hasPendente) {
+                    // 1. Pedido Gerado
+                    events.push({
+                      id: 'creation-' + order.id,
+                      type: 'creation',
+                      status: 'pendente',
+                      title: 'Pedido Gerado',
+                      timestamp: order.created_at,
+                      notes: 'O pedido foi criado no sistema.',
+                      icon: <Package className="h-4 w-4 text-blue-500" />,
+                      iconBg: 'bg-blue-500/10'
+                    });
+
+                    // 2. Pedido Pago
+                    const isPaid = order.payment_status === 'paid' || ['pago', 'recebido', 'embalado', 'enviado', 'finalizado', 'reembolsado'].includes(order.status);
+                    const dbPago = dbEvents.find(e => e.status === 'pago');
+                    if (isPaid) {
                       events.push({
-                        id: 'creation-' + order.id,
-                        type: 'creation',
-                        status: 'pendente',
-                        title: 'Pedido Gerado',
-                        timestamp: order.created_at,
-                        notes: 'O pedido foi criado no sistema.',
-                        icon: <Package className="h-4 w-4 text-blue-500" />,
-                        iconBg: 'bg-blue-500/10'
+                        id: 'synthesis-pago-' + order.id,
+                        type: 'status_change',
+                        status: 'pago_confirmed',
+                        title: 'Pedido Pago',
+                        timestamp: dbPago ? dbPago.timestamp : order.created_at,
+                        notes: dbPago?.notes || 'Pagamento confirmado.',
+                        icon: <CheckCircle className="h-4 w-4 text-green-500" />,
+                        iconBg: 'bg-green-500/10'
                       });
                     }
 
-                    // 2. Add "Pedido Pago" milestone (if active and not already in dbEvents as 'pago')
-                    const isPaid = order.payment_status === 'paid' || ['pago', 'recebido', 'embalado', 'enviado', 'finalizado', 'reembolsado'].includes(order.status);
-                    const hasPago = dbEvents.some(e => e.status === 'pago');
-                    if (isPaid && !hasPago) {
+                    // 3. Aguardando Recebimento
+                    if (isPaid) {
                       events.push({
-                        id: 'synthesis-paid-' + order.id,
+                        id: 'synthesis-awaiting-receive-' + order.id,
                         type: 'status_change',
-                        status: 'pago',
-                        title: getStatusLabel('pago'),
-                        timestamp: order.created_at, // fallback
-                        notes: 'Pagamento confirmado.',
-                        icon: getStatusIcon('pago'),
+                        status: 'awaiting_receive',
+                        title: 'Aguardando Recebimento',
+                        timestamp: dbPago ? dbPago.timestamp : order.created_at,
+                        notes: 'Aguardando confirmação de envio do fornecedor.',
+                        icon: <Clock className="h-4 w-4 text-amber-500" />,
+                        iconBg: 'bg-amber-500/10'
+                      });
+                    }
+
+                    // 4. Recebido
+                    const isReceived = ['recebido', 'embalado', 'enviado', 'finalizado'].includes(order.status);
+                    const dbRecebido = dbEvents.find(e => e.status === 'recebido');
+                    if (isReceived) {
+                      events.push({
+                        id: 'synthesis-recebido-' + order.id,
+                        type: 'status_change',
+                        status: 'recebido',
+                        title: 'Recebido',
+                        timestamp: dbRecebido ? dbRecebido.timestamp : (order.status === 'recebido' ? order.updated_at : order.created_at),
+                        notes: dbRecebido?.notes || 'Pedido recebido pelo fornecedor.',
+                        icon: getStatusIcon('recebido'),
                         iconBg: 'bg-primary/10'
                       });
                     }
 
-                    // 3. Add other milestones if active and not in dbEvents
-                    const milestones = [
-                      { status: 'recebido', notes: 'Pedido recebido pelo fornecedor.' },
-                      { status: 'embalado', notes: 'Pedido embalado e aguardando envio.' },
-                      { status: 'enviado', notes: order.tracking_number ? `Pedido enviado. Código de rastreio: ${order.tracking_number}` : 'Pedido enviado.' },
-                      { status: 'finalizado', notes: 'Pedido entregue e finalizado.' },
-                      { status: 'cancelado', notes: 'Pedido cancelado.' },
-                      { status: 'reembolsado', notes: 'Pedido reembolsado.' }
-                    ];
+                    // 5. Embalado
+                    const isEmbalado = ['embalado', 'enviado', 'finalizado'].includes(order.status);
+                    const dbEmbalado = dbEvents.find(e => e.status === 'embalado');
+                    if (isEmbalado) {
+                      events.push({
+                        id: 'synthesis-embalado-' + order.id,
+                        type: 'status_change',
+                        status: 'embalado',
+                        title: 'Embalado',
+                        timestamp: dbEmbalado ? dbEmbalado.timestamp : (order.status === 'embalado' ? order.updated_at : order.created_at),
+                        notes: dbEmbalado?.notes || 'Pedido embalado e aguardando envio.',
+                        icon: getStatusIcon('embalado'),
+                        iconBg: 'bg-primary/10'
+                      });
+                    }
 
-                    milestones.forEach(m => {
-                      let isActive = false;
-                      if (m.status === 'recebido') {
-                        isActive = ['recebido', 'embalado', 'enviado', 'finalizado'].includes(order.status);
-                      } else if (m.status === 'embalado') {
-                        isActive = ['embalado', 'enviado', 'finalizado'].includes(order.status);
-                      } else if (m.status === 'enviado') {
-                        isActive = ['enviado', 'finalizado'].includes(order.status);
-                      } else if (m.status === 'finalizado') {
-                        isActive = order.status === 'finalizado';
-                      } else if (m.status === 'cancelado') {
-                        isActive = order.status === 'cancelado';
-                      } else if (m.status === 'reembolsado') {
-                        isActive = order.status === 'reembolsado' || order.payment_status === 'refunded';
-                      }
+                    // 6. Enviado
+                    const isEnviado = ['enviado', 'finalizado'].includes(order.status);
+                    const dbEnviado = dbEvents.find(e => e.status === 'enviado');
+                    if (isEnviado) {
+                      events.push({
+                        id: 'synthesis-enviado-' + order.id,
+                        type: 'status_change',
+                        status: 'enviado',
+                        title: 'Enviado',
+                        timestamp: dbEnviado ? dbEnviado.timestamp : (order.status === 'enviado' ? order.updated_at : order.created_at),
+                        notes: dbEnviado?.notes || (order.tracking_number ? `Pedido enviado. Código de rastreio: ${order.tracking_number}` : 'Pedido enviado pelo fornecedor.'),
+                        icon: getStatusIcon('enviado'),
+                        iconBg: 'bg-primary/10'
+                      });
+                    }
 
-                      const hasStatus = dbEvents.some(e => e.status === m.status);
-                      if (isActive && !hasStatus) {
-                        events.push({
-                          id: `synthesis-${m.status}-${order.id}`,
-                          type: 'status_change',
-                          status: m.status,
-                          title: getStatusLabel(m.status),
-                          timestamp: m.status === order.status ? order.updated_at : order.created_at, // Use updated_at for current status as it represents the last update time
-                          notes: m.notes,
-                          icon: getStatusIcon(m.status),
-                          iconBg: 'bg-primary/10'
-                        });
-                      }
-                    });
+                    // 7. Finalizado
+                    const isFinalizado = order.status === 'finalizado';
+                    const dbFinalizado = dbEvents.find(e => e.status === 'finalizado');
+                    if (isFinalizado) {
+                      events.push({
+                        id: 'synthesis-finalizado-' + order.id,
+                        type: 'status_change',
+                        status: 'finalizado',
+                        title: 'Finalizado',
+                        timestamp: dbFinalizado ? dbFinalizado.timestamp : order.updated_at,
+                        notes: dbFinalizado?.notes || 'Pedido entregue e finalizado.',
+                        icon: getStatusIcon('finalizado'),
+                        iconBg: 'bg-primary/10'
+                      });
+                    }
 
-                    // 4. Add dbEvents
-                    events.push(...dbEvents);
+                    // 8. Cancelado
+                    const isCancelado = order.status === 'cancelado';
+                    const dbCancelado = dbEvents.find(e => e.status === 'cancelado');
+                    if (isCancelado) {
+                      events.push({
+                        id: 'synthesis-cancelado-' + order.id,
+                        type: 'status_change',
+                        status: 'cancelado',
+                        title: 'Cancelado',
+                        timestamp: dbCancelado ? dbCancelado.timestamp : order.updated_at,
+                        notes: dbCancelado?.notes || 'Pedido cancelado.',
+                        icon: getStatusIcon('cancelado'),
+                        iconBg: 'bg-primary/10'
+                      });
+                    }
 
-                    // 5. Add tickets
+                    // 9. Reembolsado
+                    const isReembolsado = order.status === 'reembolsado' || order.payment_status === 'refunded';
+                    const dbReembolsado = dbEvents.find(e => e.status === 'reembolsado');
+                    if (isReembolsado) {
+                      events.push({
+                        id: 'synthesis-reembolsado-' + order.id,
+                        type: 'status_change',
+                        status: 'reembolsado',
+                        title: 'Reembolsado',
+                        timestamp: dbReembolsado ? dbReembolsado.timestamp : order.updated_at,
+                        notes: dbReembolsado?.notes || 'Pedido reembolsado.',
+                        icon: getStatusIcon('reembolsado'),
+                        iconBg: 'bg-primary/10'
+                      });
+                    }
+
+                    // 10. Add tickets
                     events.push(...tickets.map(ticket => ({
                       id: ticket.id,
                       type: 'ticket',
@@ -1407,13 +1470,13 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                       iconBg: 'bg-red-500/10'
                     })));
 
-                    // 6. Sort all events
+                    // 11. Sort all events
                     const getStatusOrder = (evt) => {
                       if (evt.type === 'creation') return 0;
                       if (evt.type === 'ticket') return 100;
                       switch (evt.status) {
-                        case 'pendente': return 1;
-                        case 'pago': return 2;
+                        case 'pago_confirmed': return 1;
+                        case 'awaiting_receive': return 2;
                         case 'recebido': return 3;
                         case 'embalado': return 4;
                         case 'enviado': return 5;
