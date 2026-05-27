@@ -106,13 +106,18 @@ export const getAvailableTicketTypes = (
 ): OrderTicketType[] => {
   const types: OrderTicketType[] = [];
   
+  // Normalize statuses to cover both English and Portuguese
+  const isPaidOrDelivered = ['confirmed', 'processing', 'shipped', 'delivered', 'pago', 'recebido', 'embalado', 'enviado', 'finalizado'].includes(orderStatus);
+  const isBeforeShipping = ['confirmed', 'processing', 'pago', 'recebido', 'embalado'].includes(orderStatus);
+  const isDelivered = ['delivered', 'finalizado'].includes(orderStatus);
+  
   // Reembolso: available after payment confirmed
-  if (['confirmed', 'processing', 'shipped', 'delivered'].includes(orderStatus) && paymentStatus === 'paid') {
+  if (isPaidOrDelivered && paymentStatus === 'paid') {
     types.push('reembolso');
   }
   
   // Troca: apenas para pedidos entregues, DENTRO de 7 dias após a entrega
-  if (orderStatus === 'delivered' && deliveredAt) {
+  if (isDelivered && deliveredAt) {
     const deliveryDate = new Date(deliveredAt);
     const now = new Date();
     const daysSinceDelivery = Math.floor((now.getTime() - deliveryDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -123,7 +128,7 @@ export const getAvailableTicketTypes = (
   }
   
   // Cancelamento: before shipping
-  if (['confirmed', 'processing'].includes(orderStatus) && paymentStatus === 'paid') {
+  if (isBeforeShipping && paymentStatus === 'paid') {
     types.push('cancelamento');
   }
   

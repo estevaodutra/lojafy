@@ -15,6 +15,7 @@ import { getAvailableTicketTypes, TICKET_TYPE_LABELS } from '@/types/orderTicket
 import { getStatusConfig, getStatusLabel as gslFn, getStatusVariant as gsvFn } from '@/constants/orderStatus';
 import { OrderActionBar } from '@/components/order-details/OrderActionBar';
 import { RelatedTickets } from '@/components/order-details/RelatedTickets';
+import { useNavigate } from 'react-router-dom';
 interface OrderItem {
   id: string;
   product_id: string;
@@ -94,6 +95,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   isOpen,
   onClose
 }) => {
+  const navigate = useNavigate();
   const [order, setOrder] = useState<Order | null>(null);
   const [customer, setCustomer] = useState<CustomerProfile | null>(null);
   const [statusHistory, setStatusHistory] = useState<OrderStatusHistory[]>([]);
@@ -1511,6 +1513,33 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                       </div>
                     ));
                   })()}
+                </div>
+
+                <div className="mt-6 pt-4 border-t flex items-center gap-2">
+                  <OpenTicketButton
+                    orderId={order.id}
+                    orderStatus={order.status}
+                    paymentStatus={order.payment_status}
+                    deliveredAt={deliveredAt}
+                    existingTicketId={existingTicketId}
+                    variant="default"
+                    size="sm"
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      if (isAdmin) {
+                        navigate('/super-admin/suporte');
+                      } else {
+                        navigate('/minha-conta/tickets');
+                      }
+                    }}
+                  >
+                    Ver Todos os Tickets
+                  </Button>
                 </div>
               </CardContent>
             </Card>
