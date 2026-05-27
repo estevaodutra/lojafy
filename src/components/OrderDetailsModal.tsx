@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User, FileText, Download, Upload, TrendingUp, MessageSquarePlus, Send, Loader2, RefreshCw } from 'lucide-react';
+import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User, FileText, Download, Upload, TrendingUp, MessageSquarePlus, Send, Loader2, RefreshCw, Ticket } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { OpenTicketButton } from '@/components/order-tickets/OpenTicketButton';
-import { getAvailableTicketTypes } from '@/types/orderTickets';
+import { getAvailableTicketTypes, TICKET_TYPE_LABELS } from '@/types/orderTickets';
 import { getStatusConfig, getStatusLabel as gslFn, getStatusVariant as gsvFn } from '@/constants/orderStatus';
 import { OrderActionBar } from '@/components/order-details/OrderActionBar';
 import { RelatedTickets } from '@/components/order-details/RelatedTickets';
@@ -109,6 +109,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const [deliveredAt, setDeliveredAt] = useState<string | null>(null);
   const [webhookLog, setWebhookLog] = useState<WebhookLogInfo | null>(null);
   const [webhookLoading, setWebhookLoading] = useState(false);
+  const [tickets, setTickets] = useState<any[]>([]);
   const [isDispatchingWebhook, setIsDispatchingWebhook] = useState(false);
   const {
     toast
@@ -124,6 +125,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       fetchShippingFiles();
       fetchRefundDocuments();
       fetchExistingTicket();
+      fetchTickets();
       fetchDeliveredAt();
       if (isAdmin) {
         fetchWebhookLog();
@@ -134,6 +136,21 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       setWebhookLog(null);
     }
   }, [orderId, isOpen, isAdmin]);
+
+  const fetchTickets = async () => {
+    if (!orderId) return;
+    try {
+      const { data, error } = await supabase
+        .from('order_tickets')
+        .select('id, ticket_number, tipo, status, reason, created_at')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      setTickets(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar tickets para histórico:', error);
+    }
+  };
 
   const fetchExistingTicket = async () => {
     if (!orderId) return;
@@ -1280,32 +1297,65 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
             {/* Related Tickets */}
             <RelatedTickets orderId={order.id} />
-
             {/* Status History */}
-            {statusHistory.length > 0 && <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Histórico do Pedido
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {statusHistory.map(item => <div key={item.id} className="flex items-start gap-3">
-                        <div className="flex items-center justify-center w-8 h-8 bg-primary/10 rounded-full mt-0.5">
-                          {getStatusIcon(item.status)}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Histórico
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {(() => {
+                    const events = [
+                      {
+                        id: 'creation-' + order.id,
+                        type: 'creation',
+                        title: 'Pedido Gerado',
+                        timestamp: order.created_at,
+                        notes: 'O pedido foi criado no sistema.',
+                        icon: <Package className="h-4 w-4 text-blue-500" />,
+                        iconBg: 'bg-blue-500/10'
+                      },
+                      ...statusHistory.map(item => ({
+                        id: item.id,
+                        type: 'status_change',
+                        title: getStatusLabel(item.status),
+                        timestamp: item.created_at,
+                        notes: item.notes,
+                        icon: getStatusIcon(item.status),
+                        iconBg: 'bg-primary/10'
+                      })),
+                      ...tickets.map(ticket => ({
+                        id: ticket.id,
+                        type: 'ticket',
+                        title: `Ticket Aberto (${TICKET_TYPE_LABELS[ticket.tipo as keyof typeof TICKET_TYPE_LABELS] || ticket.tipo})`,
+                        timestamp: ticket.created_at,
+                        notes: `Ticket #${ticket.ticket_number} - Motivo: ${ticket.reason}`,
+                        icon: <Ticket className="h-4 w-4 text-red-500" />,
+                        iconBg: 'bg-red-500/10'
+                      }))
+                    ].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+                    return events.map(event => (
+                      <div key={event.id} className="flex items-start gap-3">
+                        <div className={`flex items-center justify-center w-8 h-8 rounded-full mt-0.5 ${event.iconBg}`}>
+                          {event.icon}
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <p className="font-medium">{getStatusLabel(item.status)}</p>
-                            <p className="text-sm text-muted-foreground">{formatDate(item.created_at)}</p>
+                            <p className="font-medium">{event.title}</p>
+                            <p className="text-sm text-muted-foreground">{formatDate(event.timestamp)}</p>
                           </div>
-                          {item.notes && <p className="text-sm text-muted-foreground mt-1">{item.notes}</p>}
+                          {event.notes && <p className="text-sm text-muted-foreground mt-1">{event.notes}</p>}
                         </div>
-                      </div>)}
-                  </div>
-                </CardContent>
-              </Card>}
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Order Notes */}
             {order.notes && <Card>
