@@ -1352,24 +1352,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                         status: 'pago_confirmed',
                         title: 'Pedido Pago',
                         timestamp: dbPago ? dbPago.timestamp : order.created_at,
-                        notes: dbPago?.notes || 'Pagamento confirmado.',
+                        notes: dbPago?.notes || (order.status === 'pago' ? 'Pagamento confirmado. Aguardando recebimento pelo fornecedor.' : 'Pagamento confirmado.'),
                         icon: <CheckCircle className="h-4 w-4 text-green-500" />,
                         iconBg: 'bg-green-500/10'
-                      });
-                    }
-
-                    // 3. Aguardando Recebimento
-                    const hasPagoDb = dbEvents.some(e => e.status === 'pago');
-                    if (isPaid && !hasPagoDb) {
-                      events.push({
-                        id: 'synthesis-awaiting-receive-' + order.id,
-                        type: 'status_change',
-                        status: 'awaiting_receive',
-                        title: 'Aguardando Recebimento',
-                        timestamp: dbPago ? dbPago.timestamp : order.created_at,
-                        notes: 'Aguardando confirmação de envio do fornecedor.',
-                        icon: <Clock className="h-4 w-4 text-amber-500" />,
-                        iconBg: 'bg-amber-500/10'
                       });
                     }
 
@@ -1486,7 +1471,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                       if (evt.type === 'ticket') return 100;
                       switch (evt.status) {
                         case 'pago_confirmed': return 1;
-                        case 'awaiting_receive': return 2;
                         case 'recebido': return 3;
                         case 'embalado': return 4;
                         case 'enviado': return 5;
