@@ -1359,7 +1359,8 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     }
 
                     // 3. Aguardando Recebimento
-                    if (isPaid) {
+                    const hasPagoDb = dbEvents.some(e => e.status === 'pago');
+                    if (isPaid && !hasPagoDb) {
                       events.push({
                         id: 'synthesis-awaiting-receive-' + order.id,
                         type: 'status_change',
