@@ -48,6 +48,27 @@ const AdminOrders = () => {
 
   useEffect(() => {
     fetchOrders();
+
+    // Inscrever para atualizações em tempo real na tabela de pedidos
+    const channel = supabase
+      .channel('orders-realtime-admin')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders'
+        },
+        (payload) => {
+          console.log('Atualização em tempo real recebida:', payload);
+          fetchOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchOrders = async () => {
@@ -452,30 +473,31 @@ const AdminOrders = () => {
               )}
             </>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 items-start overflow-x-auto pb-4">
-              {(() => {
-                const PIPELINE_COLUMNS: OrderStatus[] = [
-                  "pendente",
-                  "pago",
-                  "recebido",
-                  "embalado",
-                  "enviado",
-                  "finalizado"
-                ];
+            <div className="overflow-x-auto w-full pb-4 scrollbar-thin">
+              <div className="flex gap-4 items-start min-w-max pb-2">
+                {(() => {
+                  const PIPELINE_COLUMNS: OrderStatus[] = [
+                    "pendente",
+                    "pago",
+                    "recebido",
+                    "embalado",
+                    "enviado",
+                    "finalizado"
+                  ];
 
-                return PIPELINE_COLUMNS.map((colStatus) => {
-                  const config = ORDER_STATUS_CONFIG[colStatus];
-                  const StatusIcon = config.icon;
-                  // Group "em_reposicao" in the "recebido" stage column
-                  const columnOrders = filteredOrders.filter(order => {
-                    if (colStatus === "recebido") {
-                      return order.status === "recebido" || order.status === "em_reposicao";
-                    }
-                    return order.status === colStatus;
-                  });
+                  return PIPELINE_COLUMNS.map((colStatus) => {
+                    const config = ORDER_STATUS_CONFIG[colStatus];
+                    const StatusIcon = config.icon;
+                    // Group "em_reposicao" in the "recebido" stage column
+                    const columnOrders = filteredOrders.filter(order => {
+                      if (colStatus === "recebido") {
+                        return order.status === "recebido" || order.status === "em_reposicao";
+                      }
+                      return order.status === colStatus;
+                    });
 
-                  return (
-                    <div key={colStatus} className="flex flex-col gap-4 min-w-[200px] bg-muted/20 p-3 rounded-xl border border-border/40 max-h-[80vh]">
+                    return (
+                      <div key={colStatus} className="flex flex-col gap-4 w-[280px] min-w-[280px] flex-shrink-0 bg-muted/20 p-3 rounded-xl border border-border/40 max-h-[80vh]">
                       {/* Column Header */}
                       <div className="flex items-center justify-between border-b pb-2">
                         <div className="flex items-center gap-1.5 min-w-0">
@@ -570,6 +592,7 @@ const AdminOrders = () => {
                   );
                 });
               })()}
+              </div>
             </div>
           )}
         </TabsContent>
