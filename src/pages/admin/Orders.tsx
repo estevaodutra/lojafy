@@ -10,11 +10,12 @@ import OrderDetailsModal from "@/components/OrderDetailsModal";
 import { OrderSolicitations } from "@/components/admin/OrderSolicitations";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, Package, Search, Filter, AlertCircle } from "lucide-react";
+import { Eye, Package, Search, Filter, AlertCircle, LayoutGrid, List } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { ALL_STATUSES, ORDER_STATUS_CONFIG, getStatusConfig, getAvailableTransitions, type OrderStatus } from "@/constants/orderStatus";
+import { cn } from "@/lib/utils";
 
 interface Order {
   id: string;
@@ -41,6 +42,7 @@ const AdminOrders = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [viewMode, setViewMode] = useState<"table" | "pipeline">("table");
   const ordersPerPage = 20;
   const { toast } = useToast();
 
@@ -218,10 +220,32 @@ const AdminOrders = () => {
         <div>
           <h1 className="text-3xl font-bold">Gerenciar Pedidos</h1>
         </div>
-        <Badge variant="outline" className="text-sm">
-          <Package className="w-4 h-4 mr-1" />
-          {orders.length} pedidos
-        </Badge>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center border rounded-lg p-1 bg-muted/30">
+            <Button
+              variant={viewMode === "table" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("table")}
+              className="h-8 gap-1.5 px-3"
+            >
+              <List className="w-4 h-4" />
+              Tabela
+            </Button>
+            <Button
+              variant={viewMode === "pipeline" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("pipeline")}
+              className="h-8 gap-1.5 px-3"
+            >
+              <LayoutGrid className="w-4 h-4" />
+              Pipeline
+            </Button>
+          </div>
+          <Badge variant="outline" className="text-sm py-1.5 px-3">
+            <Package className="w-4 h-4 mr-1 inline-block" />
+            {orders.length} pedidos
+          </Badge>
+        </div>
       </div>
 
       <Tabs defaultValue="orders" className="space-y-6">
@@ -275,153 +299,277 @@ const AdminOrders = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Número do Pedido</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Pagamento</TableHead>
-                    <TableHead>Webhook</TableHead>
-                    <TableHead>Etiqueta</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Ações</TableHead>
-                    <TableHead>Status de Envio</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                     <TableRow>
-                       <TableCell colSpan={9} className="text-center py-8">
-                         Carregando pedidos...
-                       </TableCell>
-                     </TableRow>
-                  ) : filteredOrders.length === 0 ? (
-                     <TableRow>
-                       <TableCell colSpan={9} className="text-center py-8">
-                         Nenhum pedido encontrado
-                       </TableCell>
-                     </TableRow>
-                   ) : (
-                    currentOrders.map((order) => {
-                      return (
-                       <TableRow key={order.id}>
-                         <TableCell className="font-medium">
-                           {order.order_number}
-                         </TableCell>
-                         <TableCell>
-                           {order.profiles.first_name} {order.profiles.last_name}
-                         </TableCell>
-                         <TableCell>
-                           {format(new Date(order.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                         </TableCell>
-                         <TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
-                         <TableCell>
-                           {order.payment_status === 'paid' ? (
-                             order.webhook_paid_status === 'sent' ? (
-                               <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">✓ Enviado</Badge>
-                             ) : order.webhook_paid_status === 'failed' ? (
-                               <Badge variant="destructive" className="text-xs" title={order.webhook_paid_error ?? ''}>✗ Falhou</Badge>
-                             ) : (
-                               <Badge variant="outline" className="text-xs text-muted-foreground">Não enviado</Badge>
-                             )
-                           ) : (
-                             <span className="text-xs text-muted-foreground">—</span>
-                           )}
-                         </TableCell>
-                         <TableCell>
-                           {order.has_shipping_file ? (
-                             <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
-                               📄 Enviada
-                             </Badge>
-                           ) : (
-                             <Badge variant="outline">
-                               📄 Pendente
-                             </Badge>
-                           )}
-                         </TableCell>
-                         <TableCell>R$ {order.total_amount.toFixed(2)}</TableCell>
-                         <TableCell>
-                           <Button
-                             variant="outline"
-                             size="sm"
-                             onClick={() => setSelectedOrder(order)}
-                           >
-                             <Eye className="w-4 h-4" />
-                           </Button>
-                         </TableCell>
-                         <TableCell>
-                           <Select
-                             value={order.status}
-                             onValueChange={(value) => updateOrderStatus(order.id, value)}
-                           >
-                             <SelectTrigger className="w-[160px]">
-                               <SelectValue />
-                             </SelectTrigger>
-                             <SelectContent>
-                               {ALL_STATUSES.map((s) => (
-                                 <SelectItem key={s} value={s}>{ORDER_STATUS_CONFIG[s].label}</SelectItem>
-                               ))}
-                             </SelectContent>
-                           </Select>
-                         </TableCell>
-                       </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          {viewMode === "table" ? (
+            <>
+              <Card>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Número do Pedido</TableHead>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Pagamento</TableHead>
+                        <TableHead>Webhook</TableHead>
+                        <TableHead>Etiqueta</TableHead>
+                        <TableHead>Total</TableHead>
+                        <TableHead>Ações</TableHead>
+                        <TableHead>Status de Envio</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {loading ? (
+                         <TableRow>
+                           <TableCell colSpan={9} className="text-center py-8">
+                             Carregando pedidos...
+                           </TableCell>
+                         </TableRow>
+                      ) : filteredOrders.length === 0 ? (
+                         <TableRow>
+                           <TableCell colSpan={9} className="text-center py-8">
+                             Nenhum pedido encontrado
+                           </TableCell>
+                         </TableRow>
+                       ) : (
+                        currentOrders.map((order) => {
+                          return (
+                           <TableRow key={order.id}>
+                             <TableCell className="font-medium">
+                               {order.order_number}
+                             </TableCell>
+                             <TableCell>
+                               {order.profiles.first_name} {order.profiles.last_name}
+                             </TableCell>
+                             <TableCell>
+                               {format(new Date(order.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                             </TableCell>
+                             <TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
+                             <TableCell>
+                               {order.payment_status === 'paid' ? (
+                                 order.webhook_paid_status === 'sent' ? (
+                                   <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">✓ Enviado</Badge>
+                                 ) : order.webhook_paid_status === 'failed' ? (
+                                   <Badge variant="destructive" className="text-xs" title={order.webhook_paid_error ?? ''}>✗ Falhou</Badge>
+                                 ) : (
+                                   <Badge variant="outline" className="text-xs text-muted-foreground">Não enviado</Badge>
+                                 )
+                               ) : (
+                                 <span className="text-xs text-muted-foreground">—</span>
+                               )}
+                             </TableCell>
+                             <TableCell>
+                               {order.has_shipping_file ? (
+                                 <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
+                                   📄 Enviada
+                                 </Badge>
+                               ) : (
+                                 <Badge variant="outline">
+                                   📄 Pendente
+                                 </Badge>
+                               )}
+                             </TableCell>
+                             <TableCell>R$ {order.total_amount.toFixed(2)}</TableCell>
+                             <TableCell>
+                               <Button
+                                 variant="outline"
+                                 size="sm"
+                                 onClick={() => setSelectedOrder(order)}
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                             </TableCell>
+                             <TableCell>
+                               <Select
+                                 value={order.status}
+                                 onValueChange={(value) => updateOrderStatus(order.id, value)}
+                               >
+                                 <SelectTrigger className="w-[160px]">
+                                   <SelectValue />
+                                 </SelectTrigger>
+                                 <SelectContent>
+                                   {ALL_STATUSES.map((s) => (
+                                     <SelectItem key={s} value={s}>{ORDER_STATUS_CONFIG[s].label}</SelectItem>
+                                   ))}
+                                 </SelectContent>
+                               </Select>
+                             </TableCell>
+                           </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
 
-          {totalPages > 1 && (
-            <div className="mt-6">
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious 
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                    />
-                  </PaginationItem>
-                  
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                    if (
-                      page === 1 ||
-                      page === totalPages ||
-                      (page >= currentPage - 1 && page <= currentPage + 1)
-                    ) {
-                      return (
-                        <PaginationItem key={page}>
-                          <PaginationLink
-                            onClick={() => setCurrentPage(page)}
-                            isActive={currentPage === page}
-                            className="cursor-pointer"
-                          >
-                            {page}
-                          </PaginationLink>
-                        </PaginationItem>
-                      );
-                    } else if (page === currentPage - 2 || page === currentPage + 2) {
-                      return (
-                        <PaginationItem key={page}>
-                          <span className="px-4">...</span>
-                        </PaginationItem>
-                      );
+              {totalPages > 1 && (
+                <div className="mt-6">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                      
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                        if (
+                          page === 1 ||
+                          page === totalPages ||
+                          (page >= currentPage - 1 && page <= currentPage + 1)
+                        ) {
+                          return (
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                onClick={() => setCurrentPage(page)}
+                                isActive={currentPage === page}
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          );
+                        } else if (page === currentPage - 2 || page === currentPage + 2) {
+                          return (
+                            <PaginationItem key={page}>
+                              <span className="px-4">...</span>
+                            </PaginationItem>
+                          );
+                        }
+                        return null;
+                      })}
+                      
+                      <PaginationItem>
+                        <PaginationNext 
+                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                          className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 items-start overflow-x-auto pb-4">
+              {(() => {
+                const PIPELINE_COLUMNS: OrderStatus[] = [
+                  "pendente",
+                  "pago",
+                  "recebido",
+                  "embalado",
+                  "enviado",
+                  "finalizado"
+                ];
+
+                return PIPELINE_COLUMNS.map((colStatus) => {
+                  const config = ORDER_STATUS_CONFIG[colStatus];
+                  const StatusIcon = config.icon;
+                  // Group "em_reposicao" in the "recebido" stage column
+                  const columnOrders = filteredOrders.filter(order => {
+                    if (colStatus === "recebido") {
+                      return order.status === "recebido" || order.status === "em_reposicao";
                     }
-                    return null;
-                  })}
-                  
-                  <PaginationItem>
-                    <PaginationNext 
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
+                    return order.status === colStatus;
+                  });
+
+                  return (
+                    <div key={colStatus} className="flex flex-col gap-4 min-w-[200px] bg-muted/20 p-3 rounded-xl border border-border/40 max-h-[80vh]">
+                      {/* Column Header */}
+                      <div className="flex items-center justify-between border-b pb-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <div className={cn("p-1.5 rounded-lg text-xs", config.color.split(" ")[0])}>
+                            <StatusIcon className="w-3.5 h-3.5" />
+                          </div>
+                          <h4 className="font-bold text-xs truncate max-w-[120px]" title={config.label}>
+                            {config.label}
+                          </h4>
+                        </div>
+                        <Badge variant="secondary" className="text-2xs font-semibold px-2 py-0.5 rounded-full">
+                          {columnOrders.length}
+                        </Badge>
+                      </div>
+
+                      {/* Column Cards Container */}
+                      <div className="flex flex-col gap-3 overflow-y-auto max-h-[60vh] pr-1 py-1">
+                        {columnOrders.length === 0 ? (
+                          <div className="text-center py-8 text-xs text-muted-foreground border border-dashed border-border/60 rounded-lg">
+                            Sem pedidos
+                          </div>
+                        ) : (
+                          columnOrders.map((order) => {
+                            const isWarning = order.status === "em_reposicao";
+                            return (
+                              <div 
+                                key={order.id} 
+                                className={cn(
+                                  "p-3 border rounded-lg bg-background/80 hover:bg-background transition-all duration-300 shadow-sm hover:shadow relative group flex flex-col gap-2",
+                                  isWarning && "border-amber-400 bg-amber-500/5 hover:bg-amber-500/10"
+                                )}
+                              >
+                                {/* Card Header */}
+                                <div className="flex justify-between items-center text-xs">
+                                  <span className="font-bold text-primary">#{order.order_number}</span>
+                                  <span className="text-muted-foreground text-3xs">
+                                    {format(new Date(order.created_at), "dd/MM HH:mm", { locale: ptBR })}
+                                  </span>
+                                </div>
+
+                                {/* Customer and Amount */}
+                                <div className="text-2xs">
+                                  <p className="font-semibold text-foreground truncate">
+                                    {order.profiles.first_name} {order.profiles.last_name}
+                                  </p>
+                                  <p className="text-muted-foreground mt-0.5">
+                                    Total: <span className="font-bold text-foreground">R$ {order.total_amount.toFixed(2)}</span>
+                                  </p>
+                                </div>
+
+                                {/* Alert Badges */}
+                                {isWarning && (
+                                  <Badge variant="outline" className="text-3xs px-1.5 py-0 border-amber-300 text-amber-700 bg-amber-50 rounded w-fit">
+                                    ⚠️ Reposição
+                                  </Badge>
+                                )}
+
+                                {/* Card Footer / Actions */}
+                                <div className="flex items-center justify-between gap-2 mt-1 border-t pt-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 px-2 text-2xs flex-1"
+                                    onClick={() => setSelectedOrder(order)}
+                                  >
+                                    <Eye className="w-3.5 h-3.5 mr-1" />
+                                    Ver
+                                  </Button>
+
+                                  <Select
+                                    value={order.status}
+                                    onValueChange={(val) => updateOrderStatus(order.id, val)}
+                                  >
+                                    <SelectTrigger className="h-7 w-[100px] text-3xs px-2 flex-1">
+                                      <SelectValue placeholder="Status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {ALL_STATUSES.map((s) => (
+                                        <SelectItem key={s} value={s} className="text-3xs">
+                                          {ORDER_STATUS_CONFIG[s].label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           )}
         </TabsContent>
