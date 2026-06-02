@@ -100,11 +100,23 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!VALID_STATUSES.includes(status)) {
+    // Fetch valid statuses dynamically from order_pipeline_columns table
+    const { data: pipelineCols, error: colsError } = await supabase
+      .from('order_pipeline_columns')
+      .select('status_key');
+
+    let dynamicValidStatuses = VALID_STATUSES;
+    if (!colsError && pipelineCols && pipelineCols.length > 0) {
+      dynamicValidStatuses = pipelineCols.map((col: any) => col.status_key);
+    } else if (colsError) {
+      console.error('Error fetching valid statuses from database, falling back to static list:', colsError);
+    }
+
+    if (!dynamicValidStatuses.includes(status)) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: `Status inválido. Use: ${VALID_STATUSES.join(', ')}` 
+          error: `Status inválido. Statuses permitidos: ${dynamicValidStatuses.join(', ')}` 
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
