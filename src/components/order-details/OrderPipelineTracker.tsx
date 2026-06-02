@@ -106,7 +106,7 @@ export const OrderPipelineTracker = ({
       <div className="flex items-center justify-between border-b pb-4">
         <div>
           <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+            <span className="h-2 w-2 rounded-full bg-primary" />
             Processo Primário: Acompanhamento do Pedido
           </h3>
           <p className="text-sm text-muted-foreground">
@@ -114,12 +114,12 @@ export const OrderPipelineTracker = ({
           </p>
         </div>
         {isCancelled && (
-          <Badge variant="destructive" className="text-xs px-3 py-1 animate-pulse">
+          <Badge variant="destructive" className="text-xs px-3 py-1">
             Pedido Cancelado / Desviado
           </Badge>
         )}
         {isDevolucao && (
-          <Badge variant="outline" className="text-xs px-3 py-1 border-rose-300 text-rose-700 bg-rose-50 animate-pulse">
+          <Badge variant="outline" className="text-xs px-3 py-1 border-rose-300 text-rose-700 bg-rose-50">
             Processo de Devolução Ativo
           </Badge>
         )}
@@ -164,7 +164,7 @@ export const OrderPipelineTracker = ({
                     className={cn(
                       "flex items-center justify-center w-14 h-14 rounded-full border-4 shadow-sm transition-all duration-500",
                       isStepCompleted && "bg-gradient-to-br from-primary to-primary-foreground border-primary text-primary-foreground scale-100",
-                      isStepActive && "bg-background border-primary text-primary animate-pulse shadow-md ring-4 ring-primary/20",
+                      isStepActive && "bg-background border-primary text-primary shadow-md ring-4 ring-primary/20",
                       isStepFuture && "bg-muted border-muted-foreground/20 text-muted-foreground",
                       isCancelled && !isStepCompleted && "border-destructive/30 text-destructive/50"
                     )}
@@ -283,7 +283,7 @@ export const OrderPipelineTracker = ({
           {/* Processo Secundário (Support Tickets Active) */}
           {activeTicketsCount > 0 && (
             <div className="flex gap-3 p-4 rounded-xl border border-primary/20 bg-primary/5 text-primary-foreground backdrop-blur-sm shadow-sm">
-              <Ticket className="h-5 w-5 text-primary shrink-0 mt-0.5 animate-bounce" />
+              <Ticket className="h-5 w-5 text-primary shrink-0 mt-0.5" />
               <div>
                 <h4 className="font-bold text-sm text-primary">Processo Secundário Ativo: Ticket de Suporte</h4>
                 <p className="text-xs text-muted-foreground mt-1">
