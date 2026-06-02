@@ -129,8 +129,13 @@ const AdminOrders = () => {
 
       if (error) throw error;
       setPipelineColumns(data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching pipeline columns:', error);
+      toast({
+        title: "Erro ao carregar colunas",
+        description: error.message || "Erro desconhecido ao carregar colunas",
+        variant: "destructive"
+      });
     }
   };
 
@@ -231,11 +236,11 @@ const AdminOrders = () => {
         description: "Coluna atualizada",
       });
       fetchPipelineColumns();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating column:', error);
       toast({
         title: "Erro",
-        description: "Erro ao atualizar coluna",
+        description: error.message || "Erro ao atualizar coluna",
         variant: "destructive"
       });
     }
@@ -257,11 +262,11 @@ const AdminOrders = () => {
         description: "Coluna excluída com sucesso",
       });
       fetchPipelineColumns();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting column:', error);
       toast({
         title: "Erro",
-        description: "Erro ao excluir coluna (pode haver registros utilizando este status)",
+        description: error.message || "Erro ao excluir coluna",
         variant: "destructive"
       });
     }
@@ -300,11 +305,11 @@ const AdminOrders = () => {
       setNewColColor("bg-gray-100 text-gray-800");
       
       fetchPipelineColumns();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding column:', error);
       toast({
         title: "Erro",
-        description: "Erro ao adicionar coluna (verifique se a chave já existe)",
+        description: error.message || "Erro ao adicionar coluna",
         variant: "destructive"
       });
     }
