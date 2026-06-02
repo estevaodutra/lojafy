@@ -16,6 +16,7 @@ import { getStatusConfig, getStatusLabel as gslFn, getStatusVariant as gsvFn } f
 import { OrderActionBar } from '@/components/order-details/OrderActionBar';
 import { RelatedTickets } from '@/components/order-details/RelatedTickets';
 import { useNavigate } from 'react-router-dom';
+import { OrderPipelineTracker } from '@/components/order-details/OrderPipelineTracker';
 interface OrderItem {
   id: string;
   product_id: string;
@@ -663,6 +664,17 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
             <p className="text-muted-foreground mt-2">Carregando detalhes...</p>
           </div> : order ? <div className="space-y-6">
+            <OrderPipelineTracker
+              status={order.status}
+              paymentStatus={order.payment_status}
+              orderNumber={order.order_number}
+              motivoAtraso={order.motivo_atraso}
+              previsaoEnvio={order.previsao_envio}
+              cancelamentoMotivo={order.cancelamento_motivo}
+              cancelamentoObservacao={order.cancelamento_observacao}
+              activeTicketsCount={tickets.filter(t => t.status !== 'resolvido' && t.status !== 'cancelado').length}
+            />
+
             {/* Customer Info */}
             {customer && <Card>
                 <CardHeader>

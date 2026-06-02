@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { OrderPipelineTracker } from "@/components/order-details/OrderPipelineTracker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -252,6 +253,18 @@ const RastrearPedido = () => {
           {/* Order Details */}
           {orderData && (
             <div className="space-y-6">
+              <OrderPipelineTracker
+                status={
+                  orderData.status === 'pending' ? 'pendente' :
+                  orderData.status === 'confirmed' ? 'pago' :
+                  orderData.status === 'preparing' ? 'recebido' :
+                  orderData.status === 'shipped' || orderData.status === 'in_transit' ? 'enviado' :
+                  orderData.status === 'delivered' ? 'finalizado' :
+                  orderData.status
+                }
+                orderNumber={orderData.orderId}
+              />
+
               {/* Order Summary */}
               <Card>
                 <CardHeader>
