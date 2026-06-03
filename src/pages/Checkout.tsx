@@ -54,6 +54,8 @@ const Checkout = ({
   const [selectedShippingMethod, setSelectedShippingMethod] = useState<any>(null);
   const [shippingCost, setShippingCost] = useState(0);
   const [shippingFile, setShippingFile] = useState<any>(null);
+  const [trackingCode, setTrackingCode] = useState("");
+  const [confirmTrackingCode, setConfirmTrackingCode] = useState("");
   const [pixPaymentData, setPixPaymentData] = useState<PixPaymentData | null>(null);
   const [modernPixData, setModernPixData] = useState<{
     qr_code: string;
@@ -257,7 +259,9 @@ const Checkout = ({
       case 2:
         // If label method, only need shipping method selected
         if (isLabelMethod()) {
-          return selectedShippingMethod && (selectedShippingMethod.requires_upload ? shippingFile : true);
+          const fileValid = selectedShippingMethod.requires_upload ? shippingFile : true;
+          const trackingValid = trackingCode.trim() !== "" && trackingCode === confirmTrackingCode;
+          return selectedShippingMethod && fileValid && trackingValid;
         }
         // Regular method requires full address
         return selectedShippingMethod && formData.address && formData.number && formData.neighborhood && formData.city && formData.state && formData.zipCode;
@@ -398,6 +402,22 @@ const Checkout = ({
       const response = await createModernPixPayment(paymentRequest);
       console.log('PIX payment created successfully:', response);
 
+      // Save tracking code in orders if it's a label method
+      if (isLabelMethod() && trackingCode && response.order_id) {
+        console.log('Saving tracking number/code in order:', response.order_id);
+        const { error: trackingError } = await supabase
+          .from('orders')
+          .update({ 
+            tracking_number: trackingCode,
+            tracking_code: trackingCode
+          })
+          .eq('id', response.order_id);
+        
+        if (trackingError) {
+          console.error('Error updating order tracking code:', trackingError);
+        }
+      }
+
       // Upload shipping file if provided
       if (shippingFile && shippingFile.file && response.order_id) {
         try {
@@ -533,9 +553,15 @@ const Checkout = ({
         return;
       }
       // Validate shipping label
-      if (isLabelMethod() && selectedShippingMethod?.requires_upload && !shippingFile) {
-        toast({ title: "Etiqueta obrigatória", description: "Anexe a etiqueta de envio.", variant: "destructive" });
-        return;
+      if (isLabelMethod()) {
+        if (selectedShippingMethod?.requires_upload && !shippingFile) {
+          toast({ title: "Etiqueta obrigatória", description: "Anexe a etiqueta de envio.", variant: "destructive" });
+          return;
+        }
+        if (!trackingCode.trim() || trackingCode !== confirmTrackingCode) {
+          toast({ title: "Código de rastreio inválido", description: "Por favor, preencha e confirme o código de rastreio da etiqueta.", variant: "destructive" });
+          return;
+        }
       }
       await saveUserDataAndAddress();
       // Create order first via edge function (same as PIX but we'll debit wallet)
@@ -571,6 +597,22 @@ const Checkout = ({
       if (orderError) throw orderError;
       const orderId = orderData?.order_id;
       if (!orderId) throw new Error('Pedido não criado');
+
+      // Save tracking code in orders if it's a label method
+      if (isLabelMethod() && trackingCode && orderId) {
+        const { error: trackingError } = await supabase
+          .from('orders')
+          .update({ 
+            tracking_number: trackingCode,
+            tracking_code: trackingCode
+          })
+          .eq('id', orderId);
+        
+        if (trackingError) {
+          console.error('Error updating order tracking code:', trackingError);
+        }
+      }
+
       // Upload shipping file if needed
       if (shippingFile?.file && orderId) {
         const fileExtension = shippingFile.file.name.split('.').pop();
@@ -737,6 +779,43 @@ const Checkout = ({
                   <ShippingMethodSelector orderValue={subtotal} zipCode={formData.zipCode} weight={1} // Calculate this based on products if needed
                 selectedMethodId={selectedShippingMethod?.id} onMethodChange={handleShippingMethodChange} onFileUploaded={handleShippingFileUpload} />
                   
+                  {isLabelMethod() && (
+                    <div className="space-y-4 pt-4 border-t">
+                      <div className="space-y-2">
+                        <Label htmlFor="trackingCode" className="font-semibold text-sm">
+                          Código de Rastreio da Etiqueta *
+                        </Label>
+                        <Input
+                          id="trackingCode"
+                          value={trackingCode}
+                          onChange={e => setTrackingCode(e.target.value.toUpperCase())}
+                          placeholder="Informe o código de rastreio da etiqueta"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Código de rastreio que consta na etiqueta para rastreabilidade em caso de devolução.
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="confirmTrackingCode" className="font-semibold text-sm">
+                          Confirmar Código de Rastreio *
+                        </Label>
+                        <Input
+                          id="confirmTrackingCode"
+                          value={confirmTrackingCode}
+                          onChange={e => setConfirmTrackingCode(e.target.value.toUpperCase())}
+                          placeholder="Confirme o código de rastreio"
+                        />
+                      </div>
+
+                      {trackingCode && confirmTrackingCode && trackingCode !== confirmTrackingCode && (
+                        <p className="text-sm font-medium text-destructive">
+                          ⚠️ Os códigos de rastreio informados não são idênticos.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Address fields - only show if not using label method */}
                   {!isLabelMethod() && <div className="space-y-4 pt-4 border-t">
                       <div className="flex items-center gap-2">
