@@ -4,7 +4,6 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Search, Package, ExternalLink, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,6 +99,7 @@ export const UserOrdersTab = ({ userId }: UserOrdersTabProps) => {
           {orders.map((order) => {
             const statusConfig = ORDER_STATUS_CONFIG[order.status as OrderStatus];
             const StatusIcon = statusConfig?.icon;
+
             return (
               <div key={order.id} className="p-3 border rounded-lg flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">

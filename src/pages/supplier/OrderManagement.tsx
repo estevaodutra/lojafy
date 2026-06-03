@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import OrderDetailsModal from "@/components/OrderDetailsModal";
-import { Eye, Package, Search, Filter, Clock, AlertCircle } from "lucide-react";
+import { Eye, Package, Search, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -14,11 +14,6 @@ import { useSupplierOrders } from "@/hooks/useSupplierOrders";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ALL_STATUSES, ORDER_STATUS_CONFIG, getStatusConfig, SUPPLIER_QUICK_ACTIONS, type OrderStatus } from "@/constants/orderStatus";
-import { ReposicaoModal } from "@/components/supplier/ReposicaoModal";
-import { EmFaltaModal } from "@/components/supplier/EmFaltaModal";
-import { CancelamentoModal } from "@/components/supplier/CancelamentoModal";
-import { DevolucaoModal } from "@/components/supplier/DevolucaoModal";
-import { toast as sonnerToast } from "sonner";
 
 const SupplierOrderManagement = () => {
   const { data: orders = [], isLoading, refetch } = useSupplierOrders();
@@ -28,12 +23,6 @@ const SupplierOrderManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 20;
   const { toast } = useToast();
-
-  // Modal states
-  const [reposicaoOrder, setReposicaoOrder] = useState<any>(null);
-  const [emFaltaOrder, setEmFaltaOrder] = useState<any>(null);
-  const [cancelamentoOrder, setCancelamentoOrder] = useState<any>(null);
-  const [devolucaoOrder, setDevolucaoOrder] = useState<any>(null);
 
   const getStatusBadge = (status: string) => {
     const config = getStatusConfig(status);
@@ -50,37 +39,9 @@ const SupplierOrderManagement = () => {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: string, extra?: { 
-    estimated_shipping_date?: string; 
-    status_reason?: string;
-    cancelamento_motivo?: string;
-    cancelamento_observacao?: string;
-    devolucao_motivo?: string;
-    devolucao_observacao?: string;
-    motivo_atraso?: string;
-    motivo_falta?: string;
-  }) => {
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
       const updateData: Record<string, any> = { status: newStatus };
-      if (extra?.estimated_shipping_date) updateData.estimated_shipping_date = extra.estimated_shipping_date;
-      if (extra?.status_reason) updateData.status_reason = extra.status_reason;
-      if (extra?.cancelamento_motivo) updateData.cancelamento_motivo = extra.cancelamento_motivo;
-      if (extra?.cancelamento_observacao) updateData.cancelamento_observacao = extra.cancelamento_observacao;
-      if (extra?.devolucao_motivo) updateData.devolucao_motivo = extra.devolucao_motivo;
-      if (extra?.devolucao_observacao) updateData.devolucao_observacao = extra.devolucao_observacao;
-      if (extra?.motivo_atraso) updateData.motivo_atraso = extra.motivo_atraso;
-      if (extra?.motivo_falta) updateData.motivo_falta = extra.motivo_falta;
-
-      // Block direct cancellation - must go through solicitation
-      if (newStatus === 'cancelado') {
-        newStatus = 'cancelamento_solicitado';
-        updateData.status = 'cancelamento_solicitado';
-      }
-
-      // Set timestamp fields based on status
-      if (newStatus === 'devolucao_andamento') updateData.devolucao_iniciada_em = new Date().toISOString();
-      if (newStatus === 'devolucao_recebida') updateData.devolucao_recebida_em = new Date().toISOString();
-      if (newStatus === 'reembolsado') updateData.reembolsado_em = new Date().toISOString();
 
       const { error } = await supabase
         .from('orders')
@@ -93,16 +54,11 @@ const SupplierOrderManagement = () => {
       await supabase.from('order_status_history').insert({
         order_id: orderId,
         status: newStatus,
-        notes: extra?.status_reason || extra?.motivo_atraso || `Status atualizado pelo fornecedor`,
+        notes: `Status atualizado pelo fornecedor para: ${getStatusConfig(newStatus).label}`,
       });
 
-      // If em_falta, deactivate products
-      if (newStatus === 'em_falta') {
-        await deactivateOrderProducts(orderId);
-      }
-
-      // Create notification for customer
-      await createStatusNotification(orderId, newStatus, extra);
+      // Create notification for customer & reseller
+      await createStatusNotification(orderId, newStatus);
 
       toast({ title: "Sucesso", description: "Status do pedido atualizado" });
       refetch();
@@ -112,44 +68,7 @@ const SupplierOrderManagement = () => {
     }
   };
 
-  const deactivateOrderProducts = async (orderId: string) => {
-    try {
-      const { data: items } = await supabase
-        .from('order_items')
-        .select('product_id')
-        .eq('order_id', orderId);
-
-      if (!items || items.length === 0) return;
-
-      const productIds = items.map(i => i.product_id);
-      await supabase
-        .from('products')
-        .update({ active: false })
-        .in('id', productIds);
-
-      sonnerToast.warning(`${productIds.length} produto(s) indisponibilizado(s) por falta.`);
-
-      // Notify super admins
-      const { data: admins } = await supabase
-        .from('profiles')
-        .select('user_id')
-        .eq('role', 'super_admin');
-
-      if (admins) {
-        const notifications = admins.map(admin => ({
-          user_id: admin.user_id,
-          title: '⚠️ Produtos Indisponibilizados',
-          message: `${productIds.length} produto(s) foram indisponibilizados por falta no pedido.`,
-          type: 'product_unavailable',
-        }));
-        await supabase.from('notifications').insert(notifications);
-      }
-    } catch (error) {
-      console.error('Error deactivating products:', error);
-    }
-  };
-
-  const createStatusNotification = async (orderId: string, newStatus: string, extra?: { estimated_shipping_date?: string }) => {
+  const createStatusNotification = async (orderId: string, newStatus: string) => {
     try {
       const { data: order } = await supabase
         .from('orders')
@@ -164,9 +83,6 @@ const SupplierOrderManagement = () => {
       let message = STATUS_NOTIFICATION_MESSAGES[newStatus as OrderStatus] || '';
       message = message.replace('{numero}', order.order_number);
       message = message.replace('{codigo}', order.tracking_number || 'Em breve');
-      if (extra?.estimated_shipping_date) {
-        message = message.replace('{data}', new Date(extra.estimated_shipping_date).toLocaleDateString('pt-BR'));
-      }
 
       // Notify customer
       if (order.user_id) {
@@ -194,18 +110,8 @@ const SupplierOrderManagement = () => {
     }
   };
 
-  const handleQuickAction = (order: any, targetStatus: OrderStatus, requiresModal?: string) => {
-    if (requiresModal === 'reposicao') {
-      setReposicaoOrder(order);
-    } else if (requiresModal === 'em_falta') {
-      setEmFaltaOrder(order);
-    } else if (requiresModal === 'cancelamento') {
-      setCancelamentoOrder(order);
-    } else if (requiresModal === 'devolucao') {
-      setDevolucaoOrder(order);
-    } else {
-      updateOrderStatus(order.id, targetStatus);
-    }
+  const handleQuickAction = (order: any, targetStatus: OrderStatus) => {
+    updateOrderStatus(order.id, targetStatus);
   };
 
   const filteredOrders = orders.filter(order => {
@@ -214,10 +120,6 @@ const SupplierOrderManagement = () => {
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, statusFilter]);
 
   const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
   const startIndex = (currentPage - 1) * ordersPerPage;
@@ -248,70 +150,6 @@ const SupplierOrderManagement = () => {
           {orders.length} pedidos
         </Badge>
       </div>
-
-      {/* Urgent shipping cards */}
-      {(() => {
-        const today = new Date().toISOString().split('T')[0];
-        const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-        const activeStatuses = ['pago', 'recebido', 'embalado'];
-        
-        const pedidosHoje = orders.filter((o: any) => 
-          o.estimated_shipping_date === today && activeStatuses.includes(o.status)
-        );
-        const pedidosAmanha = orders.filter((o: any) => 
-          o.estimated_shipping_date === tomorrow && activeStatuses.includes(o.status)
-        );
-
-        return (pedidosHoje.length > 0 || pedidosAmanha.length > 0) ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {pedidosHoje.length > 0 && (
-              <Card className="border-red-300 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
-                <CardContent className="pt-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertCircle className="w-5 h-5 text-red-600" />
-                    <span className="font-bold text-red-700 dark:text-red-400">
-                      🚨 Pedidos para Enviar HOJE ({pedidosHoje.length})
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    {pedidosHoje.slice(0, 5).map((o: any) => (
-                      <div key={o.id} className="text-sm text-red-600 dark:text-red-400 flex justify-between">
-                        <span>{o.order_number}</span>
-                        <Badge variant="destructive" className="text-xs">Urgente</Badge>
-                      </div>
-                    ))}
-                    {pedidosHoje.length > 5 && (
-                      <p className="text-xs text-red-500">+ {pedidosHoje.length - 5} mais</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-            {pedidosAmanha.length > 0 && (
-              <Card className="border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
-                <CardContent className="pt-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="w-5 h-5 text-amber-600" />
-                    <span className="font-bold text-amber-700 dark:text-amber-400">
-                      📦 Pedidos para Amanhã ({pedidosAmanha.length})
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    {pedidosAmanha.slice(0, 5).map((o: any) => (
-                      <div key={o.id} className="text-sm text-amber-600 dark:text-amber-400">
-                        {o.order_number}
-                      </div>
-                    ))}
-                    {pedidosAmanha.length > 5 && (
-                      <p className="text-xs text-amber-500">+ {pedidosAmanha.length - 5} mais</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        ) : null;
-      })()}
 
       <Card className="mb-6">
         <CardHeader>
@@ -386,7 +224,7 @@ const SupplierOrderManagement = () => {
                     <TableRow key={order.id}>
                       <TableCell className="font-medium">{order.order_number}</TableCell>
                       <TableCell>
-                        {order.profiles.first_name} {order.profiles.last_name}
+                        {order.profiles?.first_name} {order.profiles?.last_name}
                       </TableCell>
                       <TableCell>
                         {format(new Date(order.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
@@ -413,7 +251,7 @@ const SupplierOrderManagement = () => {
                               key={action.targetStatus}
                               variant={action.variant || "default"}
                               size="sm"
-                              onClick={() => handleQuickAction(order, action.targetStatus, action.requiresModal)}
+                              onClick={() => handleQuickAction(order, action.targetStatus)}
                             >
                               {action.label}
                             </Button>
@@ -485,57 +323,6 @@ const SupplierOrderManagement = () => {
           onClose={() => setSelectedOrder(null)}
         />
       )}
-
-      {/* Modals */}
-      <ReposicaoModal
-        isOpen={!!reposicaoOrder}
-        onClose={() => setReposicaoOrder(null)}
-        orderNumber={reposicaoOrder?.order_number || ''}
-        onConfirm={(date, reason) => {
-          updateOrderStatus(reposicaoOrder.id, 'em_reposicao', {
-            estimated_shipping_date: date,
-            motivo_atraso: reason || 'Produto em reposição',
-            status_reason: reason,
-          });
-          setReposicaoOrder(null);
-        }}
-      />
-      <EmFaltaModal
-        isOpen={!!emFaltaOrder}
-        onClose={() => setEmFaltaOrder(null)}
-        orderNumber={emFaltaOrder?.order_number || ''}
-        onConfirm={(reason) => {
-          updateOrderStatus(emFaltaOrder.id, 'em_falta', { 
-            motivo_falta: reason,
-            status_reason: reason,
-          });
-          setEmFaltaOrder(null);
-        }}
-      />
-      <CancelamentoModal
-        isOpen={!!cancelamentoOrder}
-        onClose={() => setCancelamentoOrder(null)}
-        orderNumber={cancelamentoOrder?.order_number || ''}
-        onConfirm={(motivo, observacao) => {
-          updateOrderStatus(cancelamentoOrder.id, 'cancelamento_solicitado', {
-            cancelamento_motivo: motivo,
-            cancelamento_observacao: observacao,
-          });
-          setCancelamentoOrder(null);
-        }}
-      />
-      <DevolucaoModal
-        isOpen={!!devolucaoOrder}
-        onClose={() => setDevolucaoOrder(null)}
-        orderNumber={devolucaoOrder?.order_number || ''}
-        onConfirm={(motivo, observacao) => {
-          updateOrderStatus(devolucaoOrder.id, 'devolucao_andamento', {
-            devolucao_motivo: motivo,
-            devolucao_observacao: observacao,
-          });
-          setDevolucaoOrder(null);
-        }}
-      />
     </div>
   );
 };

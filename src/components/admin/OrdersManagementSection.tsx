@@ -5,12 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ShoppingCart, Eye, Edit, Truck, Package, CheckCircle, Clock } from 'lucide-react';
+import { ShoppingCart, Edit, Truck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ALL_STATUSES, ORDER_STATUS_CONFIG, getStatusConfig } from '@/constants/orderStatus';
+import { ALL_STATUSES, ORDER_STATUS_CONFIG, getStatusConfig, getStatusLabel, getStatusVariant, type OrderStatus } from '@/constants/orderStatus';
 
 interface AdminOrder {
   id: string;
@@ -140,14 +139,6 @@ export const OrdersManagementSection = () => {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    const Icon = getStatusConfig(status).icon;
-    return <Icon className="h-4 w-4" />;
-  };
-
-  const getStatusVariant = (status: string) => getStatusConfig(status).variant;
-  const getStatusLabel = (status: string) => getStatusConfig(status).label;
-
   const getPaymentStatusVariant = (status: string) => {
     switch (status) {
       case 'paid': return 'default';
@@ -187,7 +178,9 @@ export const OrdersManagementSection = () => {
             <SelectContent>
               <SelectItem value="all">Todos os Status</SelectItem>
               {ALL_STATUSES.map((s) => (
-                <SelectItem key={s} value={s}>{ORDER_STATUS_CONFIG[s].label}</SelectItem>
+                <SelectItem key={s} value={s}>
+                  {ORDER_STATUS_CONFIG[s].label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -201,113 +194,118 @@ export const OrdersManagementSection = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {orders.map((order) => (
-              <div
-                key={order.id}
-                className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-3">
-                    <h3 className="font-medium">
-                      {order.profiles?.first_name} {order.profiles?.last_name}
-                    </h3>
-                    <Badge variant={getPaymentStatusVariant(order.payment_status) as any} className="text-xs">
-                      {getPaymentStatusLabel(order.payment_status)}
-                    </Badge>
+            {orders.map((order) => {
+              const statusConfig = ORDER_STATUS_CONFIG[order.status as OrderStatus];
+              const StatusIcon = statusConfig?.icon;
+              return (
+                <div
+                  key={order.id}
+                  className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-3">
+                      <h3 className="font-medium">
+                        {order.profiles?.first_name} {order.profiles?.last_name}
+                      </h3>
+                      <Badge variant={getPaymentStatusVariant(order.payment_status) as any} className="text-xs">
+                        {getPaymentStatusLabel(order.payment_status)}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span>#{order.order_number}</span>
+                      <span>{new Date(order.created_at).toLocaleDateString('pt-BR')}</span>
+                      <span className="font-semibold text-foreground">R$ {Number(order.total_amount).toFixed(2)}</span>
+                      {order.tracking_number && (
+                        <span className="flex items-center gap-1">
+                          <Truck className="h-3 w-3" />
+                          {order.tracking_number}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>#{order.order_number}</span>
-                    <span>{new Date(order.created_at).toLocaleDateString('pt-BR')}</span>
-                    <span className="font-semibold text-foreground">R$ {Number(order.total_amount).toFixed(2)}</span>
-                    {order.tracking_number && (
-                      <span className="flex items-center gap-1">
-                        <Truck className="h-3 w-3" />
-                        {order.tracking_number}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <Badge variant={getStatusVariant(order.status) as any} className="text-xs">
-                    {getStatusIcon(order.status)}
-                    <span className="ml-1">{getStatusLabel(order.status)}</span>
-                  </Badge>
                   
-                  <Dialog 
-                    open={isUpdateDialogOpen && selectedOrder?.id === order.id} 
-                    onOpenChange={(open) => {
-                      setIsUpdateDialogOpen(open);
-                      if (!open) {
-                        setSelectedOrder(null);
-                        setNewStatus('');
-                        setTrackingNumber('');
-                      }
-                    }}
-                  >
-                    <DialogTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          setSelectedOrder(order);
-                          setNewStatus(order.status);
-                          setTrackingNumber(order.tracking_number || '');
-                        }}
-                      >
-                        <Edit className="h-3 w-3 mr-1" />
-                        Editar
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Atualizar Pedido #{order.order_number}</DialogTitle>
-                        <DialogDescription>
-                          Atualize o status do pedido e adicione informações de rastreamento.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="status">Status do Pedido</Label>
-                          <Select value={newStatus} onValueChange={setNewStatus}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {ALL_STATUSES.map((s) => (
-                                <SelectItem key={s} value={s}>{ORDER_STATUS_CONFIG[s].label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={getStatusVariant(order.status) as any} className="text-xs">
+                      {StatusIcon && <StatusIcon className="h-3 w-3 mr-1" />}
+                      <span>{getStatusLabel(order.status)}</span>
+                    </Badge>
+                    
+                    <Dialog 
+                      open={isUpdateDialogOpen && selectedOrder?.id === order.id} 
+                      onOpenChange={(open) => {
+                        setIsUpdateDialogOpen(open);
+                        if (!open) {
+                          setSelectedOrder(null);
+                          setNewStatus('');
+                          setTrackingNumber('');
+                        }
+                      }}
+                    >
+                      <DialogTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setSelectedOrder(order);
+                            setNewStatus(order.status);
+                            setTrackingNumber(order.tracking_number || '');
+                          }}
+                        >
+                          <Edit className="h-3 w-3 mr-1" />
+                          Editar
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Atualizar Pedido #{order.order_number}</DialogTitle>
+                          <DialogDescription>
+                            Atualize o status do pedido e adicione informações de rastreamento.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Select value={newStatus} onValueChange={setNewStatus}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione o status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ALL_STATUSES.map((s) => (
+                                  <SelectItem key={s} value={s}>
+                                    {ORDER_STATUS_CONFIG[s].label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor="tracking">Código de Rastreamento</Label>
+                            <Input
+                              id="tracking"
+                              value={trackingNumber}
+                              onChange={(e) => setTrackingNumber(e.target.value)}
+                              placeholder="Ex: BR123456789BR"
+                            />
+                          </div>
+                          
+                          <div className="flex justify-end gap-2">
+                            <Button 
+                              variant="outline" 
+                              onClick={() => setIsUpdateDialogOpen(false)}
+                            >
+                              Cancelar
+                            </Button>
+                            <Button onClick={handleUpdateOrder}>
+                              Atualizar Pedido
+                            </Button>
+                          </div>
                         </div>
-                        
-                        <div>
-                          <Label htmlFor="tracking">Código de Rastreamento</Label>
-                          <Input
-                            id="tracking"
-                            value={trackingNumber}
-                            onChange={(e) => setTrackingNumber(e.target.value)}
-                            placeholder="Ex: BR123456789BR"
-                          />
-                        </div>
-                        
-                        <div className="flex justify-end gap-2">
-                          <Button 
-                            variant="outline" 
-                            onClick={() => setIsUpdateDialogOpen(false)}
-                          >
-                            Cancelar
-                          </Button>
-                          <Button onClick={handleUpdateOrder}>
-                            Atualizar Pedido
-                          </Button>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             
             {orders.length === 0 && (
               <div className="text-center py-8">

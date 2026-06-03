@@ -9,21 +9,8 @@ const VALID_STATUSES = [
   'pendente',
   'pago',
   'recebido',
-  'embalado',
-  'enviado',
-  'finalizado',
-  'em_reposicao',
-  'em_falta',
-  'cancelamento_solicitado',
-  'cancelado',
-  'devolucao_andamento',
-  'devolucao_recebida',
-  'devolucao_analise',
-  'devolucao_aprovada',
-  'reembolsado'
+  'enviado'
 ];
-
-const REASONS_REQUIRING_OBSERVATION = ['erro_pedido', 'fraude', 'devolucao_negada', 'outro'];
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -87,10 +74,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const { 
-      order_number, status, tracking_number, notes, previsao_envio, motivo,
-      cancelamento_motivo, cancelamento_observacao,
-      devolucao_motivo, devolucao_observacao,
-      motivo_atraso, motivo_falta
+      order_number, status, tracking_number, notes, previsao_envio, motivo
     } = body;
 
     if (!order_number || !status) {
@@ -100,63 +84,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch valid statuses dynamically from order_pipeline_columns table
-    const { data: pipelineCols, error: colsError } = await supabase
-      .from('order_pipeline_columns')
-      .select('status_key');
-
-    let dynamicValidStatuses = VALID_STATUSES;
-    if (!colsError && pipelineCols && pipelineCols.length > 0) {
-      dynamicValidStatuses = pipelineCols.map((col: any) => col.status_key);
-    } else if (colsError) {
-      console.error('Error fetching valid statuses from database, falling back to static list:', colsError);
-    }
-
-    if (!dynamicValidStatuses.includes(status)) {
+    if (!VALID_STATUSES.includes(status)) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: `Status inválido. Statuses permitidos: ${dynamicValidStatuses.join(', ')}` 
+          error: `Status inválido. Use: ${VALID_STATUSES.join(', ')}` 
         }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Validate em_reposicao requires previsao_envio and motivo_atraso
-    if (status === 'em_reposicao' && !previsao_envio) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'previsao_envio é obrigatório para status em_reposicao' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (status === 'em_falta' && !motivo_falta && !motivo) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'motivo_falta é obrigatório para status em_falta' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Validate cancelado requires cancelamento_motivo
-    if (status === 'cancelado' && !cancelamento_motivo) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'cancelamento_motivo é obrigatório para status cancelado' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Validate cancelamento_observacao required for certain reasons
-    if (status === 'cancelado' && REASONS_REQUIRING_OBSERVATION.includes(cancelamento_motivo) && !cancelamento_observacao) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'cancelamento_observacao é obrigatório quando motivo é erro_pedido, fraude, devolucao_negada ou outro' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Validate devolucao_andamento requires devolucao_motivo
-    if (status === 'devolucao_andamento' && !devolucao_motivo) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'devolucao_motivo é obrigatório para status devolucao_andamento' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -229,21 +162,6 @@ Deno.serve(async (req) => {
     if (tracking_number) updateData.tracking_number = tracking_number;
     if (previsao_envio) updateData.estimated_shipping_date = previsao_envio;
     if (motivo) updateData.status_reason = motivo;
-    if (cancelamento_motivo) updateData.cancelamento_motivo = cancelamento_motivo;
-    if (cancelamento_observacao) updateData.cancelamento_observacao = cancelamento_observacao;
-    if (devolucao_motivo) updateData.devolucao_motivo = devolucao_motivo;
-    if (devolucao_observacao) updateData.devolucao_observacao = devolucao_observacao;
-    if (motivo_atraso) updateData.motivo_atraso = motivo_atraso;
-    if (motivo_falta) updateData.motivo_falta = motivo_falta;
-
-    // Set timestamp fields
-    if (status === 'cancelamento_solicitado') updateData.cancelamento_solicitado_em = new Date().toISOString();
-    if (status === 'cancelado') updateData.cancelado_em = new Date().toISOString();
-    if (status === 'devolucao_andamento') updateData.devolucao_iniciada_em = new Date().toISOString();
-    if (status === 'devolucao_recebida') updateData.devolucao_recebida_em = new Date().toISOString();
-    if (status === 'devolucao_analise') updateData.devolucao_analisada_em = new Date().toISOString();
-    if (status === 'devolucao_aprovada') updateData.devolucao_aprovada_em = new Date().toISOString();
-    if (status === 'reembolsado') updateData.reembolsado_em = new Date().toISOString();
 
     // Update order
     const { error: updateError } = await supabase
@@ -265,24 +183,8 @@ Deno.serve(async (req) => {
       .insert({
         order_id: order.id,
         status,
-        notes: notes || motivo || motivo_atraso || motivo_falta || `Status atualizado via API: ${previousStatus} → ${status}`
+        notes: notes || motivo || `Status atualizado via API: ${previousStatus} → ${status}`
       });
-
-    // If em_falta, deactivate products
-    if (status === 'em_falta') {
-      const { data: items } = await supabase
-        .from('order_items')
-        .select('product_id')
-        .eq('order_id', order.id);
-
-      if (items && items.length > 0) {
-        const productIds = items.map(i => i.product_id);
-        await supabase
-          .from('products')
-          .update({ active: false })
-          .in('id', productIds);
-      }
-    }
 
     console.log(`Order ${order_number} status updated: ${previousStatus} -> ${status}`);
 

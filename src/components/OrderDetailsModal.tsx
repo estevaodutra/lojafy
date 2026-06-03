@@ -6,17 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User, FileText, Download, Upload, TrendingUp, MessageSquarePlus, Send, Loader2, RefreshCw, Ticket } from 'lucide-react';
+import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User, FileText, Download, Upload, TrendingUp, MessageSquarePlus, Send, Loader2, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { OpenTicketButton } from '@/components/order-tickets/OpenTicketButton';
-import { getAvailableTicketTypes, TICKET_TYPE_LABELS } from '@/types/orderTickets';
+import { getAvailableTicketTypes } from '@/types/orderTickets';
 import { getStatusConfig, getStatusLabel as gslFn, getStatusVariant as gsvFn } from '@/constants/orderStatus';
 import { OrderActionBar } from '@/components/order-details/OrderActionBar';
 import { RelatedTickets } from '@/components/order-details/RelatedTickets';
-import { useNavigate } from 'react-router-dom';
-import { OrderPipelineTracker } from '@/components/order-details/OrderPipelineTracker';
 interface OrderItem {
   id: string;
   product_id: string;
@@ -96,7 +94,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   isOpen,
   onClose
 }) => {
-  const navigate = useNavigate();
   const [order, setOrder] = useState<Order | null>(null);
   const [customer, setCustomer] = useState<CustomerProfile | null>(null);
   const [statusHistory, setStatusHistory] = useState<OrderStatusHistory[]>([]);
@@ -106,16 +103,12 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [refundUploadFile, setRefundUploadFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  
-  const paidEntry = statusHistory.find(h => h.status === 'pago');
-  const paidAt = paidEntry ? paidEntry.created_at : (order?.payment_status === 'paid' ? order.created_at : null);
   const [isRefundUploading, setIsRefundUploading] = useState(false);
   const [currentProductCosts, setCurrentProductCosts] = useState<Record<string, number>>({});
   const [existingTicketId, setExistingTicketId] = useState<string | null>(null);
   const [deliveredAt, setDeliveredAt] = useState<string | null>(null);
   const [webhookLog, setWebhookLog] = useState<WebhookLogInfo | null>(null);
   const [webhookLoading, setWebhookLoading] = useState(false);
-  const [tickets, setTickets] = useState<any[]>([]);
   const [isDispatchingWebhook, setIsDispatchingWebhook] = useState(false);
   const {
     toast
@@ -131,7 +124,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       fetchShippingFiles();
       fetchRefundDocuments();
       fetchExistingTicket();
-      fetchTickets();
       fetchDeliveredAt();
       if (isAdmin) {
         fetchWebhookLog();
@@ -142,21 +134,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       setWebhookLog(null);
     }
   }, [orderId, isOpen, isAdmin]);
-
-  const fetchTickets = async () => {
-    if (!orderId) return;
-    try {
-      const { data, error } = await supabase
-        .from('order_tickets')
-        .select('id, ticket_number, tipo, status, reason, created_at')
-        .eq('order_id', orderId)
-        .order('created_at', { ascending: true });
-      if (error) throw error;
-      setTickets(data || []);
-    } catch (error) {
-      console.error('Erro ao buscar tickets para histórico:', error);
-    }
-  };
 
   const fetchExistingTicket = async () => {
     if (!orderId) return;
@@ -649,7 +626,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             order={order}
             userRole={profile.role || 'customer'}
             deliveredAt={deliveredAt}
-            paidAt={paidAt}
             existingTicketId={existingTicketId}
             onRefresh={() => {
               fetchOrderDetails();
@@ -664,17 +640,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
             <p className="text-muted-foreground mt-2">Carregando detalhes...</p>
           </div> : order ? <div className="space-y-6">
-            <OrderPipelineTracker
-              status={order.status}
-              paymentStatus={order.payment_status}
-              orderNumber={order.order_number}
-              motivoAtraso={order.motivo_atraso}
-              previsaoEnvio={order.previsao_envio}
-              cancelamentoMotivo={order.cancelamento_motivo}
-              cancelamentoObservacao={order.cancelamento_observacao}
-              activeTicketsCount={tickets.filter(t => t.status !== 'resolvido' && t.status !== 'cancelado').length}
-            />
-
             {/* Customer Info */}
             {customer && <Card>
                 <CardHeader>
@@ -1132,7 +1097,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                       orderStatus={order.status}
                       paymentStatus={order.payment_status}
                       deliveredAt={deliveredAt}
-                      paidAt={paidAt}
                       existingTicketId={existingTicketId}
                       variant="default"
                       size="default"
@@ -1316,240 +1280,32 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
             {/* Related Tickets */}
             <RelatedTickets orderId={order.id} />
+
             {/* Status History */}
-            {(() => {
-              return (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      Histórico
-                    </CardTitle>
-                  </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {(() => {
-                    const dbEvents = statusHistory.map(item => ({
-                      id: item.id,
-                      type: 'status_change',
-                      status: item.status,
-                      title: item.status === 'pago' ? 'Aguardando Recebimento' : getStatusLabel(item.status),
-                      timestamp: item.created_at,
-                      notes: item.notes,
-                      icon: getStatusIcon(item.status),
-                      iconBg: 'bg-primary/10'
-                    }));
-
-                    const events = [];
-
-                    // 1. Pedido Gerado
-                    events.push({
-                      id: 'creation-' + order.id,
-                      type: 'creation',
-                      status: 'pendente',
-                      title: 'Pedido Gerado',
-                      timestamp: order.created_at,
-                      notes: 'O pedido foi criado no sistema.',
-                      icon: <Package className="h-4 w-4 text-blue-500" />,
-                      iconBg: 'bg-blue-500/10'
-                    });
-
-                    // 2. Pedido Pago
-                    const isPaid = order.payment_status === 'paid' || ['pago', 'recebido', 'embalado', 'enviado', 'finalizado', 'reembolsado'].includes(order.status);
-                    const dbPago = dbEvents.find(e => e.status === 'pago');
-                    if (isPaid) {
-                      events.push({
-                        id: 'synthesis-pago-' + order.id,
-                        type: 'status_change',
-                        status: 'pago_confirmed',
-                        title: 'Pedido Pago',
-                        timestamp: dbPago ? dbPago.timestamp : order.created_at,
-                        notes: dbPago?.notes || (order.status === 'pago' ? 'Pagamento confirmado. Aguardando recebimento pelo fornecedor.' : 'Pagamento confirmado.'),
-                        icon: <CheckCircle className="h-4 w-4 text-green-500" />,
-                        iconBg: 'bg-green-500/10'
-                      });
-                    }
-
-                    // 4. Recebido
-                    const isReceived = ['recebido', 'embalado', 'enviado', 'finalizado'].includes(order.status);
-                    const dbRecebido = dbEvents.find(e => e.status === 'recebido');
-                    if (isReceived) {
-                      events.push({
-                        id: 'synthesis-recebido-' + order.id,
-                        type: 'status_change',
-                        status: 'recebido',
-                        title: 'Recebido',
-                        timestamp: dbRecebido ? dbRecebido.timestamp : (order.status === 'recebido' ? order.updated_at : order.created_at),
-                        notes: dbRecebido?.notes || 'Pedido recebido pelo fornecedor.',
-                        icon: getStatusIcon('recebido'),
-                        iconBg: 'bg-primary/10'
-                      });
-                    }
-
-                    // 5. Embalado
-                    const isEmbalado = ['embalado', 'enviado', 'finalizado'].includes(order.status);
-                    const dbEmbalado = dbEvents.find(e => e.status === 'embalado');
-                    if (isEmbalado) {
-                      events.push({
-                        id: 'synthesis-embalado-' + order.id,
-                        type: 'status_change',
-                        status: 'embalado',
-                        title: 'Embalado',
-                        timestamp: dbEmbalado ? dbEmbalado.timestamp : (order.status === 'embalado' ? order.updated_at : order.created_at),
-                        notes: dbEmbalado?.notes || 'Pedido embalado e aguardando envio.',
-                        icon: getStatusIcon('embalado'),
-                        iconBg: 'bg-primary/10'
-                      });
-                    }
-
-                    // 6. Enviado
-                    const isEnviado = ['enviado', 'finalizado'].includes(order.status);
-                    const dbEnviado = dbEvents.find(e => e.status === 'enviado');
-                    if (isEnviado) {
-                      events.push({
-                        id: 'synthesis-enviado-' + order.id,
-                        type: 'status_change',
-                        status: 'enviado',
-                        title: 'Enviado',
-                        timestamp: dbEnviado ? dbEnviado.timestamp : (order.status === 'enviado' ? order.updated_at : order.created_at),
-                        notes: dbEnviado?.notes || (order.tracking_number ? `Pedido enviado. Código de rastreio: ${order.tracking_number}` : 'Pedido enviado pelo fornecedor.'),
-                        icon: getStatusIcon('enviado'),
-                        iconBg: 'bg-primary/10'
-                      });
-                    }
-
-                    // 7. Finalizado
-                    const isFinalizado = order.status === 'finalizado';
-                    const dbFinalizado = dbEvents.find(e => e.status === 'finalizado');
-                    if (isFinalizado) {
-                      events.push({
-                        id: 'synthesis-finalizado-' + order.id,
-                        type: 'status_change',
-                        status: 'finalizado',
-                        title: 'Finalizado',
-                        timestamp: dbFinalizado ? dbFinalizado.timestamp : order.updated_at,
-                        notes: dbFinalizado?.notes || 'Pedido entregue e finalizado.',
-                        icon: getStatusIcon('finalizado'),
-                        iconBg: 'bg-primary/10'
-                      });
-                    }
-
-                    // 8. Cancelado
-                    const isCancelado = order.status === 'cancelado';
-                    const dbCancelado = dbEvents.find(e => e.status === 'cancelado');
-                    if (isCancelado) {
-                      events.push({
-                        id: 'synthesis-cancelado-' + order.id,
-                        type: 'status_change',
-                        status: 'cancelado',
-                        title: 'Cancelado',
-                        timestamp: dbCancelado ? dbCancelado.timestamp : order.updated_at,
-                        notes: dbCancelado?.notes || 'Pedido cancelado.',
-                        icon: getStatusIcon('cancelado'),
-                        iconBg: 'bg-primary/10'
-                      });
-                    }
-
-                    // 9. Reembolsado
-                    const isReembolsado = order.status === 'reembolsado' || order.payment_status === 'refunded';
-                    const dbReembolsado = dbEvents.find(e => e.status === 'reembolsado');
-                    if (isReembolsado) {
-                      events.push({
-                        id: 'synthesis-reembolsado-' + order.id,
-                        type: 'status_change',
-                        status: 'reembolsado',
-                        title: 'Reembolsado',
-                        timestamp: dbReembolsado ? dbReembolsado.timestamp : order.updated_at,
-                        notes: dbReembolsado?.notes || 'Pedido reembolsado.',
-                        icon: getStatusIcon('reembolsado'),
-                        iconBg: 'bg-primary/10'
-                      });
-                    }
-
-                    // 10. Add tickets
-                    events.push(...tickets.map(ticket => ({
-                      id: ticket.id,
-                      type: 'ticket',
-                      title: `Ticket Aberto (${TICKET_TYPE_LABELS[ticket.tipo as keyof typeof TICKET_TYPE_LABELS] || ticket.tipo})`,
-                      timestamp: ticket.created_at,
-                      notes: `Ticket #${ticket.ticket_number} - Motivo: ${ticket.reason}`,
-                      icon: <Ticket className="h-4 w-4 text-red-500" />,
-                      iconBg: 'bg-red-500/10'
-                    })));
-
-                    // 11. Sort all events
-                    const getStatusOrder = (evt) => {
-                      if (evt.type === 'creation') return 0;
-                      if (evt.type === 'ticket') return 100;
-                      switch (evt.status) {
-                        case 'pago_confirmed': return 1;
-                        case 'recebido': return 3;
-                        case 'embalado': return 4;
-                        case 'enviado': return 5;
-                        case 'finalizado': return 6;
-                        case 'cancelado': return 7;
-                        case 'reembolsado': return 8;
-                        default: return 50;
-                      }
-                    };
-
-                    events.sort((a, b) => {
-                      const timeA = new Date(a.timestamp).getTime();
-                      const timeB = new Date(b.timestamp).getTime();
-                      if (timeA !== timeB) {
-                        return timeA - timeB;
-                      }
-                      return getStatusOrder(a) - getStatusOrder(b);
-                    });
-
-                    return events.map(event => (
-                      <div key={event.id} className="flex items-start gap-3 text-left">
-                        <div className={`flex items-center justify-center w-8 h-8 rounded-full mt-0.5 ${event.iconBg}`}>
-                          {event.icon}
+            {statusHistory.length > 0 && <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Histórico do Pedido
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {statusHistory.map(item => <div key={item.id} className="flex items-start gap-3">
+                        <div className="flex items-center justify-center w-8 h-8 bg-primary/10 rounded-full mt-0.5">
+                          {getStatusIcon(item.status)}
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <p className="font-medium">{event.title}</p>
-                            <p className="text-sm text-muted-foreground">{formatDate(event.timestamp)}</p>
+                            <p className="font-medium">{getStatusLabel(item.status)}</p>
+                            <p className="text-sm text-muted-foreground">{formatDate(item.created_at)}</p>
                           </div>
-                          {event.notes && <p className="text-sm text-muted-foreground mt-1">{event.notes}</p>}
+                          {item.notes && <p className="text-sm text-muted-foreground mt-1">{item.notes}</p>}
                         </div>
-                      </div>
-                    ));
-                  })()}
-                </div>
-
-                <div className="mt-6 pt-4 border-t flex items-center gap-2">
-                  <OpenTicketButton
-                    orderId={order.id}
-                    orderStatus={order.status}
-                    paymentStatus={order.payment_status}
-                    deliveredAt={deliveredAt}
-                    paidAt={paidAt}
-                    existingTicketId={existingTicketId}
-                    variant="default"
-                    size="sm"
-                    className="flex-1"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => {
-                      if (isAdmin) {
-                        navigate('/super-admin/suporte');
-                      } else {
-                        navigate('/minha-conta/tickets');
-                      }
-                    }}
-                  >
-                    Ver Todos os Tickets
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-              );
-            })()}
+                      </div>)}
+                  </div>
+                </CardContent>
+              </Card>}
 
             {/* Order Notes */}
             {order.notes && <Card>
