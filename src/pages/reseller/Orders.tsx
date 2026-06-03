@@ -1,11 +1,12 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useResellerOrders } from "@/hooks/useResellerOrders";
-import { Search, Package, Download, MapPin } from "lucide-react";
+import { Search, Package, Download, MapPin, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -37,6 +38,7 @@ async function downloadLabel(orderId: string, orderNumber: string) {
 }
 
 function ResellerOrders() {
+  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const { data: orders, isLoading } = useResellerOrders(statusFilter, searchTerm);
@@ -183,6 +185,16 @@ function ResellerOrders() {
                           <p className="text-2xl font-bold text-primary">
                             R$ {Number(order.total_amount).toFixed(2)}
                           </p>
+                          {order.status === "etiqueta_incorreta" && (
+                            <Button
+                              size="sm"
+                              className="text-xs gap-1 bg-rose-600 hover:bg-rose-700 text-white w-full md:w-auto"
+                              onClick={() => navigate(`/reseller/pedidos/corrigir-etiqueta/${order.id}`)}
+                            >
+                              <AlertCircle className="h-3 w-3" />
+                              Corrigir Etiqueta
+                            </Button>
+                          )}
                           {order.ml_shipment_id && (
                             <Button
                               size="sm"

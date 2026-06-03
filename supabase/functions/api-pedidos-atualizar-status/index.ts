@@ -9,7 +9,8 @@ const VALID_STATUSES = [
   'pendente',
   'pago',
   'recebido',
-  'enviado'
+  'enviado',
+  'etiqueta_incorreta'
 ];
 
 Deno.serve(async (req) => {

@@ -3,6 +3,7 @@ import {
   Inbox,
   Send,
   BadgeCheck,
+  AlertTriangle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -10,7 +11,8 @@ export type OrderStatus =
   | "pendente"
   | "pago"
   | "recebido"
-  | "enviado";
+  | "enviado"
+  | "etiqueta_incorreta";
 
 export interface OrderStatusConfig {
   label: string;
@@ -24,12 +26,14 @@ export const ORDER_STATUS_CONFIG: Record<OrderStatus, OrderStatusConfig> = {
   pago: { label: "Pedido Pago Aguardada Recebimento da Expedição", icon: BadgeCheck, color: "bg-emerald-100 text-emerald-800", variant: "default" },
   recebido: { label: "Pedido Recebido > Aguardando Envio", icon: Inbox, color: "bg-blue-100 text-blue-800", variant: "default" },
   enviado: { label: "Pedido Enviado", icon: Send, color: "bg-purple-100 text-purple-800", variant: "secondary" },
+  etiqueta_incorreta: { label: "Erro | Etiqueta Incorreta", icon: AlertTriangle, color: "bg-rose-100 text-rose-800 border border-rose-200", variant: "destructive" },
 };
 
 export const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   pendente: ["pago"],
-  pago: ["recebido"],
-  recebido: ["enviado"],
+  pago: ["recebido", "etiqueta_incorreta"],
+  recebido: ["enviado", "etiqueta_incorreta"],
+  etiqueta_incorreta: ["pago"],
   enviado: [],
 };
 
@@ -37,6 +41,7 @@ export const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 export const SUPPLIER_STATUSES: OrderStatus[] = [
   "recebido",
   "enviado",
+  "etiqueta_incorreta",
 ];
 
 // Todos os status (para admin)
@@ -48,12 +53,14 @@ export const STATUS_NOTIFICATION_MESSAGES: Record<OrderStatus, string> = {
   pago: "✅ Pagamento confirmado! Seu pedido #{numero} está sendo processado.",
   recebido: "📥 Seu pedido #{numero} foi recebido pelo fornecedor.",
   enviado: "🚚 Seu pedido #{numero} foi enviado! Rastreio: {codigo}",
+  etiqueta_incorreta: "⚠️ A etiqueta do seu pedido #{numero} está incorreta. Por favor, envie a nova etiqueta.",
 };
 
 // Status que notificam o revendedor
 export const RESELLER_NOTIFY_STATUSES: OrderStatus[] = [
   "recebido",
   "enviado",
+  "etiqueta_incorreta",
 ];
 
 // Helper functions
