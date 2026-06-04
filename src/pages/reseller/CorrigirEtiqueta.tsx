@@ -40,7 +40,7 @@ export default function CorrigirEtiqueta() {
       
       // Validação de segurança: apenas o proprietário do pedido pode acessá-lo
       if (data.reseller_id !== user.id) {
-        throw new Error(`Acesso não autorizado a este pedido. Este pedido pertence a outro revendedor. (Logado como: ${user.email})`);
+        throw new Error(`Acesso não autorizado a este pedido. Este pedido pertence ao revendedor (ID: ${data.reseller_id || "NULO"}). Você está logado como: ${user.email} (Seu ID: ${user.id})`);
       }
 
       return data;
