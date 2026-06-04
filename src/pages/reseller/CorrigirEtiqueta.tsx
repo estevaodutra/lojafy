@@ -67,6 +67,9 @@ export default function CorrigirEtiqueta() {
     setSubmitting(true);
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
       // 1. Upload do arquivo para o bucket shipping-files
       const fileExt = shippingFile.file.name.split('.').pop();
       const fileName = `order_${orderId}_corrected_${Date.now()}.${fileExt}`;
@@ -112,49 +115,111 @@ export default function CorrigirEtiqueta() {
       try {
         console.log("Enviando webhook de atualização de etiqueta para o n8n...");
         
-        // Como o bucket 'shipping-files' é privado, precisamos gerar uma URL assinada (válida por 1 ano)
-        // para que o n8n ou o admin consiga acessar o arquivo diretamente.
-        let fileUrl = "";
-        try {
-          const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-            .from('shipping-files')
-            .createSignedUrl(filePath, 60 * 60 * 24 * 365); // 1 ano
-          
-          if (!signedUrlError && signedUrlData) {
-            fileUrl = signedUrlData.signedUrl;
-          } else {
-            console.warn("Erro ao gerar URL assinada, usando URL pública:", signedUrlError);
+        // Buscar informações completas do pedido para igualar ao evento "order.paid"
+        const { data: fullOrder } = await supabase
+          .from('orders')
+          .select('id, order_number, total_amount, payment_method, user_id, reseller_id')
+          .eq('id', orderId)
+          .single();
+
+        if (fullOrder) {
+          // Buscar perfil do cliente
+          const { data: customerProfile } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, phone')
+            .eq('user_id', fullOrder.user_id)
+            .maybeSingle();
+
+          // Determinar e-mail do cliente (usando o do usuário logado se for o comprador)
+          const customerEmail = fullOrder.user_id === user.id ? user.email : null;
+          const customerName = customerProfile
+            ? `${customerProfile.first_name || ''} ${customerProfile.last_name || ''}`.trim() || 'Cliente'
+            : 'Cliente';
+
+          // Buscar dados do revendedor/loja
+          let resellerData = { user_id: null, store_name: null };
+          if (fullOrder.reseller_id) {
+            const { data: store } = await supabase
+              .from('reseller_stores')
+              .select('store_name')
+              .eq('user_id', fullOrder.reseller_id)
+              .maybeSingle();
+            if (store) {
+              resellerData = { user_id: fullOrder.reseller_id, store_name: store.store_name };
+            }
+          }
+
+          // Buscar itens do pedido
+          const { data: items } = await supabase
+            .from('order_items')
+            .select('product_id, quantity, unit_price, product_snapshot')
+            .eq('order_id', fullOrder.id);
+
+          const enrichedItems = (items || []).map(item => {
+            const snapshot = item.product_snapshot || {};
+            return {
+              product_id: item.product_id,
+              product_url: `https://lojafy.app/produto/${item.product_id}`,
+              name: snapshot.name || 'Produto',
+              sku: snapshot.sku || null,
+              image_url: snapshot.image_url || null,
+              cost_price: snapshot.cost_price || null,
+              quantity: item.quantity,
+              unit_price: item.unit_price,
+              variation: snapshot.variation || null
+            };
+          });
+
+          // Como o bucket 'shipping-files' é privado, precisamos gerar uma URL assinada (válida por 1 ano)
+          let fileUrl = "";
+          try {
+            const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+              .from('shipping-files')
+              .createSignedUrl(filePath, 60 * 60 * 24 * 365); // 1 ano
+            
+            if (!signedUrlError && signedUrlData) {
+              fileUrl = signedUrlData.signedUrl;
+            } else {
+              fileUrl = supabase.storage.from('shipping-files').getPublicUrl(filePath).data.publicUrl;
+            }
+          } catch (urlErr) {
             fileUrl = supabase.storage.from('shipping-files').getPublicUrl(filePath).data.publicUrl;
           }
-        } catch (urlErr) {
-          console.error("Falha ao criar URL assinada, usando fallback:", urlErr);
-          fileUrl = supabase.storage.from('shipping-files').getPublicUrl(filePath).data.publicUrl;
-        }
-        
-        await fetch("https://n8n-n8n.nuwfic.easypanel.host/webhook/label_update", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            order_id: orderId,
-            order_number: order.order_number,
-            status: "pago",
-            tracking_code: trackingCode,
-            tracking_number: trackingCode,
-            total_amount: order.total_amount,
-            reseller_id: order.reseller_id,
-            user_id: order.user_id,
-            shipping_file: {
-              file_name: shippingFile.file.name,
-              file_path: filePath,
-              file_size: shippingFile.file.size,
-              file_url: fileUrl
+
+          const payload = {
+            event: "order.paid",
+            timestamp: new Date().toISOString(),
+            data: {
+              order_id: fullOrder.id,
+              order_number: fullOrder.order_number,
+              total_amount: Number(fullOrder.total_amount),
+              payment_method: fullOrder.payment_method,
+              customer: {
+                user_id: fullOrder.user_id,
+                email: customerEmail,
+                name: customerName,
+                phone: customerProfile?.phone || null
+              },
+              reseller: resellerData,
+              items: enrichedItems,
+              shipping_label: {
+                file_name: shippingFile.file.name,
+                file_size: shippingFile.file.size,
+                uploaded_at: new Date().toISOString(),
+                download_url: fileUrl
+              }
+            }
+          };
+
+          await fetch("https://n8n-n8n.nuwfic.easypanel.host/webhook/label_update", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
             },
-            updated_at: new Date().toISOString()
-          })
-        });
-        console.log("Webhook enviado com sucesso!");
+            body: JSON.stringify(payload)
+          });
+          console.log("Webhook enviado com sucesso!");
+        }
       } catch (webhookErr) {
         console.error("Erro ao enviar webhook para o n8n:", webhookErr);
       }
