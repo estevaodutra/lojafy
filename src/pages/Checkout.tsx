@@ -30,11 +30,13 @@ interface CheckoutProps {
   showHeader?: boolean;
   showFooter?: boolean;
   storeSlug?: string;
+  resellerId?: string;
 }
 const Checkout = ({
   showHeader = true,
   showFooter = true,
-  storeSlug
+  storeSlug,
+  resellerId: propResellerId
 }: CheckoutProps) => {
   const navigate = useNavigate();
   const {
@@ -75,6 +77,32 @@ const Checkout = ({
   const [isPayingWithWallet, setIsPayingWithWallet] = useState(false);
   const { data: walletData } = useWallet();
   const walletSaldo = walletData?.saldo ?? 0;
+  const [resellerId, setResellerId] = useState<string | null>(propResellerId || null);
+
+  // Fetch reseller_id from reseller_stores if storeSlug is provided
+  useEffect(() => {
+    if (propResellerId) {
+      setResellerId(propResellerId);
+      return;
+    }
+    const fetchResellerId = async () => {
+      if (!storeSlug) return;
+      try {
+        const { data, error } = await supabase
+          .from("reseller_stores")
+          .select("reseller_id")
+          .eq("store_slug", storeSlug)
+          .maybeSingle();
+        if (data && !error) {
+          setResellerId(data.reseller_id);
+          console.log("Resolved reseller_id:", data.reseller_id, "for storeSlug:", storeSlug);
+        }
+      } catch (err) {
+        console.error("Error resolving reseller_id for store:", err);
+      }
+    };
+    fetchResellerId();
+  }, [storeSlug, propResellerId]);
 
   // Check if cart is empty and redirect
   useEffect(() => {
@@ -396,7 +424,8 @@ const Checkout = ({
           city: formData.city,
           state: formData.state,
           zipCode: formData.zipCode
-        }
+        },
+        reseller_id: resellerId || undefined
       };
       console.log('Creating PIX payment via Edge Function...');
       const response = await createModernPixPayment(paymentRequest);
@@ -592,6 +621,7 @@ const Checkout = ({
             zipCode: formData.zipCode
           },
           payment_method: 'wallet',
+          reseller_id: resellerId || null,
         },
       });
       if (orderError) throw orderError;

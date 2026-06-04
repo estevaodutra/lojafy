@@ -36,7 +36,7 @@ const PublicStoreCheckoutPage = () => {
   return (
     <div className="min-h-screen">
       <PublicStoreHeader store={store} />
-      <Checkout showHeader={false} showFooter={false} storeSlug={store.store_slug} />
+      <Checkout showHeader={false} showFooter={false} storeSlug={store.store_slug} resellerId={store.reseller_id} />
       <PublicStoreFooter store={store} />
     </div>
   );

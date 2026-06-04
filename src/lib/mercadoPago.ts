@@ -16,6 +16,7 @@ export interface PixPaymentRequest {
     unitPrice: number;
   }>;
   shippingAddress?: any;
+  reseller_id?: string;
 }
 
 export interface PixPaymentResponse {
@@ -45,7 +46,8 @@ export async function createModernPixPayment(paymentData: PixPaymentRequest): Pr
         description: paymentData.description,
         payer: paymentData.payer,
         orderItems: paymentData.orderItems || [],
-        shippingAddress: paymentData.shippingAddress || null
+        shippingAddress: paymentData.shippingAddress || null,
+        reseller_id: paymentData.reseller_id || null
       }
     });
 

@@ -28,7 +28,7 @@ export default function CorrigirEtiqueta() {
 
       const { data, error } = await supabase
         .from("orders")
-        .select("id, order_number, status, total_amount, created_at, reseller_id")
+        .select("id, order_number, status, total_amount, created_at, reseller_id, user_id")
         .eq("id", orderId)
         .maybeSingle();
 
@@ -38,9 +38,12 @@ export default function CorrigirEtiqueta() {
         throw new Error(`Pedido não encontrado. Certifique-se de que você está logado na conta de revendedor correta que possui este pedido. (Logado como: ${user.email})`);
       }
       
-      // Validação de segurança: apenas o proprietário do pedido pode acessá-lo
-      if (data.reseller_id !== user.id) {
-        throw new Error(`Acesso não autorizado a este pedido. Este pedido pertence ao revendedor (ID: ${data.reseller_id || "NULO"}). Você está logado como: ${user.email} (Seu ID: ${user.id})`);
+      // Validação de segurança: o usuário logado deve ser o revendedor ou o comprador (customer) do pedido
+      const isResellerOwner = data.reseller_id === user.id;
+      const isCustomerOwner = data.user_id === user.id;
+      
+      if (!isResellerOwner && !isCustomerOwner) {
+        throw new Error(`Acesso não autorizado a este pedido. Este pedido pertence ao revendedor (ID: ${data.reseller_id || "NULO"}) e ao cliente (ID: ${data.user_id || "NULO"}). Você está logado como: ${user.email} (Seu ID: ${user.id})`);
       }
 
       return data;
