@@ -111,7 +111,25 @@ export default function CorrigirEtiqueta() {
       // 5. Enviar webhook de atualização de etiqueta para o n8n
       try {
         console.log("Enviando webhook de atualização de etiqueta para o n8n...");
-        const fileUrl = supabase.storage.from('shipping-files').getPublicUrl(filePath).data.publicUrl;
+        
+        // Como o bucket 'shipping-files' é privado, precisamos gerar uma URL assinada (válida por 1 ano)
+        // para que o n8n ou o admin consiga acessar o arquivo diretamente.
+        let fileUrl = "";
+        try {
+          const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+            .from('shipping-files')
+            .createSignedUrl(filePath, 60 * 60 * 24 * 365); // 1 ano
+          
+          if (!signedUrlError && signedUrlData) {
+            fileUrl = signedUrlData.signedUrl;
+          } else {
+            console.warn("Erro ao gerar URL assinada, usando URL pública:", signedUrlError);
+            fileUrl = supabase.storage.from('shipping-files').getPublicUrl(filePath).data.publicUrl;
+          }
+        } catch (urlErr) {
+          console.error("Falha ao criar URL assinada, usando fallback:", urlErr);
+          fileUrl = supabase.storage.from('shipping-files').getPublicUrl(filePath).data.publicUrl;
+        }
         
         await fetch("https://n8n-n8n.nuwfic.easypanel.host/webhook/label_update", {
           method: "POST",
