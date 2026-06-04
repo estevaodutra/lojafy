@@ -111,6 +111,8 @@ export default function CorrigirEtiqueta() {
       // 5. Enviar webhook de atualização de etiqueta para o n8n
       try {
         console.log("Enviando webhook de atualização de etiqueta para o n8n...");
+        const fileUrl = supabase.storage.from('shipping-files').getPublicUrl(filePath).data.publicUrl;
+        
         await fetch("https://n8n-n8n.nuwfic.easypanel.host/webhook/label_update", {
           method: "POST",
           headers: {
@@ -128,7 +130,8 @@ export default function CorrigirEtiqueta() {
             shipping_file: {
               file_name: shippingFile.file.name,
               file_path: filePath,
-              file_size: shippingFile.file.size
+              file_size: shippingFile.file.size,
+              file_url: fileUrl
             },
             updated_at: new Date().toISOString()
           })
