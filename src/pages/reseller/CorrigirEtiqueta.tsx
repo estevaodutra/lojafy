@@ -108,6 +108,36 @@ export default function CorrigirEtiqueta() {
         notes: `Etiqueta corrigida pelo revendedor. Status alterado de etiqueta_incorreta para pago. Código de rastreio: ${trackingCode}`
       });
 
+      // 5. Enviar webhook de atualização de etiqueta para o n8n
+      try {
+        console.log("Enviando webhook de atualização de etiqueta para o n8n...");
+        await fetch("https://n8n-n8n.nuwfic.easypanel.host/webhook/label_update", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            order_id: orderId,
+            order_number: order.order_number,
+            status: "pago",
+            tracking_code: trackingCode,
+            tracking_number: trackingCode,
+            total_amount: order.total_amount,
+            reseller_id: order.reseller_id,
+            user_id: order.user_id,
+            shipping_file: {
+              file_name: shippingFile.file.name,
+              file_path: filePath,
+              file_size: shippingFile.file.size
+            },
+            updated_at: new Date().toISOString()
+          })
+        });
+        console.log("Webhook enviado com sucesso!");
+      } catch (webhookErr) {
+        console.error("Erro ao enviar webhook para o n8n:", webhookErr);
+      }
+
       toast({
         title: "Sucesso!",
         description: "Etiqueta e código de rastreio corrigidos com sucesso. O pedido foi devolvido para a expedição.",
