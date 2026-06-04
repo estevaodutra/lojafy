@@ -30,13 +30,17 @@ export default function CorrigirEtiqueta() {
         .from("orders")
         .select("id, order_number, status, total_amount, created_at, reseller_id")
         .eq("id", orderId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       
+      if (!data) {
+        throw new Error(`Pedido não encontrado. Certifique-se de que você está logado na conta de revendedor correta que possui este pedido. (Logado como: ${user.email})`);
+      }
+      
       // Validação de segurança: apenas o proprietário do pedido pode acessá-lo
       if (data.reseller_id !== user.id) {
-        throw new Error("Acesso não autorizado a este pedido");
+        throw new Error(`Acesso não autorizado a este pedido. Este pedido pertence a outro revendedor. (Logado como: ${user.email})`);
       }
 
       return data;
