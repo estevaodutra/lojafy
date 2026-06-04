@@ -107,18 +107,7 @@ export const OrderSolicitations = () => {
           notes: 'Cancelamento aprovado pelo administrador',
         });
 
-        // Credit wallet
-        await supabase.rpc('creditar_carteira' as any, {
-          p_user_id: order.user_id,
-          p_valor: order.total_amount,
-          p_taxa: 0,
-          p_descricao: `Reembolso do pedido #${order.order_number} (cancelamento aprovado)`,
-          p_referencia_tipo: 'cancelamento_pedido',
-          p_referencia_id: order.id,
-          p_tipo: 'estorno',
-        });
-
-        toast.success(`Cancelamento aprovado. R$ ${order.total_amount.toFixed(2)} creditado na carteira.`);
+        toast.success(`Cancelamento aprovado e saldo estornado.`);
       } else {
         // For devolucao: advance to next status
         const nextStatus = order.status === 'devolucao_andamento' ? 'devolucao_recebida' : 'devolucao_aprovada';

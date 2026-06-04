@@ -88,18 +88,7 @@ export const OrderActionBar = ({
         notes: 'Pedido cancelado por fraude detectada',
       });
 
-      // Super admin fraud = direct cancel + credit
-      await supabase.rpc('creditar_carteira' as any, {
-        p_user_id: order.user_id,
-        p_valor: order.total_amount,
-        p_taxa: 0,
-        p_descricao: `Reembolso do pedido #${order.order_number} (fraude)`,
-        p_referencia_tipo: 'cancelamento_pedido',
-        p_referencia_id: order.id,
-        p_tipo: 'estorno',
-      });
-
-      toast.success('Pedido marcado como fraude, cancelado e valor creditado.');
+      toast.success('Pedido marcado como fraude, cancelado e estorno processado.');
       onRefresh();
     } catch (error: any) {
       toast.error(error.message || 'Erro ao marcar fraude.');
