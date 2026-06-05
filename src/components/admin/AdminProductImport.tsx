@@ -808,7 +808,7 @@ export function AdminProductImport({ onSuccess, onCancel }: AdminProductImportPr
                     Cancelar
                   </Button>
                 </div>
-              </Card>
+              </CardContent>
             </Card>
 
           </div>
