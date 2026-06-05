@@ -92,14 +92,83 @@ export function AdminProductImport({ onSuccess, onCancel }: AdminProductImportPr
     return null;
   };
 
+  // Check if string is a URL
+  const isUrl = (text: string): boolean => {
+    const trimmed = text.trim();
+    return /^https?:\/\//i.test(trimmed) || 
+           (/\.[a-z]{2,6}\b/i.test(trimmed) && !/\s/.test(trimmed));
+  };
+
+  // Extract search terms/keywords from any product URL
+  const extractKeywordsFromUrl = (urlStr: string): string => {
+    try {
+      let parsedUrl: URL;
+      if (/^https?:\/\//i.test(urlStr)) {
+        parsedUrl = new URL(urlStr);
+      } else {
+        parsedUrl = new URL('http://' + urlStr);
+      }
+
+      const pathname = decodeURIComponent(parsedUrl.pathname);
+      const segments = pathname.split('/').filter(Boolean);
+
+      let titleSegment = '';
+      let maxHyphens = -1;
+
+      for (const segment of segments) {
+        // Skip common URL keywords or short hashes
+        if (['p', 'dp', 'gp', 'product', 'products', 'produto', 'produtos', 'item', 'items', 'details', 'detail', 'c'].includes(segment.toLowerCase())) {
+          continue;
+        }
+        // Skip pure alphanumeric hashes longer than 8 characters (often product/sku IDs)
+        if (/^[a-z0-9]{8,}$/i.test(segment) && /[0-9]/.test(segment) && /[a-z]/i.test(segment)) {
+          continue;
+        }
+        
+        const hyphenCount = (segment.match(/[-_]/g) || []).length;
+        if (hyphenCount > maxHyphens) {
+          maxHyphens = hyphenCount;
+          titleSegment = segment;
+        }
+      }
+
+      if (!titleSegment && segments.length > 0) {
+        titleSegment = segments[0];
+      }
+
+      if (titleSegment) {
+        let keywords = titleSegment
+          .replace(/i\.\d+\.\d+/gi, '') // Shopee ID pattern
+          .replace(/[-_+]/g, ' ') // Replace separators with space
+          .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '') // Clean punctuation
+          .trim();
+
+        keywords = keywords.replace(/\s+/g, ' ').trim();
+        if (keywords) return keywords;
+      }
+    } catch (e) {
+      console.error('Failed to extract keywords from URL:', e);
+    }
+    
+    // Clean URL text as absolute fallback
+    return urlStr
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .replace(/[-_.\/]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
   // Execute search or URL fetch
   const handleSearch = async () => {
-    if (!query.trim()) return;
+    const cleanQuery = query.trim().replace(/[,.;]$/, '');
+    if (!cleanQuery) return;
+    
     setIsSearching(true);
     setSearchResults([]);
     setOriginalListing(null);
 
-    const itemId = extractItemId(query);
+    const itemId = extractItemId(cleanQuery);
 
     try {
       if (itemId) {
@@ -127,8 +196,20 @@ export function AdminProductImport({ onSuccess, onCancel }: AdminProductImportPr
         }
       } else {
         // Direct search
+        let searchQuery = cleanQuery;
+        if (isUrl(cleanQuery)) {
+          const extracted = extractKeywordsFromUrl(cleanQuery);
+          if (extracted) {
+            searchQuery = extracted;
+            toast({
+              title: 'Link externo detectado',
+              description: `Buscando no Mercado Livre por: "${searchQuery}"`,
+            });
+          }
+        }
+
         const searchRes = await fetch(
-          `https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(query)}&limit=8`
+          `https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(searchQuery)}&limit=8`
         );
         if (!searchRes.ok) throw new Error('Falha ao buscar anúncios.');
         const searchData = await searchRes.json();
