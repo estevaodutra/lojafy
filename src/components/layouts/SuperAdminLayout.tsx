@@ -39,6 +39,9 @@ import {
   SidebarMenuButton,
   SidebarProvider,
   SidebarTrigger,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -74,24 +77,30 @@ const superAdminMenuItems = [
     icon: Settings,
   },
   {
-    title: 'Gestão de Carteiras',
-    url: '/super-admin/financeiro/carteiras',
-    icon: Wallet,
-  },
-  {
-    title: 'Transações',
-    url: '/super-admin/financeiro/transacoes',
-    icon: BarChart3,
-  },
-  {
-    title: 'Solicitações de Saque',
-    url: '/super-admin/financeiro/saques',
-    icon: Clock,
-  },
-  {
-    title: 'Configurações Financeiras',
-    url: '/super-admin/financeiro/configuracoes',
-    icon: Settings,
+    title: 'Financeiro',
+    icon: DollarSign,
+    submenu: [
+      {
+        title: 'Gestão de Carteiras',
+        url: '/super-admin/financeiro/carteiras',
+        icon: Wallet,
+      },
+      {
+        title: 'Transações',
+        url: '/super-admin/financeiro/transacoes',
+        icon: BarChart3,
+      },
+      {
+        title: 'Solicitações de Saque',
+        url: '/super-admin/financeiro/saques',
+        icon: Clock,
+      },
+      {
+        title: 'Configurações Financeiras',
+        url: '/super-admin/financeiro/configuracoes',
+        icon: Settings,
+      },
+    ]
   },
   {
     title: 'Features',
@@ -152,19 +161,59 @@ const SuperAdminSidebar = () => {
           <SidebarGroupLabel>Administração</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {superAdminMenuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild
-                    className={currentPath === item.url ? 'bg-sidebar-accent' : ''}
-                  >
-                    <button onClick={() => navigate(item.url)}>
-                      <item.icon className="mr-2 h-4 w-4" />
-                      <span>{item.title}</span>
-                    </button>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {superAdminMenuItems.map((item) => {
+                const hasSubmenu = 'submenu' in item && !!item.submenu;
+                const isSubmenuActive = hasSubmenu && (item.submenu as any[]).some(sub => currentPath === sub.url);
+                const isActive = ('url' in item && currentPath === item.url) || isSubmenuActive;
+
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    {hasSubmenu ? (
+                      <>
+                        <SidebarMenuButton 
+                          className={isActive ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground' : ''}
+                          onClick={() => {
+                            if ((item.submenu as any[])?.[0]?.url) {
+                              navigate((item.submenu as any[])[0].url);
+                            }
+                          }}
+                        >
+                          <item.icon className="mr-2 h-4 w-4" />
+                          <span>{item.title}</span>
+                        </SidebarMenuButton>
+                        <SidebarMenuSub>
+                          {(item.submenu as any[]).map((sub) => (
+                            <SidebarMenuSubItem key={sub.title}>
+                              <SidebarMenuSubButton 
+                                asChild
+                                isActive={currentPath === sub.url}
+                              >
+                                <button onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(sub.url);
+                                }}>
+                                  <sub.icon className="mr-2 h-3.5 w-3.5" />
+                                  <span>{sub.title}</span>
+                                </button>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      </>
+                    ) : (
+                      <SidebarMenuButton 
+                        asChild
+                        className={'url' in item && currentPath === item.url ? 'bg-sidebar-accent' : ''}
+                      >
+                        <button onClick={() => navigate(('url' in item ? item.url : '') as string)}>
+                          <item.icon className="mr-2 h-4 w-4" />
+                          <span>{item.title}</span>
+                        </button>
+                      </SidebarMenuButton>
+                    )}
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
