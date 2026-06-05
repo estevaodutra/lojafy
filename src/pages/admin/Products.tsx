@@ -3,13 +3,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Package, AlertTriangle, TrendingUp, Download, Upload, ArrowUp, ArrowDown, Edit, Trash2, Loader2, Star } from 'lucide-react';
+import { Plus, Package, AlertTriangle, TrendingUp, Download, Upload, ArrowUp, ArrowDown, Edit, Trash2, Loader2, Star, Link2 } from 'lucide-react';
 import ProductTable from '@/components/admin/ProductTable';
 import ProductForm from '@/components/admin/ProductForm';
 import { ProductComparisonView } from '@/components/admin/ProductComparisonView';
 import { RestoreOriginalButton } from '@/components/admin/RestoreOriginalButton';
 import { CloneFromMarketplace } from '@/components/admin/CloneFromMarketplace';
 import { ProductMlConfig } from '@/components/admin/ProductMlConfig';
+import { AdminProductImport } from '@/components/admin/AdminProductImport';
 import { Separator } from '@/components/ui/separator';
 import StockAlert from '@/components/admin/StockAlert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -25,6 +26,7 @@ const Products = () => {
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [activeTab, setActiveTab] = useState('all');
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Fetch products data
   const { data: products = [], isLoading: productsLoading, refetch: refetchProducts } = useQuery({
@@ -131,6 +133,10 @@ const Products = () => {
           <Button variant="outline" onClick={handleExportProducts}>
             <Download className="h-4 w-4 mr-2" />
             Exportar
+          </Button>
+          <Button variant="outline" onClick={() => setShowImportModal(true)} className="border-primary text-primary hover:bg-primary/5">
+            <Link2 className="h-4 w-4 mr-2" />
+            Cadastrar via Link
           </Button>
           <Button onClick={handleCreateProduct}>
             <Plus className="h-4 w-4 mr-2" />
@@ -337,6 +343,22 @@ const Products = () => {
               />
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Product Import Dialog */}
+      <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Cadastrar Produto via Link / Busca</DialogTitle>
+            <DialogDescription>
+              Importe os dados de um anúncio do Mercado Livre de forma automática, ajuste as especificações e defina o preço de custo.
+            </DialogDescription>
+          </DialogHeader>
+          <AdminProductImport 
+            onSuccess={handleFormSuccess}
+            onCancel={() => setShowImportModal(false)}
+          />
         </DialogContent>
       </Dialog>
     </div>
