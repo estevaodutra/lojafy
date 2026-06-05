@@ -237,49 +237,229 @@ FOR EACH ROW
 EXECUTE FUNCTION public.handle_order_wallet_movements();
 
 
--- Função de sincronização histórica para alinhar transações de pedidos antigos
+-- Função de sincronização histórica robusta que gera as movimentações diretas retroativamente
 CREATE OR REPLACE FUNCTION public.sync_historical_orders_to_wallets()
 RETURNS JSON AS $$
 DECLARE
   v_order RECORD;
+  v_item RECORD;
+  v_super_admin_id UUID;
+  v_split_fornecedor_pct DECIMAL;
+  v_split_revendedor_pct DECIMAL;
+  v_valor_fornecedor DECIMAL;
+  v_valor_revendedor DECIMAL;
+  v_res JSON;
+  v_tx_id UUID;
   v_count_paid INT := 0;
   v_count_shipped INT := 0;
   v_count_cancelled INT := 0;
+  v_split_rec RECORD;
 BEGIN
-  -- Processar pedidos pagos passados
+  -- 1. Identificar o Super Admin
+  SELECT user_id INTO v_super_admin_id
+  FROM public.profiles
+  WHERE role = 'super_admin'
+  LIMIT 1;
+
+  IF v_super_admin_id IS NULL THEN
+    SELECT user_id INTO v_super_admin_id
+    FROM public.profiles
+    WHERE role = 'admin'
+    LIMIT 1;
+  END IF;
+
+  IF v_super_admin_id IS NULL THEN
+    RETURN json_build_object('success', false, 'error', 'Nenhum administrador encontrado');
+  END IF;
+
+  -- Obter configurações de split
+  SELECT COALESCE(split_fornecedor_percentual, 0), COALESCE(split_revendedor_percentual, 0)
+  INTO v_split_fornecedor_pct, v_split_revendedor_pct
+  FROM public.platform_settings
+  LIMIT 1;
+
+  -- Loop pelos pedidos
   FOR v_order IN (
-    SELECT id, order_number, status, payment_status, total_amount, user_id, reseller_id, created_at
+    SELECT id, order_number, status, payment_status, total_amount, user_id, reseller_id
     FROM public.orders
-    WHERE payment_status = 'paid'
     ORDER BY created_at ASC
   ) LOOP
-    -- Simular o fluxo do pedido disparando as rotinas internas do trigger sequencialmente
 
-    -- 1. Simular recebimento do pagamento
-    -- (O trigger handle_order_wallet_movements processa a mudança do status de pagamento para 'paid')
-    -- Vamos chamar a lógica interna do trigger diretamente fazendo um UPDATE simulado para 'paid'
-    -- ou simplesmente inserindo se não existir.
-    -- Como queremos ser idôneos, vamos fazer um UPDATE dummy no registro para disparar o trigger!
-    -- Isso garante que as regras exatas do trigger rodem!
-    UPDATE public.orders
-    SET payment_status = 'paid'
-    WHERE id = v_order.id;
-    v_count_paid := v_count_paid + 1;
+    -- A. Processar pagamento se estiver pago (ou se foi enviado/cancelado que eram pagos anteriormente)
+    IF v_order.payment_status = 'paid' THEN
+      -- Se a transação correspondente não existir na carteira do super admin
+      IF NOT EXISTS (
+        SELECT 1 FROM public.wallet_transactions
+        WHERE referencia_tipo = 'pagamento_pedido' AND referencia_id = v_order.id AND tipo = 'recarga' AND status = 'completed'
+      ) THEN
+        PERFORM public.creditar_carteira(
+          v_super_admin_id,
+          v_order.total_amount,
+          0,
+          'Recebimento de Pedido #' || v_order.order_number,
+          'pagamento_pedido',
+          v_order.id,
+          'recarga'
+        );
+        v_count_paid := v_count_paid + 1;
+      END IF;
 
-    -- 2. Simular envio se o status estiver 'enviado' ou 'finalizado'
-    IF v_order.status IN ('enviado', 'finalizado') THEN
-      UPDATE public.orders
-      SET status = v_order.status
-      WHERE id = v_order.id;
-      v_count_shipped := v_count_shipped + 1;
-    END IF;
+      -- B. Processar splits se estiver enviado ou finalizado
+      IF v_order.status IN ('enviado', 'finalizado') THEN
+        FOR v_item IN (
+          SELECT oi.id, oi.unit_price, oi.quantity, p.cost_price, p.supplier_id
+          FROM public.order_items oi
+          JOIN public.products p ON oi.product_id = p.id
+          WHERE oi.order_id = v_order.id
+        ) LOOP
+          -- Split fornecedor
+          IF v_item.supplier_id IS NOT NULL THEN
+            IF v_split_fornecedor_pct > 0 THEN
+              v_valor_fornecedor := v_item.unit_price * v_item.quantity * (v_split_fornecedor_pct / 100.0);
+            ELSE
+              v_valor_fornecedor := COALESCE(v_item.cost_price, 0) * v_item.quantity;
+            END IF;
 
-    -- 3. Simular cancelamento se o status atual estiver cancelado
-    IF v_order.status IN ('cancelado', 'reembolsado', 'devolucao_aprovada') THEN
-      UPDATE public.orders
-      SET status = v_order.status
-      WHERE id = v_order.id;
-      v_count_cancelled := v_count_cancelled + 1;
+            IF v_valor_fornecedor > 0 AND NOT EXISTS (
+              SELECT 1 FROM public.order_payment_splits
+              WHERE order_id = v_order.id AND recipient_user_id = v_item.supplier_id AND recipient_role = 'supplier' AND status = 'credited'
+            ) THEN
+              -- Débito da carteira do Super Admin
+              PERFORM public.debitar_carteira(
+                v_super_admin_id,
+                v_valor_fornecedor,
+                'Repasse Fornecedor - Pedido #' || v_order.order_number,
+                'venda_pedido',
+                v_order.id
+              );
+              
+              -- Crédito na carteira do Fornecedor
+              v_res := public.creditar_carteira(
+                v_item.supplier_id,
+                v_valor_fornecedor,
+                0,
+                'Venda de produto - Pedido #' || v_order.order_number,
+                'venda_pedido',
+                v_order.id,
+                'pagamento_pedido'
+              );
+              v_tx_id := (v_res->>'transaction_id')::UUID;
+
+              -- Registro do split
+              INSERT INTO public.order_payment_splits (
+                order_id, recipient_user_id, recipient_role, valor, status, wallet_transaction_id, processed_at
+              ) VALUES (
+                v_order.id, v_item.supplier_id, 'supplier', v_valor_fornecedor, 'credited', v_tx_id, NOW()
+              );
+              
+              v_count_shipped := v_count_shipped + 1;
+            END IF;
+          END IF;
+
+          -- Split revendedor (se houver revendedor associado)
+          IF v_order.reseller_id IS NOT NULL THEN
+            IF v_split_revendedor_pct > 0 THEN
+              v_valor_revendedor := v_item.unit_price * v_item.quantity * (v_split_revendedor_pct / 100.0);
+            ELSE
+              v_valor_revendedor := (v_item.unit_price - COALESCE(v_item.cost_price, 0)) * v_item.quantity;
+            END IF;
+
+            IF v_valor_revendedor > 0 AND NOT EXISTS (
+              SELECT 1 FROM public.order_payment_splits
+              WHERE order_id = v_order.id AND recipient_user_id = v_order.reseller_id AND recipient_role = 'reseller' AND status = 'credited'
+            ) THEN
+              -- Débito da carteira do Super Admin
+              PERFORM public.debitar_carteira(
+                v_super_admin_id,
+                v_valor_revendedor,
+                'Comissão Revendedor - Pedido #' || v_order.order_number,
+                'venda_pedido',
+                v_order.id
+              );
+              
+              -- Crédito na carteira do Revendedor
+              v_res := public.creditar_carteira(
+                v_order.reseller_id,
+                v_valor_revendedor,
+                0,
+                'Comissão de venda - Pedido #' || v_order.order_number,
+                'venda_pedido',
+                v_order.id,
+                'cashback'
+              );
+              v_tx_id := (v_res->>'transaction_id')::UUID;
+
+              -- Registro do split
+              INSERT INTO public.order_payment_splits (
+                order_id, recipient_user_id, recipient_role, valor, status, wallet_transaction_id, processed_at
+              ) VALUES (
+                v_order.id, v_order.reseller_id, 'reseller', v_valor_revendedor, 'credited', v_tx_id, NOW()
+              );
+            END IF;
+          END IF;
+        END LOOP;
+      END IF;
+
+      -- C. Processar cancelamentos/reembolsos
+      IF v_order.status IN ('cancelado', 'reembolsado', 'devolucao_aprovada') THEN
+        IF NOT EXISTS (
+          SELECT 1 FROM public.wallet_transactions
+          WHERE referencia_tipo = 'cancelamento_pedido' AND referencia_id = v_order.id AND tipo = 'estorno' AND status = 'completed'
+        ) THEN
+          -- Reverter splits creditados
+          FOR v_split_rec IN (
+            SELECT id, recipient_user_id, recipient_role, valor
+            FROM public.order_payment_splits
+            WHERE order_id = v_order.id AND status = 'credited'
+          ) LOOP
+            -- Debitar o beneficiário
+            PERFORM public.debitar_carteira(
+              v_split_rec.recipient_user_id,
+              v_split_rec.valor,
+              'Estorno de Pedido (Cancelado/Devolvido) #' || v_order.order_number,
+              'cancelamento_pedido',
+              v_order.id
+            );
+            
+            -- Creditar o Super Admin
+            PERFORM public.creditar_carteira(
+              v_super_admin_id,
+              v_split_rec.valor,
+              0,
+              'Estorno de Pedido (Cancelado/Devolvido) #' || v_order.order_number,
+              'cancelamento_pedido',
+              v_order.id,
+              'estorno'
+            );
+            
+            -- Marcar split como estornado (reversed)
+            UPDATE public.order_payment_splits
+            SET status = 'reversed', processed_at = NOW()
+            WHERE id = v_split_rec.id;
+          END LOOP;
+
+          -- Reembolsar cliente (Debitar Super Admin, Creditar Cliente)
+          PERFORM public.debitar_carteira(
+            v_super_admin_id,
+            v_order.total_amount,
+            'Reembolso Cliente - Pedido #' || v_order.order_number,
+            'cancelamento_pedido',
+            v_order.id
+          );
+          
+          PERFORM public.creditar_carteira(
+            v_order.user_id,
+            v_order.total_amount,
+            0,
+            'Estorno / Reembolso - Pedido #' || v_order.order_number,
+            'cancelamento_pedido',
+            v_order.id,
+            'estorno'
+          );
+          
+          v_count_cancelled := v_count_cancelled + 1;
+        END IF;
+      END IF;
     END IF;
   END LOOP;
 
