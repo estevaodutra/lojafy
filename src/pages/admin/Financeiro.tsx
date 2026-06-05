@@ -34,11 +34,18 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { AdminWalletAdjustModal } from "@/components/admin/AdminWalletAdjustModal";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
 function formatBRL(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+}
+
+function getOrderNumber(desc?: string) {
+  if (!desc) return "—";
+  const match = desc.match(/#([A-Za-z0-9-]+)/);
+  return match ? `#${match[1]}` : "—";
 }
 
 const TIPO_LABELS: Record<string, string> = {
@@ -423,6 +430,7 @@ function TransactionsTab() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Pedido</TableHead>
                 <TableHead>Usuário</TableHead>
                 <TableHead>Perfil</TableHead>
                 <TableHead>Operação</TableHead>
@@ -434,11 +442,14 @@ function TransactionsTab() {
             </TableHeader>
             <TableBody>
               {transactions.map((tx: any) => {
-                const isCredit = ["recarga", "estorno", "bonus", "ajuste_credito", "cashback", "pagamento_pedido"].includes(tx.tipo);
+                const isCredit = Number(tx.saldo_posterior ?? 0) > Number(tx.saldo_anterior ?? 0);
                 const userObj = tx.profile?.profiles;
                 const name = userObj ? [userObj.first_name, userObj.last_name].filter(Boolean).join(" ") : "Usuário";
                 return (
                   <TableRow key={tx.id}>
+                    <TableCell className="font-mono font-semibold text-sm whitespace-nowrap">
+                      {getOrderNumber(tx.descricao)}
+                    </TableCell>
                     <TableCell className="font-semibold text-sm">
                       {name}
                       <span className="block font-mono text-[10px] text-muted-foreground font-normal">
@@ -453,7 +464,7 @@ function TransactionsTab() {
                     <TableCell>
                       <Badge variant="outline">{TIPO_LABELS[tx.tipo] ?? tx.tipo}</Badge>
                     </TableCell>
-                    <TableCell className={isCredit ? "text-green-600 font-semibold text-sm" : "text-destructive font-semibold text-sm"}>
+                    <TableCell className={isCredit ? "text-green-600 font-semibold text-sm whitespace-nowrap" : "text-destructive font-semibold text-sm whitespace-nowrap"}>
                       {isCredit ? "+" : "-"}{formatBRL(Math.abs(tx.valor))}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
@@ -925,6 +936,9 @@ function WalletsTab() {
 // ── Página principal ──────────────────────────────────────────────────────────
 
 export default function AdminFinanceiro() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const { data: stats, refetch: refetchStats } = useQuery({
     queryKey: ['admin-financeiro-stats'],
     queryFn: async () => {
@@ -971,6 +985,21 @@ export default function AdminFinanceiro() {
       };
     },
   });
+
+  const currentTab = location.pathname.endsWith("/transacoes")
+    ? "transactions"
+    : location.pathname.endsWith("/saques")
+    ? "withdrawals"
+    : location.pathname.endsWith("/configuracoes")
+    ? "settings"
+    : "wallets";
+
+  const handleTabChange = (value: string) => {
+    if (value === "wallets") navigate("/super-admin/financeiro/carteiras");
+    else if (value === "transactions") navigate("/super-admin/financeiro/transacoes");
+    else if (value === "withdrawals") navigate("/super-admin/financeiro/saques");
+    else if (value === "settings") navigate("/super-admin/financeiro/configuracoes");
+  };
 
   return (
     <div className="space-y-6">
@@ -1036,10 +1065,10 @@ export default function AdminFinanceiro() {
         </Card>
       </div>
 
-      <Tabs defaultValue="wallets" className="space-y-6">
+      <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList>
-          <TabsTrigger value="wallets">Carteiras por Perfil</TabsTrigger>
-          <TabsTrigger value="transactions">Histórico de Transações</TabsTrigger>
+          <TabsTrigger value="wallets">Gestão de Carteiras</TabsTrigger>
+          <TabsTrigger value="transactions">Transações</TabsTrigger>
           <TabsTrigger value="withdrawals" className="relative">
             Solicitações de Saque
             {(stats?.pending ?? 0) > 0 && (
@@ -1051,22 +1080,17 @@ export default function AdminFinanceiro() {
           <TabsTrigger value="settings">Configurações</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="wallets">
-          <WalletsTab />
-        </TabsContent>
-
-        <TabsContent value="transactions">
-          <TransactionsTab />
-        </TabsContent>
-
-        <TabsContent value="withdrawals">
-          <WithdrawalsTab />
-        </TabsContent>
-
-        <TabsContent value="settings">
-          <SettingsTab />
-        </TabsContent>
+        <div className="mt-6">
+          <Outlet />
+        </div>
       </Tabs>
     </div>
   );
 }
+
+export {
+  WalletsTab as FinanceiroWallets,
+  TransactionsTab as FinanceiroTransactions,
+  WithdrawalsTab as FinanceiroWithdrawals,
+  SettingsTab as FinanceiroSettings
+};

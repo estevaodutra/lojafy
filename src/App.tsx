@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { FavoritesProvider } from "@/contexts/FavoritesContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -71,6 +71,10 @@ const Courses = lazy(() => import("./pages/customer/Courses"));
 // ── Admin panel ────────────────────────────────────────────────────────────
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
 const AdminFinanceiro = lazy(() => import("./pages/admin/Financeiro"));
+const FinanceiroWallets = lazy(() => import("./pages/admin/Financeiro").then(m => ({ default: m.FinanceiroWallets })));
+const FinanceiroTransactions = lazy(() => import("./pages/admin/Financeiro").then(m => ({ default: m.FinanceiroTransactions })));
+const FinanceiroWithdrawals = lazy(() => import("./pages/admin/Financeiro").then(m => ({ default: m.FinanceiroWithdrawals })));
+const FinanceiroSettings = lazy(() => import("./pages/admin/Financeiro").then(m => ({ default: m.FinanceiroSettings })));
 const AdminProducts = lazy(() => import("./pages/admin/Products"));
 const AdminBanners = lazy(() => import("./pages/admin/Banners"));
 const AdminOrders = lazy(() => import("./pages/admin/Orders"));
@@ -338,7 +342,13 @@ const App = () => {
                   <Route path="clientes" element={<Clientes />} />
                   <Route path="design" element={<Design />} />
                   <Route path="configuracoes" element={<Configuracoes />} />
-                  <Route path="financeiro" element={<AdminFinanceiro />} />
+                  <Route path="financeiro" element={<AdminFinanceiro />}>
+                    <Route index element={<Navigate to="carteiras" replace />} />
+                    <Route path="carteiras" element={<FinanceiroWallets />} />
+                    <Route path="transacoes" element={<FinanceiroTransactions />} />
+                    <Route path="saques" element={<FinanceiroWithdrawals />} />
+                    <Route path="configuracoes" element={<FinanceiroSettings />} />
+                  </Route>
                   <Route path="chat-suporte" element={<ChatSupport />} />
                   <Route path="academy" element={<AdminAcademy />} />
                   <Route path="features" element={<Features />} />
