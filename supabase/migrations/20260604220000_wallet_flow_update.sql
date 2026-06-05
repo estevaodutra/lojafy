@@ -237,7 +237,7 @@ FOR EACH ROW
 EXECUTE FUNCTION public.handle_order_wallet_movements();
 
 
--- Função de sincronização histórica robusta que gera as movimentações diretas retroativamente
+-- Função de sincronização histórica robusta com diagnóstico de contagem
 CREATE OR REPLACE FUNCTION public.sync_historical_orders_to_wallets()
 RETURNS JSON AS $$
 DECLARE
@@ -254,7 +254,11 @@ DECLARE
   v_count_shipped INT := 0;
   v_count_cancelled INT := 0;
   v_split_rec RECORD;
+  v_total_orders INT := 0;
 BEGIN
+  -- Contagem total de pedidos na tabela para diagnóstico
+  SELECT COUNT(*) INTO v_total_orders FROM public.orders;
+
   -- 1. Identificar o Super Admin
   SELECT user_id INTO v_super_admin_id
   FROM public.profiles
@@ -465,6 +469,7 @@ BEGIN
 
   RETURN json_build_object(
     'success', true,
+    'total_orders_in_db', v_total_orders,
     'orders_paid_synced', v_count_paid,
     'orders_shipped_synced', v_count_shipped,
     'orders_cancelled_synced', v_count_cancelled
