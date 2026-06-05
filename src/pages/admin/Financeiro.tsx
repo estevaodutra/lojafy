@@ -936,9 +936,10 @@ function WalletsTab() {
 // ── Página principal ──────────────────────────────────────────────────────────
 
 export default function AdminFinanceiro() {
-  const navigate = useNavigate();
-  const location = useLocation();
+  return <Outlet />;
+}
 
+export function FinanceiroWallets() {
   const { data: stats, refetch: refetchStats } = useQuery({
     queryKey: ['admin-financeiro-stats'],
     queryFn: async () => {
@@ -986,27 +987,12 @@ export default function AdminFinanceiro() {
     },
   });
 
-  const currentTab = location.pathname.endsWith("/transacoes")
-    ? "transactions"
-    : location.pathname.endsWith("/saques")
-    ? "withdrawals"
-    : location.pathname.endsWith("/configuracoes")
-    ? "settings"
-    : "wallets";
-
-  const handleTabChange = (value: string) => {
-    if (value === "wallets") navigate("/super-admin/financeiro/carteiras");
-    else if (value === "transactions") navigate("/super-admin/financeiro/transacoes");
-    else if (value === "withdrawals") navigate("/super-admin/financeiro/saques");
-    else if (value === "settings") navigate("/super-admin/financeiro/configuracoes");
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Painel Financeiro</h1>
-          <p className="text-muted-foreground">Gerencie saques, perfis de carteiras, repasses e transações</p>
+          <h1 className="text-3xl font-bold">Gestão de Carteiras</h1>
+          <p className="text-muted-foreground">Gerencie saldos e perfis de carteiras de administradores, fornecedores e clientes</p>
         </div>
         <Button variant="outline" size="sm" onClick={() => refetchStats()}>
           <RefreshCw className="h-4 w-4 mr-2" />
@@ -1014,7 +1000,7 @@ export default function AdminFinanceiro() {
         </Button>
       </div>
 
-      {/* Cards de resumo (3 Perfis de Carteira + Saques) */}
+      {/* Resumo Financeiro */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-blue-100 bg-blue-50/20">
           <CardContent className="flex items-center gap-4 pt-6">
@@ -1065,32 +1051,43 @@ export default function AdminFinanceiro() {
         </Card>
       </div>
 
-      <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="wallets">Gestão de Carteiras</TabsTrigger>
-          <TabsTrigger value="transactions">Transações</TabsTrigger>
-          <TabsTrigger value="withdrawals" className="relative">
-            Solicitações de Saque
-            {(stats?.pending ?? 0) > 0 && (
-              <span className="ml-2 rounded-full bg-destructive px-1.5 py-0.5 text-[10px] text-white leading-none">
-                {stats!.pending}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="settings">Configurações</TabsTrigger>
-        </TabsList>
-
-        <div className="mt-6">
-          <Outlet />
-        </div>
-      </Tabs>
+      <WalletsTab />
     </div>
   );
 }
 
-export {
-  WalletsTab as FinanceiroWallets,
-  TransactionsTab as FinanceiroTransactions,
-  WithdrawalsTab as FinanceiroWithdrawals,
-  SettingsTab as FinanceiroSettings
-};
+export function FinanceiroTransactions() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Transações</h1>
+        <p className="text-muted-foreground">Histórico de todas as movimentações financeiras da plataforma</p>
+      </div>
+      <TransactionsTab />
+    </div>
+  );
+}
+
+export function FinanceiroWithdrawals() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Solicitações de Saque</h1>
+        <p className="text-muted-foreground">Acompanhe e processe as transferências solicitadas pelos usuários</p>
+      </div>
+      <WithdrawalsTab />
+    </div>
+  );
+}
+
+export function FinanceiroSettings() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Configurações Financeiras</h1>
+        <p className="text-muted-foreground">Configure taxas de saque, limites e parâmetros da plataforma</p>
+      </div>
+      <SettingsTab />
+    </div>
+  );
+}

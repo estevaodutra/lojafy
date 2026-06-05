@@ -24,7 +24,9 @@ import {
   Code,
   Sparkles,
   CreditCard,
-  ShoppingBag
+  ShoppingBag,
+  Wallet,
+  Clock
 } from 'lucide-react';
 import {
   Sidebar,
@@ -72,9 +74,24 @@ const superAdminMenuItems = [
     icon: Settings,
   },
   {
-    title: 'Financeiro',
-    url: '/super-admin/financeiro',
-    icon: DollarSign,
+    title: 'Gestão de Carteiras',
+    url: '/super-admin/financeiro/carteiras',
+    icon: Wallet,
+  },
+  {
+    title: 'Transações',
+    url: '/super-admin/financeiro/transacoes',
+    icon: BarChart3,
+  },
+  {
+    title: 'Solicitações de Saque',
+    url: '/super-admin/financeiro/saques',
+    icon: Clock,
+  },
+  {
+    title: 'Configurações Financeiras',
+    url: '/super-admin/financeiro/configuracoes',
+    icon: Settings,
   },
   {
     title: 'Features',
