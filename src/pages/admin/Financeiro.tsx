@@ -19,15 +19,8 @@ import {
   Users, 
   ArrowUpDown, 
   Search, 
-  Sliders, 
-  ArrowRight, 
   Coins, 
-  CheckCircle2, 
-  Activity, 
-  Play, 
-  ShieldCheck, 
-  Truck,
-  RotateCcw
+  Activity
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -35,7 +28,6 @@ import {
   useAdminWithdrawalRequests,
   useApproveWithdrawal,
   useRejectWithdrawal,
-  useAdminFinancialTransactions,
   type AdminWithdrawalRequest,
 } from "@/hooks/useAdminWithdrawalRequests";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -72,6 +64,26 @@ function userName(req: AdminWithdrawalRequest) {
   if (!p) return "Usuário";
   return [p.first_name, p.last_name].filter(Boolean).join(" ") || "Usuário";
 }
+
+const getRoleLabel = (role?: string) => {
+  switch (role) {
+    case "super_admin": return "Super Admin";
+    case "admin": return "Admin";
+    case "supplier": return "Fornecedor";
+    case "reseller": return "Revendedor";
+    default: return "Cliente";
+  }
+};
+
+const getRoleBadgeVariant = (role?: string) => {
+  switch (role) {
+    case "super_admin": return "destructive" as const;
+    case "admin": return "default" as const;
+    case "supplier": return "secondary" as const;
+    case "reseller": return "outline" as const;
+    default: return "outline" as const;
+  }
+};
 
 // ── Aba 1: Solicitações de Saque ──────────────────────────────────────────────
 
@@ -257,24 +269,147 @@ function WithdrawalsTab() {
   );
 }
 
-// ── Aba 2: Histórico de Transações ────────────────────────────────────────────
+// ── Aba 2: Histórico de Transações (REMODELADO COMO LISTA DE PEDIDOS) ───────────
 
 function TransactionsTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
   const [page, setPage] = useState(1);
-  const { data, isLoading } = useAdminFinancialTransactions(page, 30);
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [syncing, setSyncing] = useState(false);
+
+  const limit = 20;
+
+  // Custom fetch to allow search, types, and pagination dynamically
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['admin-transactions-enhanced', page, typeFilter, search],
+    queryFn: async () => {
+      const offset = (page - 1) * limit;
+
+      let query = supabase
+        .from('wallet_transactions')
+        .select(`
+          *,
+          wallet:wallets!wallet_transactions_wallet_id_fkey(user_id),
+          profile:wallets!wallet_transactions_wallet_id_fkey(
+            profiles!wallets_user_id_fkey(first_name, last_name, role)
+          )
+        `, { count: 'exact' });
+
+      // Apply type filter
+      if (typeFilter !== "all") {
+        query = query.eq('tipo', typeFilter);
+      }
+
+      // Apply search in description or user name / ID
+      if (search.trim()) {
+        query = query.ilike('descricao', `%${search.trim()}%`);
+      }
+
+      const { data: txs, error, count } = await query
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (error) throw error;
+      return { transactions: txs ?? [], total: count ?? 0 };
+    }
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      setSyncing(true);
+      const { data, error } = await supabase.rpc('sync_historical_orders_to_wallets');
+      if (error) throw error;
+      return typeof data === "string" ? JSON.parse(data) : data;
+    },
+    onSuccess: (res) => {
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ['admin-all-wallets'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-financeiro-stats'] });
+      toast({
+        title: 'Sincronização Concluída',
+        description: `Transações históricas sincronizadas com sucesso. Pagos: ${res.orders_paid_synced}, Enviados: ${res.orders_shipped_synced}, Cancelados: ${res.orders_cancelled_synced}`,
+      });
+      setSyncing(false);
+    },
+    onError: (e: Error) => {
+      toast({ variant: 'destructive', title: 'Erro ao sincronizar', description: e.message });
+      setSyncing(false);
+    }
+  });
+
   const transactions = data?.transactions ?? [];
   const total = data?.total ?? 0;
-  const totalPages = Math.ceil(total / 30);
+  const totalPages = Math.ceil(total / limit);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">{total} transações no total</p>
+      {/* Filters & Actions */}
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {/* Search bar */}
+          <div className="relative w-full md:w-80">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <Input
+              placeholder="Buscar por descrição ou nº do pedido..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="pl-9"
+            />
+          </div>
+
+          {/* Type filter */}
+          <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1); }}>
+            <SelectTrigger className="w-full md:w-48">
+              <SelectValue placeholder="Filtrar por Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os tipos</SelectItem>
+              <SelectItem value="recarga">Recarga / Pagamento</SelectItem>
+              <SelectItem value="pagamento_pedido">Repasse Fornecedor</SelectItem>
+              <SelectItem value="estorno">Estorno / Reembolso</SelectItem>
+              <SelectItem value="cashback">Comissão / Cashback</SelectItem>
+              <SelectItem value="ajuste_credito">Ajuste +</SelectItem>
+              <SelectItem value="ajuste_debito">Ajuste - / Payout</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Sync and Refresh actions */}
+        <div className="flex gap-2 w-full md:w-auto justify-end">
+          <Button 
+            variant="outline" 
+            className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+            onClick={() => syncMutation.mutate()}
+            disabled={syncing}
+          >
+            {syncing ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Sincronizando...
+              </>
+            ) : (
+              <>
+                <Activity className="h-4 w-4 mr-2" />
+                Sincronizar Pedidos Antigos
+              </>
+            )}
+          </Button>
+
+          <Button variant="outline" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
         <div className="space-y-2">
-          {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+          {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
         </div>
       ) : transactions.length === 0 ? (
         <Card>
@@ -284,38 +419,47 @@ function TransactionsTab() {
           </CardContent>
         </Card>
       ) : (
-        <div className="rounded-md border overflow-x-auto">
+        <div className="rounded-md border overflow-x-auto bg-white">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Tipo</TableHead>
+                <TableHead>Usuário</TableHead>
+                <TableHead>Perfil</TableHead>
+                <TableHead>Operação</TableHead>
                 <TableHead>Valor</TableHead>
                 <TableHead>Taxa</TableHead>
                 <TableHead>Descrição</TableHead>
-                <TableHead>Status</TableHead>
                 <TableHead>Data</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {transactions.map((tx: any) => {
                 const isCredit = ["recarga", "estorno", "bonus", "ajuste_credito", "cashback", "pagamento_pedido"].includes(tx.tipo);
+                const userObj = tx.profile?.profiles;
+                const name = userObj ? [userObj.first_name, userObj.last_name].filter(Boolean).join(" ") : "Usuário";
                 return (
                   <TableRow key={tx.id}>
+                    <TableCell className="font-semibold text-sm">
+                      {name}
+                      <span className="block font-mono text-[10px] text-muted-foreground font-normal">
+                        ID: {tx.wallet?.user_id?.slice(0, 8)}...
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getRoleBadgeVariant(userObj?.role)}>
+                        {getRoleLabel(userObj?.role)}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline">{TIPO_LABELS[tx.tipo] ?? tx.tipo}</Badge>
                     </TableCell>
-                    <TableCell className={isCredit ? "text-green-600 font-medium" : "text-destructive font-medium"}>
+                    <TableCell className={isCredit ? "text-green-600 font-semibold text-sm" : "text-destructive font-semibold text-sm"}>
                       {isCredit ? "+" : "-"}{formatBRL(Math.abs(tx.valor))}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="text-muted-foreground text-sm">
                       {tx.taxa > 0 ? formatBRL(tx.taxa) : "—"}
                     </TableCell>
-                    <TableCell className="text-sm max-w-xs truncate">{tx.descricao}</TableCell>
-                    <TableCell>
-                      <Badge variant={tx.status === "completed" ? "outline" : "secondary"}>
-                        {tx.status === "completed" ? "Confirmado" : "Pendente"}
-                      </Badge>
-                    </TableCell>
+                    <TableCell className="text-sm max-w-xs truncate" title={tx.descricao}>{tx.descricao}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {format(new Date(tx.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}
                     </TableCell>
@@ -328,7 +472,7 @@ function TransactionsTab() {
       )}
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex items-center justify-center gap-2 pt-2">
           <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
             Anterior
           </Button>
@@ -492,7 +636,7 @@ function SettingsTab() {
   );
 }
 
-// ── Aba 4: Carteiras por Perfil (NOVO) ──────────────────────────────────────────
+// ── Aba 4: Carteiras por Perfil ──────────────────────────────────────────
 
 interface UserWalletData {
   id: string;
@@ -513,11 +657,10 @@ function WalletsTab() {
   const [search, setSearch] = useState("");
   const [selectedWalletForAdjust, setSelectedWalletForAdjust] = useState<UserWalletData | null>(null);
   
-  // Payout states (Dar Baixa)
+  // Payout states
   const [payoutWallet, setPayoutWallet] = useState<UserWalletData | null>(null);
   const [payoutAmount, setPayoutAmount] = useState("");
   const [payoutDescription, setPayoutDescription] = useState("Repasse efetuado via PIX");
-  const [payoutSaving, setPayoutSaving] = useState(false);
 
   // Fetch wallets and profiles
   const { data: wallets = [], isLoading, refetch } = useQuery<UserWalletData[]>({
@@ -599,26 +742,6 @@ function WalletsTab() {
     return matchesRole && matchesSearch;
   });
 
-  const getRoleLabel = (role?: string) => {
-    switch (role) {
-      case "super_admin": return "Super Admin";
-      case "admin": return "Admin";
-      case "supplier": return "Fornecedor";
-      case "reseller": return "Revendedor";
-      default: return "Cliente";
-    }
-  };
-
-  const getRoleBadgeVariant = (role?: string) => {
-    switch (role) {
-      case "super_admin": return "destructive" as const;
-      case "admin": return "default" as const;
-      case "supplier": return "secondary" as const;
-      case "reseller": return "outline" as const;
-      default: return "outline" as const;
-    }
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -664,7 +787,7 @@ function WalletsTab() {
           </CardContent>
         </Card>
       ) : (
-        <div className="rounded-md border overflow-x-auto">
+        <div className="rounded-md border overflow-x-auto bg-white">
           <Table>
             <TableHeader>
               <TableRow>
@@ -707,7 +830,7 @@ function WalletsTab() {
                             className="bg-indigo-600 hover:bg-indigo-700 text-white"
                             onClick={() => {
                               setPayoutWallet(wallet);
-                              setPayoutAmount(String(wallet.saldo)); // Pre-populate with full balance
+                              setPayoutAmount(String(wallet.saldo));
                             }}
                           >
                             Dar Baixa
@@ -799,418 +922,6 @@ function WalletsTab() {
   );
 }
 
-// ── Aba 5: Simulador de Fluxo Financeiro (NOVO) ──────────────────────────────────
-
-function FlowSimulatorTab() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [selectedOrderId, setSelectedOrderId] = useState<string>("");
-  const [syncingHistory, setSyncingHistory] = useState(false);
-  const [simulating, setSimulating] = useState(false);
-
-  // Fetch orders for the simulator dropdown list
-  const { data: simulatorOrders = [], refetch: refetchSimOrders } = useQuery({
-    queryKey: ['admin-simulator-orders-list'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('id, order_number, status, payment_status, total_amount')
-        .order('created_at', { ascending: false })
-        .limit(30);
-      if (error) throw error;
-      return data || [];
-    }
-  });
-
-  // Fetch complete details of the selected order
-  const { data: orderDetails, refetch: refetchOrderDetails } = useQuery({
-    queryKey: ['admin-simulator-order-details', selectedOrderId],
-    queryFn: async () => {
-      if (!selectedOrderId) return null;
-
-      // Parallel queries to construct details safely without complex PostgREST joins
-      const [
-        { data: order, error: orderErr },
-        { data: items, error: itemsErr },
-        { data: txs, error: txsErr }
-      ] = await Promise.all([
-        supabase.from('orders').select('*').eq('id', selectedOrderId).single(),
-        supabase.from('order_items').select('*').eq('order_id', selectedOrderId),
-        supabase.from('wallet_transactions').select('*').eq('referencia_id', selectedOrderId),
-      ]);
-
-      if (orderErr) throw orderErr;
-      if (itemsErr) throw itemsErr;
-      if (txsErr) throw txsErr;
-
-      // Load products and supplier profiles in memory
-      const productIds = items?.map(i => i.product_id).filter(Boolean) || [];
-      let products: any[] = [];
-      let profiles: any[] = [];
-
-      if (productIds.length > 0) {
-        const { data: pData } = await supabase.from('products').select('id, name, cost_price, supplier_id').in('id', productIds);
-        products = pData || [];
-        
-        const supplierUserIds = products.map(p => p.supplier_id).filter(Boolean);
-        const buyerUserId = order.user_id;
-        const resellerUserId = order.reseller_id;
-        
-        const uniqueUserIds = [...new Set([...supplierUserIds, buyerUserId, resellerUserId].filter(Boolean))];
-        const { data: profData } = await supabase.from('profiles').select('user_id, first_name, last_name, role').in('user_id', uniqueUserIds);
-        profiles = profData || [];
-      }
-
-      const profilesMap = new Map(profiles.map(p => [p.user_id, p]));
-      const productsMap = new Map(products.map(p => [p.id, p]));
-
-      const itemsWithProduct = items?.map(item => {
-        const p = productsMap.get(item.product_id);
-        const supplierProfile = p ? profilesMap.get(p.supplier_id) : null;
-        return {
-          ...item,
-          product: p,
-          supplier: supplierProfile ? `${supplierProfile.first_name || ''} ${supplierProfile.last_name || ''}` : "Fornecedor Desconhecido",
-        };
-      });
-
-      const buyerProfile = profilesMap.get(order.user_id);
-      const resellerProfile = order.reseller_id ? profilesMap.get(order.reseller_id) : null;
-
-      return {
-        order,
-        items: itemsWithProduct || [],
-        transactions: txs || [],
-        buyer: buyerProfile ? `${buyerProfile.first_name || ''} ${buyerProfile.last_name || ''}` : "Cliente",
-        reseller: resellerProfile ? `${resellerProfile.first_name || ''} ${resellerProfile.last_name || ''}` : null,
-      };
-    },
-    enabled: !!selectedOrderId
-  });
-
-  const syncMutation = useMutation({
-    mutationFn: async () => {
-      setSyncingHistory(true);
-      const { data, error } = await supabase.rpc('sync_historical_orders_to_wallets');
-      if (error) throw error;
-      return typeof data === "string" ? JSON.parse(data) : data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['admin-all-wallets'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-financeiro-stats'] });
-      if (selectedOrderId) refetchOrderDetails();
-      toast({
-        title: 'Sincronização Concluída',
-        description: `Alinhado com sucesso. Pedidos Pagos: ${data.orders_paid_synced}, Enviados: ${data.orders_shipped_synced}, Cancelados: ${data.orders_cancelled_synced}`,
-      });
-      setSyncingHistory(false);
-    },
-    onError: (e: Error) => {
-      toast({ variant: 'destructive', title: 'Erro ao sincronizar', description: e.message });
-      setSyncingHistory(false);
-    }
-  });
-
-  async function handleSimulateStatus(targetStatus: string, paymentStatus: string = "paid") {
-    if (!selectedOrderId || !orderDetails) return;
-    setSimulating(true);
-    try {
-      // 1. Update order payment_status and status
-      const { error } = await supabase
-        .from('orders')
-        .update({ status: targetStatus, payment_status: paymentStatus })
-        .eq('id', selectedOrderId);
-
-      if (error) throw error;
-
-      // 2. Insert into history
-      await supabase.from('order_status_history').insert({
-        order_id: selectedOrderId,
-        status: targetStatus,
-        notes: `Simulação de ciclo de vida no painel financeiro (Status -> ${targetStatus})`,
-      });
-
-      toast({ title: 'Simulação Executada', description: `Pedido atualizado para ${targetStatus} (${paymentStatus}).` });
-      
-      // Refresh details and state
-      setTimeout(() => {
-        refetchOrderDetails();
-        refetchSimOrders();
-        queryClient.invalidateQueries({ queryKey: ['admin-all-wallets'] });
-        queryClient.invalidateQueries({ queryKey: ['admin-financeiro-stats'] });
-        setSimulating(false);
-      }, 500);
-
-    } catch (err: any) {
-      toast({ variant: 'destructive', title: 'Erro na simulação', description: err.message });
-      setSimulating(false);
-    }
-  }
-
-  // Calculate simulated splits for display
-  const calculateSimulatedAllocations = () => {
-    if (!orderDetails) return { cost: 0, commission: 0, platform: 0 };
-    
-    let cost = 0;
-    let commission = 0;
-    
-    for (const item of orderDetails.items) {
-      const unit = Number(item.unit_price);
-      const qty = Number(item.quantity);
-      const costUnit = Number(item.product?.cost_price ?? 0);
-      
-      cost += costUnit * qty;
-      commission += Math.max(0, (unit - costUnit) * qty);
-    }
-
-    const total = Number(orderDetails.order.total_amount);
-    const platform = Math.max(0, total - cost - (orderDetails.order.reseller_id ? commission : 0));
-
-    return { cost, commission, platform };
-  };
-
-  const alloc = calculateSimulatedAllocations();
-
-  return (
-    <div className="space-y-6">
-      {/* Visual explainer */}
-      <Card className="border-indigo-100 bg-indigo-50/50">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base text-indigo-700 flex items-center gap-2">
-            <Sliders className="h-5 w-5" />
-            Como as movimentações financeiras funcionam?
-          </CardTitle>
-          <CardDescription className="text-indigo-600/80">
-            Abaixo está o ciclo de repasse de valores pelas carteiras da plataforma:
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
-            <div className="p-4 bg-white rounded-lg border border-indigo-100 shadow-sm space-y-2 relative">
-              <Badge className="bg-blue-600 text-white mb-1">Passo 1: Pedido Pago</Badge>
-              <h4 className="font-semibold text-sm">Entrada no Super Admin</h4>
-              <p className="text-xs text-muted-foreground">O cliente efetua o pagamento do pedido. O valor total vai integralmente para a carteira do Super Admin.</p>
-              <div className="hidden md:block absolute top-1/2 -right-4 transform -translate-y-1/2 text-indigo-300 z-10">
-                <ArrowRight className="h-6 w-6" />
-              </div>
-            </div>
-
-            <div className="p-4 bg-white rounded-lg border border-indigo-100 shadow-sm space-y-2 relative">
-              <Badge className="bg-emerald-600 text-white mb-1">Passo 2: Pedido Enviado</Badge>
-              <h4 className="font-semibold text-sm">Distribuição dos Splits</h4>
-              <p className="text-xs text-muted-foreground">Quando o fornecedor posta o pedido, o Super Admin debita o custo e repassa ao Fornecedor. A comissão vai para o Revendedor.</p>
-              <div className="hidden md:block absolute top-1/2 -right-4 transform -translate-y-1/2 text-indigo-300 z-10">
-                <ArrowRight className="h-6 w-6" />
-              </div>
-            </div>
-
-            <div className="p-4 bg-white rounded-lg border border-indigo-100 shadow-sm space-y-2">
-              <Badge className="bg-rose-600 text-white mb-1">Passo 3: Cancelamento</Badge>
-              <h4 className="font-semibold text-sm">Estorno & Devolução</h4>
-              <p className="text-xs text-muted-foreground">Ao cancelar, o sistema retira automaticamente o saldo do Fornecedor/Revendedor e devolve o reembolso integral ao Cliente.</p>
-            </div>
-          </div>
-
-          <div className="mt-5 flex items-center justify-between border-t pt-4 border-indigo-100">
-            <div className="text-sm text-indigo-700 font-medium">
-              Quer recalcular e aplicar as movimentações para todas as vendas passadas?
-            </div>
-            <Button 
-              className="bg-indigo-600 hover:bg-indigo-700 text-white" 
-              onClick={() => syncMutation.mutate()}
-              disabled={syncingHistory}
-            >
-              {syncingHistory ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Sincronizando histórico...
-                </>
-              ) : (
-                <>
-                  <Activity className="h-4 w-4 mr-2" />
-                  Sincronizar Pedidos Antigos
-                </>
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Simulator Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Selector & Actions */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Play className="h-4 w-4 text-emerald-600" />
-              Painel de Simulação
-            </CardTitle>
-            <CardDescription>Selecione um pedido para simular transições.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Escolha o Pedido</Label>
-              <Select value={selectedOrderId} onValueChange={setSelectedOrderId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um pedido recente..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {simulatorOrders.map(o => (
-                    <SelectItem key={o.id} value={o.id}>
-                      Pedido {o.order_number} ({formatBRL(o.total_amount)})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {orderDetails && (
-              <div className="space-y-3 pt-3 border-t">
-                <Label>Ações de Simulação de Ciclo</Label>
-                
-                <Button 
-                  className="w-full justify-start gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                  variant="outline"
-                  onClick={() => handleSimulateStatus("recebido", "paid")}
-                  disabled={simulating}
-                >
-                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                  1. Simular Pedido Pago
-                </Button>
-
-                <Button 
-                  className="w-full justify-start gap-2 border-purple-200 text-purple-700 hover:bg-purple-50"
-                  variant="outline"
-                  onClick={() => handleSimulateStatus("enviado", "paid")}
-                  disabled={simulating}
-                >
-                  <Truck className="h-4 w-4 text-purple-600" />
-                  2. Simular Pedido Enviado
-                </Button>
-
-                <Button 
-                  className="w-full justify-start gap-2 border-rose-200 text-rose-700 hover:bg-rose-50"
-                  variant="outline"
-                  onClick={() => handleSimulateStatus("cancelado", "paid")}
-                  disabled={simulating}
-                >
-                  <RotateCcw className="h-4 w-4 text-rose-600" />
-                  3. Simular Cancelamento / Estorno
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Live Details & Results */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Activity className="h-4 w-4 text-blue-600" />
-              Detalhamento de Transações do Pedido
-            </CardTitle>
-            <CardDescription>Veja em tempo real o fluxo financeiro do pedido selecionado.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!orderDetails ? (
-              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground text-sm">
-                <Sliders className="h-10 w-10 mb-3 opacity-30 animate-pulse" />
-                <p>Selecione um pedido na coluna esquerda para ver o fluxo</p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Stats */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <div className="p-3 bg-muted rounded-lg text-center">
-                    <p className="text-xs text-muted-foreground">Valor Pago</p>
-                    <p className="text-sm font-semibold">{formatBRL(Number(orderDetails.order.total_amount))}</p>
-                  </div>
-                  <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-center">
-                    <p className="text-xs text-indigo-600">Fração Fornecedor</p>
-                    <p className="text-sm font-semibold text-indigo-700">{formatBRL(alloc.cost)}</p>
-                  </div>
-                  <div className="p-3 bg-cyan-50 border border-cyan-100 rounded-lg text-center">
-                    <p className="text-xs text-cyan-600">Comissão Revendedor</p>
-                    <p className="text-sm font-semibold text-cyan-700">{formatBRL(orderDetails.order.reseller_id ? alloc.commission : 0)}</p>
-                  </div>
-                  <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg text-center">
-                    <p className="text-xs text-emerald-600">Taxa Plataforma</p>
-                    <p className="text-sm font-semibold text-emerald-700">{formatBRL(alloc.platform)}</p>
-                  </div>
-                </div>
-
-                {/* Items & Players */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Atores e Itens do Pedido</h4>
-                  <div className="text-sm space-y-1">
-                    <p><strong>Comprador (Cliente):</strong> {orderDetails.buyer}</p>
-                    {orderDetails.reseller && <p><strong>Revendedor associado:</strong> {orderDetails.reseller}</p>}
-                    <div className="border rounded mt-1.5 p-2 space-y-1.5 bg-muted/30">
-                      {orderDetails.items.map((item: any) => (
-                        <div key={item.id} className="flex justify-between text-xs">
-                          <span>{item.product?.name ?? "Produto"} (x{item.quantity})</span>
-                          <span className="text-muted-foreground">Forn: {item.supplier} | Custo: {formatBRL(Number(item.product?.cost_price ?? 0))}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Simulated Ledger */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider flex items-center justify-between">
-                    <span>Razão / Transações de Carteira Efetuadas</span>
-                    <Badge variant={orderDetails.order.status === "cancelado" ? "destructive" : "default"} className="capitalize">
-                      Status: {orderDetails.order.status}
-                    </Badge>
-                  </h4>
-                  {orderDetails.transactions.length === 0 ? (
-                    <p className="text-xs text-muted-foreground bg-muted p-4 rounded text-center border">Nenhuma movimentação de carteira registrada para este pedido. Execute os botões de simulação ao lado.</p>
-                  ) : (
-                    <div className="rounded border overflow-hidden">
-                      <Table className="text-xs">
-                        <TableHeader className="bg-muted/50">
-                          <TableRow>
-                            <TableHead>Conta</TableHead>
-                            <TableHead>Operação</TableHead>
-                            <TableHead>Descrição</TableHead>
-                            <TableHead>Valor</TableHead>
-                            <TableHead>Data</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {orderDetails.transactions.map((tx: any) => {
-                            const isCredit = ["recarga", "estorno", "bonus", "ajuste_credito", "cashback", "pagamento_pedido"].includes(tx.tipo);
-                            return (
-                              <TableRow key={tx.id}>
-                                <TableCell className="font-mono text-[10px]">{tx.wallet_id.slice(0, 8)}...</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className="text-[10px] px-1 py-0">{TIPO_LABELS[tx.tipo] ?? tx.tipo}</Badge>
-                                </TableCell>
-                                <TableCell>{tx.descricao}</TableCell>
-                                <TableCell className={isCredit ? "text-green-600 font-semibold" : "text-destructive font-semibold"}>
-                                  {isCredit ? "+" : "-"}{formatBRL(Math.abs(tx.valor))}
-                                </TableCell>
-                                <TableCell className="text-muted-foreground text-[10px]">
-                                  {format(new Date(tx.created_at), "dd/MM HH:mm", { locale: ptBR })}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
 // ── Página principal ──────────────────────────────────────────────────────────
 
 export default function AdminFinanceiro() {
@@ -1266,10 +977,10 @@ export default function AdminFinanceiro() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold">Painel Financeiro</h1>
-          <p className="text-muted-foreground">Controle saques, perfis de carteiras, repasses e simulações</p>
+          <p className="text-muted-foreground">Gerencie saques, perfis de carteiras, repasses e transações</p>
         </div>
         <Button variant="outline" size="sm" onClick={() => refetchStats()}>
-          <RefreshCw className="h-4 w-4 mr-2 animate-spin-hover" />
+          <RefreshCw className="h-4 w-4 mr-2" />
           Recarregar Painel
         </Button>
       </div>
@@ -1328,10 +1039,7 @@ export default function AdminFinanceiro() {
       <Tabs defaultValue="wallets" className="space-y-6">
         <TabsList>
           <TabsTrigger value="wallets">Carteiras por Perfil</TabsTrigger>
-          <TabsTrigger value="simulator" className="flex items-center gap-1.5">
-            <Activity className="h-4 w-4" />
-            Fluxo & Simulador
-          </TabsTrigger>
+          <TabsTrigger value="transactions">Histórico de Transações</TabsTrigger>
           <TabsTrigger value="withdrawals" className="relative">
             Solicitações de Saque
             {(stats?.pending ?? 0) > 0 && (
@@ -1340,7 +1048,6 @@ export default function AdminFinanceiro() {
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="transactions">Histórico de Transações</TabsTrigger>
           <TabsTrigger value="settings">Configurações</TabsTrigger>
         </TabsList>
 
@@ -1348,16 +1055,12 @@ export default function AdminFinanceiro() {
           <WalletsTab />
         </TabsContent>
 
-        <TabsContent value="simulator">
-          <FlowSimulatorTab />
+        <TabsContent value="transactions">
+          <TransactionsTab />
         </TabsContent>
 
         <TabsContent value="withdrawals">
           <WithdrawalsTab />
-        </TabsContent>
-
-        <TabsContent value="transactions">
-          <TransactionsTab />
         </TabsContent>
 
         <TabsContent value="settings">
