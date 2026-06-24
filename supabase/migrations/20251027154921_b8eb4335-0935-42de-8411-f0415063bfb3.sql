@@ -16,10 +16,10 @@ BEGIN
   
   -- Call the edge function to generate report for today
   PERFORM net.http_post(
-    url := 'https://bbrmjrjorcgsgeztzbsr.supabase.co/functions/v1/generate-daily-report',
+    url := 'https://lojafy.6ksfuf.easypanel.host/functions/v1/generate-daily-report',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJicm1qcmpvcmNnc2dlenR6YnNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1OTU1NTcsImV4cCI6MjA3MzE3MTU1N30.KmCmyi6AuWDGqFJKfu5cExV6bohO0qErKzOpOApAdo4'
+      'Authorization', 'Bearer eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJyb2xlIjogImFub24iLCAiaXNzIjogInN1cGFiYXNlIiwgImlhdCI6IDE3NDkyOTYwMDAsICJleHAiOiA0OTA0OTY5NjAwfQ.3A7rELYownQsXog52qS6qH_46r8mjxtCQn_F3iqBXpo'
     ),
     body := jsonb_build_object('date', report_date::text)
   );

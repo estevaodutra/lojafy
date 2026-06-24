@@ -224,7 +224,7 @@ Produto enviado ao fornecedor para aprovação antes de ser publicado.
 
 **Requisição:**
 ```bash
-curl -X POST https://bbrmjrjorcgsgeztzbsr.supabase.co/functions/v1/api-produtos-cadastrar \
+curl -X POST https://lojafy.6ksfuf.easypanel.host/functions/v1/api-produtos-cadastrar \
   -H "X-API-Key: sua-api-key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -278,7 +278,7 @@ Produto atribuído ao fornecedor mas publicado diretamente sem aprovação.
 
 **Requisição:**
 ```bash
-curl -X POST https://bbrmjrjorcgsgeztzbsr.supabase.co/functions/v1/api-produtos-cadastrar \
+curl -X POST https://lojafy.6ksfuf.easypanel.host/functions/v1/api-produtos-cadastrar \
   -H "X-API-Key: sua-api-key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -328,7 +328,7 @@ Produto cadastrado sem fornecedor (gestão interna).
 
 **Requisição:**
 ```bash
-curl -X POST https://bbrmjrjorcgsgeztzbsr.supabase.co/functions/v1/api-produtos-cadastrar \
+curl -X POST https://lojafy.6ksfuf.easypanel.host/functions/v1/api-produtos-cadastrar \
   -H "X-API-Key: sua-api-key" \
   -H "Content-Type: application/json" \
   -d '{

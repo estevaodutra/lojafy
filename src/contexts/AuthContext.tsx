@@ -335,7 +335,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (!key) continue;
-            if (key.startsWith('sb-') || key.includes('bbrmjrjorcgsgeztzbsr')) {
+            const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+            if (key.startsWith('sb-') || (projectRef && key.includes(projectRef))) {
               localStorage.removeItem(key);
             }
           }
@@ -368,7 +369,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
           if (!key) continue;
-          if (key.startsWith('sb-') || key.includes('bbrmjrjorcgsgeztzbsr')) {
+          const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+          if (key.startsWith('sb-') || (projectRef && key.includes(projectRef))) {
             localStorage.removeItem(key);
           }
         }

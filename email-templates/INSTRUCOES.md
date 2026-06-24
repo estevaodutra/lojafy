@@ -3,7 +3,7 @@
 ## Passos para implementar:
 
 ### 1. Acessar o Dashboard do Supabase
-1. Vá para https://supabase.com/dashboard/project/bbrmjrjorcgsgeztzbsr
+1. Vá para o Dashboard do Supabase (ou painel administrativo do seu provedor/Easypanel se for self-hosted).
 2. Faça login na sua conta
 3. Navegue para **Authentication** > **Email Templates**
 
@@ -52,9 +52,7 @@ Os templates usam estas variáveis do Supabase:
 3. Isso melhora a deliverability dos emails
 
 ## Links Úteis
-- [Dashboard Supabase](https://supabase.com/dashboard/project/bbrmjrjorcgsgeztzbsr)
-- [Email Templates](https://supabase.com/dashboard/project/bbrmjrjorcgsgeztzbsr/auth/templates)
-- [SMTP Settings](https://supabase.com/dashboard/project/bbrmjrjorcgsgeztzbsr/settings/smtp)
+- [Dashboard Supabase](https://supabase.com/dashboard)
 
 ## Troubleshooting
 - Se os emails não chegarem, verifique a pasta de spam

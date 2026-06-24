@@ -68,7 +68,8 @@ export const EndpointCard: React.FC<EndpointCardProps> = ({ endpoint }) => {
   };
 
   const isWebhook = endpoint.isWebhookEvent;
-  const fullUrl = isWebhook ? 'https://sua-url-de-webhook.com/endpoint' : `https://bbrmjrjorcgsgeztzbsr.supabase.co${endpoint.url}`;
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://lojafy.6ksfuf.easypanel.host';
+  const fullUrl = isWebhook ? 'https://sua-url-de-webhook.com/endpoint' : `${supabaseUrl}${endpoint.url}`;
 
   return (
     <Card>

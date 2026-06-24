@@ -9,6 +9,8 @@ import { WebhooksSection } from '@/components/admin/WebhooksSection';
 import { ApiLogsSection } from '@/components/admin/ApiLogsSection';
 import { Shield, Zap, Globe, FileText, BookOpen, Terminal } from 'lucide-react';
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://lojafy.6ksfuf.easypanel.host';
+
 interface EndpointData {
   title: string;
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -208,7 +210,7 @@ const AuthSection: React.FC = () => (
         <div className="space-y-3">
           <h4 className="font-medium">Exemplo de Requisição</h4>
           <CodeBlock 
-            code={`curl -X GET "https://bbrmjrjorcgsgeztzbsr.supabase.co/functions/v1/api-produtos-listar" \\
+            code={`curl -X GET "${SUPABASE_URL}/functions/v1/api-produtos-listar" \\
   -H "X-API-Key: sk_sua_chave_aqui" \\
   -H "Content-Type: application/json"`}
             language="bash"
@@ -224,7 +226,7 @@ const AuthSection: React.FC = () => (
       <CardContent>
         <div className="flex items-center gap-2">
           <Badge variant="secondary">URL Base</Badge>
-          <span className="font-mono text-sm break-all">https://bbrmjrjorcgsgeztzbsr.supabase.co</span>
+          <span className="font-mono text-sm break-all">{SUPABASE_URL}</span>
         </div>
       </CardContent>
     </Card>

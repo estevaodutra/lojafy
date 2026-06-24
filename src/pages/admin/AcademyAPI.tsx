@@ -549,12 +549,12 @@ const productEndpoints = [
           created_by: 'admin-456-uuid',
           supplier_id: 'supplier-789-uuid',
           reference_ad_url: null,
-          image_url: 'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/notebook-dell-main.jpg',
-          main_image_url: 'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/notebook-dell-main.jpg',
+          image_url: 'https://lojafy.6ksfuf.easypanel.host/storage/v1/object/public/product-images/notebook-dell-main.jpg',
+          main_image_url: 'https://lojafy.6ksfuf.easypanel.host/storage/v1/object/public/product-images/notebook-dell-main.jpg',
           images: [
-            'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/notebook-dell-1.jpg',
-            'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/notebook-dell-2.jpg',
-            'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/notebook-dell-3.jpg'
+            'https://lojafy.6ksfuf.easypanel.host/storage/v1/object/public/product-images/notebook-dell-1.jpg',
+            'https://lojafy.6ksfuf.easypanel.host/storage/v1/object/public/product-images/notebook-dell-2.jpg',
+            'https://lojafy.6ksfuf.easypanel.host/storage/v1/object/public/product-images/notebook-dell-3.jpg'
           ],
           specifications: {
             processador: 'Intel Core i5 11ª Geração',
@@ -582,7 +582,7 @@ const productEndpoints = [
             id: 'cat-111-uuid',
             name: 'Eletrônicos',
             slug: 'eletronicos',
-            image_url: 'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/cat-eletronicos.jpg',
+            image_url: 'https://lojafy.6ksfuf.easypanel.host/storage/v1/object/public/product-images/cat-eletronicos.jpg',
             active: true
           },
           subcategories: {
@@ -625,11 +625,11 @@ const productEndpoints = [
           created_by: 'admin-456-uuid',
           supplier_id: 'supplier-222-uuid',
           reference_ad_url: null,
-          image_url: 'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/mouse-logitech-main.jpg',
-          main_image_url: 'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/mouse-logitech-main.jpg',
+          image_url: 'https://lojafy.6ksfuf.easypanel.host/storage/v1/object/public/product-images/mouse-logitech-main.jpg',
+          main_image_url: 'https://lojafy.6ksfuf.easypanel.host/storage/v1/object/public/product-images/mouse-logitech-main.jpg',
           images: [
-            'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/mouse-logitech-1.jpg',
-            'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/mouse-logitech-2.jpg'
+            'https://lojafy.6ksfuf.easypanel.host/storage/v1/object/public/product-images/mouse-logitech-1.jpg',
+            'https://lojafy.6ksfuf.easypanel.host/storage/v1/object/public/product-images/mouse-logitech-2.jpg'
           ],
           specifications: {
             sensor: 'HERO 25K DPI',
@@ -655,7 +655,7 @@ const productEndpoints = [
             id: 'cat-111-uuid',
             name: 'Eletrônicos',
             slug: 'eletronicos',
-            image_url: 'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/cat-eletronicos.jpg',
+            image_url: 'https://lojafy.6ksfuf.easypanel.host/storage/v1/object/public/product-images/cat-eletronicos.jpg',
             active: true
           },
           subcategories: {
@@ -846,7 +846,7 @@ const AcademyAPI = () => {
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="secondary">Base URL</Badge>
-            <span className="font-mono text-sm">https://bbrmjrjorcgsgeztzbsr.supabase.co</span>
+            <span className="font-mono text-sm">https://lojafy.6ksfuf.easypanel.host</span>
           </div>
         </CardContent>
       </Card>

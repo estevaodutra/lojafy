@@ -195,11 +195,11 @@ const endpoints = [
           created_by: 'admin-456-uuid',
           supplier_id: 'supplier-789-uuid',
           reference_ad_url: null,
-          image_url: 'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/notebook-main.jpg',
-          main_image_url: 'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/notebook-main.jpg',
+          image_url: 'https://lojafy.6ksfuf.easypanel.host/storage/v1/object/public/product-images/notebook-main.jpg',
+          main_image_url: 'https://lojafy.6ksfuf.easypanel.host/storage/v1/object/public/product-images/notebook-main.jpg',
           images: [
-            'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/notebook-1.jpg',
-            'https://bbrmjrjorcgsgeztzbsr.supabase.co/storage/v1/object/public/product-images/notebook-2.jpg'
+            'https://lojafy.6ksfuf.easypanel.host/storage/v1/object/public/product-images/notebook-1.jpg',
+            'https://lojafy.6ksfuf.easypanel.host/storage/v1/object/public/product-images/notebook-2.jpg'
           ],
           specifications: {
             processador: 'Intel Core i5 11ª Geração',
@@ -1136,7 +1136,7 @@ const IntegracaoPage: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="secondary">Base URL</Badge>
-                <span className="font-mono text-sm">https://bbrmjrjorcgsgeztzbsr.supabase.co</span>
+                <span className="font-mono text-sm">https://lojafy.6ksfuf.easypanel.host</span>
               </div>
             </CardContent>
           </Card>

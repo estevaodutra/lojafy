@@ -70,7 +70,8 @@ export const ApiTester: React.FC<ApiTesterProps> = ({ endpoint }) => {
       }
 
       // Build URL with query parameters
-      let url = `https://bbrmjrjorcgsgeztzbsr.supabase.co${endpoint.url}`;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://lojafy.6ksfuf.easypanel.host';
+      let url = `${supabaseUrl}${endpoint.url}`;
       if (queryParams.trim() && endpoint.method === 'GET') {
         const params = queryParams.split('\n')
           .filter(line => line.trim())
