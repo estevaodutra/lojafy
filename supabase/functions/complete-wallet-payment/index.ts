@@ -16,20 +16,15 @@ serve(async (req) => {
 
   try {
     // Autenticar usuário via JWT
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const userClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -81,21 +76,29 @@ serve(async (req) => {
     }).catch(() => {});
 
     // Disparar split de pagamento de forma assíncrona
-    supabase.functions.invoke('process-payment-split', {
-      body: { order_id },
-    }).catch((e: Error) => console.error('[complete-wallet-payment] Split failed:', e));
+    try {
+      await supabase.functions.invoke('process-payment-split', {
+        body: { order_id },
+      });
+    } catch (e) {
+      console.error('[complete-wallet-payment] Split failed:', e);
+    }
 
     // Disparar evento order.paid para webhooks registrados (n8n, etc.)
-    supabase.functions.invoke('dispatch-webhook', {
-      body: {
-        event_type: 'order.paid',
-        payload: {
-          order_id,
-          order_number: order.order_number,
-          payment_method: 'wallet',
+    try {
+      await supabase.functions.invoke('dispatch-webhook', {
+        body: {
+          event_type: 'order.paid',
+          payload: {
+            order_id,
+            order_number: order.order_number,
+            payment_method: 'wallet',
+          },
         },
-      },
-    }).catch((e: Error) => console.error('[complete-wallet-payment] Webhook dispatch failed:', e));
+      });
+    } catch (e) {
+      console.error('[complete-wallet-payment] Webhook dispatch failed:', e);
+    }
 
     console.log(`[complete-wallet-payment] ✅ Order ${order.order_number} confirmed as wallet payment`);
     return new Response(
