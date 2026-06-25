@@ -38,11 +38,7 @@ serve(async (req) => {
 
   try {
     if (!MP_ACCESS_TOKEN) {
-      console.error('MERCADO_PAGO_ACCESS_TOKEN not configured');
-      return new Response(
-        JSON.stringify({ error: 'Payment service not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.warn('MERCADO_PAGO_ACCESS_TOKEN not configured, proceeding with webhook payment creation');
     }
 
     const authHeader = req.headers.get('authorization');
@@ -74,56 +70,102 @@ serve(async (req) => {
     const externalReference = `order_${Date.now()}_${user.id.substring(0, 8)}`;
     const notificationUrl = `${SUPABASE_URL}/functions/v1/webhook-mercadopago`;
 
-    // Chamar MP API diretamente
-    const mpPayload = {
-      transaction_amount: Number(amount),
+    // Build N8N payload (compatible format)
+    const n8nPayload = {
+      amount,
       description: description || `Pedido Lojafy - ${externalReference}`,
-      payment_method_id: 'pix',
-      payer: {
-        email: payer.email,
-        first_name: payer.firstName || '',
-        last_name: payer.lastName || '',
-        identification: {
-          type: 'CPF',
-          number: payer.cpf.replace(/\D/g, ''),
-        },
+      payer,
+      orderItems,
+      shippingAddress,
+      reseller_id,
+      externalReference,
+      notificationUrl,
+
+      // Structured format for compatibility with wallet-recharge style consumers
+      pedido: {
+        external_reference: externalReference,
+        timestamp: new Date().toISOString(),
+        valor_total: Number(amount),
+        descricao: description || `Pedido Lojafy - ${externalReference}`,
+        quantidade_itens: orderItems?.reduce((acc, i) => acc + i.quantity, 0) || 1,
       },
-      external_reference: externalReference,
-      notification_url: notificationUrl,
-      date_of_expiration: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min
+      cliente: {
+        user_id: user.id,
+        nome_completo: `${payer.firstName || ''} ${payer.lastName || ''}`.trim(),
+        email: payer.email,
+        telefone: '',
+        cpf: payer.cpf.replace(/\D/g, ''),
+        endereco: shippingAddress ?? null,
+      },
+      produtos: orderItems?.map(item => ({
+        id: item.productId,
+        nome: item.productName,
+        preco_unitario: Number(item.unitPrice),
+        quantidade: Number(item.quantity),
+        valor_total_item: Number(item.quantity) * Number(item.unitPrice),
+      })) || [],
+      pagamento: {
+        metodo: 'pix',
+        valor: Number(amount),
+      },
     };
 
-    console.log('[pix] Calling MP API for PIX payment, amount:', amount);
+    const webhookUrl = 'https://n8n.6ksfuf.easypanel.host/workflow/tvAzmbS70Lo9SXsV';
+    console.log('[pix] Calling webhook for PIX payment:', webhookUrl);
 
-    const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
+    const webhookRes = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${MP_ACCESS_TOKEN}`,
         'Content-Type': 'application/json',
-        'X-Idempotency-Key': externalReference,
       },
-      body: JSON.stringify(mpPayload),
+      body: JSON.stringify(n8nPayload),
     });
 
-    const mpData = await mpRes.json();
+    const responseText = await webhookRes.text();
+    console.log('[pix] Webhook Response Status:', webhookRes.status);
 
-    if (!mpRes.ok) {
-      console.error('[pix] MP API error:', mpRes.status, JSON.stringify(mpData));
+    let n8nResult: any;
+    try {
+      n8nResult = JSON.parse(responseText);
+    } catch {
+      console.error('[pix] Failed to parse webhook response:', responseText);
       return new Response(
-        JSON.stringify({ error: mpData?.message ?? 'Mercado Pago API error', mp_error: mpData }),
+        JSON.stringify({ error: 'Invalid response from payment webhook' }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const qrCode = mpData.point_of_interaction?.transaction_data?.qr_code ?? null;
-    const qrCodeBase64 = mpData.point_of_interaction?.transaction_data?.qr_code_base64 ?? null;
-    const paymentId = String(mpData.id);
-    const expiresAt = mpData.date_of_expiration ?? new Date(Date.now() + 30 * 60 * 1000).toISOString();
-
-    if (!qrCode) {
-      console.error('[pix] No QR code in MP response:', JSON.stringify(mpData));
+    if (!webhookRes.ok) {
+      console.error('[pix] Webhook error:', webhookRes.status, JSON.stringify(n8nResult));
       return new Response(
-        JSON.stringify({ error: 'PIX QR code not returned by Mercado Pago' }),
+        JSON.stringify({ error: 'Payment webhook error', details: n8nResult }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Parse response
+    let pixData: any;
+    if (Array.isArray(n8nResult) && n8nResult.length > 0) {
+      pixData = n8nResult[0];
+    } else if (n8nResult && typeof n8nResult === 'object') {
+      pixData = n8nResult;
+    } else {
+      console.error('[pix] Invalid webhook response format:', n8nResult);
+      return new Response(
+        JSON.stringify({ error: 'Invalid PIX response format from webhook' }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const qrCode = pixData.qrCodeCopyPaste ?? pixData.qr_code ?? null;
+    const qrCodeBase64 = pixData.qrCodeBase64 ?? pixData.qr_code_base64 ?? null;
+    const paymentId = pixData.paymentId ? String(pixData.paymentId) : null;
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+
+    if (!qrCode || !paymentId) {
+      console.error('[pix] Missing required fields in webhook response:', pixData);
+      return new Response(
+        JSON.stringify({ error: 'PIX QR code or Payment ID not returned by webhook' }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
