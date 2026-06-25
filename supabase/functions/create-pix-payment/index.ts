@@ -110,7 +110,7 @@ serve(async (req) => {
       },
     };
 
-    const webhookUrl = 'https://n8n.6ksfuf.easypanel.host/workflow/tvAzmbS70Lo9SXsV';
+    const webhookUrl = 'https://n8n.6ksfuf.easypanel.host/webhook/generate_payment';
     console.log('[pix] Calling webhook for PIX payment:', webhookUrl);
 
     const webhookRes = await fetch(webhookUrl, {
