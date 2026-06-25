@@ -1,0 +1,34 @@
+name: Deploy Edge Functions to VPS
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/functions/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy functions to VPS via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: 148.230.78.81
+          username: root
+          password: ${{ secrets.VPS_PASSWORD }}
+          source: "supabase/functions/**/*"
+          target: "/opt/supabase-lojafy/volumes/functions"
+          strip_components: 2
+
+      - name: Restart functions container
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 148.230.78.81
+          username: root
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            docker restart lojafy-functions-1
