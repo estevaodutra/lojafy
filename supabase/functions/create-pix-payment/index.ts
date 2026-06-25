@@ -67,13 +67,21 @@ serve(async (req) => {
       );
     }
 
+    // Gerar order number sequencial via banco primeiro
+    const { data: orderNumData, error: orderNumError } = await supabase.rpc('generate_order_number');
+    if (orderNumError) {
+      console.error('[pix] Failed to generate order number:', orderNumError);
+    }
+    const orderNumber = (orderNumData as string) || String(Date.now()).substring(5);
+
     const externalReference = `order_${Date.now()}_${user.id.substring(0, 8)}`;
     const notificationUrl = `${SUPABASE_URL}/functions/v1/webhook-mercadopago`;
 
     // Build N8N payload (compatible format)
     const n8nPayload = {
+      orderNumber,
       amount,
-      description: description || `Pedido Lojafy - ${externalReference}`,
+      description: description || `Pedido #${orderNumber} - ${externalReference}`,
       payer,
       orderItems,
       shippingAddress,
@@ -83,10 +91,11 @@ serve(async (req) => {
 
       // Structured format for compatibility with wallet-recharge style consumers
       pedido: {
+        numero_pedido: orderNumber,
         external_reference: externalReference,
         timestamp: new Date().toISOString(),
         valor_total: Number(amount),
-        descricao: description || `Pedido Lojafy - ${externalReference}`,
+        descricao: description || `Pedido #${orderNumber} - ${externalReference}`,
         quantidade_itens: orderItems?.reduce((acc, i) => acc + i.quantity, 0) || 1,
       },
       cliente: {
@@ -169,10 +178,6 @@ serve(async (req) => {
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    // Gerar order number sequencial via banco
-    const { data: orderNumData } = await supabase.rpc('generate_order_number');
-    const orderNumber = orderNumData as string;
 
     // Criar pedido no banco
     const { data: orderData, error: orderError } = await supabase
