@@ -412,11 +412,11 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       // Refresh shipping files
       fetchShippingFiles();
       setUploadFile(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading file:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível enviar o arquivo.",
+        description: `Não foi possível enviar o arquivo: ${error.message || error}`,
         variant: "destructive"
       });
     } finally {
@@ -454,11 +454,11 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       });
       fetchRefundDocuments();
       setRefundUploadFile(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading refund document:', error);
       toast({
         title: "Erro",
-        description: "Erro ao enviar comprovante.",
+        description: `Erro ao enviar comprovante: ${error.message || error}`,
         variant: "destructive"
       });
     } finally {
