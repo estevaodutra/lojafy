@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { buildOrderItemsPayload } from '../_shared/build-order-items-payload.ts';
+import { getPublicSignedUrl } from '../_shared/get-public-signed-url.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,11 +28,11 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🔍 Iniciando verificação de pagamentos pendentes...');
+    console.log('ðŸ” Iniciando verificaÃ§Ã£o de pagamentos pendentes...');
 
     const mercadoPagoToken = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN');
     if (!mercadoPagoToken) {
-      console.error('❌ MERCADO_PAGO_ACCESS_TOKEN não configurado');
+      console.error('âŒ MERCADO_PAGO_ACCESS_TOKEN nÃ£o configurado');
       return new Response(
         JSON.stringify({ error: 'MERCADO_PAGO_ACCESS_TOKEN not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -49,7 +50,7 @@ serve(async (req) => {
       .limit(50);
 
     if (ordersError) {
-      console.error('❌ Erro ao buscar pedidos:', ordersError);
+      console.error('âŒ Erro ao buscar pedidos:', ordersError);
       return new Response(
         JSON.stringify({ error: 'Failed to fetch pending orders' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -69,20 +70,20 @@ serve(async (req) => {
 
     const cancelledRecharges = expiredRecharges?.length || 0;
     if (rechargeError) {
-      console.error('❌ Erro ao cancelar recargas expiradas:', rechargeError);
+      console.error('âŒ Erro ao cancelar recargas expiradas:', rechargeError);
     } else if (cancelledRecharges > 0) {
-      console.log(`🗑️ ${cancelledRecharges} recarga(s) de carteira expirada(s) cancelada(s)`);
+      console.log(`ðŸ—‘ï¸ ${cancelledRecharges} recarga(s) de carteira expirada(s) cancelada(s)`);
     }
 
     if (!pendingOrders || pendingOrders.length === 0) {
-      console.log('✅ Nenhum pedido pendente encontrado');
+      console.log('âœ… Nenhum pedido pendente encontrado');
       return new Response(
         JSON.stringify({ message: 'No pending orders found', checked: 0, updated: 0, cancelled_recharges: cancelledRecharges }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`📦 Encontrados ${pendingOrders.length} pedidos pendentes`);
+    console.log(`ðŸ“¦ Encontrados ${pendingOrders.length} pedidos pendentes`);
 
     const results = {
       checked: pendingOrders.length,
@@ -93,7 +94,7 @@ serve(async (req) => {
 
     for (const order of pendingOrders) {
       try {
-        console.log(`🔄 Verificando pedido ${order.order_number} - Payment ID: ${order.payment_id}`);
+        console.log(`ðŸ”„ Verificando pedido ${order.order_number} - Payment ID: ${order.payment_id}`);
 
         // Consultar status do pagamento na API do Mercado Pago
         const mpResponse = await fetch(
@@ -107,7 +108,7 @@ serve(async (req) => {
         );
 
         if (!mpResponse.ok) {
-          console.error(`❌ Erro ao consultar MP para payment ${order.payment_id}: ${mpResponse.status}`);
+          console.error(`âŒ Erro ao consultar MP para payment ${order.payment_id}: ${mpResponse.status}`);
           results.errors++;
           results.details.push({
             order_number: order.order_number,
@@ -119,7 +120,7 @@ serve(async (req) => {
         }
 
         const payment: MercadoPagoPayment = await mpResponse.json();
-        console.log(`📊 Payment ${order.payment_id} status: ${payment.status}`);
+        console.log(`ðŸ“Š Payment ${order.payment_id} status: ${payment.status}`);
 
         let newStatus = 'pending';
         let newPaymentStatus = 'pending';
@@ -160,21 +161,21 @@ serve(async (req) => {
             .maybeSingle();
 
           if (updateError) {
-            console.error(`❌ Erro ao atualizar pedido ${order.order_number}:`, updateError);
+            console.error(`âŒ Erro ao atualizar pedido ${order.order_number}:`, updateError);
             results.errors++;
           } else if (!updatedOrder) {
-            console.log(`⚠️ Pedido ${order.order_number} já foi processado por outro processo, ignorando`);
+            console.log(`âš ï¸ Pedido ${order.order_number} jÃ¡ foi processado por outro processo, ignorando`);
           } else {
-            console.log(`✅ Pedido ${order.order_number} atualizado para ${newStatus}`);
+            console.log(`âœ… Pedido ${order.order_number} atualizado para ${newStatus}`);
             results.updated++;
 
-            // Registrar no histórico
+            // Registrar no histÃ³rico
             await supabase
               .from('order_status_history')
               .insert({
                 order_id: order.id,
                 status: newStatus,
-                notes: `Atualizado via verificação automática - MP Status: ${payment.status}`
+                notes: `Atualizado via verificaÃ§Ã£o automÃ¡tica - MP Status: ${payment.status}`
               });
 
             // Disparar webhook order.paid se aprovado
@@ -214,7 +215,7 @@ serve(async (req) => {
                     };
                   }
                 } else {
-                  // Pedidos de visitantes - usar dados do próprio pedido
+                  // Pedidos de visitantes - usar dados do prÃ³prio pedido
                   customerData = {
                     user_id: null,
                     email: fullOrder?.customer_email || null,
@@ -258,7 +259,7 @@ serve(async (req) => {
                     file_name: shippingFile.file_name,
                     file_size: shippingFile.file_size,
                     uploaded_at: shippingFile.uploaded_at,
-                    download_url: signedUrlData?.signedUrl || null,
+                    download_url: getPublicSignedUrl(signedUrlData?.signedUrl) || null,
                   };
                   console.log('📦 Etiqueta de envio encontrada:', shippingFile.file_name);
                 }
@@ -281,7 +282,7 @@ serve(async (req) => {
                   },
                 });
 
-                console.log('✅ Webhook order.paid disparado');
+                console.log('âœ… Webhook order.paid disparado');
               } catch (webhookError) {
                 console.error('Erro ao disparar webhook:', webhookError);
               }
@@ -297,17 +298,17 @@ serve(async (req) => {
         });
 
       } catch (orderError) {
-        console.error(`❌ Erro ao processar pedido ${order.order_number}:`, orderError);
+        console.error(`âŒ Erro ao processar pedido ${order.order_number}:`, orderError);
         results.errors++;
       }
     }
 
-    console.log(`📊 Verificação concluída: ${results.checked} verificados, ${results.updated} atualizados, ${results.errors} erros`);
+    console.log(`ðŸ“Š VerificaÃ§Ã£o concluÃ­da: ${results.checked} verificados, ${results.updated} atualizados, ${results.errors} erros`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Verificação concluída`,
+        message: `VerificaÃ§Ã£o concluÃ­da`,
         ...results,
         cancelled_recharges: cancelledRecharges
       }),
@@ -315,7 +316,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('❌ Erro geral:', error);
+    console.error('âŒ Erro geral:', error);
     return new Response(
       JSON.stringify({ error: 'Internal server error', details: error instanceof Error ? error.message : String(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

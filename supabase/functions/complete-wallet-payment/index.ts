@@ -15,7 +15,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    // Autenticar usuário via JWT
+    // Autenticar usuÃ¡rio via JWT
     const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -38,7 +38,7 @@ serve(async (req) => {
       });
     }
 
-    // Verificar que o pedido pertence ao usuário autenticado
+    // Verificar que o pedido pertence ao usuÃ¡rio autenticado
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select('id, order_number, customer_email, reseller_id')
@@ -46,7 +46,7 @@ serve(async (req) => {
       .single();
 
     if (orderError || !order) {
-      return new Response(JSON.stringify({ error: 'Order not found' }), {
+      return new Response(JSON.stringify({ error: 'Order not found', details: orderError }), {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -63,7 +63,7 @@ serve(async (req) => {
 
     if (updateError) {
       console.error('[complete-wallet-payment] Update error:', updateError);
-      return new Response(JSON.stringify({ error: 'Failed to update order' }), {
+      return new Response(JSON.stringify({ error: 'Failed to update order', details: updateError.message || updateError }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -108,7 +108,7 @@ serve(async (req) => {
 
   } catch (err) {
     console.error('[complete-wallet-payment] Error:', err);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+    return new Response(JSON.stringify({ error: 'Internal server error', details: err.message || err }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

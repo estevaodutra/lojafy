@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { buildOrderItemsPayload } from '../_shared/build-order-items-payload.ts';
+import { getPublicSignedUrl } from '../_shared/get-public-signed-url.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,7 +33,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('📤 Disparando webhook manual para pedido:', order_id);
+    console.log('ðŸ“¤ Disparando webhook manual para pedido:', order_id);
 
     // Buscar pedido completo
     const { data: fullOrder, error: orderError } = await supabase
@@ -51,16 +52,16 @@ serve(async (req) => {
       .single();
 
     if (orderError || !fullOrder) {
-      console.error('❌ Pedido não encontrado:', orderError);
+      console.error('âŒ Pedido nÃ£o encontrado:', orderError);
       return new Response(
         JSON.stringify({ error: 'Order not found', details: orderError?.message }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Verificar se o pedido está pago
+    // Verificar se o pedido estÃ¡ pago
     if (fullOrder.payment_status !== 'paid') {
-      console.log('⚠️ Pedido não está pago:', fullOrder.payment_status);
+      console.log('âš ï¸ Pedido nÃ£o estÃ¡ pago:', fullOrder.payment_status);
       return new Response(
         JSON.stringify({ 
           error: 'Order is not paid', 
@@ -90,7 +91,7 @@ serve(async (req) => {
         };
       }
     } else {
-      // Pedidos de visitantes - usar dados do próprio pedido
+      // Pedidos de visitantes - usar dados do prÃ³prio pedido
       customerData = {
         user_id: null,
         email: fullOrder.customer_email || null,
@@ -135,7 +136,7 @@ serve(async (req) => {
         file_name: shippingFile.file_name,
         file_size: shippingFile.file_size,
         uploaded_at: shippingFile.uploaded_at,
-        download_url: signedUrlData?.signedUrl || null,
+        download_url: getPublicSignedUrl(signedUrlData?.signedUrl) || null,
       };
       console.log('📦 Etiqueta de envio encontrada:', shippingFile.file_name);
     }
@@ -151,7 +152,7 @@ serve(async (req) => {
       shipping_label: shippingLabel,
     };
 
-    console.log('📦 Payload do webhook:', JSON.stringify(webhookPayload, null, 2));
+    console.log('ðŸ“¦ Payload do webhook:', JSON.stringify(webhookPayload, null, 2));
 
     // Disparar o webhook
     const { data: dispatchResult, error: dispatchError } = await supabase.functions.invoke('dispatch-webhook', {
@@ -163,7 +164,7 @@ serve(async (req) => {
     });
 
     if (dispatchError) {
-      console.error('❌ Erro ao disparar webhook:', dispatchError);
+      console.error('âŒ Erro ao disparar webhook:', dispatchError);
       return new Response(
         JSON.stringify({ 
           error: 'Failed to dispatch webhook', 
@@ -173,7 +174,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('✅ Webhook order.paid disparado manualmente com sucesso');
+    console.log('âœ… Webhook order.paid disparado manualmente com sucesso');
 
     return new Response(
       JSON.stringify({
@@ -187,7 +188,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('❌ Erro geral:', error);
+    console.error('âŒ Erro geral:', error);
     return new Response(
       JSON.stringify({ 
         error: 'Internal server error', 

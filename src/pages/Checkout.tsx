@@ -645,16 +645,33 @@ const Checkout = ({
 
       // Upload shipping file if needed
       if (shippingFile?.file && orderId) {
-        const fileExtension = shippingFile.file.name.split('.').pop();
-        const fileName = `order_${orderId}_${Date.now()}.${fileExtension}`;
-        const filePath = `${orderId}/${fileName}`;
-        await supabase.storage.from('shipping-files').upload(filePath, shippingFile.file);
-        await supabase.from('order_shipping_files').insert({
-          order_id: orderId,
-          file_name: shippingFile.file.name,
-          file_path: filePath,
-          file_size: shippingFile.file.size
-        });
+        try {
+          console.log('Uploading shipping file for wallet order:', orderId);
+          const fileExtension = shippingFile.file.name.split('.').pop();
+          const fileName = `order_${orderId}_${Date.now()}.${fileExtension}`;
+          const filePath = `${orderId}/${fileName}`;
+          
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('shipping-files')
+            .upload(filePath, shippingFile.file);
+            
+          if (uploadError) {
+            console.error('Error uploading shipping file for wallet order:', uploadError);
+          } else {
+            console.log('Shipping file uploaded successfully for wallet order:', uploadData);
+            const { error: dbError } = await supabase.from('order_shipping_files').insert({
+              order_id: orderId,
+              file_name: shippingFile.file.name,
+              file_path: filePath,
+              file_size: shippingFile.file.size
+            });
+            if (dbError) {
+              console.error('Error saving shipping file reference for wallet order:', dbError);
+            }
+          }
+        } catch (uploadError) {
+          console.error('Error in shipping file upload process for wallet order:', uploadError);
+        }
       }
       // Debit wallet
       const { data: debitResult, error: debitError } = await supabase.rpc('debitar_carteira', {
@@ -671,7 +688,20 @@ const Checkout = ({
       const { error: confirmError } = await supabase.functions.invoke('complete-wallet-payment', {
         body: { order_id: orderId },
       });
-      if (confirmError) throw confirmError;
+      
+      if (confirmError) {
+        let errorMessage = confirmError.message;
+        try {
+          if ('context' in confirmError && confirmError.context) {
+            const errBody = await (confirmError.context as any).json();
+            errorMessage = errBody.details || errBody.error || errorMessage;
+            if (typeof errorMessage === 'object') {
+              errorMessage = JSON.stringify(errorMessage);
+            }
+          }
+        } catch (_) {}
+        throw new Error(errorMessage);
+      }
       clearCart();
       toast({ title: "Pedido confirmado!", description: "Pagamento realizado com saldo da carteira." });
       navigate("/minha-conta/pedidos");

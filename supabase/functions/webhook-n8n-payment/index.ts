@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { buildOrderItemsPayload } from '../_shared/build-order-items-payload.ts';
+import { getPublicSignedUrl } from '../_shared/get-public-signed-url.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -119,7 +120,7 @@ serve(async (req) => {
           if (creditError) {
             console.error('Error crediting wallet:', creditError);
           } else {
-            console.log('✅ Wallet credited successfully:', creditResult);
+            console.log('âœ… Wallet credited successfully:', creditResult);
           }
 
           // Update original pending transaction status
@@ -132,7 +133,7 @@ serve(async (req) => {
           if (userId) {
             await supabase.from('notifications').insert({
               user_id: userId,
-              title: '💰 Saldo adicionado!',
+              title: 'ðŸ’° Saldo adicionado!',
               message: `R$ ${Number(walletTx.valor).toFixed(2)} foi creditado na sua carteira.`,
               type: 'wallet_recharge',
               action_url: '/minha-conta/carteira',
@@ -180,9 +181,9 @@ serve(async (req) => {
 
     console.log('Found order:', orderData.id, 'Current status:', orderData.status);
 
-    // Verificar se o pedido já foi pago - evitar disparo duplicado
+    // Verificar se o pedido jÃ¡ foi pago - evitar disparo duplicado
     if (orderData.payment_status === 'paid') {
-      console.log('⚠️ Order already paid, skipping duplicate processing');
+      console.log('âš ï¸ Order already paid, skipping duplicate processing');
       return new Response(
         JSON.stringify({ 
           message: 'Order already paid', 
@@ -193,9 +194,9 @@ serve(async (req) => {
       );
     }
 
-    // Verificar se o pedido já foi cancelado por expiração
+    // Verificar se o pedido jÃ¡ foi cancelado por expiraÃ§Ã£o
     if (orderData.status === 'cancelled' && orderData.payment_status === 'expired') {
-      console.log('⚠️ Order was already cancelled due to expiration');
+      console.log('âš ï¸ Order was already cancelled due to expiration');
       return new Response(
         JSON.stringify({ 
           message: 'Order expired and cancelled', 
@@ -213,19 +214,19 @@ serve(async (req) => {
       case 'approved':
         newStatus = 'recebido'; // Order status in Portuguese
         paymentStatus = 'paid';
-        console.log('Payment approved - order status → recebido, payment_status → paid');
+        console.log('Payment approved - order status â†’ recebido, payment_status â†’ paid');
         break;
       case 'pending':
       case 'in_process':
         // Only update payment_status, don't change order status
         paymentStatus = 'pending';
-        console.log('Payment still pending - payment_status → pending');
+        console.log('Payment still pending - payment_status â†’ pending');
         break;
       case 'rejected':
       case 'cancelled':
         // Only update payment_status, don't change order status
         paymentStatus = 'failed';
-        console.log('Payment rejected/cancelled - payment_status → failed');
+        console.log('Payment rejected/cancelled - payment_status â†’ failed');
         break;
       default:
         console.log('Unknown payment status:', webhookData.status, '- keeping current status');
@@ -243,7 +244,7 @@ serve(async (req) => {
       updated_at: new Date().toISOString()
     };
     
-    // Only update order status if it changed (approved → recebido)
+    // Only update order status if it changed (approved â†’ recebido)
     if (newStatus !== orderData.status) {
       updateData.status = newStatus;
     }
@@ -266,7 +267,7 @@ serve(async (req) => {
 
     // If no row was updated, another process already marked it as paid
     if (!updatedOrder) {
-      console.log('⚠️ Order already updated by another process, skipping webhook dispatch');
+      console.log('âš ï¸ Order already updated by another process, skipping webhook dispatch');
       return new Response(
         JSON.stringify({ success: true, message: 'Already processed by another request' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -296,9 +297,9 @@ serve(async (req) => {
 
     // Log success for approved payments
     if (webhookData.status.toLowerCase() === 'approved') {
-      console.log(`✅ Payment APPROVED for order ${orderData.order_number} - Payment ID: ${paymentId}`);
+      console.log(`âœ… Payment APPROVED for order ${orderData.order_number} - Payment ID: ${paymentId}`);
 
-      // Disparar split de pagamento de forma assíncrona (não bloqueia resposta)
+      // Disparar split de pagamento de forma assÃ­ncrona (nÃ£o bloqueia resposta)
       supabase.functions.invoke('process-payment-split', {
         body: { order_id: orderData.id },
       }).catch((err: Error) => console.error('[webhook] Split failed:', err));
@@ -340,7 +341,7 @@ serve(async (req) => {
             };
           }
         } else {
-          // Pedidos de visitantes - usar dados do próprio pedido
+          // Pedidos de visitantes - usar dados do prÃ³prio pedido
           customerData = {
             user_id: null,
             email: fullOrder?.customer_email || null,
@@ -384,7 +385,7 @@ serve(async (req) => {
             file_name: shippingFile.file_name,
             file_size: shippingFile.file_size,
             uploaded_at: shippingFile.uploaded_at,
-            download_url: signedUrlData?.signedUrl || null,
+            download_url: getPublicSignedUrl(signedUrlData?.signedUrl) || null,
           };
           console.log('📦 Etiqueta de envio encontrada:', shippingFile.file_name);
         }
@@ -407,10 +408,10 @@ serve(async (req) => {
           },
         });
 
-        console.log('✅ Webhook order.paid disparado com sucesso');
+        console.log('âœ… Webhook order.paid disparado com sucesso');
       } catch (webhookError) {
         console.error('Erro ao disparar webhook order.paid:', webhookError);
-        // Não falha a requisição por erro no webhook
+        // NÃ£o falha a requisiÃ§Ã£o por erro no webhook
       }
     }
 
