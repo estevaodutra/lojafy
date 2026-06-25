@@ -38,16 +38,22 @@ serve(async (req) => {
       });
     }
 
-    // Verificar que o pedido pertence ao usuÃ¡rio autenticado
+    // Verificar que o pedido pertence ao usuário autenticado
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select('id, order_number, customer_email, reseller_id')
+      .select('id, order_number, user_id, reseller_id')
       .eq('id', order_id)
       .single();
 
     if (orderError || !order) {
       return new Response(JSON.stringify({ error: 'Order not found', details: orderError }), {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (order.user_id !== user.id) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
