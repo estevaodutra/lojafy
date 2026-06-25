@@ -6,7 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const N8N_WEBHOOK_URL = 'https://n8n-n8n.nuwfic.easypanel.host/webhook/email_auth_lojafy';
+const N8N_BASE_URL = Deno.env.get('N8N_WEBHOOK_BASE_URL') || 'https://n8n-n8n.nuwfic.easypanel.host';
+const N8N_WEBHOOK_URL = `${N8N_BASE_URL}/webhook/email_auth_lojafy`;
 
 interface AuthEventData {
   event_type: string;

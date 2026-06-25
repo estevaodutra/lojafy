@@ -88,20 +88,40 @@ serve(async (req) => {
 
     console.log(`Fetched ${profiles?.length || 0} profiles`);
 
-    // Fetch all auth users with increased page size
-    const { data: authData, error: authError } = await supabase.auth.admin.listUsers({
-      perPage: 1000
-    });
+    // Fetch all auth users using pagination loops
+    const allAuthUsers = [];
+    let authPage = 1;
+    const perPage = 1000;
 
-    if (authError) {
-      console.error('Error fetching auth users:', authError);
+    while (true) {
+      const { data: authData, error: authError } = await supabase.auth.admin.listUsers({
+        page: authPage,
+        perPage: perPage
+      });
+
+      if (authError) {
+        console.error('Error fetching auth users:', authError);
+        break;
+      }
+
+      if (!authData?.users || authData.users.length === 0) {
+        break;
+      }
+
+      allAuthUsers.push(...authData.users);
+
+      if (authData.users.length < perPage) {
+        break;
+      }
+
+      authPage++;
     }
 
-    console.log(`Fetched ${authData?.users?.length || 0} auth users`);
+    console.log(`Fetched ${allAuthUsers.length} auth users`);
 
     // Create email map from auth.users
     const emailMap = new Map(
-      authData?.users?.map(u => [u.id, { email: u.email, last_sign_in_at: u.last_sign_in_at }]) || []
+      allAuthUsers.map(u => [u.id, { email: u.email, last_sign_in_at: u.last_sign_in_at }])
     );
 
     // Combine profiles with auth data

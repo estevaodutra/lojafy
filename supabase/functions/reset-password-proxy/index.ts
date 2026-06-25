@@ -6,7 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const WEBHOOK_URL = 'https://n8n-n8n.nuwfic.easypanel.host/webhook/lojafy_reset_password';
+const N8N_BASE_URL = Deno.env.get('N8N_WEBHOOK_BASE_URL') || 'https://n8n-n8n.nuwfic.easypanel.host';
+const WEBHOOK_URL = `${N8N_BASE_URL}/webhook/lojafy_reset_password`;
 const REDIRECT_URL = 'https://lojafy.app/reset-password';
 
 Deno.serve(async (req) => {

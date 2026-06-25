@@ -148,9 +148,9 @@ Deno.serve(async (req) => {
       },
     };
 
-    // Call N8N webhook directly (same pattern as create-pix-payment)
-    const primaryWebhookUrl = Deno.env.get('N8N_WEBHOOK_URL') || 'https://n8n-n8n.nuwfic.easypanel.host/webhook/gerar_pix';
-    const testWebhookUrl = Deno.env.get('N8N_WEBHOOK_TEST_URL') || 'https://n8n-n8n.nuwfic.easypanel.host/webhook-test/gerar_pix';
+    const n8nBaseUrl = Deno.env.get('N8N_WEBHOOK_BASE_URL') || 'https://n8n-n8n.nuwfic.easypanel.host';
+    const primaryWebhookUrl = Deno.env.get('N8N_WEBHOOK_URL') || `${n8nBaseUrl}/webhook/gerar_pix`;
+    const testWebhookUrl = Deno.env.get('N8N_WEBHOOK_TEST_URL') || `${n8nBaseUrl}/webhook-test/gerar_pix`;
 
     let n8nResult: any;
 

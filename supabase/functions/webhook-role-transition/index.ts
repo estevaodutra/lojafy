@@ -60,7 +60,8 @@ serve(async (req) => {
 
     // Se for transição de customer para reseller, enviar webhook
     if (fromRole === 'customer' && toRole === 'reseller') {
-      const webhookUrl = 'https://n8n-n8n.nuwfic.easypanel.host/webhook/transition_client_to_reseller';
+      const n8nBaseUrl = Deno.env.get('N8N_WEBHOOK_BASE_URL') || 'https://n8n-n8n.nuwfic.easypanel.host';
+      const webhookUrl = `${n8nBaseUrl}/webhook/transition_client_to_reseller`;
       
       const webhookPayload = {
         event: 'customer_to_reseller_transition',

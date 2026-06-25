@@ -4,7 +4,8 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const WEBHOOK_URL = 'https://n8n-n8n.nuwfic.easypanel.host/webhook/clone_advertise';
+const N8N_BASE_URL = Deno.env.get('N8N_WEBHOOK_BASE_URL') || 'https://n8n-n8n.nuwfic.easypanel.host';
+const WEBHOOK_URL = `${N8N_BASE_URL}/webhook/clone_advertise`;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {

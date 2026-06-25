@@ -60,9 +60,41 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verificar se email já existe
-    const { data: existingUsers } = await supabase.auth.admin.listUsers();
-    const emailExists = existingUsers.users.some(u => u.email === email);
+    // Verificar se email já existe de forma paginada
+    let emailExists = false;
+    let authPage = 1;
+    const perPage = 1000;
+
+    while (true) {
+      const { data: existingUsers, error: listError } = await supabase.auth.admin.listUsers({
+        page: authPage,
+        perPage: perPage
+      });
+
+      if (listError) {
+        console.error('Erro ao listar usuários para verificação:', listError);
+        return new Response(
+          JSON.stringify({ success: false, error: 'Erro ao verificar disponibilidade do email' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!existingUsers?.users || existingUsers.users.length === 0) {
+        break;
+      }
+
+      const found = existingUsers.users.some(u => u.email?.toLowerCase() === email.trim().toLowerCase());
+      if (found) {
+        emailExists = true;
+        break;
+      }
+
+      if (existingUsers.users.length < perPage) {
+        break;
+      }
+
+      authPage++;
+    }
 
     if (emailExists) {
       return new Response(

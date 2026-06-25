@@ -203,7 +203,8 @@ Deno.serve(async (req) => {
     if (body.send_post_sale) {
       try {
         const selectedPlan = body.plan === 'free' ? 'Free' : 'Premium';
-        await fetch('https://n8n-n8n.nuwfic.easypanel.host/webhook/FN_onboarding', {
+        const n8nBaseUrl = Deno.env.get('N8N_WEBHOOK_BASE_URL') || 'https://n8n-n8n.nuwfic.easypanel.host';
+        await fetch(`${n8nBaseUrl}/webhook/FN_onboarding`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

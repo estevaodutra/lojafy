@@ -211,7 +211,8 @@ export default function CorrigirEtiqueta() {
             }
           };
 
-          await fetch("https://n8n-n8n.nuwfic.easypanel.host/webhook/label_update", {
+          const n8nBaseUrl = import.meta.env.VITE_N8N_WEBHOOK_BASE_URL || 'https://n8n-n8n.nuwfic.easypanel.host';
+          await fetch(`${n8nBaseUrl}/webhook/label_update`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

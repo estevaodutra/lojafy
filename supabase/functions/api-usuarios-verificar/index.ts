@@ -52,19 +52,41 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Buscar todos os usuários e filtrar por email
-    const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
+    // Buscar todos os usuários e filtrar por email de forma paginada
+    let authUser = null;
+    let authPage = 1;
+    const perPage = 1000;
 
-    if (authError) {
-      console.error('Erro ao buscar usuários:', authError);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Erro ao buscar usuários' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    while (true) {
+      const { data: authData, error: authError } = await supabase.auth.admin.listUsers({
+        page: authPage,
+        perPage: perPage
+      });
+
+      if (authError) {
+        console.error('Erro ao buscar usuários:', authError);
+        return new Response(
+          JSON.stringify({ success: false, error: 'Erro ao buscar usuários' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!authData?.users || authData.users.length === 0) {
+        break;
+      }
+
+      const found = authData.users.find(u => u.email?.toLowerCase() === normalizedEmail.toLowerCase());
+      if (found) {
+        authUser = found;
+        break;
+      }
+
+      if (authData.users.length < perPage) {
+        break;
+      }
+
+      authPage++;
     }
-
-    // Filtrar usuário por email (case-insensitive)
-    const authUser = authData.users.find(u => u.email?.toLowerCase() === normalizedEmail.toLowerCase());
 
     if (!authUser) {
       console.log('Usuário não encontrado:', normalizedEmail);
