@@ -75,7 +75,7 @@ serve(async (req) => {
     }
     const orderNumber = (orderNumData as string) || String(Date.now()).substring(5);
 
-    const externalReference = `order_${Date.now()}_${user.id.substring(0, 8)}`;
+    const externalReference = orderNumber;
     const notificationUrl = `${SUPABASE_URL}/functions/v1/webhook-mercadopago`;
 
     // Build N8N payload (compatible format)
