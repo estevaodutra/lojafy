@@ -244,7 +244,7 @@ serve(async (req) => {
         status: 'pending',
         qr_code: qrCode,
         qr_code_base64: qrCodeBase64,
-        ticket_url: mpData.point_of_interaction?.transaction_data?.ticket_url ?? '',
+        ticket_url: pixData.ticket_url ?? pixData.point_of_interaction?.transaction_data?.ticket_url ?? '',
         expires_at: expiresAt,
         external_reference: externalReference,
       }),
