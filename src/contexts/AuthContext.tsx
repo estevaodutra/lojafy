@@ -28,6 +28,7 @@ interface AuthContextType {
   setImpersonationData: (data: ImpersonationData | null) => void;
   getEffectiveUserId: () => string | null;
   getEffectiveProfile: () => any;
+  signInWithGoogle: () => Promise<{ error: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -217,6 +218,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         description: "Bem-vindo de volta!",
       });
       
+      return { error: null };
+    } catch (error) {
+      return { error };
+    }
+  };
+
+  const signInWithGoogle = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/`,
+        }
+      });
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Erro no login com Google",
+          description: error.message,
+        });
+        return { error };
+      }
       return { error: null };
     } catch (error) {
       return { error };
@@ -420,6 +443,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setImpersonationData,
     getEffectiveUserId,
     getEffectiveProfile,
+    signInWithGoogle,
   };
 
   return (

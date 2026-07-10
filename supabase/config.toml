@@ -1,5 +1,11 @@
 project_id = "lojafy-selfhosted"
 
+[auth.external.google]
+enabled = true
+client_id = "env(GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(GOTRUE_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = "https://lojafy.6ksfuf.easypanel.host/auth/v1/callback"
+
 [functions.check-pending-payments]
 verify_jwt = false
 
