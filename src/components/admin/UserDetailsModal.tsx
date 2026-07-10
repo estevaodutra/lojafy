@@ -41,6 +41,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatPhone } from '@/lib/phone';
+import { usePlans } from '@/hooks/usePlans';
 import { UserFeaturesSection } from './UserFeaturesSection';
 import { UserOrdersTab } from './UserOrdersTab';
 import { UserWalletTab } from './UserWalletTab';
@@ -91,13 +92,18 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
 
   const [editedPhone, setEditedPhone] = useState('');
   const [editedRole, setEditedRole] = useState('customer');
+  const [editedPlan, setEditedPlan] = useState<string>('free');
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+
+  // Fetch available plans for the dropdown
+  const { plans } = usePlans();
 
   useEffect(() => {
     if (user && isOpen) {
       setEditedPhone(user.phone || '');
       setEditedRole(user.role);
+      setEditedPlan(user.subscription_plan || 'free');
       setHasChanges(false);
       fetchAddresses();
     }
@@ -105,10 +111,12 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
 
   useEffect(() => {
     if (user) {
-      const changed = editedPhone !== (user.phone || '') || editedRole !== user.role;
+      const changed = editedPhone !== (user.phone || '') || 
+                      editedRole !== user.role ||
+                      editedPlan !== (user.subscription_plan || 'free');
       setHasChanges(changed);
     }
-  }, [editedPhone, editedRole, user]);
+  }, [editedPhone, editedRole, editedPlan, user]);
 
   const handleSaveChanges = async () => {
     if (!user) return;
@@ -116,7 +124,10 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
     try {
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ phone: editedPhone })
+        .update({ 
+          phone: editedPhone,
+          subscription_plan: editedPlan
+        })
         .eq('user_id', user.user_id);
       if (profileError) throw profileError;
 
@@ -237,9 +248,16 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
                     <CalendarClock className="w-4 h-4 text-muted-foreground" />
                     Plano
                   </Label>
-                  <Badge variant={user.subscription_plan === 'premium' ? 'default' : 'secondary'}>
-                    {user.subscription_plan === 'premium' ? 'Premium' : 'Free'}
-                  </Badge>
+                  <Select value={editedPlan} onValueChange={setEditedPlan}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Selecione um plano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {plans.map((plan) => (
+                        <SelectItem key={plan.id} value={plan.slug}>{plan.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {user.subscription_expires_at && (
