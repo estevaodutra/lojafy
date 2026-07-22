@@ -56,6 +56,7 @@ const Checkout = ({
   const [selectedShippingMethod, setSelectedShippingMethod] = useState<any>(null);
   const [shippingCost, setShippingCost] = useState(0);
   const [shippingFile, setShippingFile] = useState<any>(null);
+  const [shippingLabelData, setShippingLabelData] = useState<any>(null);
   const [trackingCode, setTrackingCode] = useState("");
   const [confirmTrackingCode, setConfirmTrackingCode] = useState("");
   const [pixPaymentData, setPixPaymentData] = useState<PixPaymentData | null>(null);
@@ -73,8 +74,8 @@ const Checkout = ({
     amount: number;
   } | null>(null);
   const [showHighRotationAlert, setShowHighRotationAlert] = useState(false);
-  const [walletPaymentMethod, setWalletPaymentMethod] = useState<'pix' | 'wallet'>('pix');
-  const [isPayingWithWallet, setIsPayingWithWallet] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credit_card' | 'wallet'>('pix');
+  const [useWalletPartial, setUseWalletPartial] = useState(false);
   const { data: walletData } = useWallet();
   const walletSaldo = walletData?.saldo ?? 0;
   const [resellerId, setResellerId] = useState<string | null>(propResellerId || null);
@@ -181,6 +182,14 @@ const Checkout = ({
   };
   const handleShippingFileUpload = (file: any) => {
     setShippingFile(file);
+  };
+
+  const handleLabelProcessed = (data: any) => {
+    setShippingLabelData(data);
+    if (data?.trackingCode) {
+      setTrackingCode(data.trackingCode);
+      setConfirmTrackingCode(data.trackingCode);
+    }
   };
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discount = couponCode === "DESCONTO10" ? subtotal * 0.1 : 0;
@@ -425,7 +434,8 @@ const Checkout = ({
           state: formData.state,
           zipCode: formData.zipCode
         },
-        reseller_id: resellerId || undefined
+        reseller_id: resellerId || undefined,
+        shippingLabel: shippingLabelData || undefined
       };
       console.log('Creating PIX payment via Edge Function...');
       const response = await createModernPixPayment(paymentRequest);
@@ -445,10 +455,9 @@ const Checkout = ({
         if (trackingError) {
           console.error('Error updating order tracking code:', trackingError);
         }
-      }
 
-      // Upload shipping file if provided
-      if (shippingFile && shippingFile.file && response.order_id) {
+       // Upload shipping file if provided (legacy)
+      if (shippingFile && !shippingLabelData && shippingFile.file && response.order_id) {
         try {
           console.log('Uploading shipping file for order:', response.order_id);
           const fileExtension = shippingFile.file.name.split('.').pop();
@@ -470,13 +479,38 @@ const Checkout = ({
               file_path: filePath,
               file_size: shippingFile.file.size
             });
-            if (dbError) {
-              console.error('Error saving shipping file reference:', dbError);
-            }
+            if (dbError) console.error('Error saving shipping file to db:', dbError);
           }
-        } catch (uploadError) {
-          console.error('Error in shipping file upload process:', uploadError);
+        } catch (error) {
+          console.error('Error in file upload process:', error);
         }
+      } else if (shippingLabelData && response.order_id) {
+        // Link the existing uploaded label file to the order
+        try {
+          // Extrair o nome original do arquivo (simulado em shippingFile.name)
+          const fileName = shippingFile?.name || 'etiqueta.pdf';
+          
+          const { error: dbError } = await supabase.from('order_shipping_files').insert({
+            order_id: response.order_id,
+            file_name: fileName,
+            file_path: shippingLabelData.filePath,
+            file_size: shippingFile?.size || 0
+          });
+          
+          if (dbError) console.error('Error saving shipping label to db:', dbError);
+          
+          // Move o arquivo de temp/ para a pasta do pedido? Podemos manter em temp/ ou mover depois.
+          // Para simplicidade, manteremos como está e salvamos o path correto.
+          
+          // Atualiza o registro de auditoria para vincular ao order_id
+          await supabase.from('shipment_label_extractions')
+            .update({ order_id: response.order_id })
+            .eq('file_path', shippingLabelData.filePath);
+            
+        } catch (error) {
+          console.error('Error linking shipping label:', error);
+        }
+      }
       }
 
       // Set PIX data to show payment UI
@@ -622,6 +656,7 @@ const Checkout = ({
           },
           payment_method: 'wallet',
           reseller_id: resellerId || null,
+          shippingLabel: shippingLabelData || undefined
         },
       });
       if (orderError) throw orderError;
@@ -634,7 +669,7 @@ const Checkout = ({
           .from('orders')
           .update({ 
             tracking_number: trackingCode,
-            tracking_code: trackingCode
+              tracking_code: trackingCode
           })
           .eq('id', orderId);
         
@@ -644,7 +679,7 @@ const Checkout = ({
       }
 
       // Upload shipping file if needed
-      if (shippingFile?.file && orderId) {
+      if (shippingFile?.file && !shippingLabelData && orderId) {
         try {
           console.log('Uploading shipping file for wallet order:', orderId);
           const fileExtension = shippingFile.file.name.split('.').pop();
@@ -670,9 +705,29 @@ const Checkout = ({
             }
           }
         } catch (uploadError) {
-          console.error('Error in shipping file upload process for wallet order:', uploadError);
+          console.error('Error in shipping file upload process for wallet:', uploadError);
+        }
+      } else if (shippingLabelData && orderId) {
+        try {
+          const fileName = shippingFile?.name || 'etiqueta.pdf';
+          const { error: dbError } = await supabase.from('order_shipping_files').insert({
+            order_id: orderId,
+            file_name: fileName,
+            file_path: shippingLabelData.filePath,
+            file_size: shippingFile?.size || 0
+          });
+          
+          if (dbError) console.error('Error saving shipping label to db:', dbError);
+          
+          await supabase.from('shipment_label_extractions')
+            .update({ order_id: orderId })
+            .eq('file_path', shippingLabelData.filePath);
+            
+        } catch (error) {
+          console.error('Error linking shipping label:', error);
         }
       }
+      
       // Debit wallet
       const { data: debitResult, error: debitError } = await supabase.rpc('debitar_carteira', {
         p_user_id: user!.id,
@@ -836,8 +891,15 @@ const Checkout = ({
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Shipping Method Selector */}
-                  <ShippingMethodSelector orderValue={subtotal} zipCode={formData.zipCode} weight={1} // Calculate this based on products if needed
-                selectedMethodId={selectedShippingMethod?.id} onMethodChange={handleShippingMethodChange} onFileUploaded={handleShippingFileUpload} />
+                  <ShippingMethodSelector 
+                    orderValue={subtotal} 
+                    zipCode={formData.zipCode} 
+                    weight={1} // Calculate this based on products if needed
+                    selectedMethodId={selectedShippingMethod?.id} 
+                    onMethodChange={handleShippingMethodChange} 
+                    onFileUploaded={handleShippingFileUpload} 
+                    onLabelProcessed={handleLabelProcessed}
+                  />
                   
                   {isLabelMethod() && (
                     <div className="space-y-4 pt-4 border-t">

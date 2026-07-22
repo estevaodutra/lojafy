@@ -6,8 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Truck, Clock, Gift, MapPin, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { ShippingFileUpload } from "@/components/ShippingFileUpload";
 import { validateCep } from "@/lib/cep";
+import { ShippingLabelUpload, ShippingLabelData } from "@/components/orders/ShippingLabelUpload";
 
 interface ShippingMethod {
   id: string;
@@ -28,7 +28,8 @@ interface ShippingMethodSelectorProps {
   weight?: number;
   selectedMethodId?: string;
   onMethodChange: (method: ShippingMethod | null, calculatedPrice: number) => void;
-  onFileUploaded?: (file: { name: string; path: string; size: number } | null) => void;
+  onFileUploaded?: (file: any | null) => void;
+  onLabelProcessed?: (data: ShippingLabelData | null) => void;
 }
 
 export function ShippingMethodSelector({ 
@@ -37,11 +38,13 @@ export function ShippingMethodSelector({
   weight = 1, 
   selectedMethodId,
   onMethodChange,
-  onFileUploaded 
+  onFileUploaded,
+  onLabelProcessed 
 }: ShippingMethodSelectorProps) {
   const [selectedMethod, setSelectedMethod] = useState<ShippingMethod | null>(null);
   const [calculatedPrices, setCalculatedPrices] = useState<Record<string, number>>({});
   const [uploadedFile, setUploadedFile] = useState<any>(null);
+  const [labelData, setLabelData] = useState<ShippingLabelData | null>(null);
 
   const { data: shippingMethods, isLoading } = useQuery({
     queryKey: ["active-shipping-methods"],
@@ -101,17 +104,37 @@ export function ShippingMethodSelector({
     const calculatedPrice = calculatedPrices[method.id] || method.base_price;
     
     // Reset uploaded file if switching to a non-label method
-    if (!method.is_label_method && uploadedFile) {
-      setUploadedFile(null);
-      onFileUploaded?.(null);
+    if (!method.is_label_method) {
+      if (uploadedFile) {
+        setUploadedFile(null);
+        onFileUploaded?.(null);
+      }
+      if (labelData) {
+        setLabelData(null);
+        onLabelProcessed?.(null);
+      }
     }
     
     onMethodChange(method, calculatedPrice);
   };
 
-  const handleFileUpload = (file: any) => {
-    setUploadedFile(file);
-    onFileUploaded?.(file);
+  const handleLabelProcessed = (data: ShippingLabelData | null) => {
+    setLabelData(data);
+    onLabelProcessed?.(data);
+    
+    // Compatibility with existing code
+    if (data && data.filePath) {
+      const simulatedFile = {
+        name: data.filePath.split('/').pop() || 'etiqueta.pdf',
+        path: data.filePath,
+        size: 0
+      };
+      setUploadedFile(simulatedFile);
+      onFileUploaded?.(simulatedFile);
+    } else {
+      setUploadedFile(null);
+      onFileUploaded?.(null);
+    }
   };
 
   if (isLoading) {
@@ -239,10 +262,9 @@ export function ShippingMethodSelector({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ShippingFileUpload
-              onFileUploaded={handleFileUpload}
+            <ShippingLabelUpload
+              onLabelProcessed={handleLabelProcessed}
               maxSizeMB={selectedMethod.max_file_size_mb}
-              required={selectedMethod.requires_upload}
             />
           </CardContent>
         </Card>

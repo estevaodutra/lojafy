@@ -17,6 +17,7 @@ export interface PixPaymentRequest {
   }>;
   shippingAddress?: any;
   reseller_id?: string;
+  shippingLabel?: any;
 }
 
 export interface PixPaymentResponse {

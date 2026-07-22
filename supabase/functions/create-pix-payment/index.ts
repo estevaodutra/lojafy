@@ -32,6 +32,14 @@ interface PixPaymentRequest {
   }>;
   shippingAddress: any;
   reseller_id?: string;
+  shippingLabel?: {
+    marketplace: string | null;
+    marketplaceOrderId: string | null;
+    trackingCode: string | null;
+    confidence: number;
+    extractionMethod: string;
+    manuallyEdited: boolean;
+  };
 }
 
 serve(async (req) => {
@@ -59,7 +67,7 @@ serve(async (req) => {
       );
     }
 
-    const { amount, description, payer, orderItems, shippingAddress, reseller_id }: PixPaymentRequest = await req.json();
+    const { amount, description, payer, orderItems, shippingAddress, reseller_id, shippingLabel }: PixPaymentRequest = await req.json();
 
     if (!amount || !payer?.email || !payer?.cpf) {
       return new Response(
@@ -180,6 +188,19 @@ serve(async (req) => {
       );
     }
 
+    // Prepare label metadata if provided
+    const labelData = shippingLabel ? {
+      tracking_code: shippingLabel.trackingCode,
+      tracking_number: shippingLabel.trackingCode,
+      marketplace: shippingLabel.marketplace,
+      marketplace_order_id: shippingLabel.marketplaceOrderId,
+      shipping_label_confidence: shippingLabel.confidence,
+      shipping_label_extraction_method: shippingLabel.extractionMethod,
+      shipping_label_confirmed_at: new Date().toISOString(),
+      shipping_label_confirmed_by: user.id,
+      shipping_label_status: 'confirmed'
+    } : {};
+
     // Criar pedido no banco
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
@@ -197,6 +218,7 @@ serve(async (req) => {
         shipping_address: shippingAddress ?? null,
         external_reference: externalReference,
         payment_expires_at: expiresAt,
+        ...labelData
       })
       .select()
       .single();
