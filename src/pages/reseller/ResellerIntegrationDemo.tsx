@@ -173,6 +173,25 @@ export default function ResellerIntegrationDemo() {
     }
   ]);
 
+  // Apply phone number mask (12) 91234-5678
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value;
+    value = value.replace(/\D/g, ""); // Remove non-digits
+    if (value.length > 11) {
+      value = value.slice(0, 11);
+    }
+    if (value.length > 10) {
+      value = value.replace(/^(\d{2})(\d{5})(\d{4})$/, "($1) $2-$3");
+    } else if (value.length > 6) {
+      value = value.replace(/^(\d{2})(\d{4})(\d{0,4})$/, "($1) $2-$3");
+    } else if (value.length > 2) {
+      value = value.replace(/^(\d{2})(\d{0,5})$/, "($1) $2");
+    } else if (value.length > 0) {
+      value = `(${value}`;
+    }
+    setUserData(prev => ({ ...prev, phone: value }));
+  };
+
   // STEP 1 FLOW: Search marketplaces
   const handleSearchAccounts = (e: React.FormEvent) => {
     e.preventDefault();
@@ -470,7 +489,7 @@ export default function ResellerIntegrationDemo() {
                         placeholder="Ex: (11) 99999-9999" 
                         required
                         value={userData.phone}
-                        onChange={e => setUserData(prev => ({ ...prev, phone: e.target.value }))}
+                        onChange={handlePhoneChange}
                         className="pl-10 h-10 text-xs border-slate-200 focus-visible:ring-indigo-500 rounded-xl"
                       />
                     </div>
@@ -806,7 +825,8 @@ export default function ResellerIntegrationDemo() {
         </section>
 
         {/* CATALOG LIST CONTAINER */}
-        <section className="bg-white border border-slate-100 shadow-sm rounded-2xl overflow-hidden flex flex-col">
+        {currentStep === 3 && (
+          <section className="bg-white border border-slate-100 shadow-sm rounded-2xl overflow-hidden flex flex-col">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-50 bg-slate-50/20 px-6 py-5">
             <div className="space-y-1">
               <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
@@ -909,6 +929,7 @@ export default function ResellerIntegrationDemo() {
             </Table>
           </div>
         </section>
+        )}
 
       </main>
     </div>
