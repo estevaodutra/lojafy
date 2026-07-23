@@ -335,8 +335,8 @@ export default function ResellerIntegrationDemo() {
             }`}>
               <CardContent className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3 text-center sm:text-left flex-col sm:flex-row">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-2xl shadow-sm shrink-0">
-                    🔵
+                  <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center p-2 shadow-sm shrink-0 overflow-hidden select-none">
+                    <img src="/mercadolivre-logo.png" alt="Mercado Livre Logo" className="w-full h-full object-contain" />
                   </div>
                   <div>
                     <h3 className="font-bold text-sm text-slate-800">Conectar Mercado Livre</h3>
@@ -354,7 +354,7 @@ export default function ResellerIntegrationDemo() {
                   ) : (
                     <Button
                       onClick={() => startConnectionFlow('mercadolivre')}
-                      disabled={activeStep !== 'idle'}
+                      disabled={activeStep === 'ml_connecting' || activeStep === 'publishing'}
                       className="w-full sm:w-auto bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow active:scale-95 transition-all"
                     >
                       Vincular Conta
@@ -374,8 +374,8 @@ export default function ResellerIntegrationDemo() {
             }`}>
               <CardContent className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3 text-center sm:text-left flex-col sm:flex-row">
-                  <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center text-2xl shadow-sm shrink-0">
-                    🟠
+                  <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm shrink-0 overflow-hidden select-none">
+                    <img src="/shopee-logo.png" alt="Shopee Logo" className="w-full h-full object-contain" />
                   </div>
                   <div>
                     <h3 className="font-bold text-sm text-slate-800">Conectar Shopee</h3>
@@ -393,7 +393,7 @@ export default function ResellerIntegrationDemo() {
                   ) : (
                     <Button
                       onClick={() => startConnectionFlow('shopee')}
-                      disabled={activeStep !== 'idle'}
+                      disabled={activeStep === 'ml_connecting' || activeStep === 'publishing'}
                       className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow active:scale-95 transition-all"
                     >
                       Vincular Conta
@@ -573,14 +573,22 @@ export default function ResellerIntegrationDemo() {
                 ) : (
                   filteredProducts.map((p) => {
                     // Check active publishing state
-                    const isPublished = p.status !== 'ready';
+                    const isMlPublished = mlConnected || p.status === 'published_ml';
+                    const isShpPublished = shpConnected || p.status === 'published_shp';
+                    const isPublished = isMlPublished || isShpPublished;
+                    
                     let statusColor = "bg-slate-50 text-slate-500 border-slate-200";
                     let statusLabel = "Pronto para publicar";
 
-                    if (isPublished) {
-                      const mpLabel = selectedMarketplace === 'mercadolivre' ? 'Mercado Livre' : 'Shopee';
-                      statusColor = "bg-emerald-50 text-emerald-700 border-emerald-200/50 font-bold";
-                      statusLabel = `Ativo no ${mpLabel}`;
+                    if (isMlPublished && isShpPublished) {
+                      statusColor = "bg-indigo-50 text-indigo-750 border-indigo-200/50 font-bold";
+                      statusLabel = "Ativo no ML e Shopee";
+                    } else if (isMlPublished) {
+                      statusColor = "bg-blue-50 text-blue-700 border-blue-200/50 font-bold";
+                      statusLabel = "Ativo no Mercado Livre";
+                    } else if (isShpPublished) {
+                      statusColor = "bg-orange-50 text-orange-700 border-orange-200/50 font-bold";
+                      statusLabel = "Ativo na Shopee";
                     }
 
                     return (
@@ -609,7 +617,7 @@ export default function ResellerIntegrationDemo() {
                         </TableCell>
                         <TableCell className="py-3.5 px-6 text-center">
                           <Badge variant="outline" className={`rounded-lg px-2.5 py-0.5 border text-[10px] ${statusColor}`}>
-                            {isPublished && <Check className="h-3 w-3 inline mr-1 text-emerald-600" />}
+                            {isPublished && <Check className="h-3 w-3 inline mr-1" />}
                             {statusLabel}
                           </Badge>
                         </TableCell>
