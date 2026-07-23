@@ -1346,7 +1346,7 @@ export default function ResellerIntegrationDemo() {
                       <div className={`w-full border-2 rounded-2xl overflow-hidden bg-white transition-all duration-500 ${
                         isPastProduct 
                           ? 'border-emerald-500/80 shadow-md ring-4 ring-emerald-50/50' 
-                          : 'border-indigo-500/85 shadow-lg ring-4 ring-indigo-50/50 animate-pulse duration-1000'
+                          : 'border-indigo-500/85 shadow-lg ring-4 ring-indigo-50/50'
                       }`}>
                         {/* Image */}
                         <div className="relative aspect-square bg-slate-50/50 p-4 flex items-center justify-center border-b border-slate-50 h-44">
@@ -1409,7 +1409,7 @@ export default function ResellerIntegrationDemo() {
                                   ✓ Publicado
                                 </span>
                               ) : publishingMLState === 'publishing' ? (
-                                <span className="text-indigo-600 animate-pulse flex items-center gap-1 select-none">
+                                <span className="text-indigo-650 flex items-center gap-1 select-none font-semibold">
                                   <RefreshCw className="h-2.5 w-2.5 animate-spin" /> Enviando...
                                 </span>
                               ) : (
@@ -1433,7 +1433,7 @@ export default function ResellerIntegrationDemo() {
                                   ✓ Publicado
                                 </span>
                               ) : publishingSHPState === 'publishing' ? (
-                                <span className="text-indigo-600 animate-pulse flex items-center gap-1 select-none">
+                                <span className="text-indigo-650 flex items-center gap-1 select-none font-semibold">
                                   <RefreshCw className="h-2.5 w-2.5 animate-spin" /> Enviando...
                                 </span>
                               ) : (
