@@ -319,7 +319,7 @@ export default function PerformanceDashboardDemo() {
                 </Badge>
               </div>
               <p className="text-xs text-slate-500 font-medium">
-                Visão consolidada dos resultados gerados pelos vendedores da plataforma nos marketplaces.
+                Visão consolidada dos resultados da sua loja integrada nos canais de venda.
               </p>
             </div>
           </div>

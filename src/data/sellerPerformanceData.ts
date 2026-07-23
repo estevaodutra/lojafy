@@ -94,25 +94,25 @@ export const mockActivities: RecentActivity[] = [
   {
     id: "act1",
     time: "21h35",
-    message: "Jéssica Santos vendeu 1x Escova Secadora 5 em 1 no Mercado Livre por R$ 149,90. Lucro líquido estimado do vendedor: R$ 41,20.",
+    message: "Você vendeu 1x Escova Secadora 5 em 1 no Mercado Livre por R$ 149,93. Lucro líquido estimado: R$ 41,23.",
     type: "sale"
   },
   {
     id: "act2",
     time: "21h32",
-    message: "Novo marketplace conectado: Rodrigo Santos integrou sua conta da Shopee à Amazon Brasil.",
+    message: "Novo marketplace conectado: Sua conta da Shopee foi integrada com sucesso.",
     type: "connection"
   },
   {
     id: "act3",
     time: "21h15",
-    message: "Pedido Enviado: João Silva despachou 2x Smartwatch Sport Pro Max via Shopee Envios.",
+    message: "Pedido Enviado: Você despachou 2x Smartwatch Sport Pro Max via Shopee Envios.",
     type: "shipping"
   },
   {
     id: "act4",
     time: "20h58",
-    message: "Nova integração ativa! Camila Alves realizou sua primeira venda no Mercado Livre (R$ 89,90) via Lojafy.",
+    message: "Nova integração ativa! Você realizou sua primeira venda no Mercado Livre (R$ 89,93) via Lojafy.",
     type: "onboarding"
   },
   {
@@ -124,7 +124,7 @@ export const mockActivities: RecentActivity[] = [
   {
     id: "act6",
     time: "19h40",
-    message: "Pedido Cancelado: Venda #84931 de Lucas Oliveira foi cancelada na Amazon (motivo: cliente desistiu).",
+    message: "Pedido Cancelado: Venda #84931 foi cancelada na Amazon (motivo: cliente desistiu).",
     type: "cancellation"
   },
   {
@@ -864,11 +864,11 @@ export const getChartData = (period: PeriodType): ChartDataPoint[] => {
 
   const active = points[period];
   
-  // Base numbers for 30 days (impressive volumes)
-  const baseFaturamentos = [92000, 110000, 105000, 125000, 142000, 131000, 155000, 185000];
-  const basePedidos = [580, 690, 660, 780, 890, 820, 970, 1150];
-  const baseUnidades = [670, 790, 760, 900, 1020, 940, 1110, 1320];
-  const baseLucros = [23920, 28600, 27300, 32500, 36920, 34060, 40300, 48100]; // ~26% margem
+  // Base numbers for 30 days for a single seller (realistic volumes)
+  const baseFaturamentos = [1203.48, 1543.12, 1483.89, 1823.48, 2143.12, 1983.89, 2343.48, 2843.12];
+  const basePedidos = [8, 10, 9, 12, 14, 13, 15, 18];
+  const baseUnidades = [9, 11, 10, 13, 15, 14, 16, 20];
+  const baseLucros = [283.45, 363.89, 333.12, 433.76, 503.23, 453.91, 553.48, 673.37];
 
   return active.dates.map((date, idx) => {
     const factor = active.mult * (0.95 + Math.random() * 0.1); 
@@ -877,10 +877,10 @@ export const getChartData = (period: PeriodType): ChartDataPoint[] => {
     
     return {
       date,
-      faturamento: Math.round((isToday ? 6000 + Math.random()*8000 : baseFaturamentos[refIdx] * factor) * 100) / 100,
-      pedidos: Math.round(isToday ? 35 + Math.random()*45 : basePedidos[refIdx] * factor),
-      unidades: Math.round(isToday ? 42 + Math.random()*52 : baseUnidades[refIdx] * factor),
-      lucroLiquido: Math.round((isToday ? 1560 + Math.random()*2100 : baseLucros[refIdx] * factor) * 100) / 100
+      faturamento: Math.round((isToday ? 63.48 + Math.random()*80 : baseFaturamentos[refIdx] * factor) * 100) / 100,
+      pedidos: Math.round(isToday ? 1 + Math.random()*2 : basePedidos[refIdx] * factor),
+      unidades: Math.round(isToday ? 1 + Math.random()*3 : baseUnidades[refIdx] * factor),
+      lucroLiquido: Math.round((isToday ? 15.89 + Math.random()*21 : baseLucros[refIdx] * factor) * 100) / 100
     };
   });
 };
@@ -984,13 +984,13 @@ export const getAggregatedData = (filters: FilterOptions) => {
   // faturamentoBruto: ~945k
   // receitaLiquida: ~780k
   // lucroLiquidoVendedores: ~245k
-  let rawFat = 945200.48;
-  let rawRec = 781500.12;
-  let rawLuc = 244580.89; // ~25.8% margem
-  let rawPed = 5920;
-  let rawUni = 6780;
-  let rawVendedores = 22;
-  let rawCancel = 2.5;
+  let rawFat = 18243.48;
+  let rawRec = 14543.12;
+  let rawLuc = 4383.89; // ~24% margem
+  let rawPed = 123;
+  let rawUni = 137;
+  let rawVendedores = 1;
+  let rawCancel = 1.87;
 
   if (targetSeller) {
     rawFat = targetSeller.faturamentoBruto;
@@ -1100,12 +1100,12 @@ export const getAggregatedData = (filters: FilterOptions) => {
     {
       id: "mp_ml",
       name: "Mercado Livre",
-      faturamentoBruto: 425340.35 * scale,
-      receitaLiquida: 351700.73 * scale,
-      lucroLiquidoVendedores: 110060.91 * scale,
-      pedidos: Math.round(2664 * scale),
-      unidadesVendidas: Math.round(3050 * scale),
-      ticketMedio: 159.66,
+      faturamentoBruto: (rawFat * 0.45) * scale,
+      receitaLiquida: (rawRec * 0.45) * scale,
+      lucroLiquidoVendedores: (rawLuc * 0.45) * scale,
+      pedidos: Math.round((rawPed * 0.45) * scale),
+      unidadesVendidas: Math.round((rawUni * 0.45) * scale),
+      ticketMedio: 148.32,
       share: 45,
       taxaCancelamento: 2.1,
       crescimento: 15.4
@@ -1113,12 +1113,12 @@ export const getAggregatedData = (filters: FilterOptions) => {
     {
       id: "mp_sh",
       name: "Shopee",
-      faturamentoBruto: 330820.24 * scale,
-      receitaLiquida: 273525.58 * scale,
-      lucroLiquidoVendedores: 85600.67 * scale,
-      pedidos: Math.round(2072 * scale),
-      unidadesVendidas: Math.round(2373 * scale),
-      ticketMedio: 159.66,
+      faturamentoBruto: (rawFat * 0.35) * scale,
+      receitaLiquida: (rawRec * 0.35) * scale,
+      lucroLiquidoVendedores: (rawLuc * 0.35) * scale,
+      pedidos: Math.round((rawPed * 0.35) * scale),
+      unidadesVendidas: Math.round((rawUni * 0.35) * scale),
+      ticketMedio: 148.32,
       share: 35,
       taxaCancelamento: 3.9,
       crescimento: 28.2
@@ -1126,12 +1126,12 @@ export const getAggregatedData = (filters: FilterOptions) => {
     {
       id: "mp_am",
       name: "Amazon",
-      faturamentoBruto: 113424.82 * scale,
-      receitaLiquida: 93780.19 * scale,
-      lucroLiquidoVendedores: 29350.52 * scale,
-      pedidos: Math.round(710 * scale),
-      unidadesVendidas: Math.round(814 * scale),
-      ticketMedio: 159.75,
+      faturamentoBruto: (rawFat * 0.12) * scale,
+      receitaLiquida: (rawRec * 0.12) * scale,
+      lucroLiquidoVendedores: (rawLuc * 0.12) * scale,
+      pedidos: Math.round((rawPed * 0.12) * scale),
+      unidadesVendidas: Math.round((rawUni * 0.12) * scale),
+      ticketMedio: 148.32,
       share: 12,
       taxaCancelamento: 1.8,
       crescimento: 11.2
@@ -1139,12 +1139,12 @@ export const getAggregatedData = (filters: FilterOptions) => {
     {
       id: "mp_lp",
       name: "Loja Própria",
-      faturamentoBruto: 75616.37 * scale,
-      receitaLiquida: 62495.96 * scale,
-      lucroLiquidoVendedores: 19570.15 * scale,
-      pedidos: Math.round(474 * scale),
-      unidadesVendidas: Math.round(543 * scale),
-      ticketMedio: 159.52,
+      faturamentoBruto: (rawFat * 0.08) * scale,
+      receitaLiquida: (rawRec * 0.08) * scale,
+      lucroLiquidoVendedores: (rawLuc * 0.08) * scale,
+      pedidos: Math.round((rawPed * 0.08) * scale),
+      unidadesVendidas: Math.round((rawUni * 0.08) * scale),
+      ticketMedio: 148.32,
       share: 8,
       taxaCancelamento: 1.0,
       crescimento: 5.6
@@ -1203,10 +1203,11 @@ export const getAggregatedData = (filters: FilterOptions) => {
   sellersList.sort((a, b) => b.faturamentoBruto - a.faturamentoBruto);
 
   let productsList = mockProducts.map(p => {
-    const fat = breakZeros(p.faturamentoBruto * scale);
-    const luc = breakZeros(p.lucroLiquidoGerado * scale);
-    const ped = Math.max(1, Math.round(p.pedidos * scale));
-    const uni = Math.max(1, Math.round(p.unidadesVendidas * scale));
+    const productScale = 0.04;
+    const fat = breakZeros(p.faturamentoBruto * scale * productScale);
+    const luc = breakZeros(p.lucroLiquidoGerado * scale * productScale);
+    const ped = Math.max(1, Math.round(p.pedidos * scale * productScale));
+    const uni = Math.max(1, Math.round(p.unidadesVendidas * scale * productScale));
     
     return {
       ...p,
