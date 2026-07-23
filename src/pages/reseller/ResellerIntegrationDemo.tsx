@@ -25,7 +25,9 @@ import {
   CheckCircle2,
   MapPin,
   HelpCircle as SupportIcon,
-  MessageSquare
+  MessageSquare,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useQuery } from '@tanstack/react-query';
@@ -64,7 +66,12 @@ export default function ResellerIntegrationDemo() {
   const [publishProgress, setPublishProgress] = useState(0);
   const [currentPublishingProduct, setCurrentPublishingProduct] = useState('');
   const [currentPublishingIndex, setCurrentPublishingIndex] = useState<number | null>(null);
+  const [viewingIndex, setViewingIndex] = useState<number>(0);
   const [showModal, setShowModal] = useState(false);
+
+  // Live publishing states for the active product
+  const [publishingMLState, setPublishingMLState] = useState<'pending' | 'publishing' | 'success'>('pending');
+  const [publishingSHPState, setPublishingSHPState] = useState<'pending' | 'publishing' | 'success'>('pending');
 
   // Global Connection States (which persist in catalog view)
   const [mlConnected, setMlConnected] = useState(false);
@@ -324,6 +331,7 @@ export default function ResellerIntegrationDemo() {
     setPublishProgress(0);
     setShowModal(true);
     setCurrentPublishingIndex(0);
+    setViewingIndex(0);
 
     toast.info("Iniciando publicação em lote no Mercado Livre e Shopee...", {
       description: "Formatando SKUs e aplicando margem selecionada.",
@@ -359,23 +367,71 @@ export default function ResellerIntegrationDemo() {
       const currentProd = products[index];
       setCurrentPublishingProduct(`Publicando: ${currentProd.name}...`);
       setCurrentPublishingIndex(index);
+      
+      // Update viewing index if user is following live
+      setViewingIndex(prev => {
+        if (prev === index - 1 || prev === index) {
+          return index;
+        }
+        return prev;
+      });
 
-      // Set current product status to publishing
+      // Reset active product state
       setProducts(prev => prev.map(p => p.id === currentProd.id ? { ...p, status: 'publishing' } : p));
+      setPublishingMLState('pending');
+      setPublishingSHPState('pending');
 
-      // Random delay between 3 and 6 seconds per product (3000ms to 6000ms)
-      const delay = 3000 + Math.random() * 3000;
+      // Random delay between 5 and 10 seconds total for this product
+      // We will split the delay sequentially
+      const durationML = selectedML ? (2500 + Math.random() * 2000) : 0;
+      const durationSHP = selectedSHP ? (2500 + Math.random() * 2000) : 0;
+      const postApprovalDelay = 2500; // Stay on screen for 2.5s
 
-      setTimeout(() => {
-        // Set current product status to published
-        setProducts(prev => prev.map(p => p.id === currentProd.id ? { ...p, status: targetStatus } : p));
+      if (selectedML && selectedSHP) {
+        // Start ML publishing
+        setPublishingMLState('publishing');
 
-        // Update overall progress bar
-        setPublishProgress(Math.round(((index + 1) / products.length) * 100));
+        setTimeout(() => {
+          setPublishingMLState('success');
+          // Start Shopee publishing
+          setPublishingSHPState('publishing');
 
-        // Next item
-        publishNextProduct(index + 1);
-      }, delay);
+          setTimeout(() => {
+            setPublishingSHPState('success');
+            setProducts(prev => prev.map(p => p.id === currentProd.id ? { ...p, status: targetStatus } : p));
+            setPublishProgress(Math.round(((index + 1) / products.length) * 100));
+
+            // Wait on screen before proceeding
+            setTimeout(() => {
+              publishNextProduct(index + 1);
+            }, postApprovalDelay);
+
+          }, durationSHP);
+
+        }, durationML);
+      } else if (selectedML) {
+        setPublishingMLState('publishing');
+        setTimeout(() => {
+          setPublishingMLState('success');
+          setProducts(prev => prev.map(p => p.id === currentProd.id ? { ...p, status: targetStatus } : p));
+          setPublishProgress(Math.round(((index + 1) / products.length) * 100));
+
+          setTimeout(() => {
+            publishNextProduct(index + 1);
+          }, postApprovalDelay);
+        }, durationML + durationSHP || 5000);
+      } else if (selectedSHP) {
+        setPublishingSHPState('publishing');
+        setTimeout(() => {
+          setPublishingSHPState('success');
+          setProducts(prev => prev.map(p => p.id === currentProd.id ? { ...p, status: targetStatus } : p));
+          setPublishProgress(Math.round(((index + 1) / products.length) * 100));
+
+          setTimeout(() => {
+            publishNextProduct(index + 1);
+          }, postApprovalDelay);
+        }, durationML + durationSHP || 5000);
+      }
     };
 
     publishNextProduct(0);
@@ -397,6 +453,9 @@ export default function ResellerIntegrationDemo() {
     setSelectedML(true);
     setSelectedSHP(true);
     setCurrentPublishingIndex(null);
+    setViewingIndex(0);
+    setPublishingMLState('pending');
+    setPublishingSHPState('pending');
     setShowModal(false);
     setProducts(prev => prev.map(p => ({ ...p, status: 'ready' })));
     toast.info("Simulador resetado para o início.");
@@ -1236,11 +1295,12 @@ export default function ResellerIntegrationDemo() {
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
               
-              {step3SubState === 'publishing' && currentPublishingIndex !== null && products[currentPublishingIndex] && (() => {
-                const product = products[currentPublishingIndex];
+              {step3SubState === 'publishing' && viewingIndex !== null && products[viewingIndex] && (() => {
+                const product = products[viewingIndex];
                 const costPrice = product.costPrice;
                 const suggestedPrice = calculateSuggestedPrice(costPrice);
                 const profit = suggestedPrice - costPrice;
+                const isPastProduct = currentPublishingIndex !== null && viewingIndex < currentPublishingIndex;
                 
                 return (
                   <>
@@ -1248,11 +1308,17 @@ export default function ResellerIntegrationDemo() {
                     <div className="bg-slate-50 border-b border-slate-100 px-5 py-4 space-y-2">
                       <div className="flex justify-between items-center text-xs font-bold text-slate-700">
                         <span className="flex items-center gap-1.5 text-indigo-650">
-                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                          Sincronizando Catálogo...
+                          {isPastProduct ? (
+                            <span className="text-emerald-600 flex items-center gap-1">✓ Sincronizado</span>
+                          ) : (
+                            <>
+                              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                              Sincronizando...
+                            </>
+                          )}
                         </span>
                         <span className="font-extrabold text-slate-900 select-none">
-                          {currentPublishingIndex + 1} de {products.length} ({publishProgress}%)
+                          {isPastProduct ? (viewingIndex + 1) : (currentPublishingIndex !== null ? currentPublishingIndex + 1 : 1)} de {products.length} ({publishProgress}%)
                         </span>
                       </div>
                       <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner">
@@ -1263,9 +1329,25 @@ export default function ResellerIntegrationDemo() {
                       </div>
                     </div>
 
-                    {/* Focused Product Card */}
-                    <div className="p-6 flex-1 flex flex-col items-center">
-                      <div className="w-full border-2 border-indigo-500/85 shadow-lg rounded-2xl overflow-hidden bg-white ring-4 ring-indigo-50/50 animate-pulse duration-1000">
+                    {/* Focused Product Card Container with Chevrons */}
+                    <div className="p-6 flex-1 flex items-center justify-center relative select-none">
+                      
+                      {/* Left Chevron */}
+                      {viewingIndex > 0 && (
+                        <button 
+                          onClick={() => setViewingIndex(prev => prev - 1)}
+                          className="absolute left-1.5 top-1/2 -translate-y-1/2 bg-white hover:bg-slate-50 border border-slate-200 rounded-full p-2 text-slate-700 shadow-md active:scale-90 transition-all z-20 animate-in fade-in"
+                        >
+                          <ChevronLeft className="h-4 w-4 stroke-[3px]" />
+                        </button>
+                      )}
+
+                      {/* Glowing card */}
+                      <div className={`w-full border-2 rounded-2xl overflow-hidden bg-white transition-all duration-500 ${
+                        isPastProduct 
+                          ? 'border-emerald-500/80 shadow-md ring-4 ring-emerald-50/50' 
+                          : 'border-indigo-500/85 shadow-lg ring-4 ring-indigo-50/50 animate-pulse duration-1000'
+                      }`}>
                         {/* Image */}
                         <div className="relative aspect-square bg-slate-50/50 p-4 flex items-center justify-center border-b border-slate-50 h-44">
                           <img 
@@ -1273,9 +1355,15 @@ export default function ResellerIntegrationDemo() {
                             alt={product.name} 
                             className="max-h-full max-w-full object-contain rounded-lg select-none" 
                           />
-                          <Badge className="absolute top-3 left-3 bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center gap-1 font-bold text-[9px] py-0.5 px-2 select-none">
-                            <RefreshCw className="h-2.5 w-2.5 animate-spin text-indigo-500" /> Enviando...
-                          </Badge>
+                          {isPastProduct ? (
+                            <Badge className="absolute top-3 left-3 bg-emerald-50 text-emerald-700 border border-emerald-100/50 flex items-center gap-1 font-bold text-[9px] py-0.5 px-2 select-none">
+                              <Check className="h-2.5 w-2.5 text-emerald-600" /> Publicado
+                            </Badge>
+                          ) : (
+                            <Badge className="absolute top-3 left-3 bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center gap-1 font-bold text-[9px] py-0.5 px-2 select-none">
+                              <RefreshCw className="h-2.5 w-2.5 animate-spin text-indigo-500" /> Enviando...
+                            </Badge>
+                          )}
                         </div>
 
                         {/* Info */}
@@ -1315,15 +1403,17 @@ export default function ResellerIntegrationDemo() {
                               {!selectedML ? (
                                 <span className="text-slate-400 bg-slate-100/50 px-1.5 py-0.5 rounded border border-slate-150">
                                   Não integrado
-                                  </span>
-                              ) : product.status === 'published_both' || product.status === 'published_ml' ? (
+                                </span>
+                              ) : isPastProduct || publishingMLState === 'success' ? (
                                 <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-150 flex items-center gap-0.5 select-none animate-in zoom-in-90">
                                   ✓ Publicado
                                 </span>
-                              ) : (
+                              ) : publishingMLState === 'publishing' ? (
                                 <span className="text-indigo-600 animate-pulse flex items-center gap-1 select-none">
                                   <RefreshCw className="h-2.5 w-2.5 animate-spin" /> Enviando...
                                 </span>
+                              ) : (
+                                <span className="text-slate-400 select-none">Aguardando...</span>
                               )}
                             </div>
 
@@ -1338,20 +1428,33 @@ export default function ResellerIntegrationDemo() {
                                 <span className="text-slate-400 bg-slate-100/50 px-1.5 py-0.5 rounded border border-slate-150">
                                   Não integrado
                                 </span>
-                              ) : product.status === 'published_both' || product.status === 'published_shp' ? (
+                              ) : isPastProduct || publishingSHPState === 'success' ? (
                                 <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-150 flex items-center gap-0.5 select-none animate-in zoom-in-90">
                                   ✓ Publicado
                                 </span>
-                              ) : (
+                              ) : publishingSHPState === 'publishing' ? (
                                 <span className="text-indigo-600 animate-pulse flex items-center gap-1 select-none">
                                   <RefreshCw className="h-2.5 w-2.5 animate-spin" /> Enviando...
                                 </span>
+                              ) : (
+                                <span className="text-slate-400 select-none">Aguardando...</span>
                               )}
                             </div>
                           </div>
 
                         </div>
                       </div>
+
+                      {/* Right Chevron */}
+                      {currentPublishingIndex !== null && viewingIndex < currentPublishingIndex && (
+                        <button 
+                          onClick={() => setViewingIndex(prev => prev + 1)}
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 bg-white hover:bg-slate-50 border border-slate-200 rounded-full p-2 text-slate-700 shadow-md active:scale-90 transition-all z-20 animate-in fade-in"
+                        >
+                          <ChevronRight className="h-4 w-4 stroke-[3px]" />
+                        </button>
+                      )}
+
                     </div>
                   </>
                 );
