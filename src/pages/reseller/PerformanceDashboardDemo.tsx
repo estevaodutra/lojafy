@@ -345,8 +345,8 @@ export default function PerformanceDashboardDemo() {
       <main className="max-w-[1600px] mx-auto px-4 sm:px-6 mt-8 space-y-8">
         
         {/* 3. FILTERS BAR */}
-        <section className="bg-white border border-slate-100 shadow-sm rounded-2xl p-5 space-y-4">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-100 pb-4">
+        <section className="bg-white border border-slate-100 shadow-sm rounded-2xl p-4 px-5">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="flex items-center gap-2">
               <div className="p-1.5 bg-slate-100 rounded-lg text-slate-500">
                 <Filter className="h-4 w-4" />
@@ -481,7 +481,7 @@ export default function PerformanceDashboardDemo() {
 
           {/* Active Filter Badges & Clear button */}
           {hasActiveFilters && (
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-50">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 mt-4 border-t border-slate-100">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Filtros ativos:</span>
                 {filters.marketplace !== "all" && (
