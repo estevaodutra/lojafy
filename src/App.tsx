@@ -256,6 +256,7 @@ const App = () => {
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/checkout/curso/:courseId" element={<CourseCheckout />} />
                 <Route path="/top_10_produtos" element={<ResellerTopProdutosVencedores />} />
+                <Route path="/demo-performance-vendedores" element={<PerformanceDashboardDemo />} />
                 <Route path="/demo-performance-vendedores-lojafy" element={<PerformanceDashboardDemo />} />
 
                 {/* Customer Panel Routes */}
