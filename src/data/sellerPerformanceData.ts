@@ -1048,9 +1048,18 @@ export const getAggregatedData = (filters: FilterOptions) => {
   const fmtNumber = (v: number) => 
     new Intl.NumberFormat("pt-BR").format(v);
 
+  // Helper to ensure integers don't end in zero
+  const breakInt = (n: number): number => {
+    if (n % 10 === 0) return n + 3;
+    return n;
+  };
+
+  const activePedParaProcessar = breakInt(Math.round(activePed * 0.43));
+  const activePedEnviados = breakInt(Math.round(activePed * 0.57));
+
   const kpis: KPICard[] = [
     {
-      title: "Faturamento Bruto",
+      title: "Faturamento",
       value: fmtCurrency(activeFat),
       rawValue: activeFat,
       changePercent: growthFat,
@@ -1059,67 +1068,31 @@ export const getAggregatedData = (filters: FilterOptions) => {
       tooltip: "Soma das vendas brutas registradas pelos vendedores nos marketplaces selecionados antes de taxas."
     },
     {
-      title: "Receita Líquida",
-      value: fmtCurrency(activeRec),
-      rawValue: activeRec,
-      changePercent: growthRec,
-      isPositive: growthRec > 0,
-      microtext: `vs. período anterior`,
-      tooltip: "Valor faturado após dedução das tarifas padrão dos marketplaces e cancelamentos."
-    },
-    {
-      title: "Lucro Líquido dos Vendedores",
+      title: "Lucro Líquido",
       value: fmtCurrency(activeLuc),
       rawValue: activeLuc,
       changePercent: growthLuc,
       isPositive: growthLuc > 0,
       microtext: `vs. período anterior`,
-      tooltip: "Estimativa que sobra no bolso do vendedor. Descontados: custo do produto, taxas de marketplaces, comissões, frete pago, impostos e reembolsos. NÃO representa receita ou lucro da Lojafy."
+      tooltip: "Estimativa do lucro que sobra no bolso do vendedor após descontar todos os custos operacionais."
     },
     {
-      title: "Total de Pedidos",
-      value: fmtNumber(activePed),
-      rawValue: activePed,
+      title: "Pedidos para Processar",
+      value: fmtNumber(activePedParaProcessar),
+      rawValue: activePedParaProcessar,
       changePercent: growthPed,
       isPositive: growthPed > 0,
       microtext: `vs. período anterior`,
-      tooltip: "Número de pedidos aprovados realizados nas contas dos vendedores."
+      tooltip: "Número de pedidos pendentes de faturamento, separação ou embalagem."
     },
     {
-      title: "Unidades Vendidas",
-      value: fmtNumber(activeUni),
-      rawValue: activeUni,
-      changePercent: growthUni,
-      isPositive: growthUni > 0,
+      title: "Pedidos Enviados",
+      value: fmtNumber(activePedEnviados),
+      rawValue: activePedEnviados,
+      changePercent: Math.round((growthPed + 1.2) * 10) / 10,
+      isPositive: growthPed > 0,
       microtext: `vs. período anterior`,
-      tooltip: "Quantidade total de itens físicos vendidos no período."
-    },
-    {
-      title: "Ticket Médio",
-      value: fmtCurrency(activeTicket),
-      rawValue: activeTicket,
-      changePercent: growthTicket,
-      isPositive: growthTicket > 0,
-      microtext: `vs. período anterior`,
-      tooltip: "Valor médio faturado por pedido (Faturamento Bruto / Total de Pedidos)."
-    },
-    {
-      title: "Vendedores Ativos",
-      value: fmtNumber(activeVendedores),
-      rawValue: activeVendedores,
-      changePercent: filters.period === "hoje" ? 0 : 4.5,
-      isPositive: true,
-      microtext: `com vendas no período`,
-      tooltip: "Total de vendedores únicos que registraram ao menos uma venda no período com os filtros aplicados."
-    },
-    {
-      title: "Taxa de Cancelamento",
-      value: `${activeCancel.toFixed(2)}%`,
-      rawValue: activeCancel,
-      changePercent: growthCancel,
-      isPositive: growthCancel < 0,
-      microtext: `vs. período anterior`,
-      tooltip: "Percentual de pedidos que foram cancelados no período por reembolsos, recusas ou falta de estoque."
+      tooltip: "Total de pedidos despachados e em trânsito para entrega ao comprador final no período selecionado."
     }
   ];
 

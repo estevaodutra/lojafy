@@ -279,22 +279,16 @@ export default function PerformanceDashboardDemo() {
 
   const getKpiIcon = (title: string) => {
     switch (title) {
+      case "Faturamento":
       case "Faturamento Bruto":
         return <TrendingUp className="h-5 w-5 text-indigo-500" />;
-      case "Receita Líquida":
-        return <Globe className="h-5 w-5 text-blue-500" />;
+      case "Lucro Líquido":
       case "Lucro Líquido dos Vendedores":
         return <Award className="h-5 w-5 text-emerald-500" />;
-      case "Total de Pedidos":
-        return <ShoppingCart className="h-5 w-5 text-purple-500" />;
-      case "Unidades Vendidas":
-        return <Box className="h-5 w-5 text-orange-500" />;
-      case "Ticket Médio":
-        return <SlidersHorizontal className="h-5 w-5 text-violet-500" />;
-      case "Vendedores Ativos":
-        return <User className="h-5 w-5 text-sky-500" />;
-      case "Taxa de Cancelamento":
-        return <TrendingDown className="h-5 w-5 text-rose-500" />;
+      case "Pedidos para Processar":
+        return <ShoppingCart className="h-5 w-5 text-amber-500" />;
+      case "Pedidos Enviados":
+        return <Box className="h-5 w-5 text-blue-500" />;
       default:
         return <Info className="h-5 w-5 text-slate-500" />;
     }
@@ -407,7 +401,7 @@ export default function PerformanceDashboardDemo() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="hidden grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {/* Marketplace Select */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Marketplace</label>
@@ -554,7 +548,7 @@ export default function PerformanceDashboardDemo() {
         {/* 4. KPI CARDS LINE */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {data.kpis.map((kpi, idx) => {
-            const isProfit = kpi.title === "Lucro Líquido dos Vendedores";
+            const isProfit = kpi.title === "Lucro Líquido";
             
             if (loading) {
               return (
