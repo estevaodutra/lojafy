@@ -206,13 +206,14 @@ export default function ResellerIntegrationDemo() {
       duration: 1500
     });
 
+    const totalDuration = 6000 + Math.random() * 6000; // 6 to 12 seconds
     setTimeout(() => {
       setStep1SubState('results');
       toast.success("Busca de contas concluída!", {
         description: "Encontramos contas ativas elegíveis para vinculação.",
         duration: 3000
       });
-    }, 1800);
+    }, totalDuration);
   };
 
   // STEP 2 FLOW: Supplier Address configuration
@@ -225,6 +226,9 @@ export default function ResellerIntegrationDemo() {
       duration: 1000
     });
 
+    const totalDuration = 6000 + Math.random() * 6000; // 6 to 12 seconds
+    const mlFinishedTime = totalDuration * 0.45;
+
     // ML setup first
     setTimeout(() => {
       setLogisticProgressML('success');
@@ -232,7 +236,7 @@ export default function ResellerIntegrationDemo() {
         description: "Envio Coleta configurado com o CEP do Fornecedor.",
         duration: 2000
       });
-    }, 1200);
+    }, mlFinishedTime);
 
     // Shopee setup second
     setTimeout(() => {
@@ -242,7 +246,7 @@ export default function ResellerIntegrationDemo() {
         description: "Coleta Shopee Envios vinculada com sucesso.",
         duration: 2500
       });
-    }, 2400);
+    }, totalDuration);
   };
 
   // STEP 3 FLOW: Margin & Publish products
@@ -256,6 +260,8 @@ export default function ResellerIntegrationDemo() {
     });
 
     let currentProdIndex = 0;
+    const totalDuration = 6000 + Math.random() * 6000; // 6 to 12 seconds
+    const itemInterval = totalDuration / products.length;
     
     const interval = setInterval(() => {
       if (currentProdIndex < products.length) {
@@ -289,7 +295,7 @@ export default function ResellerIntegrationDemo() {
           });
         }, 800);
       }
-    }, 450); // Speed of simulation
+    }, itemInterval);
   };
 
   // Reset Onboarding Replay
@@ -378,16 +384,16 @@ export default function ResellerIntegrationDemo() {
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Passo a Passo</span>
           </div>
 
-          <div className="flex flex-1 items-center justify-center md:justify-end gap-2 sm:gap-6 text-xs font-bold">
+          <div className="flex flex-wrap md:flex-nowrap flex-1 items-center justify-center md:justify-end gap-3 md:gap-4 text-xs font-bold w-full md:w-auto">
             {/* Step 1 Tag */}
-            <div className={`flex items-center gap-2 py-1.5 px-3.5 rounded-xl border transition-all ${
+            <div className={`flex items-center gap-2 py-1.5 px-3.5 rounded-xl border transition-all whitespace-nowrap shrink-0 ${
               currentStep === 1 
                 ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm shadow-indigo-150' 
                 : currentStep > 1 
                 ? 'bg-emerald-50 border-emerald-250 text-emerald-700' 
                 : 'bg-slate-50 border-slate-150 text-slate-400'
             }`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10.5px] ${
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10.5px] shrink-0 ${
                 currentStep >= 1 ? 'bg-white text-slate-900 font-black' : 'bg-slate-200 text-slate-400'
               }`}>
                 {currentStep > 1 ? "✓" : "1"}
@@ -395,17 +401,17 @@ export default function ResellerIntegrationDemo() {
               <span>1. Localizar Contas</span>
             </div>
 
-            <div className="h-[1px] w-6 bg-slate-200 hidden sm:block"></div>
+            <div className="h-[1px] w-6 bg-slate-200 hidden md:block shrink-0"></div>
 
             {/* Step 2 Tag */}
-            <div className={`flex items-center gap-2 py-1.5 px-3.5 rounded-xl border transition-all ${
+            <div className={`flex items-center gap-2 py-1.5 px-3.5 rounded-xl border transition-all whitespace-nowrap shrink-0 ${
               currentStep === 2 
                 ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm shadow-indigo-150' 
                 : currentStep > 2 
                 ? 'bg-emerald-50 border-emerald-250 text-emerald-700' 
                 : 'bg-slate-50 border-slate-150 text-slate-400'
             }`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10.5px] ${
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10.5px] shrink-0 ${
                 currentStep >= 2 ? 'bg-white text-slate-900 font-black' : 'bg-slate-200 text-slate-400'
               }`}>
                 {currentStep > 2 ? "✓" : "2"}
@@ -413,15 +419,15 @@ export default function ResellerIntegrationDemo() {
               <span>2. Configurar Logística</span>
             </div>
 
-            <div className="h-[1px] w-6 bg-slate-200 hidden sm:block"></div>
+            <div className="h-[1px] w-6 bg-slate-200 hidden md:block shrink-0"></div>
 
             {/* Step 3 Tag */}
-            <div className={`flex items-center gap-2 py-1.5 px-3.5 rounded-xl border transition-all ${
+            <div className={`flex items-center gap-2 py-1.5 px-3.5 rounded-xl border transition-all whitespace-nowrap shrink-0 ${
               currentStep === 3 
                 ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm shadow-indigo-150' 
                 : 'bg-slate-50 border-slate-150 text-slate-400'
             }`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10.5px] ${
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10.5px] shrink-0 ${
                 currentStep === 3 ? 'bg-white text-slate-900 font-black' : 'bg-slate-200 text-slate-400'
               }`}>
                 3
@@ -508,10 +514,13 @@ export default function ResellerIntegrationDemo() {
 
               {step1SubState === 'searching' && (
                 <div className="py-8 flex flex-col items-center justify-center text-center space-y-4 animate-in fade-in duration-300">
-                  <RefreshCw className="h-10 w-10 text-purple-600 animate-spin" />
+                  <RefreshCw className="h-10 w-10 text-purple-650 animate-spin" />
                   <div className="space-y-1.5">
                     <h4 className="font-bold text-sm text-slate-800">Buscando contas ativas vinculadas aos seus dados...</h4>
                     <p className="text-xs text-slate-500 font-medium max-w-sm">Acessando API centralizada para localizar credenciais e integrações pré-existentes.</p>
+                    <p className="text-[11px] text-amber-600 font-bold animate-pulse mt-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5 inline-block">
+                      ⚠️ Isso pode levar um tempo...
+                    </p>
                   </div>
                 </div>
               )}
@@ -594,18 +603,18 @@ export default function ResellerIntegrationDemo() {
                       Duas contas de vendedor ativas foram encontradas prontas para vinculação!
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="text-xs border-slate-200 hover:bg-slate-50 text-slate-600 font-bold"
+                        className="text-xs border-slate-200 hover:bg-slate-50 text-slate-600 font-bold w-full sm:w-auto"
                         onClick={() => toast.info("Suporte comercial via WhatsApp: (11) 98765-4321")}
                       >
                         <MessageSquare className="mr-1.5 h-3.5 w-3.5 text-indigo-500" /> Falar com Suporte
                       </Button>
                       <Button
                         onClick={() => setCurrentStep(2)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-5 rounded-xl shadow-sm flex items-center gap-1.5 active:scale-95 transition-all"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-5 rounded-xl shadow-sm flex items-center gap-1.5 active:scale-95 transition-all w-full sm:w-auto justify-center"
                       >
                         Avançar para Configurações <ArrowRight className="h-4 w-4" />
                       </Button>
@@ -655,13 +664,13 @@ export default function ResellerIntegrationDemo() {
                     <h4 className="font-bold text-sm text-slate-800">Sincronizando endereços nas APIs logísticas...</h4>
                   </div>
 
-                  <div className="space-y-3 font-semibold text-xs text-slate-650">
+                  <div className="space-y-3 font-semibold text-xs text-slate-655">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                       <span>Atualizando dados de coleta no Mercado Livre Envios</span>
                       {logisticProgressML === 'success' ? (
                         <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100 select-none">✓ Configurado</Badge>
                       ) : (
-                        <span className="text-[10px] text-slate-400 animate-pulse">Processando...</span>
+                        <span className="text-[10px] text-slate-450 animate-pulse">Processando...</span>
                       )}
                     </div>
 
@@ -670,10 +679,14 @@ export default function ResellerIntegrationDemo() {
                       {logisticProgressSHP === 'success' ? (
                         <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100 select-none">✓ Configurado</Badge>
                       ) : (
-                        <span className="text-[10px] text-slate-400 animate-pulse">Aguardando fila...</span>
+                        <span className="text-[10px] text-slate-450 animate-pulse">Aguardando fila...</span>
                       )}
                     </div>
                   </div>
+
+                  <p className="text-[11px] text-amber-600 font-bold animate-pulse mt-1 bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5 inline-block">
+                    ⚠️ Isso pode levar um tempo...
+                  </p>
                 </div>
               )}
 
@@ -787,7 +800,7 @@ export default function ResellerIntegrationDemo() {
 
                   <div className="flex justify-between items-center text-[11px] text-slate-500 font-bold">
                     <span className="font-mono text-purple-650 animate-pulse">{currentPublishingProduct}</span>
-                    <span>{publishProgress === 100 ? "Concluído!" : "Publicando no lote..."}</span>
+                    <span className="text-amber-600 font-bold animate-pulse">⚠️ Isso pode levar um tempo...</span>
                   </div>
                 </div>
               )}
