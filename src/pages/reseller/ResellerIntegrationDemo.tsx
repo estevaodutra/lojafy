@@ -63,6 +63,8 @@ export default function ResellerIntegrationDemo() {
   const [marginPercent, setMarginPercent] = useState<number>(30);
   const [publishProgress, setPublishProgress] = useState(0);
   const [currentPublishingProduct, setCurrentPublishingProduct] = useState('');
+  const [currentPublishingIndex, setCurrentPublishingIndex] = useState<number | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
   // Global Connection States (which persist in catalog view)
   const [mlConnected, setMlConnected] = useState(false);
@@ -320,6 +322,8 @@ export default function ResellerIntegrationDemo() {
   const handlePublishProducts = () => {
     setStep3SubState('publishing');
     setPublishProgress(0);
+    setShowModal(true);
+    setCurrentPublishingIndex(0);
 
     toast.info("Iniciando publicação em lote no Mercado Livre e Shopee...", {
       description: "Formatando SKUs e aplicando margem selecionada.",
@@ -337,6 +341,7 @@ export default function ResellerIntegrationDemo() {
         setStep3SubState('done');
         setMlConnected(selectedML);
         setShpConnected(selectedSHP);
+        setCurrentPublishingIndex(null);
         
         const channelsText = selectedML && selectedSHP 
           ? "Mercado Livre e Shopee" 
@@ -353,6 +358,7 @@ export default function ResellerIntegrationDemo() {
 
       const currentProd = products[index];
       setCurrentPublishingProduct(`Publicando: ${currentProd.name}...`);
+      setCurrentPublishingIndex(index);
 
       // Set current product status to publishing
       setProducts(prev => prev.map(p => p.id === currentProd.id ? { ...p, status: 'publishing' } : p));
@@ -390,6 +396,8 @@ export default function ResellerIntegrationDemo() {
     setShpConnected(false);
     setSelectedML(true);
     setSelectedSHP(true);
+    setCurrentPublishingIndex(null);
+    setShowModal(false);
     setProducts(prev => prev.map(p => ({ ...p, status: 'ready' })));
     toast.info("Simulador resetado para o início.");
   };
@@ -1221,6 +1229,189 @@ export default function ResellerIntegrationDemo() {
               )}
             </div>
           </section>
+        )}
+
+        {/* Modal / Pop-up de Publicação */}
+        {showModal && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+              
+              {step3SubState === 'publishing' && currentPublishingIndex !== null && products[currentPublishingIndex] && (() => {
+                const product = products[currentPublishingIndex];
+                const costPrice = product.costPrice;
+                const suggestedPrice = calculateSuggestedPrice(costPrice);
+                const profit = suggestedPrice - costPrice;
+                
+                return (
+                  <>
+                    {/* Header Progress */}
+                    <div className="bg-slate-50 border-b border-slate-100 px-5 py-4 space-y-2">
+                      <div className="flex justify-between items-center text-xs font-bold text-slate-700">
+                        <span className="flex items-center gap-1.5 text-indigo-650">
+                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          Sincronizando Catálogo...
+                        </span>
+                        <span className="font-extrabold text-slate-900 select-none">
+                          {currentPublishingIndex + 1} de {products.length} ({publishProgress}%)
+                        </span>
+                      </div>
+                      <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                        <div 
+                          className="h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-300"
+                          style={{ width: `${publishProgress}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Focused Product Card */}
+                    <div className="p-6 flex-1 flex flex-col items-center">
+                      <div className="w-full border-2 border-indigo-500/85 shadow-lg rounded-2xl overflow-hidden bg-white ring-4 ring-indigo-50/50 animate-pulse duration-1000">
+                        {/* Image */}
+                        <div className="relative aspect-square bg-slate-50/50 p-4 flex items-center justify-center border-b border-slate-50 h-44">
+                          <img 
+                            src={product.image} 
+                            alt={product.name} 
+                            className="max-h-full max-w-full object-contain rounded-lg select-none" 
+                          />
+                          <Badge className="absolute top-3 left-3 bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center gap-1 font-bold text-[9px] py-0.5 px-2 select-none">
+                            <RefreshCw className="h-2.5 w-2.5 animate-spin text-indigo-500" /> Enviando...
+                          </Badge>
+                        </div>
+
+                        {/* Info */}
+                        <div className="p-4 space-y-3">
+                          <div>
+                            <span className="text-[9px] font-mono text-slate-400 font-bold tracking-wider">{product.sku}</span>
+                            <h4 className="font-bold text-xs text-slate-800 line-clamp-2 leading-relaxed h-8">
+                              {product.name}
+                            </h4>
+                          </div>
+
+                          {/* Prices */}
+                          <div className="space-y-1.5 border-t border-slate-50 pt-2 text-[11px]">
+                            <div className="flex justify-between items-center font-semibold text-slate-500">
+                              <span>Custo Fornecedor:</span>
+                              <span className="font-bold text-slate-700">{fmtBRL(costPrice)}</span>
+                            </div>
+                            <div className="flex justify-between items-center font-bold text-slate-850">
+                              <span>Preço de Venda:</span>
+                              <span className="text-indigo-650 font-black">{fmtBRL(suggestedPrice)}</span>
+                            </div>
+                            <div className="flex justify-between items-center font-bold bg-emerald-50/50 border border-emerald-100/50 rounded-xl px-2.5 py-1.5 mt-1 text-[10px]">
+                              <span className="text-emerald-800 font-semibold">Seu Lucro Estimado:</span>
+                              <span className="text-emerald-700 font-black font-mono">{fmtBRL(profit)}</span>
+                            </div>
+                          </div>
+
+                          {/* Status Checkboxes */}
+                          <div className="border-t border-slate-50 pt-2 space-y-1.5">
+                            <div className="flex justify-between items-center text-[10px] font-bold">
+                              <span className="text-slate-550 flex items-center gap-1">
+                                <span className="w-3.5 h-3.5 rounded bg-white border border-slate-100 p-0.5 flex items-center justify-center overflow-hidden shrink-0 select-none">
+                                  <img src="https://http2.mlstatic.com/static/org-img/homesnw/mercado-libre.png" alt="ML" className="w-full h-full object-contain" />
+                                </span>
+                                Mercado Livre
+                              </span>
+                              {!selectedML ? (
+                                <span className="text-slate-400 bg-slate-100/50 px-1.5 py-0.5 rounded border border-slate-150">
+                                  Não integrado
+                                  </span>
+                              ) : product.status === 'published_both' || product.status === 'published_ml' ? (
+                                <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-150 flex items-center gap-0.5 select-none animate-in zoom-in-90">
+                                  ✓ Publicado
+                                </span>
+                              ) : (
+                                <span className="text-indigo-600 animate-pulse flex items-center gap-1 select-none">
+                                  <RefreshCw className="h-2.5 w-2.5 animate-spin" /> Enviando...
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex justify-between items-center text-[10px] font-bold">
+                              <span className="text-slate-550 flex items-center gap-1">
+                                <span className="w-3.5 h-3.5 rounded bg-white border border-slate-100 p-0.5 flex items-center justify-center overflow-hidden shrink-0 select-none">
+                                  <img src="https://deo.shopeemobile.com/shopee/shopee-pcmall-live-sg/assets/icon_favicon_1_96.1ce0e05fc18a86e5.png" alt="Shopee" className="w-full h-full object-contain" />
+                                </span>
+                                Shopee
+                              </span>
+                              {!selectedSHP ? (
+                                <span className="text-slate-400 bg-slate-100/50 px-1.5 py-0.5 rounded border border-slate-150">
+                                  Não integrado
+                                </span>
+                              ) : product.status === 'published_both' || product.status === 'published_shp' ? (
+                                <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-150 flex items-center gap-0.5 select-none animate-in zoom-in-90">
+                                  ✓ Publicado
+                                </span>
+                              ) : (
+                                <span className="text-indigo-600 animate-pulse flex items-center gap-1 select-none">
+                                  <RefreshCw className="h-2.5 w-2.5 animate-spin" /> Enviando...
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+
+              {step3SubState === 'done' && (
+                <div className="p-8 text-center flex flex-col items-center justify-center space-y-6">
+                  <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-250 flex items-center justify-center shadow-sm text-emerald-600 animate-bounce duration-1000">
+                    <Check className="h-8 w-8 stroke-[3px]" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-black text-slate-800 select-none">Publicação Concluída!</h3>
+                    <p className="text-xs text-slate-655 font-medium leading-relaxed">
+                      {selectedML && selectedSHP 
+                        ? "20 produtos publicados na sua loja da Shopee e do Mercado Livre. Em até 12 horas os produtos vão ser aprovados pelos marketplaces e já publicados."
+                        : selectedML 
+                        ? "20 produtos publicados na sua loja do Mercado Livre. Em até 12 horas os produtos vão ser aprovados pelo marketplace e já publicados."
+                        : "20 produtos publicados na sua loja da Shopee. Em até 12 horas os produtos vão ser aprovados pelo marketplace e já publicados."
+                      }
+                    </p>
+                  </div>
+
+                  <div className="pt-2 w-full flex flex-col gap-2.5">
+                    <div className="flex justify-center gap-2 flex-wrap pb-2">
+                      <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-150 font-bold text-[9.5px] select-none">
+                        Margem: {marginPercent}%
+                      </Badge>
+                      {selectedML && (
+                        <Badge className="bg-blue-50 text-blue-700 border border-blue-150 font-bold text-[9.5px] flex items-center gap-1 select-none">
+                          <span className="w-3 h-3 rounded bg-white p-0.5 flex items-center justify-center overflow-hidden shrink-0">
+                            <img src="https://http2.mlstatic.com/static/org-img/homesnw/mercado-libre.png" alt="ML" className="w-full h-full object-contain" />
+                          </span>
+                          ML
+                        </Badge>
+                      )}
+                      {selectedSHP && (
+                        <Badge className="bg-orange-50 text-orange-700 border border-orange-150 font-bold text-[9.5px] flex items-center gap-1 select-none">
+                          <span className="w-3 h-3 rounded bg-white p-0.5 flex items-center justify-center overflow-hidden shrink-0">
+                            <img src="https://deo.shopeemobile.com/shopee/shopee-pcmall-live-sg/assets/icon_favicon_1_96.1ce0e05fc18a86e5.png" alt="Shopee" className="w-full h-full object-contain" />
+                          </span>
+                          Shopee
+                        </Badge>
+                      )}
+                    </div>
+
+                    <Button
+                      onClick={() => {
+                        setShowModal(false);
+                      }}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 w-full rounded-xl shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                    >
+                      Ver Catálogo Publicado <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </div>
         )}
 
       </main>
