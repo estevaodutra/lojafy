@@ -845,7 +845,7 @@ export default function PerformanceDashboardDemo() {
                         <TableCell className="font-bold text-xs text-slate-900 text-right py-3 px-4">{fmtBRL(mp.faturamentoBruto)}</TableCell>
                         <TableCell className="font-bold text-xs text-emerald-700 text-right py-3 px-4">{fmtBRL(mp.lucroLiquidoVendedores)}</TableCell>
                         <TableCell className="font-semibold text-xs text-slate-600 text-center py-3 px-4">{mp.pedidos}</TableCell>
-                        <TableCell className="font-semibold text-xs text-slate-500 text-center py-3 px-4">{mp.taxaCancelamento}%</TableCell>
+                        <TableCell className="font-semibold text-xs text-slate-500 text-center py-3 px-4">{mp.taxaCancelamento.toFixed(2)}%</TableCell>
                         <TableCell className={`font-extrabold text-xs text-right py-3 px-4 ${mp.crescimento > 0 ? "text-green-600" : "text-red-500"}`}>
                           {mp.crescimento > 0 ? "+" : ""}{mp.crescimento}%
                         </TableCell>
@@ -1052,7 +1052,7 @@ export default function PerformanceDashboardDemo() {
 
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/50 flex justify-between items-center text-xs font-medium text-slate-600">
                   <span>Ticket Médio: <strong className="text-slate-800">{fmtBRL(selectedSeller.ticketMedio)}</strong></span>
-                  <span>Cancelamentos: <strong className="text-rose-600">{selectedSeller.taxaCancelamento}%</strong></span>
+                  <span>Cancelamentos: <strong className="text-rose-600">{selectedSeller.taxaCancelamento.toFixed(2)}%</strong></span>
                 </div>
               </div>
 
