@@ -68,6 +68,10 @@ export default function ResellerIntegrationDemo() {
   const [mlConnected, setMlConnected] = useState(false);
   const [shpConnected, setShpConnected] = useState(false);
 
+  // Step 1 selected accounts to configure/integrate
+  const [selectedML, setSelectedML] = useState(true);
+  const [selectedSHP, setSelectedSHP] = useState(true);
+
   // Catalog search state
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -260,26 +264,45 @@ export default function ResellerIntegrationDemo() {
     });
 
     const totalDuration = 6000 + Math.random() * 6000; // 6 to 12 seconds
-    const mlFinishedTime = totalDuration * 0.45;
 
-    // ML setup first
-    setTimeout(() => {
-      setLogisticProgressML('success');
-      toast.success("Endereço sincronizado no Mercado Livre!", {
-        description: "Envio Coleta configurado com o CEP do Fornecedor.",
-        duration: 2000
-      });
-    }, mlFinishedTime);
+    if (selectedML && selectedSHP) {
+      const mlFinishedTime = totalDuration * 0.45;
+      
+      setTimeout(() => {
+        setLogisticProgressML('success');
+        toast.success("Endereço sincronizado no Mercado Livre!", {
+          description: "Envio Coleta configurado com o CEP do Fornecedor.",
+          duration: 2000
+        });
+      }, mlFinishedTime);
 
-    // Shopee setup second
-    setTimeout(() => {
-      setLogisticProgressSHP('success');
-      setStep2SubState('success');
-      toast.success("Endereço sincronizado na Shopee!", {
-        description: "Coleta Shopee Envios vinculada com sucesso.",
-        duration: 2500
-      });
-    }, totalDuration);
+      setTimeout(() => {
+        setLogisticProgressSHP('success');
+        setStep2SubState('success');
+        toast.success("Endereço sincronizado na Shopee!", {
+          description: "Coleta Shopee Envios vinculada com sucesso.",
+          duration: 2500
+        });
+      }, totalDuration);
+    } else if (selectedML) {
+      setTimeout(() => {
+        setLogisticProgressML('success');
+        setStep2SubState('success');
+        toast.success("Endereço sincronizado no Mercado Livre!", {
+          description: "Envio Coleta configurado com o CEP do Fornecedor.",
+          duration: 2500
+        });
+      }, totalDuration);
+    } else if (selectedSHP) {
+      setTimeout(() => {
+        setLogisticProgressSHP('success');
+        setStep2SubState('success');
+        toast.success("Endereço sincronizado na Shopee!", {
+          description: "Coleta Shopee Envios vinculada com sucesso.",
+          duration: 2500
+        });
+      }, totalDuration);
+    }
   };
 
   // STEP 3 FLOW: Margin & Publish products
@@ -292,13 +315,26 @@ export default function ResellerIntegrationDemo() {
       duration: 1500
     });
 
+    const targetStatus = selectedML && selectedSHP 
+      ? 'published_both' 
+      : selectedML 
+      ? 'published_ml' 
+      : 'published_shp';
+
     const publishNextProduct = (index: number) => {
       if (index >= products.length) {
         setStep3SubState('done');
-        setMlConnected(true);
-        setShpConnected(true);
+        setMlConnected(selectedML);
+        setShpConnected(selectedSHP);
+        
+        const channelsText = selectedML && selectedSHP 
+          ? "Mercado Livre e Shopee" 
+          : selectedML 
+          ? "Mercado Livre" 
+          : "Shopee";
+
         toast.success("Publicação concluída com sucesso!", {
-          description: `Os ${products.length} produtos do catálogo foram publicados nas suas lojas do ML e Shopee.`,
+          description: `Os ${products.length} produtos do catálogo foram publicados no ${channelsText}.`,
           duration: 4000
         });
         return;
@@ -315,7 +351,7 @@ export default function ResellerIntegrationDemo() {
 
       setTimeout(() => {
         // Set current product status to published
-        setProducts(prev => prev.map(p => p.id === currentProd.id ? { ...p, status: 'published_both' } : p));
+        setProducts(prev => prev.map(p => p.id === currentProd.id ? { ...p, status: targetStatus } : p));
 
         // Update overall progress bar
         setPublishProgress(Math.round(((index + 1) / products.length) * 100));
@@ -341,6 +377,8 @@ export default function ResellerIntegrationDemo() {
     setCurrentPublishingProduct('');
     setMlConnected(false);
     setShpConnected(false);
+    setSelectedML(true);
+    setSelectedSHP(true);
     setProducts(prev => prev.map(p => ({ ...p, status: 'ready' })));
     toast.info("Simulador resetado para o início.");
   };
@@ -559,9 +597,27 @@ export default function ResellerIntegrationDemo() {
                 <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-300">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                     
-                    {/* Mercado Livre Card (Habilitado) */}
-                    <Card className="border border-blue-200 bg-blue-50/5 rounded-2xl hover:shadow-sm transition-all duration-300">
+                    {/* Mercado Livre Card (Habilitado / Selecionável) */}
+                    <Card 
+                      onClick={() => setSelectedML(!selectedML)}
+                      className={`relative cursor-pointer transition-all duration-300 rounded-2xl border ${
+                        selectedML 
+                          ? 'border-blue-450 bg-blue-50/5 shadow-md ring-1 ring-blue-100' 
+                          : 'border-slate-150 bg-slate-50/10 opacity-60 shadow-none'
+                      }`}
+                    >
                       <CardContent className="p-5 flex flex-col items-center text-center space-y-4">
+                        {/* Checkbox Selector */}
+                        <div className="absolute top-3 right-3 flex items-center justify-center">
+                          <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+                            selectedML 
+                              ? 'bg-blue-600 border-blue-600 text-white' 
+                              : 'border-slate-350 bg-white'
+                          }`}>
+                            {selectedML && <Check className="h-3.5 w-3.5 font-bold" />}
+                          </div>
+                        </div>
+
                         <div className="w-14 h-14 rounded-2xl bg-white border border-slate-100 flex items-center justify-center p-2.5 shadow-sm overflow-hidden select-none">
                           <img src="https://http2.mlstatic.com/static/org-img/homesnw/mercado-libre.png" alt="Mercado Livre" className="w-full h-full object-contain" />
                         </div>
@@ -574,9 +630,27 @@ export default function ResellerIntegrationDemo() {
                       </CardContent>
                     </Card>
 
-                    {/* Shopee Card (Habilitado) */}
-                    <Card className="border border-orange-200 bg-orange-50/5 rounded-2xl hover:shadow-sm transition-all duration-300">
+                    {/* Shopee Card (Habilitado / Selecionável) */}
+                    <Card 
+                      onClick={() => setSelectedSHP(!selectedSHP)}
+                      className={`relative cursor-pointer transition-all duration-300 rounded-2xl border ${
+                        selectedSHP 
+                          ? 'border-orange-450 bg-orange-50/5 shadow-md ring-1 ring-orange-100' 
+                          : 'border-slate-150 bg-slate-50/10 opacity-60 shadow-none'
+                      }`}
+                    >
                       <CardContent className="p-5 flex flex-col items-center text-center space-y-4">
+                        {/* Checkbox Selector */}
+                        <div className="absolute top-3 right-3 flex items-center justify-center">
+                          <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+                            selectedSHP 
+                              ? 'bg-orange-600 border-orange-600 text-white' 
+                              : 'border-slate-350 bg-white'
+                          }`}>
+                            {selectedSHP && <Check className="h-3.5 w-3.5 font-bold" />}
+                          </div>
+                        </div>
+
                         <div className="w-14 h-14 rounded-2xl bg-white border border-slate-100 flex items-center justify-center p-2 shadow-sm overflow-hidden select-none">
                           <img src="https://deo.shopeemobile.com/shopee/shopee-pcmall-live-sg/assets/icon_favicon_1_96.1ce0e05fc18a86e5.png" alt="Shopee" className="w-full h-full object-contain" />
                         </div>
@@ -590,7 +664,7 @@ export default function ResellerIntegrationDemo() {
                     </Card>
 
                     {/* Amazon Card (Apagadinho) */}
-                    <Card className="border border-slate-150 bg-slate-50/40 rounded-2xl opacity-50 relative overflow-hidden">
+                    <Card className="border border-slate-150 bg-slate-50/40 rounded-2xl opacity-50 relative overflow-hidden select-none">
                       <CardContent className="p-5 flex flex-col items-center text-center space-y-4">
                         <div className="w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center p-2.5 shadow-inner grayscale select-none">
                           📦
@@ -608,7 +682,7 @@ export default function ResellerIntegrationDemo() {
                     </Card>
 
                     {/* Magalu Card (Apagadinho) */}
-                    <Card className="border border-slate-150 bg-slate-50/40 rounded-2xl opacity-50 relative overflow-hidden">
+                    <Card className="border border-slate-150 bg-slate-50/40 rounded-2xl opacity-50 relative overflow-hidden select-none">
                       <CardContent className="p-5 flex flex-col items-center text-center space-y-4">
                         <div className="w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center p-2.5 shadow-inner grayscale select-none">
                           🛍️
@@ -629,8 +703,12 @@ export default function ResellerIntegrationDemo() {
 
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-100">
                     <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                      <AlertCircle className="h-4.5 w-4.5 text-indigo-500" />
-                      Duas contas de vendedor ativas foram encontradas prontas para vinculação!
+                      <AlertCircle className="h-4.5 w-4.5 text-indigo-500 animate-in fade-in" />
+                      {!selectedML && !selectedSHP 
+                        ? "Selecione pelo menos uma conta de vendedor para avançar." 
+                        : (selectedML && selectedSHP) 
+                        ? "Duas contas de vendedor selecionadas prontas para vinculação!" 
+                        : "Uma conta de vendedor selecionada pronta para vinculação!"}
                     </div>
 
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
@@ -643,8 +721,13 @@ export default function ResellerIntegrationDemo() {
                         <MessageSquare className="mr-1.5 h-3.5 w-3.5 text-indigo-500" /> Falar com Suporte
                       </Button>
                       <Button
+                        disabled={!selectedML && !selectedSHP}
                         onClick={() => setCurrentStep(2)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-5 rounded-xl shadow-sm flex items-center gap-1.5 active:scale-95 transition-all w-full sm:w-auto justify-center"
+                        className={`font-bold text-xs h-9 px-5 rounded-xl shadow-sm flex items-center gap-1.5 active:scale-95 transition-all w-full sm:w-auto justify-center ${
+                          (!selectedML && !selectedSHP)
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                            : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                        }`}
                       >
                         Avançar para Configurações <ArrowRight className="h-4 w-4" />
                       </Button>
@@ -695,23 +778,27 @@ export default function ResellerIntegrationDemo() {
                   </div>
 
                   <div className="space-y-3 font-semibold text-xs text-slate-655">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                      <span>Atualizando dados de coleta no Mercado Livre Envios</span>
-                      {logisticProgressML === 'success' ? (
-                        <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100 select-none">✓ Configurado</Badge>
-                      ) : (
-                        <span className="text-[10px] text-slate-450 animate-pulse">Processando...</span>
-                      )}
-                    </div>
+                    {selectedML && (
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                        <span>Atualizando dados de coleta no Mercado Livre Envios</span>
+                        {logisticProgressML === 'success' ? (
+                          <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100 select-none">✓ Configurado</Badge>
+                        ) : (
+                          <span className="text-[10px] text-slate-450 animate-pulse">Processando...</span>
+                        )}
+                      </div>
+                    )}
 
-                    <div className="flex items-center justify-between pb-1">
-                      <span>Atualizando dados de coleta na Shopee Envios</span>
-                      {logisticProgressSHP === 'success' ? (
-                        <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100 select-none">✓ Configurado</Badge>
-                      ) : (
-                        <span className="text-[10px] text-slate-450 animate-pulse">Aguardando fila...</span>
-                      )}
-                    </div>
+                    {selectedSHP && (
+                      <div className="flex items-center justify-between pb-1">
+                        <span>Atualizando dados de coleta na Shopee Envios</span>
+                        {logisticProgressSHP === 'success' ? (
+                          <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100 select-none">✓ Configurado</Badge>
+                        ) : (
+                          <span className="text-[10px] text-slate-450 animate-pulse">Aguardando fila...</span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <p className="text-[11px] text-amber-600 font-bold animate-pulse mt-1 bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5 inline-block">
@@ -727,8 +814,12 @@ export default function ResellerIntegrationDemo() {
                     <div className="space-y-1">
                       <h4 className="font-bold text-sm text-emerald-950">Endereços Logísticos Vinculados!</h4>
                       <p className="text-xs text-emerald-800 leading-relaxed font-medium">
-                        O endereço de remessa da Lojafy foi definido como o local de coleta principal em ambos os canais de venda. 
-                        Sua logística está pronta para a postagem e entrega automatizada.
+                        {selectedML && selectedSHP 
+                          ? "O endereço de remessa da Lojafy foi definido como o local de coleta principal em ambos os canais de venda. Sua logística está pronta para a postagem e entrega automatizada."
+                          : selectedML 
+                          ? "O endereço de remessa da Lojafy foi definido como o local de coleta principal no Mercado Livre. Sua logística está pronta para a postagem e entrega automatizada."
+                          : "O endereço de remessa da Lojafy foi definido como o local de coleta principal na Shopee. Sua logística está pronta para a postagem e entrega automatizada."
+                        }
                       </p>
                     </div>
                   </div>
@@ -978,7 +1069,11 @@ export default function ResellerIntegrationDemo() {
                             <div className="border-t border-slate-50 pt-3 space-y-1.5">
                               <div className="flex justify-between items-center text-[10px] font-bold">
                                 <span className="text-slate-400">Mercado Livre</span>
-                                {isPublished ? (
+                                {!selectedML ? (
+                                  <span className="text-slate-400 bg-slate-100/50 px-1.5 py-0.5 rounded border border-slate-155">
+                                    Não integrado
+                                  </span>
+                                ) : isPublished || product.status === 'published_ml' ? (
                                   <span className="text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-150 flex items-center gap-0.5 select-none">
                                     ✓ Publicado
                                   </span>
@@ -991,7 +1086,11 @@ export default function ResellerIntegrationDemo() {
 
                               <div className="flex justify-between items-center text-[10px] font-bold">
                                 <span className="text-slate-400">Shopee</span>
-                                {isPublished ? (
+                                {!selectedSHP ? (
+                                  <span className="text-slate-400 bg-slate-100/50 px-1.5 py-0.5 rounded border border-slate-155">
+                                    Não integrado
+                                  </span>
+                                ) : isPublished || product.status === 'published_shp' ? (
                                   <span className="text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-150 flex items-center gap-0.5 select-none">
                                     ✓ Publicado
                                   </span>
