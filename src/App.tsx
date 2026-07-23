@@ -143,6 +143,7 @@ const MlFaturamento = lazy(() => import("./pages/reseller/MlFaturamento"));
 const ResellerMeusAcessos = lazy(() => import("./pages/reseller/MeusAcessos"));
 const ResellerTopProdutosVencedores = lazy(() => import("./pages/reseller/TopProdutosVencedores"));
 const PerformanceDashboardDemo = lazy(() => import("./pages/reseller/PerformanceDashboardDemo"));
+const ResellerIntegrationDemo = lazy(() => import("./pages/reseller/ResellerIntegrationDemo"));
 
 // ── Public store (reseller white-label) ────────────────────────────────────
 const PublicStore = lazy(() => import("./pages/PublicStore"));
@@ -258,6 +259,7 @@ const App = () => {
                 <Route path="/top_10_produtos" element={<ResellerTopProdutosVencedores />} />
                 <Route path="/demo-performance-vendedores" element={<PerformanceDashboardDemo />} />
                 <Route path="/demo-performance-vendedores-lojafy" element={<PerformanceDashboardDemo />} />
+                <Route path="/demo-integracao-revendedor" element={<ResellerIntegrationDemo />} />
 
                 {/* Customer Panel Routes */}
                 <Route path="/minha-conta" element={<CustomerLayout />}>
