@@ -300,13 +300,13 @@ export default function PerformanceDashboardDemo() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 pb-16 font-sans">
       {/* 1. TOP HEADER SECTION */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100 shadow-sm px-6 py-4">
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100 shadow-sm px-6 py-5">
         <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <img 
               src={logoIntegration} 
               alt="Lojafy Integra" 
-              className="h-10 w-auto object-contain select-none"
+              className="h-[75px] w-auto object-contain select-none"
             />
             
             <div className="h-8 w-[1px] bg-slate-200 hidden sm:block mx-2"></div>
