@@ -524,7 +524,7 @@ export default function ResellerIntegrationDemo() {
                   📦 Marketplace sem Estoque Automático
                 </Badge>
                 <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border border-emerald-100/50 text-[11px] font-bold py-0.5 px-2.5 rounded-full flex items-center gap-1 shadow-sm select-none">
-                  🟢 Estoque Integrado
+                  📦 Estoque Integrado
                 </Badge>
               </div>
               <p className="text-xs text-slate-500 font-medium">
