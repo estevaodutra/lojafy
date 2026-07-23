@@ -885,6 +885,52 @@ export const getChartData = (period: PeriodType): ChartDataPoint[] => {
   });
 };
 
+// Helper to break zero-ending numbers in decimals (cents) and integer part (units, tens)
+const breakZeros = (v: number): number => {
+  if (v <= 0) return v;
+  let finalVal = v;
+  for (let i = 0; i < 20; i++) {
+    const str = finalVal.toFixed(2);
+    const [intPart, decPart] = str.split('.');
+    const lastDigitInt = intPart[intPart.length - 1];
+    const secondLastDigitInt = intPart[intPart.length - 2] || '1';
+    const lastDigitDec = decPart[decPart.length - 1];
+    
+    if (lastDigitDec === '0') {
+      finalVal += 0.07;
+      continue;
+    }
+    if (lastDigitInt === '0') {
+      finalVal += 3.00;
+      continue;
+    }
+    if (secondLastDigitInt === '0') {
+      finalVal += 37.00;
+      continue;
+    }
+    break;
+  }
+  return finalVal;
+};
+
+// Helper to break zero-ending decimal percentages
+const breakPercentage = (v: number): number => {
+  if (v <= 0) return v;
+  let finalVal = v;
+  for (let i = 0; i < 10; i++) {
+    const str = finalVal.toFixed(2);
+    const decPart = str.split('.')[1];
+    const lastDigitDec = decPart[decPart.length - 1];
+    
+    if (lastDigitDec === '0') {
+      finalVal += 0.07;
+      continue;
+    }
+    break;
+  }
+  return finalVal;
+};
+
 // ----------------------------------------------------
 // SYSTEM STATE FILTER COMPILER
 // ----------------------------------------------------
@@ -978,12 +1024,13 @@ export const getAggregatedData = (filters: FilterOptions) => {
     if (filters.marketplace === "mercadolivre") rawCancel = 2.1;
   }
 
-  const activeFat = rawFat * scale * marketplaceFactor;
-  const activeRec = rawRec * scale * marketplaceFactor;
-  const activeLuc = rawLuc * scale * marketplaceFactor;
+  const activeFat = breakZeros(rawFat * scale * marketplaceFactor);
+  const activeRec = breakZeros(rawRec * scale * marketplaceFactor);
+  const activeLuc = breakZeros(rawLuc * scale * marketplaceFactor);
   const activePed = Math.round(rawPed * scale * marketplaceFactor);
   const activeUni = Math.round(rawUni * scale * marketplaceFactor);
-  const activeTicket = activePed > 0 ? activeFat / activePed : 0;
+  const activeTicket = activePed > 0 ? breakZeros(activeFat / activePed) : 0;
+  const activeCancel = breakPercentage(rawCancel);
   const activeVendedores = targetSeller ? 1 : Math.max(1, Math.round(rawVendedores * (filters.marketplace !== "all" ? 0.75 : 1)));
 
   const isPositiveGrowth = filters.period !== "hoje";
@@ -1067,8 +1114,8 @@ export const getAggregatedData = (filters: FilterOptions) => {
     },
     {
       title: "Taxa de Cancelamento",
-      value: `${rawCancel.toFixed(2)}%`,
-      rawValue: rawCancel,
+      value: `${activeCancel.toFixed(2)}%`,
+      rawValue: activeCancel,
       changePercent: growthCancel,
       isPositive: growthCancel < 0,
       microtext: `vs. período anterior`,
@@ -1131,9 +1178,18 @@ export const getAggregatedData = (filters: FilterOptions) => {
     }
   ];
 
-  let marketplaces = baseMarketplaces;
+  const mappedMarketplaces = baseMarketplaces.map(mp => ({
+    ...mp,
+    faturamentoBruto: breakZeros(mp.faturamentoBruto),
+    receitaLiquida: breakZeros(mp.receitaLiquida),
+    lucroLiquidoVendedores: breakZeros(mp.lucroLiquidoVendedores),
+    ticketMedio: breakZeros(mp.ticketMedio),
+    taxaCancelamento: breakPercentage(mp.taxaCancelamento)
+  }));
+
+  let marketplaces = mappedMarketplaces;
   if (filters.marketplace && filters.marketplace !== "all") {
-    marketplaces = baseMarketplaces.filter(mp => 
+    marketplaces = mappedMarketplaces.filter(mp => 
       mp.name.toLowerCase().replace(" ", "") === filters.marketplace
     );
     if (marketplaces.length > 0) {
@@ -1142,9 +1198,9 @@ export const getAggregatedData = (filters: FilterOptions) => {
   }
 
   let sellersList = mockSellers.map(s => {
-    const fat = s.faturamentoBruto * scale;
-    const luc = s.lucroLiquidoVendedores * scale;
-    const rec = s.receitaLiquida * scale;
+    const fat = breakZeros(s.faturamentoBruto * scale);
+    const luc = breakZeros(s.lucroLiquidoVendedores * scale);
+    const rec = breakZeros(s.receitaLiquida * scale);
     const ped = Math.max(1, Math.round(s.pedidos * scale));
     const uni = Math.max(1, Math.round(s.unidadesVendidas * scale));
     
@@ -1156,7 +1212,7 @@ export const getAggregatedData = (filters: FilterOptions) => {
       margemLiquida: fat > 0 ? (luc / fat) * 100 : 0,
       pedidos: ped,
       unidadesVendidas: uni,
-      ticketMedio: ped > 0 ? fat / ped : 0
+      ticketMedio: ped > 0 ? breakZeros(fat / ped) : 0
     };
   });
 
@@ -1174,8 +1230,8 @@ export const getAggregatedData = (filters: FilterOptions) => {
   sellersList.sort((a, b) => b.faturamentoBruto - a.faturamentoBruto);
 
   let productsList = mockProducts.map(p => {
-    const fat = p.faturamentoBruto * scale;
-    const luc = p.lucroLiquidoGerado * scale;
+    const fat = breakZeros(p.faturamentoBruto * scale);
+    const luc = breakZeros(p.lucroLiquidoGerado * scale);
     const ped = Math.max(1, Math.round(p.pedidos * scale));
     const uni = Math.max(1, Math.round(p.unidadesVendidas * scale));
     
@@ -1185,7 +1241,7 @@ export const getAggregatedData = (filters: FilterOptions) => {
       lucroLiquidoGerado: luc,
       pedidos: ped,
       unidadesVendidas: uni,
-      ticketMedio: ped > 0 ? fat / ped : 0
+      ticketMedio: ped > 0 ? breakZeros(fat / ped) : 0
     };
   });
 
