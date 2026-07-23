@@ -316,7 +316,7 @@ export default function PerformanceDashboardDemo() {
             
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold text-slate-800 tracking-tight">Dashboard de Performance dos Vendedores</h1>
+                <h1 className="text-lg font-bold text-slate-800 tracking-tight">Marketplaces sem estoque automático</h1>
                 <Badge className="bg-slate-50 text-slate-700 hover:bg-slate-50 border border-slate-200 text-[11px] font-bold py-0.5 px-2.5 rounded-full flex items-center gap-1 shadow-sm select-none">
                   📦 Marketplace sem Estoque Automático
                 </Badge>
