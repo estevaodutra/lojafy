@@ -520,9 +520,11 @@ export default function ResellerIntegrationDemo() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-bold text-slate-800 tracking-tight">Painel de Integração do Revendedor</h1>
-                <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100/50 text-[11px] font-bold py-0.5 px-2.5 rounded-full flex items-center gap-1 shadow-sm select-none">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Operação Ativa
+                <Badge className="bg-slate-50 text-slate-700 hover:bg-slate-50 border border-slate-200 text-[11px] font-bold py-0.5 px-2.5 rounded-full flex items-center gap-1 shadow-sm select-none">
+                  📦 Marketplace sem Estoque Automático
+                </Badge>
+                <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border border-emerald-100/50 text-[11px] font-bold py-0.5 px-2.5 rounded-full flex items-center gap-1 shadow-sm select-none">
+                  🟢 Estoque Integrado
                 </Badge>
               </div>
               <p className="text-xs text-slate-500 font-medium">
