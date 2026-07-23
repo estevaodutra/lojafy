@@ -857,22 +857,22 @@ export default function PerformanceDashboardDemo() {
             </CardContent>
           </Card>
 
-          {/* Ranking of Sellers */}
+          {/* Ranking of Top Products */}
           <Card className="border border-slate-100 shadow-sm bg-white rounded-2xl overflow-hidden flex flex-col">
             <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-50 bg-slate-50/20 px-6 py-4">
               <div>
-                <CardTitle className="text-base font-bold text-slate-800">Ranking de Performance dos Vendedores</CardTitle>
+                <CardTitle className="text-base font-bold text-slate-800">Produtos Mais Vendidos da Semana</CardTitle>
                 <CardDescription className="text-xs text-slate-500 font-medium">
-                  Resultados individuais dos vendedores (Clique na linha para ver visão 360º)
+                  Listagem dos produtos campeões em volume de saída e lucratividade
                 </CardDescription>
               </div>
               
               <div className="relative w-full sm:w-48">
                 <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
                 <Input 
-                  placeholder="Buscar vendedor..." 
-                  value={sellerSearch}
-                  onChange={(e) => setSellerSearch(e.target.value)}
+                  placeholder="Buscar produto..." 
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
                   className="pl-8 h-8 text-xs bg-slate-50 border-slate-200 focus:bg-white rounded-lg focus-visible:ring-purple-500"
                 />
               </div>
@@ -887,103 +887,62 @@ export default function PerformanceDashboardDemo() {
                   <TableHeader className="sticky top-0 bg-slate-50 z-15">
                     <TableRow className="border-b border-slate-100 hover:bg-transparent">
                       <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-center w-12 bg-slate-50">Pos.</TableHead>
-                      <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 bg-slate-50">Vendedor</TableHead>
-                      
-                      <TableHead 
-                        className="text-xs font-bold text-slate-500 h-10 px-4 text-right cursor-pointer hover:text-slate-800 bg-slate-50"
-                        onClick={() => {
-                          setSellerSortField("faturamento");
-                          setSellerSortOrder(prev => prev === "asc" ? "desc" : "asc");
-                        }}
-                      >
-                        <span className="flex items-center justify-end gap-1 select-none">
-                          Faturamento <ArrowUpDown className="h-3 w-3 text-slate-400" />
-                        </span>
-                      </TableHead>
-
-                      <TableHead 
-                        className="text-xs font-bold text-emerald-700 h-10 px-4 text-right cursor-pointer hover:text-emerald-800 bg-slate-50"
-                        onClick={() => {
-                          setSellerSortField("lucro");
-                          setSellerSortOrder(prev => prev === "asc" ? "desc" : "asc");
-                        }}
-                      >
-                        <span className="flex items-center justify-end gap-1 select-none">
-                          Lucro Líquido <ArrowUpDown className="h-3 w-3 text-slate-400" />
-                        </span>
-                      </TableHead>
-
-                      <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-center bg-slate-50">Margem</TableHead>
-                      <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-center bg-slate-50">Canal</TableHead>
-                      <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-right bg-slate-50">Crescimento</TableHead>
+                      <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 bg-slate-50">Produto</TableHead>
+                      <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-center bg-slate-50">Unidades</TableHead>
+                      <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-right bg-slate-50">Faturamento</TableHead>
+                      <TableHead className="text-xs font-bold text-emerald-700 h-10 px-4 text-right bg-slate-50">Lucro</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {processedSellers.length === 0 ? (
+                    {processedProducts.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-xs text-slate-400 font-medium">
-                          Nenhum vendedor encontrado com os filtros aplicados.
+                        <TableCell colSpan={5} className="text-center py-8 text-xs text-slate-400 font-medium">
+                          Nenhum produto encontrado.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      processedSellers.map((seller, index) => {
-                        const globalIndex = mockSellers.findIndex(s => s.id === seller.id) + 1;
-                        let medal = "";
-                        if (globalIndex === 1) medal = "🥇";
-                        else if (globalIndex === 2) medal = "🥈";
-                        else if (globalIndex === 3) medal = "🥉";
+                      [...processedProducts]
+                        .sort((a, b) => b.unidadesVendidas - a.unidadesVendidas)
+                        .map((product, index) => {
+                          let medal = "";
+                          if (index === 0) medal = "🥇";
+                          else if (index === 1) medal = "🥈";
+                          else if (index === 2) medal = "🥉";
 
-                        return (
-                          <TableRow 
-                            key={seller.id} 
-                            onClick={() => handleSellerClick(seller)}
-                            className="border-b border-slate-100 hover:bg-indigo-50/20 cursor-pointer active:bg-indigo-50/50 transition-colors"
-                          >
-                            <TableCell className="font-extrabold text-xs text-slate-500 text-center py-3 px-4">
-                              {medal ? <span className="text-base">{medal}</span> : `${globalIndex}º`}
-                            </TableCell>
-                            <TableCell className="font-bold text-xs text-slate-800 py-3 px-4 flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0">
-                                {seller.name.split(" ").map(n => n[0]).join("")}
-                              </div>
-                              <span className="truncate max-w-[90px]">{seller.name}</span>
-                            </TableCell>
-                            <TableCell className="font-bold text-xs text-slate-900 text-right py-3 px-4">
-                              {fmtBRL(seller.faturamentoBruto)}
-                            </TableCell>
-                            <TableCell className="font-bold text-xs text-emerald-700 text-right py-3 px-4">
-                              <span className="flex items-center justify-end gap-1">
-                                {fmtBRL(seller.lucroLiquidoVendedores)}
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                      <HelpCircle className="h-3 w-3 text-emerald-500 cursor-help" />
-                                    </TooltipTrigger>
-                                    <TooltipContent className="bg-slate-900 text-white border-none p-2 text-[10px] leading-relaxed max-w-[220px]">
-                                      Detalhamento conceitual: {profitFormulaStr}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </span>
-                            </TableCell>
-                            <TableCell className="font-semibold text-xs text-slate-600 text-center py-3 px-4">
-                              {seller.margemLiquida.toFixed(1)}%
-                            </TableCell>
-                            <TableCell className="font-bold text-[10px] text-slate-500 text-center py-3 px-4">
-                              <Badge variant="outline" className={`rounded-full px-2 py-0 border-none text-[10px] ${
-                                seller.marketplacePrincipal === "Mercado Livre" ? "bg-blue-50 text-blue-700" :
-                                seller.marketplacePrincipal === "Shopee" ? "bg-orange-50 text-orange-700" :
-                                seller.marketplacePrincipal === "Amazon" ? "bg-yellow-50 text-yellow-800" : "bg-emerald-50 text-emerald-800"
-                              }`}>
-                                {seller.marketplacePrincipal}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className={`font-extrabold text-xs text-right py-3 px-4 ${seller.crescimento > 0 ? "text-green-600" : "text-red-500"}`}>
-                              {seller.crescimento > 0 ? "+" : ""}{seller.crescimento.toFixed(1)}%
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
+                          return (
+                            <TableRow 
+                              key={product.id} 
+                              className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors"
+                            >
+                              <TableCell className="font-extrabold text-xs text-slate-500 text-center py-3 px-4">
+                                {medal ? <span className="text-base">{medal}</span> : `${index + 1}º`}
+                              </TableCell>
+                              <TableCell className="font-bold text-xs text-slate-800 py-3 px-4 flex items-center gap-2">
+                                <img 
+                                  src={product.image} 
+                                  alt={product.name} 
+                                  className="w-8 h-8 rounded object-cover border border-slate-150 shadow-sm shrink-0"
+                                  onError={(e) => {
+                                    (e.target as any).src = "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=80&h=80&fit=crop";
+                                  }}
+                                />
+                                <div className="flex flex-col min-w-0">
+                                  <span className="truncate max-w-[120px] font-bold text-slate-800">{product.name}</span>
+                                  <span className="text-[9px] font-mono text-slate-400 font-bold">{product.sku}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="font-semibold text-xs text-slate-600 text-center py-3 px-4">
+                                {product.unidadesVendidas}
+                              </TableCell>
+                              <TableCell className="font-bold text-xs text-slate-900 text-right py-3 px-4">
+                                {fmtBRL(product.faturamentoBruto)}
+                              </TableCell>
+                              <TableCell className="font-bold text-xs text-emerald-700 text-right py-3 px-4">
+                                {fmtBRL(product.lucroLiquidoGerado)}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
                     )}
                   </TableBody>
                 </Table>
@@ -993,139 +952,7 @@ export default function PerformanceDashboardDemo() {
 
         </section>
 
-        {/* 7. PRODUCTS WITH BEST PERFORMANCE */}
-        <section className="bg-white border border-slate-100 shadow-sm rounded-2xl overflow-hidden flex flex-col">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-50 bg-slate-50/20 px-6 py-4">
-            <div>
-              <h3 className="text-base font-bold text-slate-800">Produtos com Melhor Performance</h3>
-              <p className="text-xs text-slate-500 font-medium">
-                Desempenho de vendas consolidado por SKU de produto cadastrado no catálogo dos vendedores
-              </p>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <div className="relative w-full sm:w-48">
-                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
-                <Input 
-                  placeholder="Filtrar SKU ou nome..." 
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                  className="pl-8 h-8 text-xs bg-slate-50 border-slate-200 focus:bg-white rounded-lg focus-visible:ring-purple-500"
-                />
-              </div>
 
-              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200/50">
-                {[
-                  { key: "qtd", label: "Qtd Vendida" },
-                  { key: "faturamento", label: "Faturamento" },
-                  { key: "lucro", label: "Lucro Líquido" },
-                  { key: "crescimento", label: "Crescimento" }
-                ].map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveProductTab(tab.key as any)}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
-                      activeProductTab === tab.key 
-                        ? "bg-white text-slate-800 shadow-sm" 
-                        : "text-slate-500 hover:text-slate-800"
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            {loading ? (
-              <div className="p-6 space-y-4">
-                {[1, 2, 3].map(idx => <Skeleton key={idx} className="h-10 w-full bg-slate-100" />)}
-              </div>
-            ) : (
-              <Table>
-                <TableHeader className="bg-slate-50/50">
-                  <TableRow className="border-b border-slate-100 hover:bg-transparent">
-                    <TableHead className="text-xs font-bold text-slate-500 h-10 px-6">Produto</TableHead>
-                    <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-center">Unidades</TableHead>
-                    <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-center">Pedidos</TableHead>
-                    <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-right">Faturamento</TableHead>
-                    <TableHead className="text-xs font-bold text-emerald-700 h-10 px-4 text-right">Lucro Gerado</TableHead>
-                    <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-right">Ticket Médio</TableHead>
-                    <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-center">Estoque</TableHead>
-                    <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-center">Canal</TableHead>
-                    <TableHead className="text-xs font-bold text-slate-500 h-10 px-6 text-center">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {processedProducts.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-xs text-slate-400 font-medium">
-                        Nenhum produto cadastrado com os filtros aplicados.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    processedProducts.map((p) => {
-                      let statusBadge = "bg-slate-50 text-slate-600 border-slate-200";
-                      if (p.status === "Campeão de vendas") statusBadge = "bg-green-50 text-green-700 border-green-200/50";
-                      else if (p.status === "Alta conversão") statusBadge = "bg-emerald-50 text-emerald-700 border-emerald-200/30";
-                      else if (p.status === "Em crescimento") statusBadge = "bg-blue-50 text-blue-700 border-blue-200/30";
-                      else if (p.status === "Estável") statusBadge = "bg-slate-50 text-slate-600 border-slate-200";
-                      else if (p.status === "Queda de vendas") statusBadge = "bg-orange-50 text-orange-600 border-orange-200/50";
-                      else if (p.status === "Risco de estoque") statusBadge = "bg-red-50 text-red-600 border-red-200/50";
-                      else if (p.status === "Alto cancelamento") statusBadge = "bg-rose-50 text-rose-700 border-rose-200/50";
-
-                      return (
-                        <TableRow key={p.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                          <TableCell className="py-3.5 px-6">
-                            <div className="flex items-center gap-3">
-                              <img 
-                                src={p.image} 
-                                alt={p.name} 
-                                className="w-10 h-10 rounded-lg object-cover border border-slate-150 shadow-sm"
-                                onError={(e) => {
-                                  (e.target as any).src = "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=80&h=80&fit=crop";
-                                }}
-                              />
-                              <div className="flex flex-col">
-                                <span className="font-bold text-xs text-slate-800 max-w-[280px] truncate">{p.name}</span>
-                                <span className="text-[10px] text-slate-400 font-mono mt-0.5">{p.sku}</span>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-bold text-xs text-slate-900 text-center py-3.5 px-4">{p.unidadesVendidas}</TableCell>
-                          <TableCell className="font-semibold text-xs text-slate-600 text-center py-3.5 px-4">{p.pedidos}</TableCell>
-                          <TableCell className="font-bold text-xs text-slate-800 text-right py-3.5 px-4">{fmtBRL(p.faturamentoBruto)}</TableCell>
-                          <TableCell className="font-black text-xs text-emerald-700 text-right py-3.5 px-4">{fmtBRL(p.lucroLiquidoGerado)}</TableCell>
-                          <TableCell className="font-semibold text-xs text-slate-500 text-right py-3.5 px-4">{fmtBRL(p.ticketMedio)}</TableCell>
-                          <TableCell className="text-center py-3.5 px-4">
-                            <span className={`text-xs font-bold ${p.estoqueDisponivel <= 10 ? "text-red-500 font-black animate-pulse" : "text-slate-600"}`}>
-                              {p.estoqueDisponivel} un
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-center py-3.5 px-4">
-                            <Badge variant="outline" className={`rounded-full px-2 py-0 border-none text-[10px] font-bold ${
-                              p.marketplacePrincipal === "Mercado Livre" ? "bg-blue-50 text-blue-700" :
-                              p.marketplacePrincipal === "Shopee" ? "bg-orange-50 text-orange-700" :
-                              p.marketplacePrincipal === "Amazon" ? "bg-yellow-50 text-yellow-800" : "bg-emerald-50 text-emerald-800"
-                            }`}>
-                              {p.marketplacePrincipal}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="py-3.5 px-6 text-center">
-                            <Badge className={`rounded-lg px-2 py-0.5 border text-[10px] font-bold ${statusBadge}`}>
-                              {p.status}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            )}
-          </div>
-        </section>
 
         {/* 8. RECENT ACTIVITIES (Expanded to Full Width) */}
         <section className="w-full">
