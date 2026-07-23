@@ -336,7 +336,7 @@ export default function ResellerIntegrationDemo() {
               <CardContent className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3 text-center sm:text-left flex-col sm:flex-row">
                   <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center p-2 shadow-sm shrink-0 overflow-hidden select-none">
-                    <img src="/mercadolivre-logo.png" alt="Mercado Livre Logo" className="w-full h-full object-contain" />
+                    <img src="https://http2.mlstatic.com/static/org-img/homesnw/mercado-libre.png" alt="Mercado Livre Logo" className="w-full h-full object-contain" />
                   </div>
                   <div>
                     <h3 className="font-bold text-sm text-slate-800">Conectar Mercado Livre</h3>
@@ -375,7 +375,7 @@ export default function ResellerIntegrationDemo() {
               <CardContent className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3 text-center sm:text-left flex-col sm:flex-row">
                   <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center p-1.5 shadow-sm shrink-0 overflow-hidden select-none">
-                    <img src="/shopee-logo.png" alt="Shopee Logo" className="w-full h-full object-contain" />
+                    <img src="https://deo.shopeemobile.com/shopee/shopee-pcmall-live-sg/assets/icon_favicon_1_96.1ce0e05fc18a86e5.png" alt="Shopee Logo" className="w-full h-full object-contain" />
                   </div>
                   <div>
                     <h3 className="font-bold text-sm text-slate-800">Conectar Shopee</h3>
