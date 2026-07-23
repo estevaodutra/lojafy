@@ -42,6 +42,7 @@ interface DemoProduct {
   stock: number;
   category: string;
   status: 'ready' | 'publishing' | 'published_ml' | 'published_shp' | 'published_both';
+  selected?: boolean;
 }
 
 export default function ResellerIntegrationDemo() {
@@ -68,6 +69,7 @@ export default function ResellerIntegrationDemo() {
   const [currentPublishingIndex, setCurrentPublishingIndex] = useState<number | null>(null);
   const [viewingIndex, setViewingIndex] = useState<number>(0);
   const [showModal, setShowModal] = useState(false);
+  const [publishingIds, setPublishingIds] = useState<string[]>([]);
 
   // Live publishing states for the active product
   const [publishingMLState, setPublishingMLState] = useState<'pending' | 'publishing' | 'success'>('pending');
@@ -109,11 +111,22 @@ export default function ResellerIntegrationDemo() {
         costPrice: Number(p.cost_price || p.price * 0.7 || 10.00),
         stock: p.stock_quantity || 50,
         category: p.category_id || 'Geral',
-        status: 'ready' as const
+        status: 'ready' as const,
+        selected: true
       }));
       setProducts(mapped);
     }
   }, [dbProducts]);
+
+  // Ensure all initial mock products are selected by default on mount
+  useEffect(() => {
+    setProducts(prev => {
+      if (prev.some(p => p.selected === undefined)) {
+        return prev.map(p => ({ ...p, selected: true }));
+      }
+      return prev;
+    });
+  }, []);
 
   // Catalog products
   const [products, setProducts] = useState<DemoProduct[]>([
@@ -327,13 +340,20 @@ export default function ResellerIntegrationDemo() {
 
   // STEP 3 FLOW: Margin & Publish products
   const handlePublishProducts = () => {
+    const selectedProducts = products.filter(p => p.selected);
+    if (selectedProducts.length === 0) {
+      toast.warning("Selecione pelo menos um produto do catálogo para publicar.");
+      return;
+    }
+
     setStep3SubState('publishing');
     setPublishProgress(0);
     setShowModal(true);
+    setPublishingIds(selectedProducts.map(p => p.id));
     setCurrentPublishingIndex(0);
     setViewingIndex(0);
 
-    toast.info("Iniciando publicação em lote no Mercado Livre e Shopee...", {
+    toast.info("Iniciando publicação em lote...", {
       description: "Formatando SKUs e aplicando margem selecionada.",
       duration: 1500
     });
@@ -345,7 +365,7 @@ export default function ResellerIntegrationDemo() {
       : 'published_shp';
 
     const publishNextProduct = (index: number) => {
-      if (index >= products.length) {
+      if (index >= selectedProducts.length) {
         setStep3SubState('done');
         setMlConnected(selectedML);
         setShpConnected(selectedSHP);
@@ -358,13 +378,13 @@ export default function ResellerIntegrationDemo() {
           : "Shopee";
 
         toast.success("Publicação concluída com sucesso!", {
-          description: `Os ${products.length} produtos do catálogo foram publicados no ${channelsText}.`,
+          description: `Os ${selectedProducts.length} produtos selecionados foram publicados no ${channelsText}.`,
           duration: 4000
         });
         return;
       }
 
-      const currentProd = products[index];
+      const currentProd = selectedProducts[index];
       setCurrentPublishingProduct(`Publicando: ${currentProd.name}...`);
       setCurrentPublishingIndex(index);
       
@@ -399,7 +419,7 @@ export default function ResellerIntegrationDemo() {
           setTimeout(() => {
             setPublishingSHPState('success');
             setProducts(prev => prev.map(p => p.id === currentProd.id ? { ...p, status: targetStatus } : p));
-            setPublishProgress(Math.round(((index + 1) / products.length) * 100));
+            setPublishProgress(Math.round(((index + 1) / selectedProducts.length) * 100));
 
             // Wait on screen before proceeding
             setTimeout(() => {
@@ -414,7 +434,7 @@ export default function ResellerIntegrationDemo() {
         setTimeout(() => {
           setPublishingMLState('success');
           setProducts(prev => prev.map(p => p.id === currentProd.id ? { ...p, status: targetStatus } : p));
-          setPublishProgress(Math.round(((index + 1) / products.length) * 100));
+          setPublishProgress(Math.round(((index + 1) / selectedProducts.length) * 100));
 
           setTimeout(() => {
             publishNextProduct(index + 1);
@@ -425,7 +445,7 @@ export default function ResellerIntegrationDemo() {
         setTimeout(() => {
           setPublishingSHPState('success');
           setProducts(prev => prev.map(p => p.id === currentProd.id ? { ...p, status: targetStatus } : p));
-          setPublishProgress(Math.round(((index + 1) / products.length) * 100));
+          setPublishProgress(Math.round(((index + 1) / selectedProducts.length) * 100));
 
           setTimeout(() => {
             publishNextProduct(index + 1);
@@ -457,7 +477,8 @@ export default function ResellerIntegrationDemo() {
     setPublishingMLState('pending');
     setPublishingSHPState('pending');
     setShowModal(false);
-    setProducts(prev => prev.map(p => ({ ...p, status: 'ready' })));
+    setPublishingIds([]);
+    setProducts(prev => prev.map(p => ({ ...p, status: 'ready', selected: true })));
     toast.info("Simulador resetado para o início.");
   };
 
@@ -1151,6 +1172,31 @@ export default function ResellerIntegrationDemo() {
               </div>
             </div>
 
+            {/* SELECT ALL AND SUMMARY ROW */}
+            <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-50 border border-slate-150 rounded-2xl px-5 py-3.5 gap-3 shadow-inner">
+              <span className="text-xs font-bold text-slate-700 select-none">
+                <strong className="text-indigo-650 font-black">{products.filter(p => p.selected).length}</strong> de <strong className="text-slate-900 font-extrabold">{products.length}</strong> produtos selecionados para publicação
+              </span>
+              {step3SubState === 'idle' && (
+                <button 
+                  onClick={() => {
+                    const allSelected = products.every(p => p.selected);
+                    setProducts(prev => prev.map(p => ({ ...p, selected: !allSelected })));
+                  }}
+                  className="text-xs font-extrabold text-indigo-600 hover:text-indigo-700 flex items-center gap-2 active:scale-95 transition-all select-none"
+                >
+                  <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+                    products.every(p => p.selected)
+                      ? 'bg-indigo-600 border-indigo-600 text-white' 
+                      : 'border-slate-350 bg-white shadow-sm'
+                  }`}>
+                    {products.every(p => p.selected) && <Check className="h-3 w-3 font-black" />}
+                  </div>
+                  Selecionar Todos
+                </button>
+              )}
+            </div>
+
             {/* PRODUCT CARDS GRID */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {filteredProducts.length === 0 ? (
@@ -1178,12 +1224,21 @@ export default function ResellerIntegrationDemo() {
                     return (
                       <Card 
                         key={product.id} 
-                        className={`overflow-hidden border rounded-2xl transition-all duration-300 ${
-                          isPublishing 
-                            ? 'border-indigo-400 ring-2 ring-indigo-100 shadow-md animate-pulse' 
-                            : isPublished 
-                            ? 'border-emerald-200 bg-emerald-50/5 shadow-sm' 
-                            : 'border-slate-100 hover:shadow-md'
+                        onClick={() => {
+                          if (step3SubState === 'idle') {
+                            setProducts(prev => prev.map(p => p.id === product.id ? { ...p, selected: !p.selected } : p));
+                          }
+                        }}
+                        className={`overflow-hidden border rounded-2xl transition-all duration-300 flex flex-col h-full ${
+                          step3SubState === 'idle' ? 'cursor-pointer' : ''
+                        } ${
+                          step3SubState === 'idle' && !product.selected 
+                            ? 'opacity-65 bg-slate-50/20 border-slate-150 shadow-none' 
+                            : product.status === 'published_both' || product.status === 'published_ml' || product.status === 'published_shp'
+                            ? 'border-emerald-250 bg-emerald-50/5 shadow-sm' 
+                            : isPublishing 
+                            ? 'border-indigo-400 ring-2 ring-indigo-100 shadow-md' 
+                            : 'border-slate-150 hover:shadow-md bg-white'
                         }`}
                       >
                         <CardContent className="p-0 flex flex-col h-full">
@@ -1194,6 +1249,26 @@ export default function ResellerIntegrationDemo() {
                               alt={product.name} 
                               className="max-h-full max-w-full object-contain select-none rounded-lg" 
                             />
+                            
+                            {/* Checkbox Selector (Idle state only) */}
+                            {step3SubState === 'idle' && (
+                              <div 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setProducts(prev => prev.map(p => p.id === product.id ? { ...p, selected: !p.selected } : p));
+                                }}
+                                className="absolute top-3 right-3 flex items-center justify-center cursor-pointer z-10"
+                              >
+                                <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+                                  product.selected 
+                                    ? 'bg-indigo-600 border-indigo-600 text-white' 
+                                    : 'border-slate-350 bg-white shadow-sm'
+                                }`}>
+                                  {product.selected && <Check className="h-3.5 w-3.5 font-bold" />}
+                                </div>
+                              </div>
+                            )}
+
                             {isPublished && (
                               <Badge className="absolute top-3 left-3 bg-emerald-50 text-emerald-700 border border-emerald-100/50 flex items-center gap-1 font-bold text-[10px] py-0.5 px-2 select-none">
                                 <Check className="h-3 w-3 text-emerald-600" /> Ativo
@@ -1295,8 +1370,9 @@ export default function ResellerIntegrationDemo() {
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
               
-              {step3SubState === 'publishing' && viewingIndex !== null && products[viewingIndex] && (() => {
-                const product = products[viewingIndex];
+              {step3SubState === 'publishing' && viewingIndex !== null && publishingIds[viewingIndex] && (() => {
+                const product = products.find(p => p.id === publishingIds[viewingIndex]);
+                if (!product) return null;
                 const costPrice = product.costPrice;
                 const suggestedPrice = calculateSuggestedPrice(costPrice);
                 const profit = suggestedPrice - costPrice;
@@ -1318,7 +1394,7 @@ export default function ResellerIntegrationDemo() {
                           )}
                         </span>
                         <span className="font-extrabold text-slate-900 select-none">
-                          {isPastProduct ? (viewingIndex + 1) : (currentPublishingIndex !== null ? currentPublishingIndex + 1 : 1)} de {products.length} ({publishProgress}%)
+                          {isPastProduct ? (viewingIndex + 1) : (currentPublishingIndex !== null ? currentPublishingIndex + 1 : 1)} de {publishingIds.length} ({publishProgress}%)
                         </span>
                       </div>
                       <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner">
@@ -1470,10 +1546,10 @@ export default function ResellerIntegrationDemo() {
                     <h3 className="text-lg font-black text-slate-800 select-none">Publicação Concluída!</h3>
                     <p className="text-xs text-slate-655 font-medium leading-relaxed">
                       {selectedML && selectedSHP 
-                        ? "20 produtos publicados na sua loja da Shopee e do Mercado Livre. Em até 12 horas os produtos vão ser aprovados pelos marketplaces e já publicados."
+                        ? `${publishingIds.length} ${publishingIds.length === 1 ? 'produto publicado' : 'produtos publicados'} na sua loja da Shopee e do Mercado Livre. Em até 12 horas os produtos vão ser aprovados pelos marketplaces e já publicados.`
                         : selectedML 
-                        ? "20 produtos publicados na sua loja do Mercado Livre. Em até 12 horas os produtos vão ser aprovados pelo marketplace e já publicados."
-                        : "20 produtos publicados na sua loja da Shopee. Em até 12 horas os produtos vão ser aprovados pelo marketplace e já publicados."
+                        ? `${publishingIds.length} ${publishingIds.length === 1 ? 'produto publicado' : 'produtos publicados'} na sua loja do Mercado Livre. Em até 12 horas os produtos vão ser aprovados pelo marketplace e já publicados.`
+                        : `${publishingIds.length} ${publishingIds.length === 1 ? 'produto publicado' : 'produtos publicados'} na sua loja da Shopee. Em até 12 horas os produtos vão ser aprovados pelo marketplace e já publicados.`
                       }
                     </p>
                   </div>
