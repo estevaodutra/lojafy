@@ -438,7 +438,7 @@ export default function ResellerIntegrationDemo() {
         </section>
 
         {/* ONBOARDING BOX */}
-        <section className="bg-white border border-slate-150 shadow-md rounded-2xl p-6 md:p-8 space-y-6 relative overflow-hidden">
+        <section className="bg-white border border-slate-150 shadow-md rounded-2xl p-4 sm:p-6 md:p-8 space-y-6 relative overflow-hidden">
           
           {/* STEP 1 CONTROLLER */}
           {currentStep === 1 && (
@@ -706,7 +706,7 @@ export default function ResellerIntegrationDemo() {
                   <div className="pt-2 border-t border-slate-100 flex justify-end">
                     <Button
                       onClick={() => setCurrentStep(3)}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 px-6 rounded-xl shadow-sm flex items-center gap-1.5 active:scale-95 transition-all"
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 px-6 rounded-xl shadow-sm flex items-center gap-1.5 active:scale-95 transition-all w-full sm:w-auto justify-center"
                     >
                       Avançar para Publicação dos Produtos <ArrowRight className="h-4 w-4" />
                     </Button>
