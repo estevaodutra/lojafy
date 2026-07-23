@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
+import logoIntegration from "../../assets/logo-painel-de-integracao.png";
 import { 
   Check, 
   RefreshCw, 
@@ -507,15 +508,11 @@ export default function ResellerIntegrationDemo() {
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100 shadow-sm px-6 py-4">
         <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shadow-indigo-200">
-                L
-              </div>
-              <div className="flex flex-col">
-                <span className="font-extrabold text-2xl tracking-tight bg-gradient-to-r from-purple-600 to-indigo-850 bg-clip-text text-transparent">Lojafy</span>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider -mt-1">Integra</span>
-              </div>
-            </div>
+            <img 
+              src={logoIntegration} 
+              alt="Lojafy Integra" 
+              className="h-10 w-auto object-contain select-none"
+            />
             <div className="h-8 w-[1px] bg-slate-200 hidden sm:block mx-2"></div>
             <div>
               <div className="flex items-center gap-2">
