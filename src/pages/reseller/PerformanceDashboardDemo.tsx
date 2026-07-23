@@ -39,7 +39,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetClose } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 
 import { 
@@ -1213,7 +1213,11 @@ export default function PerformanceDashboardDemo() {
               <Badge className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-100 text-[10px] font-bold">
                 Performance do Vendedor
               </Badge>
-              <SheetClose className="text-slate-400 hover:text-slate-600 rounded-lg p-1 hover:bg-slate-50 transition-all" />
+              <SheetClose asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50">
+                  <X className="h-4 w-4" />
+                </Button>
+              </SheetClose>
             </div>
             
             <div className="flex items-center gap-3 mt-4">
