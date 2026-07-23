@@ -69,6 +69,37 @@ export default function ResellerIntegrationDemo() {
   // Catalog search state
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Fetch real products from Supabase
+  const { data: dbProducts = [] } = useQuery({
+    queryKey: ['reseller-db-products'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('active', true)
+        .limit(20);
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
+  // Map database products to reseller demo products
+  useEffect(() => {
+    if (dbProducts && dbProducts.length > 0) {
+      const mapped = dbProducts.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        sku: p.sku || `SKU-${p.id.slice(0, 8).toUpperCase()}`,
+        image: p.main_image_url || p.image_url || (p.images && p.images[0]) || '/placeholder.svg',
+        costPrice: Number(p.cost_price || p.price * 0.7 || 10.00),
+        stock: p.stock_quantity || 50,
+        category: p.category_id || 'Geral',
+        status: 'ready' as const
+      }));
+      setProducts(mapped);
+    }
+  }, [dbProducts]);
+
   // Catalog products
   const [products, setProducts] = useState<DemoProduct[]>([
     {
@@ -256,46 +287,43 @@ export default function ResellerIntegrationDemo() {
 
     toast.info("Iniciando publicação em lote no Mercado Livre e Shopee...", {
       description: "Formatando SKUs e aplicando margem selecionada.",
-      duration: 1000
+      duration: 1500
     });
 
-    let currentProdIndex = 0;
-    const totalDuration = 6000 + Math.random() * 6000; // 6 to 12 seconds
-    const itemInterval = totalDuration / products.length;
-    
-    const interval = setInterval(() => {
-      if (currentProdIndex < products.length) {
-        const prod = products[currentProdIndex];
-        setCurrentPublishingProduct(`Publicando SKU: ${prod.sku}...`);
-        
-        // Update product individual status
-        setProducts(prev => prev.map((p, i) => {
-          if (i === currentProdIndex) {
-            return {
-              ...p,
-              status: 'published_both' // Uploads to both ML and Shopee
-            };
-          }
-          return p;
-        }));
-
-        currentProdIndex++;
-        setPublishProgress(Math.round((currentProdIndex / products.length) * 100));
-      } else {
-        clearInterval(interval);
-        
-        setTimeout(() => {
-          setStep3SubState('done');
-          setMlConnected(true);
-          setShpConnected(true);
-          
-          toast.success("Publicação concluída com sucesso!", {
-            description: `Os top ${products.length} produtos já estão ativos nas suas lojas do ML e Shopee.`,
-            duration: 4000
-          });
-        }, 800);
+    const publishNextProduct = (index: number) => {
+      if (index >= products.length) {
+        setStep3SubState('done');
+        setMlConnected(true);
+        setShpConnected(true);
+        toast.success("Publicação concluída com sucesso!", {
+          description: `Os ${products.length} produtos do catálogo foram publicados nas suas lojas do ML e Shopee.`,
+          duration: 4000
+        });
+        return;
       }
-    }, itemInterval);
+
+      const currentProd = products[index];
+      setCurrentPublishingProduct(`Publicando: ${currentProd.name}...`);
+
+      // Set current product status to publishing
+      setProducts(prev => prev.map(p => p.id === currentProd.id ? { ...p, status: 'publishing' } : p));
+
+      // Random delay between 3 and 6 seconds per product (3000ms to 6000ms)
+      const delay = 3000 + Math.random() * 3000;
+
+      setTimeout(() => {
+        // Set current product status to published
+        setProducts(prev => prev.map(p => p.id === currentProd.id ? { ...p, status: 'published_both' } : p));
+
+        // Update overall progress bar
+        setPublishProgress(Math.round(((index + 1) / products.length) * 100));
+
+        // Next item
+        publishNextProduct(index + 1);
+      }, delay);
+    };
+
+    publishNextProduct(0);
   };
 
   // Reset Onboarding Replay
@@ -839,109 +867,148 @@ export default function ResellerIntegrationDemo() {
 
         {/* CATALOG LIST CONTAINER */}
         {currentStep === 3 && (
-          <section className="bg-white border border-slate-100 shadow-sm rounded-2xl overflow-hidden flex flex-col">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-50 bg-slate-50/20 px-6 py-5">
-            <div className="space-y-1">
-              <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                <Database className="h-4 w-4 text-indigo-500" />
-                Pré-visualização do Catálogo de Produtos
-              </h3>
-              <p className="text-xs text-slate-500 font-medium">
-                Os preços de venda exibidos abaixo são calculados em tempo real com base no custo de fornecedor da Lojafy e na margem de lucro selecionada no passo 3.
-              </p>
-            </div>
+          <section className="space-y-6">
+            <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  <Database className="h-4 w-4 text-indigo-500" />
+                  Visualização do Catálogo de Produtos
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Abaixo estão listados os produtos do seu catálogo. Modifique a margem comercial acima para simular preços de venda e lucros sugeridos.
+                </p>
+              </div>
 
-            <div className="flex items-center gap-3">
-              <div className="relative w-full sm:w-56">
+              <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
                 <Input 
-                  placeholder="Buscar SKU ou nome..." 
+                  placeholder="Buscar produto por nome ou SKU..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 h-9 text-xs bg-slate-50 border-slate-200 focus:bg-white rounded-lg focus-visible:ring-purple-500"
+                  className="pl-9 h-9 text-xs border-slate-200 focus-visible:ring-indigo-500 rounded-xl"
                 />
               </div>
             </div>
-          </div>
 
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-slate-50/50">
-                <TableRow className="border-b border-slate-100 hover:bg-transparent">
-                  <TableHead className="text-xs font-bold text-slate-500 h-10 px-6">Produto</TableHead>
-                  <TableHead className="text-xs font-bold text-slate-500 h-10 px-4">Categoria</TableHead>
-                  <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-right">Preço de Custo</TableHead>
-                  <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-center">Margem</TableHead>
-                  <TableHead className="text-xs font-bold text-indigo-650 h-10 px-4 text-right bg-indigo-55/10">Preço Sugerido (Venda)</TableHead>
-                  <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-center">Estoque</TableHead>
-                  <TableHead className="text-xs font-bold text-slate-500 h-10 px-6 text-center">Status no Canal</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProducts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-xs text-slate-400 font-medium">
-                      Nenhum produto correspondente encontrado no catálogo.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredProducts.map((p) => {
-                    const isMlPublished = mlConnected || p.status === 'published_ml' || p.status === 'published_both';
-                    const isShpPublished = shpConnected || p.status === 'published_shp' || p.status === 'published_both';
-                    const isPublished = isMlPublished || isShpPublished;
+            {/* PRODUCT CARDS GRID */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {filteredProducts.length === 0 ? (
+                <div className="col-span-full bg-white border border-slate-100 rounded-2xl p-12 text-center text-slate-400 font-semibold text-xs">
+                  Nenhum produto correspondente encontrado.
+                </div>
+              ) : (
+                [...filteredProducts]
+                  .sort((a, b) => {
+                    const score = (p: typeof a) => {
+                      if (p.status === 'published_both') return 2;
+                      if (p.status === 'publishing') return 1;
+                      return 0;
+                    };
+                    return score(b) - score(a);
+                  })
+                  .map(product => {
+                    const costPrice = product.costPrice;
+                    const suggestedPrice = calculateSuggestedPrice(costPrice);
+                    const profit = suggestedPrice - costPrice;
                     
-                    let statusColor = "bg-slate-50 text-slate-500 border-slate-200";
-                    let statusLabel = "Pronto para publicar";
-
-                    if (isMlPublished && isShpPublished) {
-                      statusColor = "bg-indigo-50 text-indigo-750 border-indigo-200/50 font-bold";
-                      statusLabel = "Ativo no ML e Shopee";
-                    } else if (isMlPublished) {
-                      statusColor = "bg-blue-50 text-blue-700 border-blue-200/50 font-bold";
-                      statusLabel = "Ativo no Mercado Livre";
-                    } else if (isShpPublished) {
-                      statusColor = "bg-orange-50 text-orange-700 border-orange-200/50 font-bold";
-                      statusLabel = "Ativo na Shopee";
-                    }
+                    const isPublishing = product.status === 'publishing';
+                    const isPublished = product.status === 'published_both';
 
                     return (
-                      <TableRow key={p.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                        <TableCell className="py-3.5 px-6">
-                          <div className="flex items-center gap-3">
+                      <Card 
+                        key={product.id} 
+                        className={`overflow-hidden border rounded-2xl transition-all duration-300 ${
+                          isPublishing 
+                            ? 'border-indigo-400 ring-2 ring-indigo-100 shadow-md animate-pulse' 
+                            : isPublished 
+                            ? 'border-emerald-200 bg-emerald-50/5 shadow-sm' 
+                            : 'border-slate-100 hover:shadow-md'
+                        }`}
+                      >
+                        <CardContent className="p-0 flex flex-col h-full">
+                          {/* Image Container */}
+                          <div className="relative aspect-square bg-slate-50/50 p-4 flex items-center justify-center border-b border-slate-50">
                             <img 
-                              src={p.image} 
-                              alt={p.name} 
-                              className="w-10 h-10 rounded-lg object-cover border border-slate-150 shadow-sm shrink-0"
+                              src={product.image} 
+                              alt={product.name} 
+                              className="max-h-full max-w-full object-contain select-none rounded-lg" 
                             />
-                            <div className="flex flex-col">
-                              <span className="font-bold text-xs text-slate-800 max-w-[280px] truncate">{p.name}</span>
-                              <span className="text-[10px] text-slate-400 font-mono mt-0.5">{p.sku}</span>
-                            </div>
+                            {isPublished && (
+                              <Badge className="absolute top-3 left-3 bg-emerald-50 text-emerald-700 border border-emerald-100/50 flex items-center gap-1 font-bold text-[10px] py-0.5 px-2 select-none">
+                                <Check className="h-3 w-3 text-emerald-600" /> Ativo
+                              </Badge>
+                            )}
+                            {isPublishing && (
+                              <Badge className="absolute top-3 left-3 bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center gap-1 font-bold text-[10px] py-0.5 px-2 animate-pulse select-none">
+                                <RefreshCw className="h-2.5 w-2.5 animate-spin text-indigo-500" /> Enviando...
+                              </Badge>
+                            )}
                           </div>
-                        </TableCell>
-                        <TableCell className="font-semibold text-xs text-slate-500 py-3.5 px-4">{p.category}</TableCell>
-                        <TableCell className="font-bold text-xs text-slate-900 text-right py-3.5 px-4">{fmtBRL(p.costPrice)}</TableCell>
-                        <TableCell className="font-bold text-xs text-slate-600 text-center py-3.5 px-4">{marginPercent}%</TableCell>
-                        <TableCell className="font-black text-xs text-indigo-700 text-right py-3.5 px-4 bg-indigo-50/10">
-                          {fmtBRL(calculateSuggestedPrice(p.costPrice))}
-                        </TableCell>
-                        <TableCell className="text-center py-3.5 px-4">
-                          <span className="text-xs font-bold text-slate-600">{p.stock} un</span>
-                        </TableCell>
-                        <TableCell className="py-3.5 px-6 text-center">
-                          <Badge variant="outline" className={`rounded-lg px-2.5 py-0.5 border text-[10px] ${statusColor}`}>
-                            {isPublished && <Check className="h-3 w-3 inline mr-1" />}
-                            {statusLabel}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
+
+                          {/* Info Container */}
+                          <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
+                            <div className="space-y-1">
+                              <span className="text-[10px] font-mono text-slate-400 font-bold tracking-wider">{product.sku}</span>
+                              <h4 className="font-bold text-xs text-slate-800 line-clamp-2 leading-relaxed h-8">
+                                {product.name}
+                              </h4>
+                            </div>
+
+                            {/* Prices and Profit */}
+                            <div className="space-y-2 border-t border-slate-50 pt-3">
+                              <div className="flex justify-between items-center text-[11px] font-semibold text-slate-500">
+                                <span>Custo Fornecedor:</span>
+                                <span className="font-bold text-slate-700">{fmtBRL(costPrice)}</span>
+                              </div>
+
+                              <div className="flex justify-between items-center text-xs font-bold text-slate-800">
+                                <span>Preço de Venda:</span>
+                                <span className="text-indigo-650 font-black">{fmtBRL(suggestedPrice)}</span>
+                              </div>
+
+                              <div className="flex justify-between items-center text-xs font-bold bg-emerald-50/50 border border-emerald-100/50 rounded-xl px-2.5 py-1.5 mt-1">
+                                <span className="text-emerald-800 font-semibold text-[11px]">Seu Lucro Estimado:</span>
+                                <span className="text-emerald-700 font-black text-xs font-mono">{fmtBRL(profit)}</span>
+                              </div>
+                            </div>
+
+                            {/* Channel Integration Badges */}
+                            <div className="border-t border-slate-50 pt-3 space-y-1.5">
+                              <div className="flex justify-between items-center text-[10px] font-bold">
+                                <span className="text-slate-400">Mercado Livre</span>
+                                {isPublished ? (
+                                  <span className="text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-150 flex items-center gap-0.5 select-none">
+                                    ✓ Publicado
+                                  </span>
+                                ) : isPublishing ? (
+                                  <span className="text-indigo-600 animate-pulse">Enviando...</span>
+                                ) : (
+                                  <span className="text-slate-400">Pendente</span>
+                                )}
+                              </div>
+
+                              <div className="flex justify-between items-center text-[10px] font-bold">
+                                <span className="text-slate-400">Shopee</span>
+                                {isPublished ? (
+                                  <span className="text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-150 flex items-center gap-0.5 select-none">
+                                    ✓ Publicado
+                                  </span>
+                                ) : isPublishing ? (
+                                  <span className="text-indigo-600 animate-pulse">Enviando...</span>
+                                ) : (
+                                  <span className="text-slate-400">Pendente</span>
+                                )}
+                              </div>
+                            </div>
+
+                          </div>
+                        </CardContent>
+                      </Card>
                     );
                   })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </section>
+              )}
+            </div>
+          </section>
         )}
 
       </main>
