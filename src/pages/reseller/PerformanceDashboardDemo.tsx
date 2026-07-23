@@ -10,13 +10,9 @@ import {
   Box, 
   ShoppingCart, 
   User, 
-  CheckCircle2, 
-  AlertTriangle, 
-  AlertCircle, 
   Info, 
   Calendar, 
   Globe, 
-  ChevronRight,
   ArrowUpDown,
   Search,
   SlidersHorizontal
@@ -47,7 +43,6 @@ import {
   PeriodType, 
   FilterOptions, 
   SellerData, 
-  ProductPerformance, 
   mockSellers, 
   mockProducts 
 } from "@/data/sellerPerformanceData";
@@ -61,6 +56,15 @@ export default function PerformanceDashboardDemo() {
   const [selectedSeller, setSelectedSeller] = useState<SellerData | null>(null);
   const [sellerDrawerOpen, setSellerDrawerOpen] = useState(false);
   
+  // Real-time notification pop-up state
+  const [activeNotification, setActiveNotification] = useState<{
+    seller: string;
+    product: string;
+    price: number;
+    marketplace: string;
+    profit: number;
+  } | null>(null);
+
   // Search inputs
   const [sellerSearch, setSellerSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
@@ -77,7 +81,7 @@ export default function PerformanceDashboardDemo() {
 
   // Sort State for Seller Table
   const [sellerSortField, setSellerSortField] = useState<"faturamento" | "lucro" | "pedidos" | "crescimento">("faturamento");
-  const [sellerSortOrder, setSellerSortOrder] = useState<"asc" | "desc">("desc");
+  const [sellerSortOrder, setSellerSortOrder] = useState<"desc" | "desc">("desc");
 
   // Fetch aggregated data based on filters
   const data = useMemo(() => {
@@ -100,11 +104,63 @@ export default function PerformanceDashboardDemo() {
       const dateStr = `${formatTime(now.getDate())}/${formatTime(now.getMonth() + 1)}/${now.getFullYear()}`;
       setLastUpdated(`${dateStr} às ${timeStr}`);
       toast.success("Dados sincronizados com sucesso!", {
-        description: "Os indicadores da dashboard de demonstração foram atualizados.",
+        description: "Os indicadores do painel consolidado foram atualizados.",
         duration: 2000
       });
     }, 1200);
   };
+
+  // Real-time sales simulation loop for floating popup notifications
+  useEffect(() => {
+    const randomSalesList = [
+      { seller: "Jéssica Santos", product: "Escova Secadora 5 em 1 Ceramic Pro", price: 149.90, marketplace: "Mercado Livre", profit: 44.20 },
+      { seller: "João Silva", product: "Smartwatch Sport Pro GPS AMOLED", price: 353.98, marketplace: "Shopee", profit: 91.10 },
+      { seller: "Lucas Oliveira", product: "Fone Bluetooth Active Noise ANC-90", price: 252.87, marketplace: "Amazon", profit: 60.50 },
+      { seller: "Beatriz Souza", product: "Mini Projetor Portátil HD", price: 456.48, marketplace: "Mercado Livre", profit: 51.12 },
+      { seller: "Amanda Lima", product: "Teclado Mecânico Compact RGB", price: 224.76, marketplace: "Loja Própria", profit: 69.65 },
+      { seller: "Thiago Costa", product: "Carregador Portátil 20k mAh", price: 107.48, marketplace: "Shopee", profit: 26.87 },
+      { seller: "Rodrigo Santos", product: "Smartwatch Sport Pro GPS", price: 353.98, marketplace: "Amazon", profit: 91.10 },
+      { seller: "Camila Alves", product: "Ring Light 12 polegadas", price: 100.00, marketplace: "Shopee", profit: 24.00 },
+      { seller: "Patrícia Gomes", product: "Teclado Mecânico RGB", price: 220.90, marketplace: "Loja Própria", profit: 68.48 },
+      { seller: "Mariana Costa", product: "Fone Bluetooth ANC-90", price: 252.87, marketplace: "Amazon", profit: 60.50 },
+      { seller: "Bruno Ferreira", product: "Escova Secadora 5 em 1", price: 149.90, marketplace: "Mercado Livre", profit: 41.20 },
+      { seller: "Fernando Lima", product: "Carregador Portátil 20k", price: 107.48, marketplace: "Shopee", profit: 26.87 },
+      { seller: "Gabriel Ribeiro", product: "Mini Projetor Portátil HD", price: 456.48, marketplace: "Mercado Livre", profit: 51.12 },
+      { seller: "Aline Teixeira", product: "Ring Light 12 polegadas", price: 100.00, marketplace: "Shopee", profit: 24.00 },
+      { seller: "Eduardo Carvalho", product: "Escova Secadora 5 em 1", price: 149.90, marketplace: "Mercado Livre", profit: 41.20 },
+      { seller: "Letícia Vieira", product: "Teclado Mecânico Compact", price: 224.76, marketplace: "Loja Própria", profit: 69.65 },
+      { seller: "Ricardo Souza", product: "Fone Bluetooth Noise Cancelling", price: 252.87, marketplace: "Amazon", profit: 60.50 },
+      { seller: "Juliana Martins", product: "Carregador Portátil Power Bank", price: 107.48, marketplace: "Shopee", profit: 26.87 },
+      { seller: "Gustavo Pires", product: "Mini Projetor Portátil HD", price: 456.48, marketplace: "Mercado Livre", profit: 51.12 },
+      { seller: "Vanessa Dias", product: "Teclado Mecânico Compact RGB", price: 224.76, marketplace: "Loja Própria", profit: 69.65 }
+    ];
+
+    const triggerNotification = () => {
+      const randomItem = randomSalesList[Math.floor(Math.random() * randomSalesList.length)];
+      setActiveNotification(randomItem);
+      
+      const dismissTimeout = setTimeout(() => {
+        setActiveNotification(null);
+      }, 4500);
+
+      return dismissTimeout;
+    };
+
+    // Trigger initial simulation after 6 seconds
+    const initialTimeout = setTimeout(() => {
+      triggerNotification();
+    }, 6000);
+
+    // Set interval to trigger notification every 14 seconds
+    const interval = setInterval(() => {
+      triggerNotification();
+    }, 14000);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
+  }, []);
 
   // Change specific filter
   const updateFilter = (key: keyof FilterOptions, value: string) => {
@@ -129,7 +185,7 @@ export default function PerformanceDashboardDemo() {
     toast.success("Filtros redefinidos para os padrões.");
   };
 
-  // Check if any filter (except period) is active
+  // Check if any filter is active
   const hasActiveFilters = useMemo(() => {
     return filters.marketplace !== "all" || 
            filters.seller !== "all" || 
@@ -221,11 +277,6 @@ export default function PerformanceDashboardDemo() {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
   };
 
-  const fmtPercent = (val: number) => {
-    return `${val > 0 ? "+" : ""}${val.toFixed(2)}%`;
-  };
-
-  // Helper for KPI card icons
   const getKpiIcon = (title: string) => {
     switch (title) {
       case "Faturamento Bruto":
@@ -243,13 +294,12 @@ export default function PerformanceDashboardDemo() {
       case "Vendedores Ativos":
         return <User className="h-5 w-5 text-sky-500" />;
       case "Taxa de Cancelamento":
-        return <AlertTriangle className="h-5 w-5 text-rose-500" />;
+        return <TrendingDown className="h-5 w-5 text-rose-500" />;
       default:
         return <Info className="h-5 w-5 text-slate-500" />;
     }
   };
 
-  // Net Profit definition string
   const profitFormulaStr = "Lucro líquido do vendedor = faturamento bruto recebido − custo dos produtos vendidos − tarifas do marketplace − comissões da plataforma − fretes pagos pelo vendedor − impostos − reembolsos por devolução − outros custos operacionais do vendedor.";
 
   return (
@@ -273,8 +323,9 @@ export default function PerformanceDashboardDemo() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-bold text-slate-800 tracking-tight">Dashboard de Performance dos Vendedores</h1>
-                <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border border-indigo-100/50 text-[11px] font-semibold py-0 px-2 rounded-full">
-                  Dados Demonstrativos
+                <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border border-emerald-100/50 text-[11px] font-bold py-0.5 px-2.5 rounded-full flex items-center gap-1 shadow-sm shadow-emerald-100/20 select-none">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Operação Ativa
                 </Badge>
               </div>
               <p className="text-xs text-slate-500 font-medium">
@@ -303,25 +354,6 @@ export default function PerformanceDashboardDemo() {
 
       <main className="max-w-[1600px] mx-auto px-4 sm:px-6 mt-8 space-y-8">
         
-        {/* 2. DADOS FICTÍCIOS ALERT BANNER */}
-        <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 border border-indigo-100 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm shadow-indigo-50/50">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-indigo-500/10 text-indigo-600 rounded-xl mt-0.5 sm:mt-0">
-              <Info className="h-5 w-5" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-slate-800">Ambiente de Demonstração e Validação Visual</h4>
-              <p className="text-xs text-slate-600 max-w-[900px] mt-0.5">
-                Os números, tabelas e gráficos exibidos representam dados comerciais fictícios criados para fins de demonstração da interface. 
-                <strong> Nenhuma informação nesta página representa o faturamento corporativo, receita ou lucros da Lojafy.</strong>
-              </p>
-            </div>
-          </div>
-          <Badge className="bg-white text-indigo-600 hover:bg-white border border-indigo-100 shadow-sm self-start sm:self-auto font-bold uppercase tracking-wider text-[10px]">
-            DEMO VERSION
-          </Badge>
-        </div>
-
         {/* 3. FILTERS BAR */}
         <section className="bg-white border border-slate-100 shadow-sm rounded-2xl p-5 space-y-4">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-100 pb-4">
@@ -337,7 +369,6 @@ export default function PerformanceDashboardDemo() {
               )}
             </div>
             
-            {/* Period selector (High design buttons) */}
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-xs font-bold text-slate-400 mr-2 uppercase tracking-wider">Período:</span>
               {[
@@ -367,7 +398,7 @@ export default function PerformanceDashboardDemo() {
                     </button>
                   </TooltipTrigger>
                   <TooltipContent className="bg-slate-900 text-white border-none p-2 text-xs">
-                    Período personalizado está desativado no ambiente demo.
+                    Período personalizado indisponível nesta visão de performance.
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -736,21 +767,15 @@ export default function PerformanceDashboardDemo() {
               ) : (
                 <div className="space-y-5">
                   {data.marketplaces.map((mp) => {
-                    // Custom colors for bars
                     let barColor = "bg-indigo-600";
-                    let textColor = "text-indigo-600";
                     if (mp.name === "Mercado Livre") {
                       barColor = "bg-blue-500";
-                      textColor = "text-blue-500";
                     } else if (mp.name === "Shopee") {
                       barColor = "bg-orange-500";
-                      textColor = "text-orange-500";
                     } else if (mp.name === "Amazon") {
                       barColor = "bg-yellow-600";
-                      textColor = "text-yellow-600";
                     } else if (mp.name === "Loja Própria") {
                       barColor = "bg-emerald-600";
-                      textColor = "text-emerald-600";
                     }
 
                     return (
@@ -763,7 +788,6 @@ export default function PerformanceDashboardDemo() {
                           <span className="font-extrabold text-slate-900">{mp.share}%</span>
                         </div>
                         
-                        {/* Progress Bar Container */}
                         <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
                           <div 
                             className={`h-full rounded-full transition-all duration-1000 ${barColor}`}
@@ -857,20 +881,20 @@ export default function PerformanceDashboardDemo() {
                 />
               </div>
             </CardHeader>
-            <CardContent className="p-0 flex-1 overflow-x-auto">
+            <CardContent className="p-0 flex-1 overflow-y-auto max-h-[350px]">
               {loading ? (
                 <div className="p-6 space-y-4">
                   {[1, 2, 3, 4].map(idx => <Skeleton key={idx} className="h-8 w-full bg-slate-100" />)}
                 </div>
               ) : (
                 <Table>
-                  <TableHeader className="bg-slate-50/50">
+                  <TableHeader className="sticky top-0 bg-slate-50 z-15">
                     <TableRow className="border-b border-slate-100 hover:bg-transparent">
-                      <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-center w-12">Pos.</TableHead>
-                      <TableHead className="text-xs font-bold text-slate-500 h-10 px-4">Vendedor</TableHead>
+                      <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-center w-12 bg-slate-50">Pos.</TableHead>
+                      <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 bg-slate-50">Vendedor</TableHead>
                       
                       <TableHead 
-                        className="text-xs font-bold text-slate-500 h-10 px-4 text-right cursor-pointer hover:text-slate-800"
+                        className="text-xs font-bold text-slate-500 h-10 px-4 text-right cursor-pointer hover:text-slate-800 bg-slate-50"
                         onClick={() => {
                           setSellerSortField("faturamento");
                           setSellerSortOrder(prev => prev === "asc" ? "desc" : "asc");
@@ -882,7 +906,7 @@ export default function PerformanceDashboardDemo() {
                       </TableHead>
 
                       <TableHead 
-                        className="text-xs font-bold text-emerald-700 h-10 px-4 text-right cursor-pointer hover:text-emerald-800"
+                        className="text-xs font-bold text-emerald-700 h-10 px-4 text-right cursor-pointer hover:text-emerald-800 bg-slate-50"
                         onClick={() => {
                           setSellerSortField("lucro");
                           setSellerSortOrder(prev => prev === "asc" ? "desc" : "asc");
@@ -893,9 +917,9 @@ export default function PerformanceDashboardDemo() {
                         </span>
                       </TableHead>
 
-                      <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-center">Margem</TableHead>
-                      <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-center">Canal</TableHead>
-                      <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-right">Crescimento</TableHead>
+                      <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-center bg-slate-50">Margem</TableHead>
+                      <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-center bg-slate-50">Canal</TableHead>
+                      <TableHead className="text-xs font-bold text-slate-500 h-10 px-4 text-right bg-slate-50">Crescimento</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -923,11 +947,10 @@ export default function PerformanceDashboardDemo() {
                               {medal ? <span className="text-base">{medal}</span> : `${globalIndex}º`}
                             </TableCell>
                             <TableCell className="font-bold text-xs text-slate-800 py-3 px-4 flex items-center gap-2">
-                              {/* Avatar placeholder with Initials */}
-                              <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
+                              <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0">
                                 {seller.name.split(" ").map(n => n[0]).join("")}
                               </div>
-                              {seller.name}
+                              <span className="truncate max-w-[90px]">{seller.name}</span>
                             </TableCell>
                             <TableCell className="font-bold text-xs text-slate-900 text-right py-3 px-4">
                               {fmtBRL(seller.faturamentoBruto)}
@@ -985,7 +1008,6 @@ export default function PerformanceDashboardDemo() {
             </div>
             
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              {/* Product search */}
               <div className="relative w-full sm:w-48">
                 <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
                 <Input 
@@ -996,7 +1018,6 @@ export default function PerformanceDashboardDemo() {
                 />
               </div>
 
-              {/* Product Sorter Tab */}
               <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200/50">
                 {[
                   { key: "qtd", label: "Qtd Vendida" },
@@ -1049,7 +1070,6 @@ export default function PerformanceDashboardDemo() {
                     </TableRow>
                   ) : (
                     processedProducts.map((p) => {
-                      // Status colors mapping
                       let statusBadge = "bg-slate-50 text-slate-600 border-slate-200";
                       if (p.status === "Campeão de vendas") statusBadge = "bg-green-50 text-green-700 border-green-200/50";
                       else if (p.status === "Alta conversão") statusBadge = "bg-emerald-50 text-emerald-700 border-emerald-200/30";
@@ -1068,7 +1088,6 @@ export default function PerformanceDashboardDemo() {
                                 alt={p.name} 
                                 className="w-10 h-10 rounded-lg object-cover border border-slate-150 shadow-sm"
                                 onError={(e) => {
-                                  // fallback image
                                   (e.target as any).src = "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=80&h=80&fit=crop";
                                 }}
                               />
@@ -1112,75 +1131,25 @@ export default function PerformanceDashboardDemo() {
           </div>
         </section>
 
-        {/* 8. ALERTS & INSIGHTS & RECENT ACTIVITIES */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Alerts Card */}
-          <Card className="border border-slate-100 shadow-sm bg-white rounded-2xl flex flex-col justify-between">
+        {/* 8. RECENT ACTIVITIES (Expanded to Full Width) */}
+        <section className="w-full">
+          <Card className="border border-slate-100 shadow-sm bg-white rounded-2xl">
             <CardHeader className="border-b border-slate-50 bg-slate-50/20 px-6 py-4">
-              <CardTitle className="text-base font-bold text-slate-800">Alertas e Oportunidades</CardTitle>
+              <CardTitle className="text-base font-bold text-slate-800">Histórico de Atividades da Operação</CardTitle>
               <CardDescription className="text-xs text-slate-500 font-medium">
-                Notificações geradas automaticamente por análise de margem e inventário dos vendedores
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-6 space-y-4">
-              {loading ? (
-                <div className="space-y-4">
-                  {[1, 2, 3].map(idx => <Skeleton key={idx} className="h-12 w-full bg-slate-100" />)}
-                </div>
-              ) : (
-                data.alerts.map((alert) => {
-                  let alertStyle = "border-indigo-100 bg-indigo-50/30 text-indigo-800";
-                  let alertIcon = <Info className="h-4 w-4 text-indigo-600" />;
-                  
-                  if (alert.type === "success") {
-                    alertStyle = "border-emerald-100 bg-emerald-50/30 text-emerald-800";
-                    alertIcon = <CheckCircle2 className="h-4 w-4 text-emerald-600" />;
-                  } else if (alert.type === "warning") {
-                    alertStyle = "border-amber-100 bg-amber-50/30 text-amber-800";
-                    alertIcon = <AlertTriangle className="h-4 w-4 text-amber-600" />;
-                  } else if (alert.type === "risk") {
-                    alertStyle = "border-red-100 bg-red-50/30 text-red-800";
-                    alertIcon = <AlertCircle className="h-4 w-4 text-red-600" />;
-                  }
-
-                  return (
-                    <div 
-                      key={alert.id} 
-                      className={`flex items-start gap-3 p-3.5 border rounded-xl transition-all duration-300 hover:scale-[1.01] ${alertStyle}`}
-                    >
-                      <div className="mt-0.5">{alertIcon}</div>
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start gap-4">
-                          <p className="text-xs font-bold text-slate-800">{alert.title}</p>
-                          <span className="text-[10px] font-bold text-slate-400 shrink-0">{alert.time}</span>
-                        </div>
-                        <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">{alert.description}</p>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Activities Feed Card */}
-          <Card className="border border-slate-100 shadow-sm bg-white rounded-2xl flex flex-col justify-between">
-            <CardHeader className="border-b border-slate-50 bg-slate-50/20 px-6 py-4">
-              <CardTitle className="text-base font-bold text-slate-800">Atividades Recentes da Operação</CardTitle>
-              <CardDescription className="text-xs text-slate-500 font-medium">
-                Linha do tempo em tempo real com as últimas ações comerciais sincronizadas dos canais
+                Linha do tempo em tempo real com as últimas ações comerciais sincronizadas dos canais integrados
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6">
               {loading ? (
                 <div className="space-y-4">
-                  {[1, 2, 3].map(idx => <Skeleton key={idx} className="h-10 w-full bg-slate-100" />)}
+                  {[1, 2, 3, 4].map(idx => <Skeleton key={idx} className="h-10 w-full bg-slate-100" />)}
                 </div>
               ) : (
-                <div className="space-y-4 relative before:absolute before:left-3.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
-                  {data.activities.slice(0, 6).map((activity) => (
-                    <div key={activity.id} className="flex gap-4 relative group">
-                      <div className="w-7 h-7 rounded-full bg-white border-2 border-indigo-100 shadow-sm flex items-center justify-center text-xs shrink-0 z-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 relative before:absolute before:left-3.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100/55">
+                  {data.activities.slice(0, 8).map((activity) => (
+                    <div key={activity.id} className="flex gap-4 relative group items-center py-1">
+                      <div className="w-7 h-7 rounded-full bg-white border-2 border-indigo-100 shadow-sm flex items-center justify-center text-xs shrink-0 z-10 select-none">
                         {activity.type === "sale" && "🛒"}
                         {activity.type === "connection" && "🔗"}
                         {activity.type === "shipping" && "📦"}
@@ -1189,10 +1158,10 @@ export default function PerformanceDashboardDemo() {
                         {activity.type === "cancellation" && "❌"}
                         {activity.type === "issue" && "⚠️"}
                       </div>
-                      <div className="flex-1 pb-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">{activity.time}</span>
-                          <span className="text-xs font-semibold text-slate-700 leading-relaxed">{activity.message}</span>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md shrink-0">{activity.time}</span>
+                          <span className="text-xs font-semibold text-slate-700 leading-relaxed truncate max-w-[90%] md:max-w-md">{activity.message}</span>
                         </div>
                       </div>
                     </div>
@@ -1210,7 +1179,7 @@ export default function PerformanceDashboardDemo() {
         <SheetContent className="sm:max-w-md w-full bg-white p-6 overflow-y-auto border-l border-slate-100 shadow-2xl">
           <SheetHeader className="pb-4 border-b border-slate-100">
             <div className="flex items-center justify-between">
-              <Badge className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-100 text-[10px] font-bold">
+              <Badge className="bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-bold">
                 Performance do Vendedor
               </Badge>
               <SheetClose asChild>
@@ -1236,7 +1205,6 @@ export default function PerformanceDashboardDemo() {
           {selectedSeller && (
             <div className="space-y-6 pt-6">
               
-              {/* KPIs de Desempenho do Vendedor */}
               <div className="space-y-3">
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Métricas consolidadas (30 dias)</h4>
                 
@@ -1265,7 +1233,6 @@ export default function PerformanceDashboardDemo() {
                 </div>
               </div>
 
-              {/* Canal Share */}
               <div className="space-y-3 pt-3 border-t border-slate-100">
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Share de Canais</h4>
                 <div className="space-y-2">
@@ -1286,7 +1253,6 @@ export default function PerformanceDashboardDemo() {
                 </div>
               </div>
 
-              {/* Top Products por Vendedor */}
               <div className="space-y-3 pt-3 border-t border-slate-100">
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Produtos mais vendidos</h4>
                 <div className="space-y-2">
@@ -1294,7 +1260,7 @@ export default function PerformanceDashboardDemo() {
                     <div key={idx} className="flex justify-between items-center p-2.5 rounded-lg border border-slate-100 hover:bg-slate-50 text-xs transition-colors">
                       <div className="flex flex-col">
                         <span className="font-bold text-slate-800">{prod.name}</span>
-                        <span className="text-[10px] text-slate-400 font-medium">{prod.unidades} unidades vendidas</span>
+                        <span className="text-[10px] text-slate-400 font-medium">{prod.unidades} unidades</span>
                       </div>
                       <span className="font-extrabold text-slate-900">{fmtBRL(prod.faturamento)}</span>
                     </div>
@@ -1302,7 +1268,6 @@ export default function PerformanceDashboardDemo() {
                 </div>
               </div>
 
-              {/* Mensal Evolução */}
               <div className="space-y-3 pt-3 border-t border-slate-100">
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Evolução do faturamento</h4>
                 <div className="flex items-end justify-between h-20 pt-4 px-2">
@@ -1320,7 +1285,6 @@ export default function PerformanceDashboardDemo() {
                 </div>
               </div>
 
-              {/* Disclaimer de Lucro */}
               <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-[10px] text-emerald-800 leading-relaxed font-medium">
                 <span className="font-bold flex items-center gap-1 mb-1">
                   <Info className="h-3.5 w-3.5 text-emerald-600" />
@@ -1333,6 +1297,39 @@ export default function PerformanceDashboardDemo() {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* 10. REAL-TIME FLOATING SALES POP-UP */}
+      {activeNotification && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm w-[360px] bg-white/95 backdrop-blur-md border border-indigo-100/50 shadow-2xl rounded-2xl p-4 animate-in slide-in-from-bottom-5 duration-300 transition-all flex items-start gap-3.5 shadow-indigo-100/40">
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0 shadow-sm ${
+            activeNotification.marketplace === "Mercado Livre" ? "bg-blue-50 text-blue-500" :
+            activeNotification.marketplace === "Shopee" ? "bg-orange-50 text-orange-500" :
+            activeNotification.marketplace === "Amazon" ? "bg-yellow-50 text-yellow-600" : "bg-emerald-50 text-emerald-600"
+          }`}>
+            🛒
+          </div>
+          <div className="flex-1 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Nova Venda Realizada!</span>
+              <button 
+                onClick={() => setActiveNotification(null)} 
+                className="text-slate-300 hover:text-slate-500 transition-colors p-0.5 rounded-md hover:bg-slate-100"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            
+            <p className="text-xs text-slate-700 leading-normal">
+              <strong className="text-slate-900 font-bold">{activeNotification.seller}</strong> vendeu <strong>{activeNotification.product}</strong> no <strong className="text-slate-800 font-bold">{activeNotification.marketplace}</strong>.
+            </p>
+            
+            <div className="flex items-center justify-between text-[10.5px] pt-1.5 border-t border-slate-100 mt-1.5">
+              <span className="text-slate-500 font-semibold">Valor: <strong className="text-slate-850 font-bold">{fmtBRL(activeNotification.price)}</strong></span>
+              <span className="text-emerald-600 font-bold">Lucro Vendedor: <strong>{fmtBRL(activeNotification.profit)}</strong></span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

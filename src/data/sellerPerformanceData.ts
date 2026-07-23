@@ -1,4 +1,4 @@
-// Seller Performance Dashboard Mock Data & Utilities
+// Seller Performance Dashboard Data & Utilities
 // Exclusively represents performance of sellers using Lojafy to sell on marketplaces.
 
 export type PeriodType = "hoje" | "7_dias" | "10_dias" | "15_dias" | "30_dias";
@@ -82,14 +82,6 @@ export interface ProductPerformance {
   status: "Campeão de vendas" | "Alta conversão" | "Em crescimento" | "Estável" | "Queda de vendas" | "Risco de estoque" | "Alto cancelamento";
 }
 
-export interface AlertInsight {
-  id: string;
-  type: "success" | "info" | "warning" | "risk";
-  title: string;
-  description: string;
-  time: string;
-}
-
 export interface RecentActivity {
   id: string;
   time: string;
@@ -97,48 +89,7 @@ export interface RecentActivity {
   type: "sale" | "onboarding" | "shipping" | "milestone" | "connection" | "issue" | "cancellation";
 }
 
-// ----------------------------------------------------
-// RAW DATA SETS FOR VARIOUS PERIODS
-// ----------------------------------------------------
-
-export const mockAlerts: AlertInsight[] = [
-  {
-    id: "a1",
-    type: "risk",
-    title: "Estoque Crítico — Fone Bluetooth Noise Cancelling",
-    description: "Estoque central do parceiro Amazon está abaixo de 8 unidades. Risco de ruptura nas próximas 12 horas.",
-    time: "Há 10 min"
-  },
-  {
-    id: "a2",
-    type: "warning",
-    title: "Aumento de Cancelamentos na Shopee",
-    description: "A taxa de cancelamento média dos vendedores na Shopee subiu para 4.2% (alvo é menor que 2.5%). Principal motivo: atraso na postagem.",
-    time: "Há 42 min"
-  },
-  {
-    id: "a3",
-    type: "success",
-    title: "Vendedor Destaque — Jéssica Santos",
-    description: "A vendedora registrou um aumento de +45.2% no faturamento bruto via Mercado Livre, atingindo a liderança do ranking no período.",
-    time: "Há 2 horas"
-  },
-  {
-    id: "a4",
-    type: "info",
-    title: "Oportunidade: Concentração de Vendas no Mercado Livre",
-    description: "62% do faturamento total dos vendedores está concentrado no Mercado Livre. Sugira campanhas na Shopee e Amazon para diversificar o risco.",
-    time: "Há 5 horas"
-  },
-  {
-    id: "a5",
-    type: "warning",
-    title: "Margem Estreita detectada",
-    description: "O produto 'Mini Projetor Portátil HD' registrou margem líquida média de 11.8%, abaixo da meta ideal de 15% devido à alta no frete.",
-    time: "Há 1 dia"
-  }
-];
-
+// Recent Activities Feed for Real-time Simulator
 export const mockActivities: RecentActivity[] = [
   {
     id: "act1",
@@ -149,7 +100,7 @@ export const mockActivities: RecentActivity[] = [
   {
     id: "act2",
     time: "21h32",
-    message: "Novo marketplace conectado: Rodrigo Santos integrou sua loja Lojafy à Amazon Brasil.",
+    message: "Novo marketplace conectado: Rodrigo Santos integrou sua conta da Shopee à Amazon Brasil.",
     type: "connection"
   },
   {
@@ -161,13 +112,13 @@ export const mockActivities: RecentActivity[] = [
   {
     id: "act4",
     time: "20h58",
-    message: "Primeira venda! Camila Alves realizou sua primeira venda aprovada (R$ 89,90) na Shopee.",
+    message: "Nova integração ativa! Camila Alves realizou sua primeira venda no Mercado Livre (R$ 89,90) via Lojafy.",
     type: "onboarding"
   },
   {
     id: "act5",
     time: "20h12",
-    message: "Produto no Top 10: Teclado Mecânico RGB entrou no ranking de mais vendidos geral.",
+    message: "Teclado Mecânico RGB subiu de posição no ranking de produtos mais vendidos.",
     type: "milestone"
   },
   {
@@ -179,12 +130,11 @@ export const mockActivities: RecentActivity[] = [
   {
     id: "act7",
     time: "18h15",
-    message: "Alerta de Integração: Erro temporário de sincronização resolvido na API da Shopee.",
+    message: "Sincronização de Integração concluída com sucesso para a API da Shopee.",
     type: "issue"
   }
 ];
 
-// Product Images (mocked with simple premium styling or SVG data URLs later, here using generic icons/placeholders)
 export const mockProducts: ProductPerformance[] = [
   {
     id: "p1",
@@ -254,7 +204,7 @@ export const mockProducts: ProductPerformance[] = [
     unidadesVendidas: 122,
     pedidos: 120,
     faturamentoBruto: 54778.00,
-    lucroLiquidoGerado: 6135.13, // 11.2% margem líquida
+    lucroLiquidoGerado: 6135.13,
     ticketMedio: 456.48,
     marketplacePrincipal: "Mercado Livre",
     crescimento: -12.4,
@@ -293,9 +243,37 @@ export const mockProducts: ProductPerformance[] = [
   }
 ];
 
+// Expanded Sellers list containing 22 high-performance sellers
 export const mockSellers: SellerData[] = [
   {
     id: "s1",
+    name: "Jéssica Santos",
+    faturamentoBruto: 148900.00,
+    receitaLiquida: 122100.00,
+    lucroLiquidoVendedores: 44210.00,
+    margemLiquida: 29.69,
+    pedidos: 980,
+    unidadesVendidas: 1080,
+    ticketMedio: 151.93,
+    marketplacePrincipal: "Mercado Livre",
+    crescimento: 45.20,
+    produtosVendidos: [
+      { name: "Escova Secadora 5 em 1", unidades: 290, faturamento: 43490.00 },
+      { name: "Mini Projetor Portátil HD", unidades: 82, faturamento: 37400.00 }
+    ],
+    marketplacesShare: [
+      { name: "Mercado Livre", percent: 85 },
+      { name: "Shopee", percent: 15 }
+    ],
+    mensalEvolucao: [
+      { month: "Fev", faturamento: 90000, lucro: 26000 },
+      { month: "Mar", faturamento: 105000, lucro: 30200 },
+      { month: "Abr", faturamento: 120000, lucro: 35100 },
+      { month: "Mai", faturamento: 148900, lucro: 44210 }
+    ]
+  },
+  {
+    id: "s2",
     name: "João Silva",
     faturamentoBruto: 124500.00,
     receitaLiquida: 102090.00,
@@ -321,33 +299,6 @@ export const mockSellers: SellerData[] = [
       { month: "Mar", faturamento: 95000, lucro: 24200 },
       { month: "Abr", faturamento: 110000, lucro: 28800 },
       { month: "Mai", faturamento: 124500, lucro: 32840 }
-    ]
-  },
-  {
-    id: "s2",
-    name: "Jéssica Santos",
-    faturamentoBruto: 148900.00,
-    receitaLiquida: 122100.00,
-    lucroLiquidoVendedores: 44210.00,
-    margemLiquida: 29.69,
-    pedidos: 980,
-    unidadesVendidas: 1080,
-    ticketMedio: 151.93,
-    marketplacePrincipal: "Mercado Livre",
-    crescimento: 45.20,
-    produtosVendidos: [
-      { name: "Escova Secadora 5 em 1", unidades: 290, faturamento: 43490.00 },
-      { name: "Mini Projetor Portátil HD", unidades: 82, faturamento: 37400.00 }
-    ],
-    marketplacesShare: [
-      { name: "Mercado Livre", percent: 85 },
-      { name: "Shopee", percent: 15 }
-    ],
-    mensalEvolucao: [
-      { month: "Fev", faturamento: 90000, lucro: 26000 },
-      { month: "Mar", faturamento: 105000, lucro: 30200 },
-      { month: "Abr", faturamento: 120000, lucro: 35100 },
-      { month: "Mai", faturamento: 148900, lucro: 44210 }
     ]
   },
   {
@@ -510,6 +461,379 @@ export const mockSellers: SellerData[] = [
       { month: "Abr", faturamento: 14450, lucro: 3300 },
       { month: "Mai", faturamento: 29500, lucro: 6780 }
     ]
+  },
+  {
+    id: "s9",
+    name: "Bruno Ferreira",
+    faturamentoBruto: 26800.00,
+    receitaLiquida: 22100.00,
+    lucroLiquidoVendedores: 6430.00,
+    margemLiquida: 23.99,
+    pedidos: 168,
+    unidadesVendidas: 180,
+    ticketMedio: 159.52,
+    marketplacePrincipal: "Mercado Livre",
+    crescimento: 15.40,
+    produtosVendidos: [
+      { name: "Escova Secadora 5 em 1", unidades: 80, faturamento: 12000.00 },
+      { name: "Mini Projetor Portátil HD", unidades: 32, faturamento: 14800.00 }
+    ],
+    marketplacesShare: [
+      { name: "Mercado Livre", percent: 70 },
+      { name: "Shopee", percent: 30 }
+    ],
+    mensalEvolucao: [
+      { month: "Fev", faturamento: 20000, lucro: 4500 },
+      { month: "Mar", faturamento: 22000, lucro: 5100 },
+      { month: "Abr", faturamento: 24500, lucro: 5800 },
+      { month: "Mai", faturamento: 26800, lucro: 6430 }
+    ]
+  },
+  {
+    id: "s10",
+    name: "Patrícia Gomes",
+    faturamentoBruto: 24300.00,
+    receitaLiquida: 21100.00,
+    lucroLiquidoVendedores: 7530.00,
+    margemLiquida: 30.98,
+    pedidos: 110,
+    unidadesVendidas: 120,
+    ticketMedio: 220.90,
+    marketplacePrincipal: "Loja Própria",
+    crescimento: 12.30,
+    produtosVendidos: [
+      { name: "Teclado Mecânico RGB", unidades: 60, faturamento: 13200.00 },
+      { name: "Fone Bluetooth Noise Cancelling", unidades: 44, faturamento: 11100.00 }
+    ],
+    marketplacesShare: [
+      { name: "Loja Própria", percent: 90 },
+      { name: "Amazon", percent: 10 }
+    ],
+    mensalEvolucao: [
+      { month: "Fev", faturamento: 18000, lucro: 5500 },
+      { month: "Mar", faturamento: 20000, lucro: 6100 },
+      { month: "Abr", faturamento: 22000, lucro: 6800 },
+      { month: "Mai", faturamento: 24300, lucro: 7530 }
+    ]
+  },
+  {
+    id: "s11",
+    name: "Fernando Lima",
+    faturamentoBruto: 22100.00,
+    receitaLiquida: 18100.00,
+    lucroLiquidoVendedores: 4860.00,
+    margemLiquida: 21.99,
+    pedidos: 172,
+    unidadesVendidas: 195,
+    ticketMedio: 128.48,
+    marketplacePrincipal: "Shopee",
+    crescimento: -2.10,
+    produtosVendidos: [
+      { name: "Carregador Portátil 20k mAh", unidades: 120, faturamento: 11880.00 },
+      { name: "Ring Light 12 polegadas", unidades: 110, faturamento: 10220.00 }
+    ],
+    marketplacesShare: [
+      { name: "Shopee", percent: 85 },
+      { name: "Mercado Livre", percent: 15 }
+    ],
+    mensalEvolucao: [
+      { month: "Fev", faturamento: 21000, lucro: 4600 },
+      { month: "Mar", faturamento: 23000, lucro: 5100 },
+      { month: "Abr", faturamento: 22500, lucro: 4900 },
+      { month: "Mai", faturamento: 22100, lucro: 4860 }
+    ]
+  },
+  {
+    id: "s12",
+    name: "Mariana Costa",
+    faturamentoBruto: 20500.00,
+    receitaLiquida: 16900.00,
+    lucroLiquidoVendedores: 4710.00,
+    margemLiquida: 22.97,
+    pedidos: 86,
+    unidadesVendidas: 98,
+    ticketMedio: 238.37,
+    marketplacePrincipal: "Amazon",
+    crescimento: 14.50,
+    produtosVendidos: [
+      { name: "Fone Bluetooth Noise Cancelling", unidades: 50, faturamento: 12000.00 },
+      { name: "Teclado Mecânico RGB", unidades: 38, faturamento: 8500.00 }
+    ],
+    marketplacesShare: [
+      { name: "Amazon", percent: 90 },
+      { name: "Loja Própria", percent: 10 }
+    ],
+    mensalEvolucao: [
+      { month: "Fev", faturamento: 15000, lucro: 3400 },
+      { month: "Mar", faturamento: 17000, lucro: 3900 },
+      { month: "Abr", faturamento: 19000, lucro: 4300 },
+      { month: "Mai", faturamento: 20500, lucro: 4710 }
+    ]
+  },
+  {
+    id: "s13",
+    name: "Gabriel Ribeiro",
+    faturamentoBruto: 18900.00,
+    receitaLiquida: 15600.00,
+    lucroLiquidoVendedores: 4950.00,
+    margemLiquida: 26.19,
+    pedidos: 122,
+    unidadesVendidas: 140,
+    ticketMedio: 154.91,
+    marketplacePrincipal: "Mercado Livre",
+    crescimento: 18.20,
+    produtosVendidos: [
+      { name: "Escova Secadora 5 em 1", unidades: 60, faturamento: 9000.00 },
+      { name: "Mini Projetor Portátil HD", unidades: 22, faturamento: 9900.00 }
+    ],
+    marketplacesShare: [
+      { name: "Mercado Livre", percent: 100 }
+    ],
+    mensalEvolucao: [
+      { month: "Fev", faturamento: 13000, lucro: 3400 },
+      { month: "Mar", faturamento: 15000, lucro: 3900 },
+      { month: "Abr", faturamento: 17000, lucro: 4400 },
+      { month: "Mai", faturamento: 18900, lucro: 4950 }
+    ]
+  },
+  {
+    id: "s14",
+    name: "Aline Teixeira",
+    faturamentoBruto: 17200.00,
+    receitaLiquida: 14100.00,
+    lucroLiquidoVendedores: 3950.00,
+    margemLiquida: 22.96,
+    pedidos: 136,
+    unidadesVendidas: 155,
+    ticketMedio: 126.47,
+    marketplacePrincipal: "Shopee",
+    crescimento: 25.60,
+    produtosVendidos: [
+      { name: "Carregador Portátil 20k mAh", unidades: 80, faturamento: 7920.00 },
+      { name: "Ring Light 12 polegadas", unidades: 85, faturamento: 9280.00 }
+    ],
+    marketplacesShare: [
+      { name: "Shopee", percent: 80 },
+      { name: "Mercado Livre", percent: 20 }
+    ],
+    mensalEvolucao: [
+      { month: "Fev", faturamento: 10000, lucro: 2200 },
+      { month: "Mar", faturamento: 12000, lucro: 2700 },
+      { month: "Abr", faturamento: 14000, lucro: 3100 },
+      { month: "Mai", faturamento: 17200, lucro: 3950 }
+    ]
+  },
+  {
+    id: "s15",
+    name: "Eduardo Carvalho",
+    faturamentoBruto: 15600.00,
+    receitaLiquida: 12800.00,
+    lucroLiquidoVendedores: 3740.00,
+    margemLiquida: 23.97,
+    pedidos: 98,
+    unidadesVendidas: 110,
+    ticketMedio: 159.18,
+    marketplacePrincipal: "Mercado Livre",
+    crescimento: 5.40,
+    produtosVendidos: [
+      { name: "Escova Secadora 5 em 1", unidades: 48, faturamento: 7200.00 },
+      { name: "Mini Projetor Portátil HD", unidades: 18, faturamento: 8400.00 }
+    ],
+    marketplacesShare: [
+      { name: "Mercado Livre", percent: 75 },
+      { name: "Shopee", percent: 25 }
+    ],
+    mensalEvolucao: [
+      { month: "Fev", faturamento: 13000, lucro: 3100 },
+      { month: "Mar", faturamento: 14000, lucro: 3300 },
+      { month: "Abr", faturamento: 14800, lucro: 3500 },
+      { month: "Mai", faturamento: 15600, lucro: 3740 }
+    ]
+  },
+  {
+    id: "s16",
+    name: "Letícia Vieira",
+    faturamentoBruto: 14100.00,
+    receitaLiquida: 12200.00,
+    lucroLiquidoVendedores: 4350.00,
+    margemLiquida: 30.85,
+    pedidos: 64,
+    unidadesVendidas: 72,
+    ticketMedio: 220.31,
+    marketplacePrincipal: "Loja Própria",
+    crescimento: 31.20,
+    produtosVendidos: [
+      { name: "Teclado Mecânico RGB", unidades: 40, faturamento: 8800.00 },
+      { name: "Fone Bluetooth Noise Cancelling", unidades: 22, faturamento: 5300.00 }
+    ],
+    marketplacesShare: [
+      { name: "Loja Própria", percent: 100 }
+    ],
+    mensalEvolucao: [
+      { month: "Fev", faturamento: 8000, lucro: 2400 },
+      { month: "Mar", faturamento: 10000, lucro: 3100 },
+      { month: "Abr", faturamento: 12000, lucro: 3700 },
+      { month: "Mai", faturamento: 14100, lucro: 4350 }
+    ]
+  },
+  {
+    id: "s17",
+    name: "Ricardo Souza",
+    faturamentoBruto: 12800.00,
+    receitaLiquida: 10500.00,
+    lucroLiquidoVendedores: 2940.00,
+    margemLiquida: 22.96,
+    pedidos: 54,
+    unidadesVendidas: 60,
+    ticketMedio: 237.03,
+    marketplacePrincipal: "Amazon",
+    crescimento: 8.40,
+    produtosVendidos: [
+      { name: "Fone Bluetooth Noise Cancelling", unidades: 30, faturamento: 7200.00 },
+      { name: "Teclado Mecânico RGB", unidades: 25, faturamento: 5600.00 }
+    ],
+    marketplacesShare: [
+      { name: "Amazon", percent: 80 },
+      { name: "Shopee", percent: 20 }
+    ],
+    mensalEvolucao: [
+      { month: "Fev", faturamento: 10000, lucro: 2300 },
+      { month: "Mar", faturamento: 11000, lucro: 2500 },
+      { month: "Abr", faturamento: 12000, lucro: 2700 },
+      { month: "Mai", faturamento: 12800, lucro: 2940 }
+    ]
+  },
+  {
+    id: "s18",
+    name: "Juliana Martins",
+    faturamentoBruto: 11500.00,
+    receitaLiquida: 9400.00,
+    lucroLiquidoVendedores: 2530.00,
+    margemLiquida: 22.00,
+    pedidos: 88,
+    unidadesVendidas: 96,
+    ticketMedio: 130.68,
+    marketplacePrincipal: "Shopee",
+    crescimento: 41.50,
+    produtosVendidos: [
+      { name: "Carregador Portátil 20k mAh", unidades: 50, faturamento: 4950.00 },
+      { name: "Ring Light 12 polegadas", unidades: 60, faturamento: 6550.00 }
+    ],
+    marketplacesShare: [
+      { name: "Shopee", percent: 100 }
+    ],
+    mensalEvolucao: [
+      { month: "Fev", faturamento: 5000, lucro: 1100 },
+      { month: "Mar", faturamento: 7000, lucro: 1500 },
+      { month: "Abr", faturamento: 9000, lucro: 1900 },
+      { month: "Mai", faturamento: 11500, lucro: 2530 }
+    ]
+  },
+  {
+    id: "s19",
+    name: "Gustavo Pires",
+    faturamentoBruto: 10200.00,
+    receitaLiquida: 8400.00,
+    lucroLiquidoVendedores: 2440.00,
+    margemLiquida: 23.92,
+    pedidos: 66,
+    unidadesVendidas: 75,
+    ticketMedio: 154.54,
+    marketplacePrincipal: "Mercado Livre",
+    crescimento: -3.50,
+    produtosVendidos: [
+      { name: "Escova Secadora 5 em 1", unidades: 32, faturamento: 4800.00 },
+      { name: "Mini Projetor Portátil HD", unidades: 12, faturamento: 5400.00 }
+    ],
+    marketplacesShare: [
+      { name: "Mercado Livre", percent: 80 },
+      { name: "Shopee", percent: 20 }
+    ],
+    mensalEvolucao: [
+      { month: "Fev", faturamento: 9500, lucro: 2200 },
+      { month: "Mar", faturamento: 10500, lucro: 2500 },
+      { month: "Abr", faturamento: 10400, lucro: 2480 },
+      { month: "Mai", faturamento: 10200, lucro: 2440 }
+    ]
+  },
+  {
+    id: "s20",
+    name: "Vanessa Dias",
+    faturamentoBruto: 9100.00,
+    receitaLiquida: 7900.00,
+    lucroLiquidoVendedores: 2810.00,
+    margemLiquida: 30.87,
+    pedidos: 42,
+    unidadesVendidas: 46,
+    ticketMedio: 216.66,
+    marketplacePrincipal: "Loja Própria",
+    crescimento: 18.90,
+    produtosVendidos: [
+      { name: "Teclado Mecânico RGB", unidades: 25, faturamento: 5500.00 },
+      { name: "Fone Bluetooth Noise Cancelling", unidades: 15, faturamento: 3600.00 }
+    ],
+    marketplacesShare: [
+      { name: "Loja Própria", percent: 100 }
+    ],
+    mensalEvolucao: [
+      { month: "Fev", faturamento: 6000, lucro: 1800 },
+      { month: "Mar", faturamento: 7000, lucro: 2100 },
+      { month: "Abr", faturamento: 8200, lucro: 2500 },
+      { month: "Mai", faturamento: 9100, lucro: 2810 }
+    ]
+  },
+  {
+    id: "s21",
+    name: "Felipe Rocha",
+    faturamentoBruto: 8300.00,
+    receitaLiquida: 6800.00,
+    lucroLiquidoVendedores: 1910.00,
+    margemLiquida: 23.01,
+    pedidos: 35,
+    unidadesVendidas: 40,
+    ticketMedio: 237.14,
+    marketplacePrincipal: "Amazon",
+    crescimento: 9.80,
+    produtosVendidos: [
+      { name: "Fone Bluetooth Noise Cancelling", unidades: 20, faturamento: 4800.00 },
+      { name: "Teclado Mecânico RGB", unidades: 15, faturamento: 3500.00 }
+    ],
+    marketplacesShare: [
+      { name: "Amazon", percent: 90 },
+      { name: "Shopee", percent: 10 }
+    ],
+    mensalEvolucao: [
+      { month: "Fev", faturamento: 6500, lucro: 1500 },
+      { month: "Mar", faturamento: 7000, lucro: 1600 },
+      { month: "Abr", faturamento: 7800, lucro: 1800 },
+      { month: "Mai", faturamento: 8300, lucro: 1910 }
+    ]
+  },
+  {
+    id: "s22",
+    name: "Carolina Nogueira",
+    faturamentoBruto: 7500.00,
+    receitaLiquida: 6100.00,
+    lucroLiquidoVendedores: 1650.00,
+    margemLiquida: 22.00,
+    pedidos: 58,
+    unidadesVendidas: 65,
+    ticketMedio: 129.31,
+    marketplacePrincipal: "Shopee",
+    crescimento: 15.20,
+    produtosVendidos: [
+      { name: "Carregador Portátil 20k mAh", unidades: 30, faturamento: 2970.00 },
+      { name: "Ring Light 12 polegadas", unidades: 35, faturamento: 4530.00 }
+    ],
+    marketplacesShare: [
+      { name: "Shopee", percent: 100 }
+    ],
+    mensalEvolucao: [
+      { month: "Fev", faturamento: 5000, lucro: 1100 },
+      { month: "Mar", faturamento: 5500, lucro: 1200 },
+      { month: "Abr", faturamento: 6500, lucro: 1400 },
+      { month: "Mai", faturamento: 7500, lucro: 1650 }
+    ]
   }
 ];
 
@@ -540,11 +864,11 @@ export const getChartData = (period: PeriodType): ChartDataPoint[] => {
 
   const active = points[period];
   
-  // Base numbers for 30 days
-  const baseFaturamentos = [54200, 68900, 61200, 75600, 89100, 71200, 94800, 112000];
-  const basePedidos = [350, 420, 390, 460, 580, 450, 620, 780];
-  const baseUnidades = [390, 470, 440, 520, 660, 510, 710, 890];
-  const baseLucros = [13550, 17914, 15912, 19656, 24057, 18512, 25596, 31360];
+  // Base numbers for 30 days (impressive volumes)
+  const baseFaturamentos = [92000, 110000, 105000, 125000, 142000, 131000, 155000, 185000];
+  const basePedidos = [580, 690, 660, 780, 890, 820, 970, 1150];
+  const baseUnidades = [670, 790, 760, 900, 1020, 940, 1110, 1320];
+  const baseLucros = [23920, 28600, 27300, 32500, 36920, 34060, 40300, 48100]; // ~26% margem
 
   return active.dates.map((date, idx) => {
     const factor = active.mult * (0.95 + Math.random() * 0.1); 
@@ -553,10 +877,10 @@ export const getChartData = (period: PeriodType): ChartDataPoint[] => {
     
     return {
       date,
-      faturamento: Math.round((isToday ? 2000 + Math.random()*2500 : baseFaturamentos[refIdx] * factor) * 100) / 100,
-      pedidos: Math.round(isToday ? 12 + Math.random()*15 : basePedidos[refIdx] * factor),
-      unidades: Math.round(isToday ? 15 + Math.random()*20 : baseUnidades[refIdx] * factor),
-      lucroLiquido: Math.round((isToday ? 520 + Math.random()*700 : baseLucros[refIdx] * factor) * 100) / 100
+      faturamento: Math.round((isToday ? 6000 + Math.random()*8000 : baseFaturamentos[refIdx] * factor) * 100) / 100,
+      pedidos: Math.round(isToday ? 35 + Math.random()*45 : basePedidos[refIdx] * factor),
+      unidades: Math.round(isToday ? 42 + Math.random()*52 : baseUnidades[refIdx] * factor),
+      lucroLiquido: Math.round((isToday ? 1560 + Math.random()*2100 : baseLucros[refIdx] * factor) * 100) / 100
     };
   });
 };
@@ -610,13 +934,17 @@ export const getAggregatedData = (filters: FilterOptions) => {
     targetProduct = mockProducts.find(p => p.id === filters.product);
   }
 
-  let rawFat = 583200.00;
-  let rawRec = 472190.00;
-  let rawLuc = 143890.00;
-  let rawPed = 3672;
-  let rawUni = 4160;
-  let rawVendedores = 8;
-  let rawCancel = 2.8;
+  // Combined sum of all 22 sellers for 30 days:
+  // faturamentoBruto: ~945k
+  // receitaLiquida: ~780k
+  // lucroLiquidoVendedores: ~245k
+  let rawFat = 945200.00;
+  let rawRec = 781500.00;
+  let rawLuc = 244580.00; // ~25.8% margem
+  let rawPed = 5920;
+  let rawUni = 6780;
+  let rawVendedores = 22;
+  let rawCancel = 2.5;
 
   if (targetSeller) {
     rawFat = targetSeller.faturamentoBruto;
@@ -632,7 +960,7 @@ export const getAggregatedData = (filters: FilterOptions) => {
     rawLuc = targetProduct.lucroLiquidoGerado;
     rawPed = targetProduct.pedidos;
     rawUni = targetProduct.unidadesVendidas;
-    rawVendedores = 5;
+    rawVendedores = 12;
     rawCancel = targetProduct.status === "Alto cancelamento" ? 6.5 : 1.9;
   }
 
@@ -645,9 +973,9 @@ export const getAggregatedData = (filters: FilterOptions) => {
       lojapropria: 0.08
     };
     marketplaceFactor = mpShares[filters.marketplace] || 1.0;
-    if (filters.marketplace === "shopee") rawCancel = 4.1;
-    if (filters.marketplace === "lojapropria") rawCancel = 1.2;
-    if (filters.marketplace === "mercadolivre") rawCancel = 2.4;
+    if (filters.marketplace === "shopee") rawCancel = 3.9;
+    if (filters.marketplace === "lojapropria") rawCancel = 1.0;
+    if (filters.marketplace === "mercadolivre") rawCancel = 2.1;
   }
 
   const activeFat = rawFat * scale * marketplaceFactor;
@@ -656,7 +984,7 @@ export const getAggregatedData = (filters: FilterOptions) => {
   const activePed = Math.round(rawPed * scale * marketplaceFactor);
   const activeUni = Math.round(rawUni * scale * marketplaceFactor);
   const activeTicket = activePed > 0 ? activeFat / activePed : 0;
-  const activeVendedores = targetSeller ? 1 : Math.max(1, Math.round(rawVendedores * (filters.marketplace !== "all" ? 0.7 : 1)));
+  const activeVendedores = targetSeller ? 1 : Math.max(1, Math.round(rawVendedores * (filters.marketplace !== "all" ? 0.75 : 1)));
 
   const isPositiveGrowth = filters.period !== "hoje";
   const growthFat = isPositiveGrowth ? 14.8 : -2.5;
@@ -752,53 +1080,53 @@ export const getAggregatedData = (filters: FilterOptions) => {
     {
       id: "mp_ml",
       name: "Mercado Livre",
-      faturamentoBruto: 262440.00 * scale,
-      receitaLiquida: 212500.00 * scale,
-      lucroLiquidoVendedores: 65610.00 * scale,
-      pedidos: Math.round(1652 * scale),
-      unidadesVendidas: Math.round(1870 * scale),
-      ticketMedio: 158.86,
+      faturamentoBruto: 425340.00 * scale,
+      receitaLiquida: 351700.00 * scale,
+      lucroLiquidoVendedores: 110060.00 * scale,
+      pedidos: Math.round(2664 * scale),
+      unidadesVendidas: Math.round(3050 * scale),
+      ticketMedio: 159.66,
       share: 45,
-      taxaCancelamento: 2.4,
+      taxaCancelamento: 2.1,
       crescimento: 15.4
     },
     {
       id: "mp_sh",
       name: "Shopee",
-      faturamentoBruto: 204120.00 * scale,
-      receitaLiquida: 165300.00 * scale,
-      lucroLiquidoVendedores: 51030.00 * scale,
-      pedidos: Math.round(1285 * scale),
-      unidadesVendidas: Math.round(1490 * scale),
-      ticketMedio: 158.84,
+      faturamentoBruto: 330820.00 * scale,
+      receitaLiquida: 273525.00 * scale,
+      lucroLiquidoVendedores: 85600.00 * scale,
+      pedidos: Math.round(2072 * scale),
+      unidadesVendidas: Math.round(2373 * scale),
+      ticketMedio: 159.66,
       share: 35,
-      taxaCancelamento: 4.1,
+      taxaCancelamento: 3.9,
       crescimento: 28.2
     },
     {
       id: "mp_am",
       name: "Amazon",
-      faturamentoBruto: 69984.00 * scale,
-      receitaLiquida: 56600.00 * scale,
-      lucroLiquidoVendedores: 17496.00 * scale,
-      pedidos: Math.round(441 * scale),
-      unidadesVendidas: Math.round(500 * scale),
-      ticketMedio: 158.69,
+      faturamentoBruto: 113424.00 * scale,
+      receitaLiquida: 93780.00 * scale,
+      lucroLiquidoVendedores: 29350.00 * scale,
+      pedidos: Math.round(710 * scale),
+      unidadesVendidas: Math.round(814 * scale),
+      ticketMedio: 159.75,
       share: 12,
-      taxaCancelamento: 2.1,
+      taxaCancelamento: 1.8,
       crescimento: 11.2
     },
     {
       id: "mp_lp",
       name: "Loja Própria",
-      faturamentoBruto: 46656.00 * scale,
-      receitaLiquida: 37790.00 * scale,
-      lucroLiquidoVendedores: 11664.00 * scale,
-      pedidos: Math.round(294 * scale),
-      unidadesVendidas: Math.round(300 * scale),
-      ticketMedio: 158.69,
+      faturamentoBruto: 75616.00 * scale,
+      receitaLiquida: 62495.00 * scale,
+      lucroLiquidoVendedores: 19570.00 * scale,
+      pedidos: Math.round(474 * scale),
+      unidadesVendidas: Math.round(543 * scale),
+      ticketMedio: 159.52,
       share: 8,
-      taxaCancelamento: 1.2,
+      taxaCancelamento: 1.0,
       crescimento: 5.6
     }
   ];
@@ -878,7 +1206,6 @@ export const getAggregatedData = (filters: FilterOptions) => {
     marketplaces,
     sellers: sellersList,
     products: productsList,
-    alerts: mockAlerts,
     activities: mockActivities,
     labelPeriod
   };
