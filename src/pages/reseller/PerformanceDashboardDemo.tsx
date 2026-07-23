@@ -56,6 +56,42 @@ export default function PerformanceDashboardDemo() {
   const [activeProductTab, setActiveProductTab] = useState<"qtd" | "faturamento" | "lucro" | "crescimento">("qtd");
   const [selectedSeller, setSelectedSeller] = useState<SellerData | null>(null);
   const [sellerDrawerOpen, setSellerDrawerOpen] = useState(false);
+
+  // Pending orders simulator states
+  const [pendingOrders, setPendingOrders] = useState([
+    {
+      id: "ord_1",
+      product: "Escova Secadora 5 em 1 Ceramic Pro",
+      sku: "ESC-SEC-5X1-PRO",
+      value: 149.93,
+      profit: 41.23,
+      marketplace: "Mercado Livre",
+      status: "pending" as "pending" | "processing" | "shipped"
+    },
+    {
+      id: "ord_2",
+      product: "Smartwatch Sport Pro GPS AMOLED",
+      sku: "SMT-WTCH-AMOLED-RED",
+      value: 353.98,
+      profit: 89.12,
+      marketplace: "Shopee",
+      status: "pending" as "pending" | "processing" | "shipped"
+    }
+  ]);
+  const [isOrdersModalOpen, setIsOrdersModalOpen] = useState(false);
+
+  const handleProcessOrder = (orderId: string) => {
+    setPendingOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: "processing" } : o));
+    setTimeout(() => {
+      setPendingOrders(prev => {
+        const order = prev.find(o => o.id === orderId);
+        if (order) {
+          toast.success(`Pedido do SKU ${order.sku} processado e despachado com sucesso!`);
+        }
+        return prev.map(o => o.id === orderId ? { ...o, status: "shipped" } : o);
+      });
+    }, 1500);
+  };
   
   // Real-time notification pop-up state
   const [activeNotification, setActiveNotification] = useState<{
@@ -558,6 +594,19 @@ export default function PerformanceDashboardDemo() {
               );
             }
 
+            const isPendingOrdersCard = kpi.title === "Pedidos para Processar";
+            const isShippedOrdersCard = kpi.title === "Pedidos Enviados";
+            
+            const pendingCount = pendingOrders.filter(o => o.status !== "shipped").length;
+            const processedCount = pendingOrders.filter(o => o.status === "shipped").length;
+            
+            let displayValue = kpi.value;
+            if (isPendingOrdersCard) {
+              displayValue = pendingCount.toString();
+            } else if (isShippedOrdersCard) {
+              displayValue = ((kpi.rawValue || 0) + processedCount).toString();
+            }
+
             return (
               <Card 
                 key={idx} 
@@ -578,25 +627,34 @@ export default function PerformanceDashboardDemo() {
                 <CardContent className="pt-1">
                   <div className="flex items-baseline gap-2">
                     <span className={`text-2xl font-black tracking-tight ${isProfit ? "text-emerald-800" : "text-slate-800"}`}>
-                      {kpi.value}
+                      {displayValue}
                     </span>
                   </div>
                   
                   <div className="flex items-center gap-2 mt-2">
-                    {kpi.changePercent !== 0 && (
-                      <span className={`flex items-center text-[11px] font-extrabold px-1.5 py-0.5 rounded-md ${
-                        kpi.isPositive 
-                          ? "bg-green-50 text-green-700" 
-                          : "bg-red-50 text-red-600"
-                      }`}>
-                        {kpi.isPositive ? <TrendingUp className="mr-1 h-3 w-3" /> : <TrendingDown className="mr-1 h-3 w-3" />}
+                    {kpi.changePercent !== 0 && kpi.isPositive && (
+                      <span className="flex items-center text-[11px] font-extrabold px-1.5 py-0.5 rounded-md bg-green-50 text-green-700">
+                        <TrendingUp className="mr-1 h-3 w-3" />
                         {Math.abs(kpi.changePercent)}%
                       </span>
                     )}
-                    <span className="text-[11px] font-semibold text-slate-400">
-                      {kpi.microtext}
-                    </span>
+                    {kpi.changePercent !== 0 && kpi.isPositive && (
+                      <span className="text-[11px] font-semibold text-slate-400">
+                        {kpi.microtext}
+                      </span>
+                    )}
                   </div>
+
+                  {isPendingOrdersCard && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => setIsOrdersModalOpen(true)}
+                      className="mt-3 w-full text-[11px] font-bold h-7 border-indigo-150 hover:border-indigo-250 text-indigo-700 bg-indigo-50/20 hover:bg-indigo-50/70 rounded-lg transition-all"
+                    >
+                      Ver Pedidos
+                    </Button>
+                  )}
 
                   {kpi.tooltip && (
                     <div className="absolute top-4 right-4 z-10">
@@ -1137,12 +1195,118 @@ export default function PerformanceDashboardDemo() {
             </div>
             
             <p className="text-xs text-slate-700 leading-normal">
-              <strong className="text-slate-900 font-bold">{activeNotification.seller}</strong> vendeu <strong>{activeNotification.product}</strong> no <strong className="text-slate-800 font-bold">{activeNotification.marketplace}</strong>.
+              Você vendeu <strong className="text-slate-900 font-bold">{activeNotification.product}</strong> no <strong className="text-slate-800 font-bold">{activeNotification.marketplace}</strong>.
             </p>
             
             <div className="flex items-center justify-between text-[10.5px] pt-1.5 border-t border-slate-100 mt-1.5">
               <span className="text-slate-500 font-semibold">Valor: <strong className="text-slate-850 font-bold">{fmtBRL(activeNotification.price)}</strong></span>
-              <span className="text-emerald-600 font-bold">Lucro Vendedor: <strong>{fmtBRL(activeNotification.profit)}</strong></span>
+              <span className="text-emerald-600 font-bold">Lucro Estimado: <strong>{fmtBRL(activeNotification.profit)}</strong></span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pending Orders Modal */}
+      {isOrdersModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-250">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-150 bg-slate-50/50">
+              <div>
+                <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                  📋 Pedidos para Processar
+                </h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">
+                  Demonstração de Faturamento e Despacho
+                </p>
+              </div>
+              <button 
+                onClick={() => setIsOrdersModalOpen(false)}
+                className="h-7 w-7 rounded-lg hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            
+            {/* List */}
+            <div className="p-5 space-y-4 max-h-[350px] overflow-y-auto">
+              {pendingOrders.map((order) => {
+                const isPending = order.status === "pending";
+                const isProcessing = order.status === "processing";
+                const isShipped = order.status === "shipped";
+                
+                return (
+                  <div key={order.id} className="p-3 bg-slate-50/50 rounded-xl border border-slate-150 flex flex-col gap-2.5">
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="min-w-0">
+                        <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                          {order.marketplace}
+                        </span>
+                        <h4 className="text-xs font-bold text-slate-800 truncate mt-1 max-w-[200px]">
+                          {order.product}
+                        </h4>
+                        <p className="text-[9px] font-mono text-slate-450 font-bold mt-0.5">SKU: {order.sku}</p>
+                      </div>
+                      
+                      <Badge 
+                        variant="outline" 
+                        className={`rounded-lg px-2 py-0.5 border text-[9px] font-bold shrink-0 ${
+                          isPending ? "bg-amber-50 text-amber-700 border-amber-250/50" :
+                          isProcessing ? "bg-purple-50 text-purple-700 border-purple-250/50" :
+                          "bg-emerald-50 text-emerald-700 border-emerald-250/50"
+                        }`}
+                      >
+                        {isPending ? "Pendente" : isProcessing ? "Processando..." : "Despachado"}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                      <div className="flex gap-4">
+                        <div className="flex flex-col">
+                          <span className="text-[9px] text-slate-400 font-bold uppercase">Venda</span>
+                          <span className="font-extrabold text-slate-700">{fmtBRL(order.value)}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[9px] text-emerald-600 font-bold uppercase">Lucro</span>
+                          <span className="font-extrabold text-emerald-700">{fmtBRL(order.profit)}</span>
+                        </div>
+                      </div>
+                      
+                      <Button
+                        size="sm"
+                        disabled={!isPending}
+                        onClick={() => handleProcessOrder(order.id)}
+                        className={`h-7 px-3 text-[11px] font-bold rounded-lg transition-all ${
+                          isPending 
+                            ? "bg-slate-900 text-white hover:bg-slate-800 active:scale-95" 
+                            : isProcessing 
+                            ? "bg-purple-50 text-purple-700 border border-purple-200/50 cursor-not-allowed" 
+                            : "bg-emerald-50 text-emerald-700 border border-emerald-200/50 cursor-not-allowed"
+                        }`}
+                      >
+                        {isPending && "Processar"}
+                        {isProcessing && (
+                          <span className="flex items-center gap-1.5">
+                            <RefreshCw className="h-3 w-3 animate-spin" />
+                            Embalando...
+                          </span>
+                        )}
+                        {isShipped && "Despachado! ✓"}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* Footer */}
+            <div className="px-5 py-3 bg-slate-50/50 border-t border-slate-100 flex justify-end">
+              <Button 
+                onClick={() => setIsOrdersModalOpen(false)}
+                className="bg-slate-900 text-white hover:bg-slate-800 text-xs font-bold px-4 h-8 rounded-lg"
+              >
+                Fechar
+              </Button>
             </div>
           </div>
         </div>
