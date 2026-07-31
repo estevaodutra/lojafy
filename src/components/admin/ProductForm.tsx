@@ -18,6 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ImageUploadArea } from './ImageUploadArea';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/contexts/AuthContext';
 import { useEffect } from 'react';
 import { VariantsManager, ProductVariant } from './VariantsManager';
 import { DimensionsInput } from './DimensionsInput';
@@ -61,7 +62,8 @@ interface ProductFormProps {
 
 const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { isSuperAdmin } = useUserRole();
+  const { isSuperAdmin, isSupplier } = useUserRole();
+  const { user } = useAuth();
   const { settings } = usePlatformSettings();
   const [specifications, setSpecifications] = useState<{ key: string; value: string }[]>(() => {
     // First try to load from specifications (legacy format: {key: value})
@@ -411,13 +413,20 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         main_image_url: mainImageUrl,
         image_url: mainImageUrl, // Backward compatibility
         active: data.active,
-        featured: data.reference_ad_url && data.reference_ad_url.trim() !== '' ? true : data.featured,
-        badge: data.badge || null,
-        reference_ad_url: data.reference_ad_url || null,
+        featured: isSupplier() ? false : (data.reference_ad_url && data.reference_ad_url.trim() !== '' ? true : data.featured),
+        badge: isSupplier() ? null : (data.badge || null),
+        reference_ad_url: isSupplier() ? null : (data.reference_ad_url || null),
         specifications: specificationsObj,
         images: imageUrls,
         updated_at: new Date().toISOString(),
       };
+
+      if (isSupplier()) {
+        productData.supplier_id = user?.id;
+        if (!product?.id) {
+          productData.approval_status = 'pending_approval';
+        }
+      }
 
       let savedProduct;
       
@@ -791,46 +800,50 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
               </div>
             </div>
 
-            <FormField
-              control={form.control}
-              name="badge"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Badge/Etiqueta</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: Novo, Promoção, Bestseller..." {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    Etiqueta de destaque que aparecerá no produto (opcional)
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {!isSupplier() && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="badge"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Badge/Etiqueta</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: Novo, Promoção, Bestseller..." {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Etiqueta de destaque que aparecerá no produto (opcional)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <FormField
-              control={form.control}
-              name="reference_ad_url"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center gap-2">
-                    <ExternalLink className="h-4 w-4" />
-                    Anúncio de Referência
-                  </FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="url"
-                      placeholder="https://exemplo.com/produto" 
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Link para anúncio externo onde o produto está mais barato. <strong>Quando preenchido, o produto será automaticamente marcado como destaque.</strong>
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name="reference_ad_url"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <ExternalLink className="h-4 w-4" />
+                        Anúncio de Referência
+                      </FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="url"
+                          placeholder="https://exemplo.com/produto" 
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Link para anúncio externo onde o produto está mais barato. <strong>Quando preenchido, o produto será automaticamente marcado como destaque.</strong>
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -1222,33 +1235,36 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
               />
             </div>
 
-            <Separator />
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <FormLabel>Produto em Destaque</FormLabel>
-                <FormDescription>
-                  {watchedReferenceUrl && watchedReferenceUrl.trim() !== '' 
-                    ? '✓ Ativado automaticamente pelo Anúncio de Referência' 
-                    : 'Produto será exibido em seções especiais'}
-                </FormDescription>
-              </div>
-              <FormField
-                control={form.control}
-                name="featured"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        disabled={watchedReferenceUrl && watchedReferenceUrl.trim() !== ''}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </div>
+            {!isSupplier() && (
+              <>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <FormLabel>Produto em Destaque</FormLabel>
+                    <FormDescription>
+                      {watchedReferenceUrl && watchedReferenceUrl.trim() !== '' 
+                        ? '✓ Ativado automaticamente pelo Anúncio de Referência' 
+                        : 'Produto será exibido em seções especiais'}
+                    </FormDescription>
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="featured"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            disabled={watchedReferenceUrl && watchedReferenceUrl.trim() !== ''}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </>
+            )}
 
             <Separator />
 

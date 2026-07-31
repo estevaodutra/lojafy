@@ -52,9 +52,9 @@ const ProductApproval = () => {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Aprovação de Produtos</h1>
+        <h1 className="text-3xl font-bold">Produtos Atribuídos & Custos</h1>
         <p className="text-muted-foreground mt-2">
-          Revise e aprove produtos atribuídos à sua conta
+          Revise as sugestões de produtos da plataforma, defina seu preço de custo e confirme ou rejeite o fornecimento.
         </p>
       </div>
 

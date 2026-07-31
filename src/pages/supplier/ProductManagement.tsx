@@ -2,16 +2,18 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Package, Plus, AlertCircle, PackageX } from "lucide-react";
+import { Package, Plus, AlertCircle, PackageX, FileSpreadsheet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import ProductTable from "@/components/admin/ProductTable";
 import ProductForm from "@/components/admin/ProductForm";
+import { SupplierProductImport } from "@/components/supplier/SupplierProductImport";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSupplierProducts, useSupplierProductStats } from "@/hooks/useSupplierProducts";
 import { useAuth } from "@/contexts/AuthContext";
 
 const SupplierProductManagement = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -50,10 +52,16 @@ const SupplierProductManagement = () => {
           <h1 className="text-3xl font-bold">Meus Produtos</h1>
           <p className="text-muted-foreground">Gerencie seu catálogo de produtos</p>
         </div>
-        <Button onClick={handleCreateProduct}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Produto
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsImportOpen(true)}>
+            <FileSpreadsheet className="w-4 h-4 mr-2" />
+            Importar Planilha
+          </Button>
+          <Button onClick={handleCreateProduct}>
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Produto
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -186,6 +194,15 @@ const SupplierProductManagement = () => {
             setIsDialogOpen(false);
             setEditingProduct(null);
           }}
+        />
+      )}
+
+      {/* Product Import Dialog */}
+      {isImportOpen && (
+        <SupplierProductImport
+          isOpen={isImportOpen}
+          onClose={() => setIsImportOpen(false)}
+          onSuccess={refetch}
         />
       )}
     </div>
