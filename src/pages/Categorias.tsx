@@ -72,7 +72,7 @@ const Categorias = () => {
     queryKey: ['products', slug],
     queryFn: async () => {
       let query = supabase
-        .from('products')
+        .from('store_products')
         .select(`
           *,
           categories!inner(slug, name)

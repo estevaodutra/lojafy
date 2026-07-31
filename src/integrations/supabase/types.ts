@@ -5209,6 +5209,7 @@ export type Database = {
           featured: boolean | null
           gtin_ean13: string | null
           has_variations: boolean | null
+          high_rotation: boolean | null
           height: number | null
           id: string | null
           image_url: string | null
@@ -5230,6 +5231,22 @@ export type Database = {
           variations: Json | null
           weight: number | null
           width: number | null
+        }
+        Relationships: []
+      }
+      store_product_variants: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          id: string | null
+          image_url: string | null
+          name: string | null
+          price_modifier: number | null
+          product_id: string | null
+          stock_quantity: number | null
+          type: string | null
+          updated_at: string | null
+          value: string | null
         }
         Relationships: []
       }

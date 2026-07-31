@@ -15,7 +15,7 @@ export const useMostViewedProducts = () => {
       // Since we don't have a product_views table yet, we'll use products with some logic
       // We'll base "views" on a combination of rating, review_count, and random factor
       const { data, error } = await supabase
-        .from('products')
+        .from('store_products')
         .select('id, name, image_url, rating, review_count, created_at')
         .eq('active', true)
         .order('rating', { ascending: false })

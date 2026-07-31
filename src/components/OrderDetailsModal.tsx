@@ -255,7 +255,8 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           quantity,
           unit_price,
           total_price,
-          product_snapshot
+          product_snapshot,
+          supplier_unit_cost
         )
       `).eq('id', orderId).single();
       if (error) throw error;
@@ -269,21 +270,14 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         setCustomer(profileData);
       }
 
-      // Fetch current cost prices for products that don't have it in snapshot
-      const productsNeedingCostPrice = data.order_items.filter((item: any) => !item.product_snapshot?.cost_price);
-      if (productsNeedingCostPrice.length > 0) {
-        const productIds = productsNeedingCostPrice.map((item: any) => item.product_id);
-        const {
-          data: productsData
-        } = await supabase.from('products').select('id, cost_price').in('id', productIds);
-        if (productsData) {
-          const costsMap: Record<string, number> = {};
-          productsData.forEach(product => {
-            costsMap[product.id] = Number(product.cost_price || 0);
-          });
-          setCurrentProductCosts(costsMap);
+      // Custos vêm congelados de order_items.supplier_unit_cost (fallback: snapshot da compra)
+      const costsMap: Record<string, number> = {};
+      data.order_items.forEach((item: any) => {
+        if (item.supplier_unit_cost != null) {
+          costsMap[item.product_id] = Number(item.supplier_unit_cost);
         }
-      }
+      });
+      setCurrentProductCosts(costsMap);
     } catch (error) {
       console.error('Erro ao buscar detalhes do pedido:', error);
     } finally {

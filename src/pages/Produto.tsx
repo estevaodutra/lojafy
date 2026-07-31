@@ -59,7 +59,7 @@ const Produto = ({
       const {
         data,
         error
-      } = await supabase.from('products').select('*').eq('id', id).eq('active', true).single();
+      } = await supabase.from('store_products').select('*').eq('id', id).eq('active', true).single();
       if (error) throw error;
       return data;
     },
@@ -72,7 +72,7 @@ const Produto = ({
     queryFn: async () => {
       if (!id) return [];
       const { data, error } = await supabase
-        .from('product_variants')
+        .from('store_product_variants')
         .select('*')
         .eq('product_id', id)
         .eq('active', true)
@@ -93,7 +93,7 @@ const Produto = ({
       const {
         data,
         error
-      } = await supabase.from('products').select('*').eq('category_id', product.category_id).eq('active', true).neq('id', product.id).limit(4);
+      } = await supabase.from('store_products').select('*').eq('category_id', product.category_id).eq('active', true).neq('id', product.id).limit(4);
       if (error) throw error;
       return data || [];
     },

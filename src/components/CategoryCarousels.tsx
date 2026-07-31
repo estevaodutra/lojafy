@@ -82,7 +82,7 @@ const CategoryCarousels = () => {
           if (!category) return;
           
           const { data: products, error } = await supabase
-            .from('products')
+            .from('store_products')
             .select('*')
             .eq('category_id', category.id)
             .eq('active', true)
