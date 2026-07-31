@@ -72,7 +72,7 @@ export const OperationQueue = ({
   const { data, isLoading, isError, refetch } = useSupplierFulfillments({ statuses, page, sla, search });
   const { transition, batch } = useFulfillmentMutations();
 
-  const rows = data?.rows ?? [];
+  const rows = useMemo(() => data?.rows ?? [], [data]);
 
   const selectableRows = useMemo(
     () => rows.filter((row) => primaryAction[row.status]),
