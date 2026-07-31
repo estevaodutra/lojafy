@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, FileSpreadsheet, Loader2, Search, Upload, XCircle } from 'lucide-react';
+import { CheckCircle2, FileSpreadsheet, Loader2, Search, Upload, XCircle, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -32,6 +32,7 @@ interface ParsedRow {
   length: number;
   price: number;
   errors: string[];
+  warnings: string[];
 }
 
 type RowResult = 'pending' | 'inserted' | 'error' | 'searching' | 'candidates_found';
@@ -57,10 +58,11 @@ const parseRow = (obj: Record<string, string>): ParsedRow => {
     length: num(obj.comprimento_cm || obj.length),
     price: num(obj.preco || obj.price),
     errors: [],
+    warnings: [],
   };
   if (!row.photo_url.startsWith('http')) row.errors.push('foto_url inválida');
   if (row.title.length < 10) row.errors.push('título muito curto');
-  if (row.description.length < 20) row.errors.push('descrição muito curta');
+  if (row.description.length < 20) row.warnings.push('descrição muito curta');
   if (!(row.price > 0)) row.errors.push('preço inválido');
   for (const [key, label] of [
     ['weight', 'peso'], ['height', 'altura'], ['width', 'largura'], ['length', 'comprimento'],
@@ -232,12 +234,17 @@ const SupplierImport = () => {
                     <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />
                   ) : results[i] === 'searching' ? (
                     <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                  ) : row.warnings && row.warnings.length > 0 ? (
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
                   ) : (
                     <FileSpreadsheet className="h-4 w-4 shrink-0 text-muted-foreground" />
                   )}
                   <span className="min-w-0 flex-1 truncate">{row.title || '(sem título)'}</span>
                   {row.errors.length > 0 && (
                     <span className="text-xs text-destructive">{row.errors.join(', ')}</span>
+                  )}
+                  {row.errors.length === 0 && row.warnings && row.warnings.length > 0 && results[i] === 'pending' && (
+                    <span className="text-xs text-amber-600">{row.warnings.join(', ')}</span>
                   )}
                   {results[i] === 'candidates_found' && (
                     <Badge variant="outline" className="gap-1">
