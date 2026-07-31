@@ -1,5 +1,5 @@
-// Parser/serializador CSV nativo compartilhado pelo portal fornecedor.
-// Extraído de SupplierProductImport para reuso (rastreios, estoque, export).
+// Parser/serializador CSV nativo compartilhado pelo portal fornecedor
+// (importação de produtos, rastreios, estoque e exports).
 
 /** Detecta o delimitador (vírgula ou ponto-e-vírgula) pela primeira linha. */
 export function detectDelimiter(text: string): ',' | ';' {
