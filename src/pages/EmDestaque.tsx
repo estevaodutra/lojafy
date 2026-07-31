@@ -19,7 +19,7 @@ const EmDestaque = () => {
     queryKey: ['all-featured-products'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('products')
+        .from('store_products')
         .select('*')
         .eq('active', true)
         .eq('featured', true)

@@ -582,7 +582,7 @@ const Checkout = ({
       const productIds = cartItems.map(item => item.productId);
       const {
         data: products
-      } = await supabase.from('products').select('id, high_rotation').in('id', productIds);
+      } = await supabase.from('store_products').select('id, high_rotation').in('id', productIds);
       return products?.some(product => product.high_rotation) || false;
     } catch (error) {
       console.error('Error checking high rotation products:', error);

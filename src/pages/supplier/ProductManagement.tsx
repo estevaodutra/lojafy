@@ -1,210 +1,275 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Package, Plus, AlertCircle, PackageX, FileSpreadsheet } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import ProductTable from "@/components/admin/ProductTable";
-import ProductForm from "@/components/admin/ProductForm";
-import { SupplierProductImport } from "@/components/supplier/SupplierProductImport";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useSupplierProducts, useSupplierProductStats } from "@/hooks/useSupplierProducts";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Download, Plus, Search, Send } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { supplierKeys } from '@/lib/supplierQueryKeys';
+import { useSupplierOrganization } from '@/hooks/supplier/useSupplierOrganization';
+import { useSupplierPaginatedQuery } from '@/hooks/supplier/useSupplierPaginatedQuery';
+import { exportCatalogCsv, exportCatalogJson } from '@/services/supplierExportService';
+import { GtinStatusBadge, StageBadge } from '@/components/supplier/products/GtinStatusBadge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
+import {
+  Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious,
+} from '@/components/ui/pagination';
+import type { Database } from '@/integrations/supabase/types';
+
+type ProductRow = Pick<
+  Database['public']['Tables']['products']['Row'],
+  | 'id' | 'name' | 'sku' | 'price' | 'stock_quantity' | 'stage' | 'gtin_status'
+  | 'approval_status' | 'active' | 'main_image_url' | 'image_url' | 'created_at'
+>;
 
 const SupplierProductManagement = () => {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isImportOpen, setIsImportOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<any>(null);
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: orgData } = useSupplierOrganization();
+  const orgId = orgData?.organization.id;
 
-  const { data: products = [], isLoading, refetch } = useSupplierProducts();
-  const { data: stats } = useSupplierProductStats();
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [stageFilter, setStageFilter] = useState('all');
 
-  const handleCreateProduct = () => {
-    setEditingProduct(null);
-    setIsDialogOpen(true);
+  const { data, isLoading } = useSupplierPaginatedQuery<ProductRow>({
+    queryKey: orgId
+      ? supplierKeys.products(orgId, { page, search, stage: stageFilter })
+      : ['supplier', 'products', 'pending'],
+    page,
+    pageSize: 20,
+    enabled: !!orgId,
+    fetcher: async (from, to) => {
+      let query = supabase
+        .from('products')
+        .select(
+          'id, name, sku, price, stock_quantity, stage, gtin_status, approval_status, active, main_image_url, image_url, created_at',
+          { count: 'exact' },
+        )
+        .eq('supplier_organization_id', orgId!)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+      if (search) {
+        query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%`);
+      }
+      if (stageFilter !== 'all') {
+        query = query.eq('stage', stageFilter);
+      }
+      const { data: rows, count, error } = await query;
+      return { data: rows, count, error };
+    },
+  });
+
+  const submitApproval = useMutation({
+    mutationFn: async (productId: string) => {
+      const { error } = await supabase
+        .from('products')
+        .update({ approval_status: 'pending_approval' })
+        .eq('id', productId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      if (orgId) queryClient.invalidateQueries({ queryKey: supplierKeys.scope(orgId) });
+      toast({ title: 'Produto enviado para aprovação' });
+    },
+    onError: (error: Error) =>
+      toast({ title: 'Erro ao enviar', description: error.message, variant: 'destructive' }),
+  });
+
+  const handleExport = async (format: 'csv' | 'json') => {
+    try {
+      const count =
+        format === 'csv' ? await exportCatalogCsv(orgId!) : await exportCatalogJson(orgId!);
+      toast({ title: `${count} produtos exportados` });
+    } catch (error) {
+      toast({
+        title: 'Erro no export',
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleEditProduct = (product: any) => {
-    setEditingProduct(product);
-    setIsDialogOpen(true);
-  };
-
-  const handleSuccess = () => {
-    refetch();
-    setIsDialogOpen(false);
-    setEditingProduct(null);
-  };
-
-  const handleDuplicate = (product: any) => {
-    setEditingProduct({ ...product, id: undefined, name: `${product.name} (Cópia)` });
-    setIsDialogOpen(true);
-  };
-
-  const lowStockProducts = products.filter(p => p.stock_quantity <= 5 && p.stock_quantity > 0);
-  const outOfStockProducts = products.filter(p => p.stock_quantity === 0);
+  const rows = data?.rows ?? [];
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Meus Produtos</h1>
-          <p className="text-muted-foreground">Gerencie seu catálogo de produtos</p>
+          <h1 className="text-2xl font-bold">Meus Produtos</h1>
+          <p className="text-muted-foreground">Catálogo em dois estágios</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsImportOpen(true)}>
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            Importar Planilha
-          </Button>
-          <Button onClick={handleCreateProduct}>
-            <Plus className="w-4 h-4 mr-2" />
-            Novo Produto
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Download className="mr-2 h-4 w-4" />
+                Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => handleExport('csv')}>Planilha (CSV)</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport('json')}>Backup completo (JSON)</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button onClick={() => navigate('/supplier/produtos/novo')}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo produto
           </Button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Produtos</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.total || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              no seu catálogo
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Produtos Ativos</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.active || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              disponíveis para venda
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Estoque Baixo</CardTitle>
-            <AlertCircle className="h-4 w-4 text-yellow-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats?.lowStock || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              precisam de atenção
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Sem Estoque</CardTitle>
-            <PackageX className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats?.outOfStock || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              produtos esgotados
-            </p>
-          </CardContent>
-        </Card>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Nome ou SKU"
+            className="w-56 pl-8"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          />
+        </div>
+        <Select value={stageFilter} onValueChange={(v) => { setStageFilter(v); setPage(1); }}>
+          <SelectTrigger className="w-56">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os estágios</SelectItem>
+            <SelectItem value="stage_1_basic">Estágio 1 — Básico</SelectItem>
+            <SelectItem value="stage_2_requires_review">Estágio 2 — Requer revisão</SelectItem>
+            <SelectItem value="stage_2_enabled">Habilitados</SelectItem>
+            <SelectItem value="stage_2_blocked">Bloqueados</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Products Table */}
-      <Tabs defaultValue="all" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="all">
-            Todos ({products.length})
-          </TabsTrigger>
-          <TabsTrigger value="low-stock">
-            Estoque Baixo ({lowStockProducts.length})
-          </TabsTrigger>
-          <TabsTrigger value="out-of-stock">
-            Sem Estoque ({outOfStockProducts.length})
-          </TabsTrigger>
-        </TabsList>
+      <Card>
+        <CardContent className="pt-6">
+          {isLoading ? (
+            <Skeleton className="h-64 w-full" />
+          ) : rows.length === 0 ? (
+            <div className="py-12 text-center space-y-3">
+              <p className="text-muted-foreground">Nenhum produto encontrado.</p>
+              <Button onClick={() => navigate('/supplier/produtos/novo')}>
+                <Plus className="mr-2 h-4 w-4" />
+                Cadastrar primeiro produto
+              </Button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Produto</TableHead>
+                    <TableHead>SKU</TableHead>
+                    <TableHead>Preço</TableHead>
+                    <TableHead>Estoque</TableHead>
+                    <TableHead>Estágio</TableHead>
+                    <TableHead>GTIN</TableHead>
+                    <TableHead>Aprovação</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((product) => (
+                    <TableRow
+                      key={product.id}
+                      className="cursor-pointer"
+                      onClick={() => navigate(`/supplier/produtos/${product.id}`)}
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {(product.main_image_url || product.image_url) && (
+                            <img
+                              src={product.main_image_url || product.image_url || ''}
+                              alt=""
+                              className="h-9 w-9 rounded object-cover"
+                            />
+                          )}
+                          <span className="max-w-[240px] truncate font-medium">{product.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{product.sku ?? '—'}</TableCell>
+                      <TableCell>
+                        {product.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </TableCell>
+                      <TableCell>{product.stock_quantity ?? 0}</TableCell>
+                      <TableCell>
+                        <StageBadge stage={product.stage} />
+                      </TableCell>
+                      <TableCell>
+                        <GtinStatusBadge status={product.gtin_status} />
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={product.approval_status === 'approved' ? 'default' : 'secondary'}>
+                          {product.approval_status === 'approved'
+                            ? 'Aprovado'
+                            : product.approval_status === 'pending_approval'
+                              ? 'Em análise'
+                              : product.approval_status === 'rejected'
+                                ? 'Rejeitado'
+                                : 'Rascunho'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        {product.stage === 'stage_2_enabled' && product.approval_status === 'draft' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => submitApproval.mutate(product.id)}
+                            disabled={submitApproval.isPending}
+                          >
+                            <Send className="mr-1 h-3 w-3" />
+                            Enviar p/ aprovação
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
 
-        <TabsContent value="all">
-          <Card>
-            <CardHeader>
-              <CardTitle>Todos os Produtos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ProductTable
-                products={products}
-                loading={isLoading}
-                onEdit={handleEditProduct}
-                onDuplicate={handleDuplicate}
-                onRefresh={refetch}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="low-stock">
-          <Card>
-            <CardHeader>
-              <CardTitle>Produtos com Estoque Baixo</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ProductTable
-                products={lowStockProducts}
-                loading={isLoading}
-                onEdit={handleEditProduct}
-                onDuplicate={handleDuplicate}
-                onRefresh={refetch}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="out-of-stock">
-          <Card>
-            <CardHeader>
-              <CardTitle>Produtos Sem Estoque</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ProductTable
-                products={outOfStockProducts}
-                loading={isLoading}
-                onEdit={handleEditProduct}
-                onDuplicate={handleDuplicate}
-                onRefresh={refetch}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Product Form Dialog */}
-      {isDialogOpen && (
-        <ProductForm
-          product={editingProduct}
-          onSuccess={handleSuccess}
-          onCancel={() => {
-            setIsDialogOpen(false);
-            setEditingProduct(null);
-          }}
-        />
-      )}
-
-      {/* Product Import Dialog */}
-      {isImportOpen && (
-        <SupplierProductImport
-          isOpen={isImportOpen}
-          onClose={() => setIsImportOpen(false)}
-          onSuccess={refetch}
-        />
-      )}
+          {data && data.pageCount > 1 && (
+            <Pagination className="mt-4">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className={page === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+                <PaginationItem>
+                  <span className="px-3 text-sm">{page} de {data.pageCount}</span>
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setPage((p) => Math.min(data.pageCount, p + 1))}
+                    className={page >= data.pageCount ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

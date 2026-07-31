@@ -1,0 +1,98 @@
+name: Deploy Supplier Module Migrations to VPS
+
+# Disparo MANUAL apenas — nunca roda em push, para não aplicar DDL sem intenção.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Digite APLICAR para confirmar (aplica DDL no banco de produção)'
+        required: true
+        default: ''
+      mode:
+        description: 'O que executar'
+        required: true
+        default: 'migrations-e-testes'
+        type: choice
+        options:
+          - migrations-e-testes
+          - somente-testes
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard — exige confirmação explícita
+        if: ${{ inputs.confirm != 'APLICAR' }}
+        run: |
+          echo "::error::Confirmação ausente. Rode novamente digitando APLICAR no campo de confirmação."
+          exit 1
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Copiar migrations e scripts para a VPS
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -p 22022 -o StrictHostKeyChecking=no \
+            root@108.174.148.227 "mkdir -p /root/lojafy-deploy/migrations /root/lojafy-deploy/scripts"
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" rsync -avz -e "ssh -p 22022 -o StrictHostKeyChecking=no" \
+            supabase/migrations/ root@108.174.148.227:/root/lojafy-deploy/migrations/
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" rsync -avz -e "ssh -p 22022 -o StrictHostKeyChecking=no" \
+            scripts/ root@108.174.148.227:/root/lojafy-deploy/scripts/
+
+      - name: Aplicar as 9 migrations do módulo Fornecedor (em ordem)
+        if: ${{ inputs.mode == 'migrations-e-testes' }}
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -p 22022 -o StrictHostKeyChecking=no \
+            root@108.174.148.227 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd /root/supabase-lojafy
+          DC="docker compose"; $DC version >/dev/null 2>&1 || DC="docker-compose"
+
+          for f in \
+            20260801100000_supplier_organizations.sql \
+            20260801100500_rls_hardening.sql \
+            20260801101000_supplier_fulfillments.sql \
+            20260801101500_frozen_order_financials.sql \
+            20260801102000_two_stage_products.sql \
+            20260801102500_supplier_inventory.sql \
+            20260801103000_supplier_occurrences.sql \
+            20260801103500_supplier_dashboard.sql \
+            20260801104000_storefront_view_swap.sql
+          do
+            echo "==> aplicando $f"
+            $DC exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 --single-transaction \
+              < "/root/lojafy-deploy/migrations/$f"
+          done
+          echo "== 9 migrations aplicadas =="
+          REMOTE
+
+      - name: Teste de dinheiro (transacional, ROLLBACK ao final)
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -p 22022 -o StrictHostKeyChecking=no \
+            root@108.174.148.227 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd /root/supabase-lojafy
+          DC="docker compose"; $DC version >/dev/null 2>&1 || DC="docker-compose"
+          $DC exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < /root/lojafy-deploy/scripts/money-test.sql
+          REMOTE
+
+      - name: Teste de RLS (transacional, ROLLBACK ao final)
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -p 22022 -o StrictHostKeyChecking=no \
+            root@108.174.148.227 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd /root/supabase-lojafy
+          DC="docker compose"; $DC version >/dev/null 2>&1 || DC="docker-compose"
+          $DC exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < /root/lojafy-deploy/scripts/rls-test.sql
+          REMOTE
+
+      - name: Limpar arquivos temporários da VPS
+        if: always()
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -p 22022 -o StrictHostKeyChecking=no \
+            root@108.174.148.227 "rm -rf /root/lojafy-deploy" || true

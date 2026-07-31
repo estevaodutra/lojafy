@@ -47,7 +47,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       console.log('🔍 Checking prices for products:', productIds);
       
       const { data: products, error } = await supabase
-        .from('products')
+        .from('store_products')
         .select('id, price, name, active')
         .in('id', productIds);
 

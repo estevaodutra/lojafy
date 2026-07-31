@@ -4,6 +4,9 @@ import {
   Send,
   BadgeCheck,
   AlertTriangle,
+  Package,
+  CheckCircle2,
+  XCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -11,7 +14,10 @@ export type OrderStatus =
   | "pendente"
   | "pago"
   | "recebido"
+  | "embalado"
   | "enviado"
+  | "finalizado"
+  | "cancelado"
   | "etiqueta_incorreta";
 
 export interface OrderStatusConfig {
@@ -25,16 +31,22 @@ export const ORDER_STATUS_CONFIG: Record<OrderStatus, OrderStatusConfig> = {
   pendente: { label: "Pedido Gerado > Aguardando Pagamento", icon: Clock, color: "bg-gray-100 text-gray-800", variant: "secondary" },
   pago: { label: "Pedido Pago Aguardada Recebimento da Expedição", icon: BadgeCheck, color: "bg-emerald-100 text-emerald-800", variant: "default" },
   recebido: { label: "Pedido Recebido > Aguardando Envio", icon: Inbox, color: "bg-blue-100 text-blue-800", variant: "default" },
+  embalado: { label: "Embalado > Aguardando Envio", icon: Package, color: "bg-orange-100 text-orange-800", variant: "default" },
   enviado: { label: "Pedido Enviado", icon: Send, color: "bg-purple-100 text-purple-800", variant: "secondary" },
+  finalizado: { label: "Finalizado", icon: CheckCircle2, color: "bg-green-100 text-green-800", variant: "default" },
+  cancelado: { label: "Cancelado", icon: XCircle, color: "bg-gray-200 text-gray-600", variant: "outline" },
   etiqueta_incorreta: { label: "Erro | Etiqueta Incorreta", icon: AlertTriangle, color: "bg-rose-100 text-rose-800 border border-rose-200", variant: "destructive" },
 };
 
 export const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pendente: ["pago"],
-  pago: ["recebido", "etiqueta_incorreta"],
-  recebido: ["enviado", "etiqueta_incorreta"],
+  pendente: ["pago", "cancelado"],
+  pago: ["recebido", "etiqueta_incorreta", "cancelado"],
+  recebido: ["embalado", "enviado", "etiqueta_incorreta", "cancelado"],
+  embalado: ["enviado", "etiqueta_incorreta", "cancelado"],
   etiqueta_incorreta: ["pago"],
-  enviado: [],
+  enviado: ["finalizado"],
+  finalizado: [],
+  cancelado: [],
 };
 
 // Status que o fornecedor pode selecionar
@@ -52,7 +64,10 @@ export const STATUS_NOTIFICATION_MESSAGES: Record<OrderStatus, string> = {
   pendente: "⏳ Seu pedido #{numero} está aguardando pagamento.",
   pago: "✅ Pagamento confirmado! Seu pedido #{numero} está sendo processado.",
   recebido: "📥 Seu pedido #{numero} foi recebido pelo fornecedor.",
+  embalado: "📦 Seu pedido #{numero} foi embalado e está pronto para envio.",
   enviado: "🚚 Seu pedido #{numero} foi enviado! Rastreio: {codigo}",
+  finalizado: "🎉 Seu pedido #{numero} foi entregue. Obrigado pela compra!",
+  cancelado: "❌ Seu pedido #{numero} foi cancelado.",
   etiqueta_incorreta: "⚠️ A etiqueta do seu pedido #{numero} está incorreta. Por favor, envie a nova etiqueta.",
 };
 

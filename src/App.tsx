@@ -107,9 +107,20 @@ const Marketplaces = lazy(() => import("./pages/admin/Marketplaces"));
 const SupplierDashboard = lazy(() => import("./pages/supplier/Dashboard"));
 const SupplierProductManagement = lazy(() => import("./pages/supplier/ProductManagement"));
 const SupplierProductApproval = lazy(() => import("./pages/supplier/ProductApproval"));
+const SupplierProductCreate = lazy(() => import("./pages/supplier/ProductCreate"));
+const SupplierProductDetail = lazy(() => import("./pages/supplier/ProductDetail"));
 const SupplierOrderManagement = lazy(() => import("./pages/supplier/OrderManagement"));
 const SupplierInventory = lazy(() => import("./pages/supplier/Inventory"));
-const SupplierSales = lazy(() => import("./pages/supplier/Sales"));
+const SupplierPicking = lazy(() => import("./pages/supplier/Picking"));
+const SupplierPacking = lazy(() => import("./pages/supplier/Packing"));
+const SupplierExpedition = lazy(() => import("./pages/supplier/Expedition"));
+const SupplierLabels = lazy(() => import("./pages/supplier/Labels"));
+const SupplierOccurrences = lazy(() => import("./pages/supplier/Occurrences"));
+const SupplierMovements = lazy(() => import("./pages/supplier/Movements"));
+const SupplierImport = lazy(() => import("./pages/supplier/Import"));
+const SupplierCompanySettings = lazy(() => import("./pages/supplier/settings/Company"));
+const SupplierLogisticsSettings = lazy(() => import("./pages/supplier/settings/Logistics"));
+const SupplierLocationsSettings = lazy(() => import("./pages/supplier/settings/Locations"));
 
 // ── Reseller panel ─────────────────────────────────────────────────────────
 const ResellerDashboard = lazy(() => import("./pages/reseller/Dashboard"));
@@ -391,12 +402,23 @@ const App = () => {
                   }
                 >
                   <Route index element={<SupplierDashboard />} />
-                  <Route path="produtos" element={<SupplierProductManagement />} />
-                  <Route path="produtos/aprovacao" element={<SupplierProductApproval />} />
                   <Route path="pedidos" element={<SupplierOrderManagement />} />
+                  <Route path="separacao" element={<SupplierPicking />} />
+                  <Route path="embalagem" element={<SupplierPacking />} />
+                  <Route path="expedicao" element={<SupplierExpedition />} />
+                  <Route path="etiquetas" element={<SupplierLabels />} />
+                  <Route path="ocorrencias" element={<SupplierOccurrences />} />
+                  <Route path="produtos" element={<SupplierProductManagement />} />
+                  <Route path="produtos/novo" element={<SupplierProductCreate />} />
+                  <Route path="produtos/aprovacao" element={<SupplierProductApproval />} />
+                  <Route path="produtos/:id" element={<SupplierProductDetail />} />
                   <Route path="estoque" element={<SupplierInventory />} />
-                  <Route path="vendas" element={<SupplierSales />} />
-
+                  <Route path="movimentacoes" element={<SupplierMovements />} />
+                  <Route path="importacao" element={<SupplierImport />} />
+                  <Route path="configuracoes/empresa" element={<SupplierCompanySettings />} />
+                  <Route path="configuracoes/logistica" element={<SupplierLogisticsSettings />} />
+                  <Route path="configuracoes/depositos" element={<SupplierLocationsSettings />} />
+                  <Route path="vendas" element={<Navigate to="/supplier" replace />} />
                 </Route>
 
                 {/* Reseller Panel Routes */}
