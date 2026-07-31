@@ -1,7 +1,7 @@
 /**
  * Converts an internal Supabase Storage signed URL (e.g. referencing http://kong:8000)
  * to a public-facing URL using the configured public Supabase URL.
- * (Trigger deploy)
+ * (Trigger deploy with custom port)
  */
 export function getPublicSignedUrl(signedUrl: string | null | undefined): string | null {
   if (!signedUrl) return null;
