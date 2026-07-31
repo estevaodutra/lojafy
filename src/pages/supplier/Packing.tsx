@@ -1,8 +1,17 @@
+import { OperationQueue } from '@/components/supplier/operations/OperationQueue';
+
 const SupplierPacking = () => (
-  <div className="space-y-2">
-    <h1 className="text-2xl font-bold">Embalagem</h1>
-    <p className="text-muted-foreground">Em breve.</p>
-  </div>
+  <OperationQueue
+    title="Embalagem"
+    description="Pedidos separados aguardando embalagem"
+    statuses={['picked', 'packing']}
+    primaryAction={{
+      picked: { label: 'Iniciar embalagem', to: 'packing' },
+      packing: { label: 'Marcar embalado', to: 'packed' },
+    }}
+    batchLabel="Avançar selecionados"
+    emptyMessage="Nada para embalar agora."
+  />
 );
 
 export default SupplierPacking;

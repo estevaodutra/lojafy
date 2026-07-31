@@ -1,135 +1,106 @@
-import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package, TrendingUp, DollarSign, AlertTriangle, Clock } from 'lucide-react';
-import { useSupplierProductStats } from '@/hooks/useSupplierProducts';
-import { useSupplierOrderStats } from '@/hooks/useSupplierOrders';
-import { useSupplierApprovalStats } from '@/hooks/useSupplierPendingProducts';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+import {
+  Hand,
+  Inbox,
+  PackageOpen,
+  Tag,
+  AlertTriangle,
+  PackageX,
+  Clock,
+} from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ActionCard } from '@/components/supplier/dashboard/ActionCard';
+import { PerformanceIndicators } from '@/components/supplier/dashboard/PerformanceIndicators';
+import { useSupplierDashboardMetrics } from '@/hooks/supplier/useSupplierDashboardMetrics';
+import { useSupplierOrganization } from '@/hooks/supplier/useSupplierOrganization';
 
 const SupplierDashboard = () => {
-  const navigate = useNavigate();
-  const { data: productStats } = useSupplierProductStats();
-  const { data: orderStats } = useSupplierOrderStats();
-  const { data: approvalStats } = useSupplierApprovalStats();
+  const { data: orgData, isLoading: orgLoading } = useSupplierOrganization();
+  const { data: metrics, isLoading } = useSupplierDashboardMetrics();
+
+  if (orgLoading || isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-64" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(8)].map((_, i) => (
+            <Skeleton key={i} className="h-32 w-full" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!orgData) {
+    return (
+      <p className="text-muted-foreground">
+        Nenhuma organização de fornecedor encontrada para este usuário. Contate o suporte.
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Dashboard do Fornecedor</h1>
-        <p className="text-muted-foreground">
-          Visão geral dos seus produtos e vendas
-        </p>
+        <h1 className="text-3xl font-bold">Dashboard Operacional</h1>
+        <p className="text-muted-foreground">O que precisa da sua ação agora</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Produtos Ativos</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{productStats?.active || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              de {productStats?.total || 0} produtos
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pedidos do Mês</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{orderStats?.totalOrders || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              {orderStats?.totalItems || 0} itens vendidos
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receita do Mês</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">R$ {(orderStats?.totalRevenue || 0).toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">
-              vendas confirmadas
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card 
-          className="cursor-pointer hover:bg-accent transition-colors" 
-          onClick={() => navigate('/supplier/produtos/aprovacao')}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Aguardando Aprovação</CardTitle>
-            <Clock className="h-4 w-4 text-yellow-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{approvalStats?.pending || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Produtos pendentes
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <ActionCard
+          title="Aguardando separação"
+          value={metrics?.awaiting_picking}
+          icon={Inbox}
+          to="/supplier/separacao"
+        />
+        <ActionCard
+          title="Em separação"
+          value={metrics?.picking}
+          icon={Hand}
+          to="/supplier/separacao"
+        />
+        <ActionCard
+          title="Em embalagem"
+          value={metrics?.packing}
+          icon={PackageOpen}
+          to="/supplier/embalagem"
+        />
+        <ActionCard
+          title="Etiquetas pendentes"
+          value={metrics?.labels_pending}
+          icon={Tag}
+          to="/supplier/etiquetas"
+        />
+        <ActionCard
+          title="Vencem hoje"
+          value={metrics?.due_today}
+          icon={Clock}
+          to="/supplier/pedidos?sla=due_today"
+          tone={metrics && metrics.due_today > 0 ? 'warning' : 'default'}
+        />
+        <ActionCard
+          title="Atrasados"
+          value={metrics?.late}
+          icon={Clock}
+          to="/supplier/pedidos?sla=late"
+          tone={metrics && metrics.late > 0 ? 'destructive' : 'default'}
+        />
+        <ActionCard
+          title="Ocorrências abertas"
+          value={metrics?.occurrences_open}
+          icon={AlertTriangle}
+          to="/supplier/ocorrencias"
+          tone={metrics && metrics.occurrences_open > 0 ? 'warning' : 'default'}
+        />
+        <ActionCard
+          title="Estoque crítico"
+          value={metrics?.critical_stock}
+          icon={PackageX}
+          to="/supplier/estoque?filtro=critico"
+          tone={metrics && metrics.critical_stock > 0 ? 'warning' : 'default'}
+        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Visão Geral</CardTitle>
-            <CardDescription>Resumo da sua operação</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Total de Produtos</span>
-                <span className="text-sm font-medium">{productStats?.total || 0}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Produtos Ativos</span>
-                <span className="text-sm font-medium text-green-600">{productStats?.active || 0}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Estoque Baixo</span>
-                <span className="text-sm font-medium text-yellow-600">{productStats?.lowStock || 0}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Sem Estoque</span>
-                <span className="text-sm font-medium text-red-600">{productStats?.outOfStock || 0}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Vendas do Mês</CardTitle>
-            <CardDescription>Performance das suas vendas</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Pedidos com seus produtos</span>
-                <span className="text-sm font-medium">{orderStats?.totalOrders || 0}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Itens vendidos</span>
-                <span className="text-sm font-medium">{orderStats?.totalItems || 0}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Receita total</span>
-                <span className="text-sm font-medium text-green-600">R$ {(orderStats?.totalRevenue || 0).toFixed(2)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {metrics && <PerformanceIndicators metrics={metrics} />}
     </div>
   );
 };
