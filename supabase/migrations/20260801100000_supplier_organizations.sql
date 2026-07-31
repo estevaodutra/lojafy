@@ -197,42 +197,93 @@ CREATE TRIGGER sync_product_supplier_org_trigger
   EXECUTE FUNCTION public.sync_product_supplier_org();
 
 -- =============================================================================
+-- Provisionamento de org: usado pelo backfill e pelo trigger de novos suppliers
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.provision_supplier_organization(p_user_id UUID)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_org_id UUID;
+  v_profile RECORD;
+  v_email TEXT;
+BEGIN
+  SELECT id INTO v_org_id FROM public.supplier_organizations WHERE owner_user_id = p_user_id;
+  IF v_org_id IS NOT NULL THEN
+    RETURN v_org_id;
+  END IF;
+
+  SELECT first_name, last_name, phone INTO v_profile
+  FROM public.profiles WHERE user_id = p_user_id;
+
+  SELECT email INTO v_email FROM auth.users WHERE id = p_user_id;
+
+  INSERT INTO public.supplier_organizations (owner_user_id, org_code, trade_name, email, phone)
+  VALUES (
+    p_user_id,
+    public.generate_supplier_org_code(),
+    NULLIF(trim(concat_ws(' ', v_profile.first_name, v_profile.last_name)), ''),
+    v_email,
+    v_profile.phone
+  )
+  RETURNING id INTO v_org_id;
+
+  INSERT INTO public.supplier_members (organization_id, user_id, role)
+  VALUES (v_org_id, p_user_id, 'owner')
+  ON CONFLICT (organization_id, user_id) DO NOTHING;
+
+  INSERT INTO public.supplier_locations (organization_id, name, is_default)
+  VALUES (v_org_id, 'Depósito principal', true);
+
+  INSERT INTO public.supplier_settings (organization_id)
+  VALUES (v_org_id)
+  ON CONFLICT (organization_id) DO NOTHING;
+
+  RETURN v_org_id;
+END;
+$$;
+
+-- Novos suppliers (cadastrados após esta migration) ganham org automaticamente
+CREATE OR REPLACE FUNCTION public.handle_supplier_profile_org()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.role = 'supplier' THEN
+    PERFORM public.provision_supplier_organization(NEW.user_id);
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS provision_supplier_org_trigger ON public.profiles;
+CREATE TRIGGER provision_supplier_org_trigger
+  AFTER INSERT OR UPDATE OF role ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_supplier_profile_org();
+
+-- =============================================================================
 -- Backfill idempotente: 1 org por profile supplier + member owner + depósito + settings
 -- =============================================================================
 
 DO $$
 DECLARE
   v_profile RECORD;
-  v_org_id UUID;
 BEGIN
   FOR v_profile IN (
-    SELECT p.user_id, p.first_name, p.last_name, p.email, p.phone
+    SELECT p.user_id
     FROM public.profiles p
     WHERE p.role = 'supplier'
       AND NOT EXISTS (
         SELECT 1 FROM public.supplier_organizations o WHERE o.owner_user_id = p.user_id
       )
   ) LOOP
-    INSERT INTO public.supplier_organizations (owner_user_id, org_code, trade_name, email, phone)
-    VALUES (
-      v_profile.user_id,
-      public.generate_supplier_org_code(),
-      NULLIF(trim(concat_ws(' ', v_profile.first_name, v_profile.last_name)), ''),
-      v_profile.email,
-      v_profile.phone
-    )
-    RETURNING id INTO v_org_id;
-
-    INSERT INTO public.supplier_members (organization_id, user_id, role)
-    VALUES (v_org_id, v_profile.user_id, 'owner')
-    ON CONFLICT (organization_id, user_id) DO NOTHING;
-
-    INSERT INTO public.supplier_locations (organization_id, name, is_default)
-    VALUES (v_org_id, 'Depósito principal', true);
-
-    INSERT INTO public.supplier_settings (organization_id)
-    VALUES (v_org_id)
-    ON CONFLICT (organization_id) DO NOTHING;
+    PERFORM public.provision_supplier_organization(v_profile.user_id);
   END LOOP;
 
   UPDATE public.products pr

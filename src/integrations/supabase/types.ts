@@ -5219,7 +5219,6 @@ export type Database = {
           min_stock_level: number | null
           name: string | null
           original_price: number | null
-          permalink: string | null
           price: number | null
           rating: number | null
           review_count: number | null

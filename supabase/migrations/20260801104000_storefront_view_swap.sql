@@ -40,7 +40,6 @@ SELECT
   p.width,
   p.length,
   p.weight,
-  p.permalink,
   p.created_at,
   p.updated_at,
   p.high_rotation
