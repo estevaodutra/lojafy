@@ -3,38 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { DollarSign, TrendingUp, ShoppingCart, Users } from "lucide-react";
 
 export default function SupplierSales() {
-  const recentSales = [
-    {
-      id: 1,
-      product: "Smartphone XYZ Pro",
-      customer: "João Silva",
-      quantity: 2,
-      value: "R$ 2.598,00",
-      commission: "R$ 259,80",
-      date: "15/01/2024",
-      status: "Confirmado"
-    },
-    {
-      id: 2,
-      product: "Notebook ABC Gaming",
-      customer: "Maria Santos",
-      quantity: 1,
-      value: "R$ 2.899,00",
-      commission: "R$ 289,90",
-      date: "14/01/2024",
-      status: "Enviado"
-    },
-    {
-      id: 3,
-      product: "Headphones DEF Wireless",
-      customer: "Carlos Oliveira",
-      quantity: 3,
-      value: "R$ 1.197,00",
-      commission: "R$ 119,70",
-      date: "13/01/2024",
-      status: "Entregue"
-    }
-  ];
+  const recentSales: any[] = [];
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -65,8 +34,8 @@ export default function SupplierSales() {
             <DollarSign className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 45.890</div>
-            <p className="text-xs text-muted-foreground">+12% em relação ao mês anterior</p>
+            <div className="text-2xl font-bold">R$ 0,00</div>
+            <p className="text-xs text-muted-foreground">Sem histórico anterior</p>
           </CardContent>
         </Card>
 
@@ -76,8 +45,8 @@ export default function SupplierSales() {
             <TrendingUp className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 4.589</div>
-            <p className="text-xs text-muted-foreground">10% das vendas brutas</p>
+            <div className="text-2xl font-bold">R$ 0,00</div>
+            <p className="text-xs text-muted-foreground">Aguardando comissões</p>
           </CardContent>
         </Card>
 
@@ -87,8 +56,8 @@ export default function SupplierSales() {
             <ShoppingCart className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">89</div>
-            <p className="text-xs text-muted-foreground">+8 novos pedidos hoje</p>
+            <div className="text-2xl font-bold">0</div>
+            <p className="text-xs text-muted-foreground">Nenhum pedido hoje</p>
           </CardContent>
         </Card>
 
@@ -98,8 +67,8 @@ export default function SupplierSales() {
             <Users className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">67</div>
-            <p className="text-xs text-muted-foreground">15 clientes recorrentes</p>
+            <div className="text-2xl font-bold">0</div>
+            <p className="text-xs text-muted-foreground">Sem clientes recorrentes</p>
           </CardContent>
         </Card>
       </div>
@@ -114,42 +83,48 @@ export default function SupplierSales() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {recentSales.map((sale) => (
-              <div key={sale.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center">
-                    <ShoppingCart className="w-6 h-6 text-muted-foreground" />
+            {recentSales.length > 0 ? (
+              recentSales.map((sale) => (
+                <div key={sale.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center">
+                      <ShoppingCart className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">{sale.product}</h3>
+                      <p className="text-sm text-muted-foreground">Cliente: {sale.customer}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-medium">{sale.product}</h3>
-                    <p className="text-sm text-muted-foreground">Cliente: {sale.customer}</p>
+                  
+                  <div className="grid grid-cols-4 gap-8 text-sm">
+                    <div className="text-center">
+                      <p className="text-muted-foreground">Quantidade</p>
+                      <p className="font-medium">{sale.quantity}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-muted-foreground">Valor Total</p>
+                      <p className="font-medium">{sale.value}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-muted-foreground">Comissão</p>
+                      <p className="font-medium text-green-600">{sale.commission}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-muted-foreground">Data</p>
+                      <p className="font-medium">{sale.date}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    {getStatusBadge(sale.status)}
                   </div>
                 </div>
-                
-                <div className="grid grid-cols-4 gap-8 text-sm">
-                  <div className="text-center">
-                    <p className="text-muted-foreground">Quantidade</p>
-                    <p className="font-medium">{sale.quantity}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-muted-foreground">Valor Total</p>
-                    <p className="font-medium">{sale.value}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-muted-foreground">Comissão</p>
-                    <p className="font-medium text-green-600">{sale.commission}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-muted-foreground">Data</p>
-                    <p className="font-medium">{sale.date}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  {getStatusBadge(sale.status)}
-                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                Nenhuma venda recente registrada.
               </div>
-            ))}
+            )}
           </div>
         </CardContent>
       </Card>
@@ -163,17 +138,8 @@ export default function SupplierSales() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm">Smartphone XYZ Pro</span>
-                <span className="text-sm font-medium">34 vendas</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm">Notebook ABC Gaming</span>
-                <span className="text-sm font-medium">28 vendas</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm">Headphones DEF Wireless</span>
-                <span className="text-sm font-medium">21 vendas</span>
+              <div className="text-center py-6 text-muted-foreground text-sm">
+                Nenhum produto vendido este mês.
               </div>
             </div>
           </CardContent>
@@ -188,14 +154,14 @@ export default function SupplierSales() {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-sm">Progresso</span>
-                <span className="text-sm font-medium">76%</span>
+                <span className="text-sm font-medium">0%</span>
               </div>
               <div className="w-full bg-muted rounded-full h-2">
-                <div className="bg-primary h-2 rounded-full" style={{ width: '76%' }} />
+                <div className="bg-primary h-2 rounded-full" style={{ width: '0%' }} />
               </div>
               <div className="flex justify-between text-sm text-muted-foreground">
-                <span>R$ 45.890 / R$ 60.000</span>
-                <span>Faltam R$ 14.110</span>
+                <span>R$ 0,00 / R$ 60.000,00</span>
+                <span>Faltam R$ 60.000,00</span>
               </div>
             </div>
           </CardContent>
