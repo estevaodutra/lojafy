@@ -17,6 +17,9 @@ dist-ssr
 .env.local
 .env.*.local
 
+# Personal/local-only scripts (may contain destructive ops or personal data)
+scratch/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
