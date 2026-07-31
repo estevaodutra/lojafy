@@ -23,6 +23,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ParsedRow {
   photo_url: string;
+  photo_urls: string[];
   title: string;
   description: string;
   weight: number;
@@ -41,8 +42,13 @@ const TEMPLATE_HEADERS = [
 
 const parseRow = (obj: Record<string, string>): ParsedRow => {
   const num = (v: string) => parseFloat((v || '').replace(',', '.'));
+  const photoUrls = (obj.foto_url || obj.photo_url || '')
+    .split(',')
+    .map((url) => url.trim())
+    .filter((url) => url !== '');
   const row: ParsedRow = {
-    photo_url: obj.foto_url || obj.photo_url || '',
+    photo_url: photoUrls[0] || '',
+    photo_urls: photoUrls,
     title: obj.titulo || obj.title || '',
     description: obj.descricao || obj.description || '',
     weight: num(obj.peso_kg || obj.weight),
@@ -132,6 +138,7 @@ const SupplierImport = () => {
             length: row.length,
             main_image_url: row.photo_url,
             image_url: row.photo_url,
+            images: row.photo_urls,
             supplier_id: userId!,
             stage: 'stage_1_basic',
             active: false,
@@ -185,7 +192,8 @@ const SupplierImport = () => {
         <CardHeader>
           <CardTitle className="text-base">1. Planilha</CardTitle>
           <CardDescription>
-            Colunas: {TEMPLATE_HEADERS.join('; ')}.{' '}
+            Colunas: {TEMPLATE_HEADERS.join('; ')}. Em <code>foto_url</code>, você pode informar
+            várias imagens separadas por vírgula (a primeira vira a foto principal).{' '}
             <button type="button" className="underline" onClick={downloadTemplate}>
               Baixar modelo
             </button>
