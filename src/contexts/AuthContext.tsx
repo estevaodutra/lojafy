@@ -144,8 +144,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
       
       if (error) {
-        // Send error event to N8N
-        await sendAuthEvent('signup', email, undefined, 'error', { error: error.message });
+        // Send error event to N8N (non-blocking)
+        sendAuthEvent('signup', email, undefined, 'error', { error: error.message });
         
         // Translate common error messages to Portuguese
         let errorMessage = error.message;
@@ -165,8 +165,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return { error: { ...error, friendlyMessage: errorMessage } };
       }
 
-      // Send successful signup event to N8N
-      await sendAuthEvent('signup', email, data.user?.id, 'success', { 
+      // Send successful signup event to N8N (non-blocking)
+      sendAuthEvent('signup', email, data.user?.id, 'success', { 
         first_name: firstName, 
         last_name: lastName 
       });
@@ -187,9 +187,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
       
       if (error) {
-        // Send error event to N8N (only if email is provided)
+        // Send error event to N8N (only if email is provided, non-blocking)
         if (email) {
-          await sendAuthEvent('login', email, undefined, 'error', { error: error.message });
+          sendAuthEvent('login', email, undefined, 'error', { error: error.message });
         }
         
         // Translate common error messages to Portuguese
@@ -210,8 +210,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return { error: { ...error, friendlyMessage: errorMessage, needsEmailConfirmation: error.message.includes('Email not confirmed') } };
       }
 
-      // Send successful login event to N8N
-      await sendAuthEvent('login', email, data.user?.id, 'success');
+      // Send successful login event to N8N (non-blocking)
+      sendAuthEvent('login', email, data.user?.id, 'success');
 
       toast({
         title: "Login realizado!",

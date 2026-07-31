@@ -18,6 +18,7 @@ interface GenerateAccessLinkModalProps {
   onOpenChange: (open: boolean) => void;
   userId: string;
   userName: string;
+  redirectUrl?: string;
 }
 
 export const GenerateAccessLinkModal = ({
@@ -25,6 +26,7 @@ export const GenerateAccessLinkModal = ({
   onOpenChange,
   userId,
   userName,
+  redirectUrl,
 }: GenerateAccessLinkModalProps) => {
   const [loading, setLoading] = useState(false);
   const [link, setLink] = useState('');
@@ -38,7 +40,10 @@ export const GenerateAccessLinkModal = ({
 
     try {
       const { data, error } = await supabase.functions.invoke('generate-onetime-link', {
-        body: { user_id: userId },
+        body: { 
+          user_id: userId,
+          redirect_url: redirectUrl
+        },
       });
 
       if (error || !data?.success) {

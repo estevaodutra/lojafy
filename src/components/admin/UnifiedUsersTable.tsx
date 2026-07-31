@@ -101,7 +101,7 @@ export const UnifiedUsersTable = ({
   onDeleteUser,
   onUnbanUser,
 }: UnifiedUsersTableProps) => {
-  const [accessLinkModal, setAccessLinkModal] = useState<{ userId: string; userName: string } | null>(null);
+  const [accessLinkModal, setAccessLinkModal] = useState<{ userId: string; userName: string; redirectUrl?: string } | null>(null);
   
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -300,11 +300,12 @@ export const UnifiedUsersTable = ({
                           userName={`${user.first_name} ${user.last_name}`}
                           asMenuItem
                         />
-                        {user.role === 'reseller' && (
+                        {(user.role === 'reseller' || user.role === 'supplier') && (
                           <DropdownMenuItem
                             onClick={() => setAccessLinkModal({
                               userId: user.user_id,
                               userName: `${user.first_name} ${user.last_name}`,
+                              redirectUrl: user.role === 'reseller' ? '/reseller/onboarding' : '/supplier',
                             })}
                           >
                             <Link className="mr-2 h-4 w-4" />
@@ -410,6 +411,7 @@ export const UnifiedUsersTable = ({
           onOpenChange={(open) => !open && setAccessLinkModal(null)}
           userId={accessLinkModal.userId}
           userName={accessLinkModal.userName}
+          redirectUrl={accessLinkModal.redirectUrl}
         />
       )}
     </div>

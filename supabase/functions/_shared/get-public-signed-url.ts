@@ -6,8 +6,8 @@ export function getPublicSignedUrl(signedUrl: string | null | undefined): string
   if (!signedUrl) return null;
 
   // PUBLIC_SUPABASE_URL should be configured in the production environment.
-  // Fallback to the known production domain 'https://lojafy.6ksfuf.easypanel.host' if not set.
-  const publicSupabaseUrl = Deno.env.get('PUBLIC_SUPABASE_URL') || 'https://lojafy.6ksfuf.easypanel.host';
+  // Fallback to the known production domain 'https://lojafy-supabase.d2x.site' if not set.
+  const publicSupabaseUrl = Deno.env.get('PUBLIC_SUPABASE_URL') || 'https://lojafy-supabase.d2x.site';
 
   try {
     const urlObj = new URL(signedUrl);
