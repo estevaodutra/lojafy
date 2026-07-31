@@ -114,8 +114,17 @@ const SupplierInventory = () => {
                     <TableRow key={row.product_id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {row.main_image_url && (
-                            <img src={row.main_image_url} alt="" className="h-9 w-9 rounded object-cover" />
+                          {row.main_image_url ? (
+                            <img 
+                              src={row.main_image_url} 
+                              alt="" 
+                              className="h-9 w-9 rounded object-cover" 
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://placehold.co/100x100/e2e8f0/64748b?text=Sem+Foto';
+                              }}
+                            />
+                          ) : (
+                            <div className="h-9 w-9 rounded bg-muted flex items-center justify-center text-[10px] text-muted-foreground select-none">Sem Foto</div>
                           )}
                           <span className="max-w-[260px] truncate font-medium">{row.name}</span>
                         </div>

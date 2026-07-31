@@ -213,7 +213,7 @@ const SupplierProductDetail = () => {
                       alt={`Imagem ${index + 1}`} 
                       className="object-cover w-full h-full"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/placeholder.svg';
+                        (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/e2e8f0/64748b?text=Sem+Foto';
                       }}
                     />
                     

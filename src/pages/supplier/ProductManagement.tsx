@@ -195,12 +195,17 @@ const SupplierProductManagement = () => {
                     >
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {(product.main_image_url || product.image_url) && (
+                          {product.main_image_url || product.image_url ? (
                             <img
                               src={product.main_image_url || product.image_url || ''}
                               alt=""
                               className="h-9 w-9 rounded object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://placehold.co/100x100/e2e8f0/64748b?text=Sem+Foto';
+                              }}
                             />
+                          ) : (
+                            <div className="h-9 w-9 rounded bg-muted flex items-center justify-center text-[10px] text-muted-foreground select-none">Sem Foto</div>
                           )}
                           <span className="max-w-[240px] truncate font-medium">{product.name}</span>
                         </div>
