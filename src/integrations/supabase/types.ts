@@ -1960,31 +1960,55 @@ export type Database = {
       order_items: {
         Row: {
           created_at: string
+          financials_frozen_at: string | null
           id: string
           order_id: string
+          platform_fee_amount: number | null
           product_id: string
           product_snapshot: Json | null
           quantity: number
+          reseller_margin_amount: number | null
+          supplier_id: string | null
+          supplier_net_amount: number | null
+          supplier_organization_id: string | null
+          supplier_total_cost: number | null
+          supplier_unit_cost: number | null
           total_price: number
           unit_price: number
         }
         Insert: {
           created_at?: string
+          financials_frozen_at?: string | null
           id?: string
           order_id: string
+          platform_fee_amount?: number | null
           product_id: string
           product_snapshot?: Json | null
           quantity: number
+          reseller_margin_amount?: number | null
+          supplier_id?: string | null
+          supplier_net_amount?: number | null
+          supplier_organization_id?: string | null
+          supplier_total_cost?: number | null
+          supplier_unit_cost?: number | null
           total_price: number
           unit_price: number
         }
         Update: {
           created_at?: string
+          financials_frozen_at?: string | null
           id?: string
           order_id?: string
+          platform_fee_amount?: number | null
           product_id?: string
           product_snapshot?: Json | null
           quantity?: number
+          reseller_margin_amount?: number | null
+          supplier_id?: string | null
+          supplier_net_amount?: number | null
+          supplier_organization_id?: string | null
+          supplier_total_cost?: number | null
+          supplier_unit_cost?: number | null
           total_price?: number
           unit_price?: number
         }
@@ -2947,6 +2971,96 @@ export type Database = {
           },
         ]
       }
+      product_reference_candidates: {
+        Row: {
+          attribute_count: number | null
+          brand: string | null
+          compatibility_score: number | null
+          created_at: string
+          has_gtin: boolean | null
+          id: string
+          image_url: string | null
+          ml_category_id: string | null
+          ml_item_id: string
+          model: string | null
+          price: number | null
+          product_id: string
+          raw_data: Json | null
+          search_query: string | null
+          title: string | null
+        }
+        Insert: {
+          attribute_count?: number | null
+          brand?: string | null
+          compatibility_score?: number | null
+          created_at?: string
+          has_gtin?: boolean | null
+          id?: string
+          image_url?: string | null
+          ml_category_id?: string | null
+          ml_item_id: string
+          model?: string | null
+          price?: number | null
+          product_id: string
+          raw_data?: Json | null
+          search_query?: string | null
+          title?: string | null
+        }
+        Update: {
+          attribute_count?: number | null
+          brand?: string | null
+          compatibility_score?: number | null
+          created_at?: string
+          has_gtin?: boolean | null
+          id?: string
+          image_url?: string | null
+          ml_category_id?: string | null
+          ml_item_id?: string
+          model?: string | null
+          price?: number | null
+          product_id?: string
+          raw_data?: Json | null
+          search_query?: string | null
+          title?: string | null
+        }
+        Relationships: []
+      }
+      product_reference_imports: {
+        Row: {
+          candidate_id: string | null
+          created_at: string
+          id: string
+          imported_by: string | null
+          imported_fields: Json | null
+          ml_item_id: string | null
+          product_id: string
+          snapshot_after: Json | null
+          snapshot_before: Json | null
+        }
+        Insert: {
+          candidate_id?: string | null
+          created_at?: string
+          id?: string
+          imported_by?: string | null
+          imported_fields?: Json | null
+          ml_item_id?: string | null
+          product_id: string
+          snapshot_after?: Json | null
+          snapshot_before?: Json | null
+        }
+        Update: {
+          candidate_id?: string | null
+          created_at?: string
+          id?: string
+          imported_by?: string | null
+          imported_fields?: Json | null
+          ml_item_id?: string | null
+          product_id?: string
+          snapshot_after?: Json | null
+          snapshot_before?: Json | null
+        }
+        Relationships: []
+      }
       product_variants: {
         Row: {
           active: boolean | null
@@ -3049,6 +3163,8 @@ export type Database = {
           enriched_at: string | null
           featured: boolean | null
           gtin_ean13: string | null
+          gtin_source: string | null
+          gtin_status: string | null
           has_variations: boolean | null
           height: number | null
           high_rotation: boolean | null
@@ -3065,18 +3181,24 @@ export type Database = {
           original_name: string | null
           original_price: number | null
           original_saved_at: string | null
+          original_stage1_data: Json | null
           price: number
           rating: number | null
           reference_ad_url: string | null
+          reference_imported_at: string | null
+          reference_item_id: string | null
           rejected_at: string | null
           rejection_reason: string | null
           requires_approval: boolean | null
           review_count: number | null
           sku: string | null
+          sku_locked: boolean | null
           specifications: Json | null
+          stage: string | null
           stock_quantity: number | null
           subcategory_id: string | null
           supplier_id: string | null
+          supplier_organization_id: string | null
           updated_at: string
           use_auto_pricing: boolean | null
           variations: Json | null
@@ -3103,6 +3225,8 @@ export type Database = {
           enriched_at?: string | null
           featured?: boolean | null
           gtin_ean13?: string | null
+          gtin_source?: string | null
+          gtin_status?: string | null
           has_variations?: boolean | null
           height?: number | null
           high_rotation?: boolean | null
@@ -3119,18 +3243,24 @@ export type Database = {
           original_name?: string | null
           original_price?: number | null
           original_saved_at?: string | null
+          original_stage1_data?: Json | null
           price: number
           rating?: number | null
           reference_ad_url?: string | null
+          reference_imported_at?: string | null
+          reference_item_id?: string | null
           rejected_at?: string | null
           rejection_reason?: string | null
           requires_approval?: boolean | null
           review_count?: number | null
           sku?: string | null
+          sku_locked?: boolean | null
           specifications?: Json | null
+          stage?: string | null
           stock_quantity?: number | null
           subcategory_id?: string | null
           supplier_id?: string | null
+          supplier_organization_id?: string | null
           updated_at?: string
           use_auto_pricing?: boolean | null
           variations?: Json | null
@@ -3157,6 +3287,8 @@ export type Database = {
           enriched_at?: string | null
           featured?: boolean | null
           gtin_ean13?: string | null
+          gtin_source?: string | null
+          gtin_status?: string | null
           has_variations?: boolean | null
           height?: number | null
           high_rotation?: boolean | null
@@ -3173,18 +3305,24 @@ export type Database = {
           original_name?: string | null
           original_price?: number | null
           original_saved_at?: string | null
+          original_stage1_data?: Json | null
           price?: number
           rating?: number | null
           reference_ad_url?: string | null
+          reference_imported_at?: string | null
+          reference_item_id?: string | null
           rejected_at?: string | null
           rejection_reason?: string | null
           requires_approval?: boolean | null
           review_count?: number | null
           sku?: string | null
+          sku_locked?: boolean | null
           specifications?: Json | null
+          stage?: string | null
           stock_quantity?: number | null
           subcategory_id?: string | null
           supplier_id?: string | null
+          supplier_organization_id?: string | null
           updated_at?: string
           use_auto_pricing?: boolean | null
           variations?: Json | null
@@ -4191,6 +4329,420 @@ export type Database = {
           },
         ]
       }
+      supplier_audit_logs: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          after: Json | null
+          before: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json | null
+          organization_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+        }
+        Relationships: []
+      }
+      supplier_fulfillment_items: {
+        Row: {
+          created_at: string
+          fulfillment_id: string
+          id: string
+          order_item_id: string
+          product_id: string | null
+          quantity: number
+        }
+        Insert: {
+          created_at?: string
+          fulfillment_id: string
+          id?: string
+          order_item_id: string
+          product_id?: string | null
+          quantity: number
+        }
+        Update: {
+          created_at?: string
+          fulfillment_id?: string
+          id?: string
+          order_item_id?: string
+          product_id?: string | null
+          quantity?: number
+        }
+        Relationships: []
+      }
+      supplier_fulfillment_status_history: {
+        Row: {
+          changed_by: string | null
+          created_at: string
+          from_status: string | null
+          fulfillment_id: string
+          id: string
+          notes: string | null
+          to_status: string
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string
+          from_status?: string | null
+          fulfillment_id: string
+          id?: string
+          notes?: string | null
+          to_status: string
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string
+          from_status?: string | null
+          fulfillment_id?: string
+          id?: string
+          notes?: string | null
+          to_status?: string
+        }
+        Relationships: []
+      }
+      supplier_fulfillments: {
+        Row: {
+          carrier: string | null
+          created_at: string
+          delivered_at: string | null
+          id: string
+          label_status: string
+          notes: string | null
+          order_id: string
+          shipped_at: string | null
+          sla_picking_deadline: string | null
+          sla_shipping_deadline: string | null
+          status: string
+          supplier_organization_id: string
+          supplier_user_id: string | null
+          tracking_code: string | null
+          updated_at: string
+        }
+        Insert: {
+          carrier?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          label_status?: string
+          notes?: string | null
+          order_id: string
+          shipped_at?: string | null
+          sla_picking_deadline?: string | null
+          sla_shipping_deadline?: string | null
+          status?: string
+          supplier_organization_id: string
+          supplier_user_id?: string | null
+          tracking_code?: string | null
+          updated_at?: string
+        }
+        Update: {
+          carrier?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          label_status?: string
+          notes?: string | null
+          order_id?: string
+          shipped_at?: string | null
+          sla_picking_deadline?: string | null
+          sla_shipping_deadline?: string | null
+          status?: string
+          supplier_organization_id?: string
+          supplier_user_id?: string | null
+          tracking_code?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      supplier_inventory_movements: {
+        Row: {
+          created_at: string
+          id: string
+          location_id: string | null
+          movement_type: string
+          new_quantity: number
+          organization_id: string
+          performed_by: string | null
+          previous_quantity: number
+          product_id: string
+          quantity: number
+          reason: string | null
+          reference_id: string | null
+          reference_type: string | null
+          variant_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location_id?: string | null
+          movement_type: string
+          new_quantity: number
+          organization_id: string
+          performed_by?: string | null
+          previous_quantity: number
+          product_id: string
+          quantity: number
+          reason?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          variant_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location_id?: string | null
+          movement_type?: string
+          new_quantity?: number
+          organization_id?: string
+          performed_by?: string | null
+          previous_quantity?: number
+          product_id?: string
+          quantity?: number
+          reason?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          variant_id?: string | null
+        }
+        Relationships: []
+      }
+      supplier_locations: {
+        Row: {
+          active: boolean
+          address: Json | null
+          created_at: string
+          id: string
+          is_default: boolean
+          name: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          address?: Json | null
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          address?: Json | null
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      supplier_members: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          organization_id: string
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          organization_id: string
+          role?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          organization_id?: string
+          role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      supplier_occurrences: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          fulfillment_id: string | null
+          id: string
+          occurrence_type: string
+          order_id: string | null
+          organization_id: string
+          product_id: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          fulfillment_id?: string | null
+          id?: string
+          occurrence_type: string
+          order_id?: string | null
+          organization_id: string
+          product_id?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          fulfillment_id?: string | null
+          id?: string
+          occurrence_type?: string
+          order_id?: string | null
+          organization_id?: string
+          product_id?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      supplier_organizations: {
+        Row: {
+          active: boolean
+          created_at: string
+          document: string | null
+          email: string | null
+          id: string
+          legal_name: string | null
+          logo_url: string | null
+          org_code: string
+          owner_user_id: string
+          phone: string | null
+          trade_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          document?: string | null
+          email?: string | null
+          id?: string
+          legal_name?: string | null
+          logo_url?: string | null
+          org_code: string
+          owner_user_id: string
+          phone?: string | null
+          trade_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          document?: string | null
+          email?: string | null
+          id?: string
+          legal_name?: string | null
+          logo_url?: string | null
+          org_code?: string
+          owner_user_id?: string
+          phone?: string | null
+          trade_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      supplier_settings: {
+        Row: {
+          created_at: string
+          default_carrier: string | null
+          low_stock_threshold: number
+          notifications: Json
+          organization_id: string
+          picking_sla_hours: number
+          shipping_sla_hours: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_carrier?: string | null
+          low_stock_threshold?: number
+          notifications?: Json
+          organization_id: string
+          picking_sla_hours?: number
+          shipping_sla_hours?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_carrier?: string | null
+          low_stock_threshold?: number
+          notifications?: Json
+          organization_id?: string
+          picking_sla_hours?: number
+          shipping_sla_hours?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      supplier_sku_sequences: {
+        Row: {
+          last_seq: number
+          organization_id: string | null
+          prefix: string
+        }
+        Insert: {
+          last_seq?: number
+          organization_id?: string | null
+          prefix: string
+        }
+        Update: {
+          last_seq?: number
+          organization_id?: string | null
+          prefix?: string
+        }
+        Relationships: []
+      }
       support_tickets: {
         Row: {
           ai_handled: boolean | null
@@ -4644,6 +5196,58 @@ export type Database = {
       }
     }
     Views: {
+      store_products: {
+        Row: {
+          active: boolean | null
+          attributes: Json | null
+          badge: string | null
+          brand: string | null
+          category_id: string | null
+          condition: string | null
+          created_at: string | null
+          description: string | null
+          featured: boolean | null
+          gtin_ean13: string | null
+          has_variations: boolean | null
+          height: number | null
+          id: string | null
+          image_url: string | null
+          images: string[] | null
+          length: number | null
+          main_image_url: string | null
+          min_stock_level: number | null
+          name: string | null
+          original_price: number | null
+          permalink: string | null
+          price: number | null
+          rating: number | null
+          review_count: number | null
+          sku: string | null
+          specifications: Json | null
+          stock_quantity: number | null
+          subcategory_id: string | null
+          updated_at: string | null
+          variations: Json | null
+          weight: number | null
+          width: number | null
+        }
+        Relationships: []
+      }
+      supplier_stock_overview: {
+        Row: {
+          available_quantity: number | null
+          is_below_minimum: boolean | null
+          main_image_url: string | null
+          min_stock_level: number | null
+          name: string | null
+          organization_id: string | null
+          product_id: string | null
+          reserved_quantity: number | null
+          sku: string | null
+          stock_quantity: number | null
+        }
+        Relationships: []
+      }
       v_products_mercadolivre: {
         Row: {
           is_validated: boolean | null
@@ -4735,6 +5339,67 @@ export type Database = {
       }
     }
     Functions: {
+      apply_inventory_movement: {
+        Args: {
+          p_location_id?: string
+          p_movement_type: string
+          p_product_id: string
+          p_quantity: number
+          p_reason?: string
+          p_reference_id?: string
+          p_reference_type?: string
+          p_variant_id?: string
+        }
+        Returns: Json
+      }
+      create_fulfillments_for_order: {
+        Args: { p_order_id: string }
+        Returns: number
+      }
+      get_supplier_dashboard_metrics: {
+        Args: { p_org_id: string }
+        Returns: Json
+      }
+      get_supplier_org_id: {
+        Args: { _user_id: string }
+        Returns: string
+      }
+      import_reference_data: {
+        Args: { p_candidate_id: string; p_overrides?: Json; p_product_id: string }
+        Returns: Json
+      }
+      is_order_stakeholder: {
+        Args: { _order_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_supplier_org_member: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: boolean
+      }
+      log_supplier_audit: {
+        Args: {
+          p_action: string
+          p_after?: Json
+          p_before?: Json
+          p_entity_id: string
+          p_entity_type: string
+          p_metadata?: Json
+          p_organization_id: string
+        }
+        Returns: string
+      }
+      recompute_order_status: {
+        Args: { p_order_id: string }
+        Returns: undefined
+      }
+      restore_reference_import: {
+        Args: { p_import_id: string }
+        Returns: Json
+      }
+      validate_gtin_check_digit: {
+        Args: { p_gtin: string }
+        Returns: boolean
+      }
       add_product_attribute: {
         Args: {
           p_attribute_id: string
