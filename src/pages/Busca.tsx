@@ -39,7 +39,7 @@ const Busca = () => {
       setLoading(true);
       try {
         const { data, error } = await supabase
-          .from("products")
+          .from("store_products")
           .select("*")
           .ilike("name", `%${searchQuery}%`)
           .eq("active", true)
