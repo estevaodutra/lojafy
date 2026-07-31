@@ -57,6 +57,20 @@ export function extractSearchKeywords(name: string): string {
 const attr = (attributes: MlItemDetail['attributes'], id: string): string | null =>
   attributes?.find((a) => a.id === id)?.value_name ?? null;
 
+// Função helper para buscar do proxy seguro da Edge Function
+async function fetchFromMlProxy(path: string): Promise<any> {
+  const { data, error } = await supabase.functions.invoke('ml-public-search', {
+    body: { path }
+  });
+  if (error) {
+    throw new Error(error.message || 'Erro na chamada do proxy do Mercado Livre');
+  }
+  return {
+    ok: true,
+    json: async () => data,
+  };
+}
+
 /**
  * Busca candidatos no ML e enriquece com detalhes (atributos, GTIN).
  * Detalhes são buscados em paralelo; falha de um item não derruba a busca.
@@ -66,8 +80,8 @@ export async function searchMlCandidates(product: {
   price: number;
 }): Promise<ScoredCandidate[]> {
   const query = extractSearchKeywords(product.name);
-  const searchRes = await fetch(
-    `${ML_API}/sites/MLB/search?q=${encodeURIComponent(query)}&limit=8`,
+  const searchRes = await fetchFromMlProxy(
+    `/sites/MLB/search?q=${encodeURIComponent(query)}&limit=8`,
   );
   if (!searchRes.ok) throw new Error('Falha ao buscar anúncios no Mercado Livre');
   const searchData = await searchRes.json();
@@ -77,8 +91,8 @@ export async function searchMlCandidates(product: {
     results.map(async (result) => {
       try {
         const [detailRes, descRes] = await Promise.all([
-          fetch(`${ML_API}/items/${result.id}`),
-          fetch(`${ML_API}/items/${result.id}/description`),
+          fetchFromMlProxy(`/items/${result.id}`),
+          fetchFromMlProxy(`/items/${result.id}/description`),
         ]);
         if (!detailRes.ok) return null;
         const detail: MlItemDetail = await detailRes.json();
