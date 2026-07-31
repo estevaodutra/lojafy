@@ -47,6 +47,10 @@ const parseRow = (obj: Record<string, string>): ParsedRow => {
     .split(',')
     .map((url) => url.trim())
     .filter((url) => url !== '');
+  
+  const rawPrice = num(obj.preco || obj.price);
+  const finalPrice = isNaN(rawPrice) || rawPrice < 0 ? 0 : rawPrice;
+
   const row: ParsedRow = {
     photo_url: photoUrls[0] || '',
     photo_urls: photoUrls,
@@ -56,14 +60,14 @@ const parseRow = (obj: Record<string, string>): ParsedRow => {
     height: num(obj.altura_cm || obj.height),
     width: num(obj.largura_cm || obj.width),
     length: num(obj.comprimento_cm || obj.length),
-    price: num(obj.preco || obj.price),
+    price: finalPrice,
     errors: [],
     warnings: [],
   };
   if (!row.photo_url.startsWith('http')) row.errors.push('foto_url inválida');
   if (row.title.length < 10) row.errors.push('título muito curto');
   if (row.description.length < 20) row.warnings.push('descrição muito curta');
-  if (!(row.price > 0)) row.errors.push('preço inválido');
+  if (isNaN(rawPrice) || rawPrice <= 0) row.warnings.push('preço zerado');
   for (const [key, label] of [
     ['weight', 'peso'], ['height', 'altura'], ['width', 'largura'], ['length', 'comprimento'],
   ] as const) {
