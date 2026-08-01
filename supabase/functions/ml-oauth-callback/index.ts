@@ -20,12 +20,18 @@ serve(async (req) => {
     // ML authorization error (user denied or app misconfigured)
     if (error) {
       console.error('[ml-oauth] ML returned error:', error, url.searchParams.get('error_description'));
-      return Response.redirect(`${APP_URL}/reseller/integracoes?ml_error=${encodeURIComponent(error)}`, 302);
+      return new Response(null, {
+        status: 302,
+        headers: { 'Location': `${APP_URL}/reseller/integracoes?ml_error=${encodeURIComponent(error)}` }
+      });
     }
 
     if (!code || !state) {
       console.error('[ml-oauth] Missing code or state');
-      return Response.redirect(`${APP_URL}/reseller/integracoes?ml_error=missing_params`, 302);
+      return new Response(null, {
+        status: 302,
+        headers: { 'Location': `${APP_URL}/reseller/integracoes?ml_error=missing_params` }
+      });
     }
 
     const userId = state;
@@ -127,10 +133,16 @@ serve(async (req) => {
     }
 
     console.log(`✅ [ml-oauth] Integration saved for user ${userId}, ML user ${mlUserId}`);
-    return Response.redirect(`${APP_URL}/reseller/ml-sucesso`, 302);
+    return new Response(null, {
+      status: 302,
+      headers: { 'Location': `${APP_URL}/reseller/ml-sucesso` }
+    });
 
   } catch (err: any) {
     console.error('[ml-oauth] Unexpected error:', err);
-    return Response.redirect(`${APP_URL}/reseller/integracoes?ml_error=${encodeURIComponent(err.message)}`, 302);
+    return new Response(null, {
+      status: 302,
+      headers: { 'Location': `${APP_URL}/reseller/integracoes?ml_error=${encodeURIComponent(err.message)}` }
+    });
   }
 });
