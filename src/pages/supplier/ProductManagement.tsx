@@ -192,6 +192,30 @@ const SupplierProductManagement = () => {
       toast({ title: 'Erro ao enviar', description: error.message, variant: 'destructive' }),
   });
 
+  const quickPublish = useMutation({
+    mutationFn: async (productId: string) => {
+      const { error } = await supabase
+        .from('products')
+        .update({ 
+          approval_status: 'approved', 
+          active: true,
+          stage: 'stage_2_enabled',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', productId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      if (orgId) {
+        queryClient.invalidateQueries({ queryKey: supplierKeys.scope(orgId) });
+        queryClient.invalidateQueries({ queryKey: supplierKeys.all });
+      }
+      toast({ title: 'Produto publicado e ativado com sucesso!' });
+    },
+    onError: (error: Error) =>
+      toast({ title: 'Erro ao publicar produto', description: error.message, variant: 'destructive' }),
+  });
+
   const handleExport = async (format: 'csv' | 'json') => {
     try {
       const count =
@@ -472,15 +496,28 @@ const SupplierProductManagement = () => {
                               Editar Produto
                             </DropdownMenuItem>
 
-                            {product.approval_status === 'draft' && (
-                              <DropdownMenuItem
-                                onClick={() => submitApproval.mutate(product.id)}
-                                disabled={submitApproval.isPending}
-                                className="gap-2 cursor-pointer text-blue-600 focus:text-blue-600"
-                              >
-                                <Send className="h-4 w-4" />
-                                Enviar p/ Aprovação
-                              </DropdownMenuItem>
+                            {product.approval_status !== 'approved' && (
+                              <>
+                                <DropdownMenuItem
+                                  onClick={() => quickPublish.mutate(product.id)}
+                                  disabled={quickPublish.isPending}
+                                  className="gap-2 cursor-pointer text-green-600 focus:text-green-600 font-semibold"
+                                >
+                                  <Check className="h-4 w-4" />
+                                  Publicar e Ativar
+                                </DropdownMenuItem>
+
+                                {product.approval_status === 'draft' && (
+                                  <DropdownMenuItem
+                                    onClick={() => submitApproval.mutate(product.id)}
+                                    disabled={submitApproval.isPending}
+                                    className="gap-2 cursor-pointer text-blue-600 focus:text-blue-600"
+                                  >
+                                    <Send className="h-4 w-4" />
+                                    Enviar p/ Aprovação
+                                  </DropdownMenuItem>
+                                )}
+                              </>
                             )}
 
                             {product.approval_status === 'approved' && (
