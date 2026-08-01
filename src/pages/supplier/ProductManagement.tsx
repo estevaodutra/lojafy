@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Download, Plus, Search, Send, Check, X, Trash2 } from 'lucide-react';
+import { Download, Plus, Search, Send, Check, X, Trash2, MoreVertical, Edit, Eye, Power } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { supplierKeys } from '@/lib/supplierQueryKeys';
@@ -377,7 +377,7 @@ const SupplierProductManagement = () => {
                     <TableHead>Estoque</TableHead>
                     <TableHead>Estágio</TableHead>
                     <TableHead>GTIN</TableHead>
-                    <TableHead>Aprovação</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -431,28 +431,83 @@ const SupplierProductManagement = () => {
                         <GtinStatusBadge status={product.gtin_status} />
                       </TableCell>
                       <TableCell>
-                        <Badge variant={product.approval_status === 'approved' ? 'default' : 'secondary'}>
-                          {product.approval_status === 'approved'
-                            ? 'Aprovado'
-                            : product.approval_status === 'pending_approval'
-                              ? 'Em análise'
+                        {product.active ? (
+                          <Badge className="bg-green-600 hover:bg-green-600 text-white border-none">
+                            Ativado
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className={
+                            product.approval_status === 'pending_approval' 
+                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-none'
+                              : product.approval_status === 'rejected'
+                                ? 'bg-destructive/15 text-destructive border-none'
+                                : product.approval_status === 'approved'
+                                  ? 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-none'
+                                  : 'bg-muted text-muted-foreground border-none'
+                          }>
+                            {product.approval_status === 'pending_approval' 
+                              ? 'Em análise' 
                               : product.approval_status === 'rejected'
                                 ? 'Rejeitado'
-                                : 'Rascunho'}
-                        </Badge>
+                                : product.approval_status === 'approved'
+                                  ? 'Desativado'
+                                  : 'Rascunho'}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        {product.stage === 'stage_2_enabled' && product.approval_status === 'draft' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => submitApproval.mutate(product.id)}
-                            disabled={submitApproval.isPending}
-                          >
-                            <Send className="mr-1 h-3 w-3" />
-                            Enviar p/ aprovação
-                          </Button>
-                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Abrir menu</span>
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-background border border-border shadow-md">
+                            <DropdownMenuItem 
+                              onClick={() => navigate(`/supplier/produtos/${product.id}`)}
+                              className="gap-2 cursor-pointer"
+                            >
+                              <Edit className="h-4 w-4" />
+                              Editar Produto
+                            </DropdownMenuItem>
+
+                            {product.approval_status === 'draft' && (
+                              <DropdownMenuItem
+                                onClick={() => submitApproval.mutate(product.id)}
+                                disabled={submitApproval.isPending}
+                                className="gap-2 cursor-pointer text-blue-600 focus:text-blue-600"
+                              >
+                                <Send className="h-4 w-4" />
+                                Enviar p/ Aprovação
+                              </DropdownMenuItem>
+                            )}
+
+                            {product.approval_status === 'approved' && (
+                              <DropdownMenuItem
+                                onClick={() => bulkToggleStatus.mutate({ productIds: [product.id], active: !product.active })}
+                                disabled={bulkToggleStatus.isPending}
+                                className="gap-2 cursor-pointer"
+                              >
+                                <Power className="h-4 w-4" />
+                                {product.active ? 'Desativar' : 'Ativar'}
+                              </DropdownMenuItem>
+                            )}
+
+                            <DropdownMenuItem
+                              onClick={() => {
+                                if (confirm('Tem certeza que deseja processar/excluir este produto?')) {
+                                  bulkDelete.mutate([product.id]);
+                                }
+                              }}
+                              disabled={bulkDelete.isPending}
+                              className="gap-2 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Excluir / Processar
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}

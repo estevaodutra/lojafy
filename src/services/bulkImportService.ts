@@ -132,8 +132,8 @@ class BulkImportService {
           return {
             name: item.title,
             description: item.description,
-            price: calculatedPrice, // Preço de venda calculado e preenchido!
-            cost_price: item.price, // Preço de custo vindo do CSV!
+            price: calculatedPrice,
+            cost_price: item.price,
             weight: item.weight,
             height: item.height,
             width: item.width,
@@ -148,6 +148,8 @@ class BulkImportService {
             approval_status: 'draft',
             use_auto_pricing: true,
             use_default_profit_margin: true,
+            stock_quantity: supplierSettings?.default_min_stock_level ?? 100,
+            min_stock_level: supplierSettings?.default_min_stock_level ?? 100,
           };
         });
 
