@@ -81,6 +81,35 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
   const { user } = useAuth();
   const { settings } = usePlatformSettings();
 
+  const form = useForm<ProductFormData>({
+    resolver: zodResolver(productSchema),
+    defaultValues: {
+      name: product?.name || '',
+      description: product?.description || '',
+      cost_price: product?.cost_price && product.cost_price > 0 ? product.cost_price : undefined,
+      price: product?.price && product.price > 0 ? product.price : 0,
+      original_price: product?.original_price || undefined,
+      use_auto_pricing: product?.use_auto_pricing ?? true,
+      category_id: product?.category_id || '',
+      subcategory_id: product?.subcategory_id || 'none',
+      brand: product?.brand || '',
+      sku: product?.sku || '',
+      gtin_ean13: product?.gtin_ean13 || '',
+      stock_quantity: product?.stock_quantity || 0,
+      min_stock_level: product?.min_stock_level || 5,
+      low_stock_alert: product?.low_stock_alert ?? false,
+      high_rotation: product?.high_rotation ?? false,
+      height: product?.height || undefined,
+      width: product?.width || undefined,
+      length: product?.length || undefined,
+      weight: product?.weight || undefined,
+      active: product?.active ?? true,
+      featured: product?.featured ?? false,
+      badge: product?.badge || '',
+      reference_ad_url: product?.reference_ad_url || '',
+    },
+  });
+
   // Fetch categories (moved to top of component to avoid initialization order ReferenceError)
   const { data: categories = [], isLoading: categoriesLoading } = useQuery({
     queryKey: ['categories'],
@@ -289,35 +318,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
     form.setValue('weight', newDimensions.weight);
   };
   const { toast } = useToast();
-
-  const form = useForm<ProductFormData>({
-    resolver: zodResolver(productSchema),
-    defaultValues: {
-      name: product?.name || '',
-      description: product?.description || '',
-      cost_price: product?.cost_price && product.cost_price > 0 ? product.cost_price : undefined,
-      price: product?.price && product.price > 0 ? product.price : 0,
-      original_price: product?.original_price || undefined,
-      use_auto_pricing: product?.use_auto_pricing ?? true,
-      category_id: product?.category_id || '',
-      subcategory_id: product?.subcategory_id || 'none',
-      brand: product?.brand || '',
-      sku: product?.sku || '',
-      gtin_ean13: product?.gtin_ean13 || '',
-      stock_quantity: product?.stock_quantity || 0,
-      min_stock_level: product?.min_stock_level || 5,
-      low_stock_alert: product?.low_stock_alert ?? false,
-      high_rotation: product?.high_rotation ?? false,
-      height: product?.height || undefined,
-      width: product?.width || undefined,
-      length: product?.length || undefined,
-      weight: product?.weight || undefined,
-      active: product?.active ?? true,
-      featured: product?.featured ?? false,
-      badge: product?.badge || '',
-      reference_ad_url: product?.reference_ad_url || '',
-    },
-  });
 
   const selectedCategoryId = form.watch('category_id');
   const watchedCostPrice = form.watch('cost_price');
