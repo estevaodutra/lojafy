@@ -79,7 +79,8 @@ class BulkImportService {
         const payload = batch.map((item) => ({
           name: item.title,
           description: item.description,
-          price: item.price,
+          price: 0,
+          cost_price: item.price,
           weight: item.weight,
           height: item.height,
           width: item.width,
@@ -92,6 +93,8 @@ class BulkImportService {
           stage: 'stage_1_basic',
           active: false,
           approval_status: 'draft',
+          use_auto_pricing: true,
+          use_default_profit_margin: true,
         }));
 
         try {
