@@ -24,6 +24,55 @@ export interface ImportState {
 
 type Subscriber = (state: ImportState) => void;
 
+// Função pura idêntica ao cálculo do formulário do frontend
+export const calculateAutoPrice = (
+  costPrice: number,
+  platformSettings: any,
+  supplierSettings: any
+): number => {
+  let fixedFees = 0;
+  let percentFees = 0;
+  
+  // Margem de lucro padrão (seja a da empresa ou o fallback de 20%)
+  const marginPercentage = supplierSettings?.default_profit_margin_percentage ?? 20;
+
+  if (platformSettings) {
+    if (platformSettings.platform_fee_type === 'fixed') {
+      fixedFees += platformSettings.platform_fee_value;
+    } else {
+      percentFees += platformSettings.platform_fee_value / 100;
+    }
+    percentFees += (platformSettings.gateway_fee_percentage || 0) / 100;
+
+    if (platformSettings.additional_costs && Array.isArray(platformSettings.additional_costs)) {
+      platformSettings.additional_costs.forEach((c: any) => {
+        if (c.active) {
+          if (c.type === 'fixed') {
+            fixedFees += c.value;
+          } else {
+            percentFees += c.value / 100;
+          }
+        }
+      });
+    }
+  }
+
+  const denominator = Math.max(0.05, 1 - (marginPercentage / 100) - percentFees);
+  let calculated = (costPrice + fixedFees) / denominator;
+
+  // Aplicar estratégia de arredondamento
+  const rounding = supplierSettings?.price_rounding_strategy ?? '90';
+  if (rounding === '90') {
+    calculated = Math.ceil(calculated - 0.90) + 0.90;
+  } else if (rounding === '99') {
+    calculated = Math.ceil(calculated - 0.99) + 0.99;
+  } else {
+    calculated = Math.round(calculated * 100) / 100;
+  }
+
+  return calculated;
+};
+
 class BulkImportService {
   private state: ImportState = {
     status: 'idle',
@@ -55,6 +104,8 @@ class BulkImportService {
     items: ImportProductItem[],
     userId: string,
     orgId: string | undefined,
+    platformSettings: any,
+    supplierSettings: any,
     onFinished?: (insertedCount: number, errorCount: number) => void
   ): Promise<void> {
     if (this.state.status === 'processing') {
@@ -76,26 +127,29 @@ class BulkImportService {
 
       for (let i = 0; i < items.length; i += batchSize) {
         const batch = items.slice(i, i + batchSize);
-        const payload = batch.map((item) => ({
-          name: item.title,
-          description: item.description,
-          price: 0,
-          cost_price: item.price,
-          weight: item.weight,
-          height: item.height,
-          width: item.width,
-          length: item.length,
-          main_image_url: item.photo_url,
-          image_url: item.photo_url,
-          images: item.photo_urls,
-          supplier_id: userId,
-          supplier_organization_id: orgId,
-          stage: 'stage_1_basic',
-          active: false,
-          approval_status: 'draft',
-          use_auto_pricing: true,
-          use_default_profit_margin: true,
-        }));
+        const payload = batch.map((item) => {
+          const calculatedPrice = calculateAutoPrice(item.price, platformSettings, supplierSettings);
+          return {
+            name: item.title,
+            description: item.description,
+            price: calculatedPrice, // Preço de venda calculado e preenchido!
+            cost_price: item.price, // Preço de custo vindo do CSV!
+            weight: item.weight,
+            height: item.height,
+            width: item.width,
+            length: item.length,
+            main_image_url: item.photo_url,
+            image_url: item.photo_url,
+            images: item.photo_urls,
+            supplier_id: userId,
+            supplier_organization_id: orgId,
+            stage: 'stage_1_basic',
+            active: false,
+            approval_status: 'draft',
+            use_auto_pricing: true,
+            use_default_profit_margin: true,
+          };
+        });
 
         try {
           const { error } = await supabase.from('products').insert(payload);

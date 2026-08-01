@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { parseCsv, csvRowsToObjects, buildCsv, downloadCsv } from '@/lib/csv';
 import { supplierKeys } from '@/lib/supplierQueryKeys';
 import { useSupplierOrganization } from '@/hooks/supplier/useSupplierOrganization';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { bulkImportService, type ImportState } from '@/services/bulkImportService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -78,6 +79,7 @@ const SupplierImport = () => {
   const queryClient = useQueryClient();
   const { getEffectiveUserId } = useAuth();
   const { data: orgData } = useSupplierOrganization();
+  const { settings: platformSettings } = usePlatformSettings();
 
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [results, setResults] = useState<RowResult[]>([]);
@@ -153,6 +155,8 @@ const SupplierImport = () => {
       items,
       userId,
       orgData?.organization.id,
+      platformSettings,
+      orgData?.settings,
       (inserted, errors) => {
         toast({
           title: 'Importação Concluída',
