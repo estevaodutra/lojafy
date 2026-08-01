@@ -204,43 +204,41 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
   const watchedName = form.watch('name');
 
   useEffect(() => {
-    if (watchedName && categories.length > 0) {
-      const currentCategory = form.getValues('category_id');
-      if (!currentCategory || currentCategory === '') {
-        const lowerName = watchedName.toLowerCase();
-        const keywordMap = [
-          { keywords: ['bolo', 'doce', 'confeitaria', 'sobremesa', 'chocolate'], categoryName: 'Bolos e Confeitaria' },
-          { keywords: ['ventilador', 'climatizador', 'ar condicionado', 'aquecedor'], categoryName: 'Eletrodomésticos' },
-          { keywords: ['celular', 'smartphone', 'telefone', 'capinha', 'carregador'], categoryName: 'Celulares e Acessórios' },
-          { keywords: ['fone', 'headphone', 'caixa de som', 'audio'], categoryName: 'Eletrônicos e Áudio' },
-          { keywords: ['camiseta', 'calça', 'vestido', 'roupa', 'meia', 'casaco'], categoryName: 'Moda e Vestuário' },
-          { keywords: ['copo', 'prato', 'panela', 'cozinha', 'talher'], categoryName: 'Cozinha e Casa' },
-        ];
-
-        let matchedCategory = null;
-        for (const mapping of keywordMap) {
-          if (mapping.keywords.some(kw => lowerName.includes(kw))) {
-            const found = categories.find((cat: any) => cat.name.toLowerCase() === mapping.categoryName.toLowerCase());
-            if (found) {
-              matchedCategory = found.id;
-              break;
-            }
+    const initGtinAndCategory = async () => {
+      // 1. Gerar GTIN se estiver vazio
+      const currentGtin = form.getValues('gtin_ean13');
+      if (!currentGtin || currentGtin.trim() === '') {
+        try {
+          const { data: remoteGtin } = await supabase.rpc('generate_gtin_ean13');
+          if (remoteGtin) {
+            form.setValue('gtin_ean13', remoteGtin);
+          } else {
+            form.setValue('gtin_ean13', generateRandomEan13());
           }
-        }
-
-        if (!matchedCategory) {
-          const foundDirect = categories.find((cat: any) => lowerName.includes(cat.name.toLowerCase()));
-          if (foundDirect) {
-            matchedCategory = foundDirect.id;
-          }
-        }
-
-        if (matchedCategory) {
-          form.setValue('category_id', matchedCategory);
+        } catch {
+          form.setValue('gtin_ean13', generateRandomEan13());
         }
       }
+
+      // 2. Resolver Categoria se estiver vazia e tiver nome do produto
+      const currentCategory = form.getValues('category_id');
+      if (watchedName && (!currentCategory || currentCategory === '')) {
+        const domainId = product?.domain_id || (product?.raw_data as any)?.domain_id;
+        try {
+          const catId = await ensureCategory(watchedName, domainId);
+          if (catId) {
+            form.setValue('category_id', catId);
+          }
+        } catch (catErr) {
+          console.error('Erro ao resolver categoria na montagem:', catErr);
+        }
+      }
+    };
+
+    if (!categoriesLoading) {
+      initGtinAndCategory();
     }
-  }, [watchedName, categories, form]);
+  }, [watchedName, categoriesLoading, product, form]);
 
   const [specifications, setSpecifications] = useState<{ key: string; value: string }[]>(() => {
     // First try to load from specifications (legacy format: {key: value})
