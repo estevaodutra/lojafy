@@ -36,7 +36,7 @@ const Products = () => {
         .from('products')
         .select(`
           *,
-          categories(name),
+          categories!category_id(name),
           product_marketplace_data(id, marketplace, listing_status)
         `)
         .order('created_at', { ascending: false });

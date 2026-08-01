@@ -105,7 +105,7 @@ export const useMercadoLivreIntegration = () => {
         .from('products')
         .select(`
           *,
-          category:categories(id, name),
+          category:categories!category_id(id, name),
           subcategory:subcategories(id, name)
         `)
         .eq('id', productId)

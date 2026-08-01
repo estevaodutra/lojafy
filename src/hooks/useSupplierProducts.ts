@@ -14,7 +14,7 @@ export const useSupplierProducts = () => {
         .from('products')
         .select(`
           *,
-          categories (
+          categories!category_id (
             id,
             name,
             slug

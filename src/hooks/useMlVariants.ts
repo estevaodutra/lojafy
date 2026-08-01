@@ -85,7 +85,7 @@ export function useMlVariants(productId?: string) {
       // Buscar produto completo
       const { data: product } = await supabase
         .from('products')
-        .select('*, categories(name), subcategories(name)')
+        .select('*, categories!category_id(name), subcategories(name)')
         .eq('id', variant.product_id)
         .single();
 

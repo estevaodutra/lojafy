@@ -9,7 +9,7 @@ export const useAdminPendingProducts = () => {
         .from('products')
         .select(`
           *,
-          categories (
+          categories!category_id (
             id,
             name,
             slug

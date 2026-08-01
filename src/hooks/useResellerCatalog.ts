@@ -117,7 +117,7 @@ export const useResellerCatalog = () => {
         .from('products')
         .select(`
           *,
-          category:categories(id, name)
+          category:categories!category_id(id, name)
         `, { count: 'exact' })
         .eq('active', true)
         .range(from, to);

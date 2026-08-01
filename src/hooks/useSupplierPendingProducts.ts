@@ -11,7 +11,7 @@ export const useSupplierPendingProducts = (orgId?: string) => {
         .from('products')
         .select(`
           *,
-          categories (
+          categories!category_id (
             id,
             name,
             slug
