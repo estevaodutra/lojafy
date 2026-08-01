@@ -39,16 +39,25 @@ serve(async (req) => {
     const tokenData = await tokenRes.json();
     const accessToken = tokenData.access_token;
 
-    // 2. Fazer a requisição no Mercado Livre com o Token de Aplicação
+    // 2. Fazer a requisição no Mercado Livre
     const mlPath = path || `/products/search?status=active&site_id=MLB&q=${encodeURIComponent(query)}&limit=15`;
     const mlUrl = `https://api.mercadolibre.com${mlPath}`;
     
-    const mlRes = await fetch(mlUrl, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'application/json',
-      }
-    });
+    // Rotas de listagem comum (/sites/) e descrição de anúncios (/description) bloqueiam tokens de servidor/Client Credentials,
+    // mas aceitam requisições sem qualquer autenticação (públicas). Enviamos token apenas para catálogo (/products).
+    const isPublicRoute = mlPath.includes('/sites/') || mlPath.includes('/description');
+    
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+    };
+    
+    if (!isPublicRoute) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    console.log(`[ml-public-search] Fetching ML: ${mlUrl} (authenticated: ${!isPublicRoute})`);
+    
+    const mlRes = await fetch(mlUrl, { headers });
 
     const data = await mlRes.json().catch(() => ({}));
 
