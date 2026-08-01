@@ -43,10 +43,6 @@ const SupplierProductDetail = () => {
   const { data: candidates } = useReferenceCandidates(id);
   const [showGalleryToChange, setShowGalleryToChange] = useState(false);
 
-  const activeCandidate = candidates?.find(
-    c => c.id === product?.selected_reference_candidate_id || c.ml_item_id === product?.reference_item_id
-  );
-
   const handleUndoLink = async () => {
     try {
       const { error } = await supabase
@@ -149,6 +145,10 @@ const SupplierProductDetail = () => {
     },
     enabled: !!orgId && !!id,
   });
+
+  const activeCandidate = candidates?.find(
+    c => c.id === product?.selected_reference_candidate_id || c.ml_item_id === product?.reference_item_id
+  );
 
   const handleConfirmImport = (overrides: ImportOverrides) => {
     const hasGtin = importCandidate?.has_gtin || !!(importCandidate?.raw_data as any)?.gtin;
