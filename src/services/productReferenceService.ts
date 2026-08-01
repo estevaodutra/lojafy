@@ -79,7 +79,7 @@ export async function searchMlCandidates(product: {
   name: string;
   price: number;
 }): Promise<ScoredCandidate[]> {
-  const query = extractSearchKeywords(product.name);
+  const query = product.name.trim();
   const searchRes = await fetchFromMlProxy(
     `/products/search?status=active&site_id=MLB&q=${encodeURIComponent(query)}&limit=15`,
   );
