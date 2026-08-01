@@ -81,7 +81,7 @@ export async function searchMlCandidates(product: {
 }): Promise<ScoredCandidate[]> {
   const query = extractSearchKeywords(product.name);
   const searchRes = await fetchFromMlProxy(
-    `/sites/MLB/search?q=${encodeURIComponent(query)}&limit=8`,
+    `/products/search?status=active&site_id=MLB&q=${encodeURIComponent(query)}&limit=8`,
   );
   if (!searchRes.ok) throw new Error('Falha ao buscar anúncios no Mercado Livre');
   const searchData = await searchRes.json();
@@ -90,17 +90,10 @@ export async function searchMlCandidates(product: {
   const detailed = await Promise.all(
     results.map(async (result) => {
       try {
-        const [detailRes, descRes] = await Promise.all([
-          fetchFromMlProxy(`/items/${result.id}`),
-          fetchFromMlProxy(`/items/${result.id}/description`),
-        ]);
+        const detailRes = await fetchFromMlProxy(`/products/${result.id}`);
         if (!detailRes.ok) return null;
-        const detail: MlItemDetail = await detailRes.json();
-        let description = '';
-        if (descRes.ok) {
-          const descData = await descRes.json();
-          description = descData.plain_text || descData.text || '';
-        }
+        const detail: any = await detailRes.json();
+        let description = ''; // Produtos de catálogo não possuem descrição separada
 
         const gtin = attr(detail.attributes, 'GTIN');
         const image =
@@ -110,7 +103,7 @@ export async function searchMlCandidates(product: {
 
         const candidate: ScoredCandidate = {
           mlItemId: detail.id,
-          title: detail.title,
+          title: detail.name || detail.title,
           price: detail.price ?? null,
           imageUrl: image,
           mlCategoryId: detail.category_id ?? null,
@@ -124,7 +117,7 @@ export async function searchMlCandidates(product: {
             description,
             attributes: detail.attributes ?? [],
             domain_id: detail.domain_id ?? null,
-            permalink: `https://produto.mercadolivre.com.br/${detail.id}`,
+            permalink: `https://www.mercadolivre.com.br/p/${detail.id}`,
           },
         };
         candidate.score = computeCompatibilityScore(
