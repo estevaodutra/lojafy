@@ -5,8 +5,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const ML_CLIENT_ID = Deno.env.get('ML_CLIENT_ID') ?? '';
-const ML_CLIENT_SECRET = Deno.env.get('ML_CLIENT_SECRET') ?? '';
+const ML_CLIENT_ID = Deno.env.get('ML_CLIENT_ID') || '2003351424267574';
+const ML_CLIENT_SECRET = Deno.env.get('ML_CLIENT_SECRET') || 'xxhhZC2YUeAi2GWMM222aPstgCfu0GTL';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
