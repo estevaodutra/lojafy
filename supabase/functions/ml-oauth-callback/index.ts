@@ -69,6 +69,7 @@ serve(async (req) => {
     if (platSettings) {
       if (!mlClientId) mlClientId = platSettings.ml_client_id || undefined;
       if (!mlClientSecret) mlClientSecret = platSettings.ml_client_secret || undefined;
+      // Se appUrl estiver vazio ou apontar incorretamente para o Supabase (contendo 'supabase'), usa o do banco
       if (!appUrl || appUrl.includes('supabase')) {
         appUrl = platSettings.app_url || undefined;
       }
@@ -101,7 +102,12 @@ serve(async (req) => {
       throw new Error('Configuração ausente: preencha o ml_client_id e ml_client_secret na tabela platform_settings do seu Supabase.');
     }
 
-    const ML_REDIRECT_URI = Deno.env.get('ML_REDIRECT_URI') ?? `${supabaseUrl}/functions/v1/ml-oauth-callback`;
+    // Higieniza a URL do Supabase para evitar barras duplas no redirect_uri
+    let cleanSupabaseUrl = supabaseUrl.trim();
+    if (cleanSupabaseUrl.endsWith('/')) {
+      cleanSupabaseUrl = cleanSupabaseUrl.slice(0, -1);
+    }
+    const ML_REDIRECT_URI = Deno.env.get('ML_REDIRECT_URI') ?? `${cleanSupabaseUrl}/functions/v1/ml-oauth-callback`;
 
     // Exchange authorization code for access token
     const tokenRes = await fetch('https://api.mercadolibre.com/oauth/token', {
@@ -111,7 +117,7 @@ serve(async (req) => {
         grant_type: 'authorization_code',
         client_id: mlClientId,
         client_secret: mlClientSecret,
-        code,
+        code: code,
         redirect_uri: ML_REDIRECT_URI,
       }),
     });
