@@ -11,7 +11,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, X, RefreshCw, ExternalLink } from 'lucide-react';
+import { Loader2, Plus, X, RefreshCw, ExternalLink, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
@@ -20,23 +20,43 @@ import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect } from 'react';
-import { VariantsManager, ProductVariant } from './VariantsManager';
 import { DimensionsInput } from './DimensionsInput';
 import { CategoryCreationModal } from './CategoryCreationModal';
 import { SubcategoryCreationModal } from './SubcategoryCreationModal';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSupplierOrganization } from '@/hooks/supplier/useSupplierOrganization';
+import { VariantsManager, ProductVariant } from './VariantsManager';
 
-const generateRandomEan13 = (): string => {
-  let ean = '789';
-  for (let i = 0; i < 9; i++) {
-    ean += Math.floor(Math.random() * 10).toString();
+export const isUsableProductImage = (url: string | null | undefined): boolean => {
+  if (!url || typeof url !== 'string' || url.trim() === '') return false;
+  
+  const lowerUrl = url.toLowerCase();
+  const invalidKeywords = [
+    'sem-imagem',
+    'semimagem',
+    'sem_imagem',
+    'no-image',
+    'no_image',
+    'noimage',
+    'placeholder',
+    'indisponivel',
+    'indisponível',
+    'image-not-found',
+    'notfound',
+    'quebrada'
+  ];
+  
+  if (invalidKeywords.some(kw => lowerUrl.includes(kw))) {
+    return false;
   }
-  let sum = 0;
-  for (let i = 0; i < 12; i++) {
-    sum += parseInt(ean[i]) * (i % 2 === 0 ? 1 : 3);
+  
+  try {
+    new URL(url);
+  } catch {
+    return false;
   }
-  const checkDigit = (10 - (sum % 10)) % 10;
-  return ean + checkDigit.toString();
+  
+  return true;
 };
 
 const productSchema = z.object({
@@ -46,6 +66,8 @@ const productSchema = z.object({
   price: z.coerce.number().min(0.01, 'Preço de venda deve ser maior que zero').optional(),
   original_price: z.coerce.number().min(0, 'Preço promocional não pode ser negativo').optional(),
   use_auto_pricing: z.boolean().default(false),
+  use_default_profit_margin: z.boolean().default(true),
+  custom_profit_margin_percentage: z.coerce.number().min(0).max(100).optional(),
   category_id: z.string().optional().or(z.literal('')),
   subcategory_id: z.string().optional(),
   brand: z.string().optional(),
@@ -80,6 +102,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
   const { isSuperAdmin, isSupplier } = useUserRole();
   const { user } = useAuth();
   const { settings } = usePlatformSettings();
+  const { data: supplierOrgData } = useSupplierOrganization();
+  const supplierSettings = supplierOrgData?.settings;
 
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
@@ -90,13 +114,15 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       price: product?.price && product.price > 0 ? product.price : 0,
       original_price: product?.original_price || undefined,
       use_auto_pricing: product?.use_auto_pricing ?? true,
+      use_default_profit_margin: product?.use_default_profit_margin ?? true,
+      custom_profit_margin_percentage: product?.custom_profit_margin_percentage ?? undefined,
       category_id: product?.category_id || '',
       subcategory_id: product?.subcategory_id || 'none',
       brand: product?.brand || '',
       sku: product?.sku || '',
       gtin_ean13: product?.gtin_ean13 || '',
       stock_quantity: product?.stock_quantity || 0,
-      min_stock_level: product?.min_stock_level || 5,
+      min_stock_level: product?.min_stock_level ?? supplierSettings?.default_min_stock_level ?? 100,
       low_stock_alert: product?.low_stock_alert ?? false,
       high_rotation: product?.high_rotation ?? false,
       height: product?.height || undefined,
@@ -136,7 +162,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       { keywords: ['copo', 'prato', 'panela', 'cozinha', 'talher'], categoryName: 'Cozinha e Casa' },
     ];
 
-    let targetCategoryName = 'Geral';
+    let targetCategoryName: string | null = null;
     
     for (const mapping of keywordMap) {
       if (mapping.keywords.some(kw => lowerName.includes(kw))) {
@@ -145,7 +171,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       }
     }
 
-    if (domainId && targetCategoryName === 'Geral') {
+    if (domainId) {
       const mlDomainMap: Record<string, string> = {
         'MLB-FANS': 'Ventiladores e Climatização',
         'MLB-CELLPHONES': 'Celulares e Acessórios',
@@ -164,7 +190,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       }
     }
 
-    const existing = categories.find((cat: any) => cat.name.toLowerCase() === targetCategoryName.toLowerCase());
+    if (!targetCategoryName) {
+      throw new Error('Não foi possível identificar uma categoria correspondente.');
+    }
+
+    const existing = categories.find((cat: any) => cat.name.toLowerCase() === targetCategoryName!.toLowerCase());
     if (existing) {
       return existing.id;
     }
@@ -194,51 +224,39 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       return newCat.id;
     } catch (e) {
       console.error('Erro ao criar categoria automática:', e);
-      if (categories.length > 0) {
-        return categories[0].id;
-      }
-      throw new Error('Nenhuma categoria disponível.');
+      throw new Error('Falha ao registrar nova categoria no banco.');
     }
   };
 
   const watchedName = form.watch('name');
 
   useEffect(() => {
-    const initGtinAndCategory = async () => {
-      // 1. Gerar GTIN se estiver vazio
+    const initGtin = async () => {
       const currentGtin = form.getValues('gtin_ean13');
       if (!currentGtin || currentGtin.trim() === '') {
         try {
           const { data: remoteGtin } = await supabase.rpc('generate_gtin_ean13');
           if (remoteGtin) {
             form.setValue('gtin_ean13', remoteGtin);
-          } else {
-            form.setValue('gtin_ean13', generateRandomEan13());
           }
-        } catch {
-          form.setValue('gtin_ean13', generateRandomEan13());
-        }
-      }
-
-      // 2. Resolver Categoria se estiver vazia e tiver nome do produto
-      const currentCategory = form.getValues('category_id');
-      if (watchedName && (!currentCategory || currentCategory === '')) {
-        const domainId = product?.domain_id || (product?.raw_data as any)?.domain_id;
-        try {
-          const catId = await ensureCategory(watchedName, domainId);
-          if (catId) {
-            form.setValue('category_id', catId);
-          }
-        } catch (catErr) {
-          console.error('Erro ao resolver categoria na montagem:', catErr);
+        } catch (err) {
+          console.error('Erro ao obter GTIN inicial:', err);
         }
       }
     };
 
-    if (!categoriesLoading) {
-      initGtinAndCategory();
+    initGtin();
+  }, [product, form]);
+
+  // Atualiza o estoque mínimo padrão a partir das configurações do fornecedor assim que carregar
+  useEffect(() => {
+    if (supplierSettings) {
+      const currentMinStock = form.getValues('min_stock_level');
+      if (product === undefined && (currentMinStock === undefined || currentMinStock === 100)) {
+        form.setValue('min_stock_level', supplierSettings.default_min_stock_level ?? 100);
+      }
     }
-  }, [watchedName, categoriesLoading, product, form]);
+  }, [supplierSettings, product, form]);
 
   const [specifications, setSpecifications] = useState<{ key: string; value: string }[]>(() => {
     // First try to load from specifications (legacy format: {key: value})
@@ -296,8 +314,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
     }
     
     // Map URLs to ImageFile format
-    if (imageUrls.length > 0) {
-      const initialImages = imageUrls.map((url: string, index: number) => ({
+    const filteredUrls = imageUrls.filter(url => isUsableProductImage(url));
+    if (filteredUrls.length > 0) {
+      const initialImages = filteredUrls.map((url: string, index: number) => ({
         id: `existing-${index}`,
         file: null,
         preview: url,
@@ -305,7 +324,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         isMain: index === 0,
         isUploading: false
       }));
-      
       
       return initialImages;
     }
@@ -335,22 +353,23 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
   const watchedUseAutoPricing = form.watch('use_auto_pricing');
   const watchedReferenceUrl = form.watch('reference_ad_url');
 
+  const watchedUseDefaultMargin = form.watch('use_default_profit_margin');
+  const watchedCustomMargin = form.watch('custom_profit_margin_percentage');
+
   // Auto-calculate price based on cost_price with auto pricing enabled
   useEffect(() => {
     if (settings && watchedUseAutoPricing) {
       const costPrice = Number(watchedCostPrice);
       // Só calcular se for número válido e maior que zero
       if (!isNaN(costPrice) && costPrice > 0) {
-        const calculatedPrice = calculatePrice(
-          costPrice,
-          settings.platform_fee_value,
-          settings.platform_fee_type,
-          settings.gateway_fee_percentage
-        );
+        const margin = watchedUseDefaultMargin 
+          ? (supplierSettings?.default_profit_margin_percentage ?? 20) 
+          : (watchedCustomMargin ?? 20);
+        const calculatedPrice = calculatePrice(costPrice, margin);
         form.setValue('price', calculatedPrice);
       }
     }
-  }, [watchedCostPrice, watchedUseAutoPricing, settings, form]);
+  }, [watchedCostPrice, watchedUseAutoPricing, watchedUseDefaultMargin, watchedCustomMargin, settings, supplierSettings, form]);
 
   // Auto-set featured when reference_ad_url is filled
   useEffect(() => {
@@ -359,58 +378,74 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
     }
   }, [watchedReferenceUrl, form]);
 
-  // Calculate price based on cost and fees
-  // Formula: (cost + profit_margin + additional_costs) / (1 - gateway_fee/100)
-  // This ensures the gateway fee is calculated on the final price
-  const calculatePrice = (
-    costPrice: number,
-    platformFee: number,
-    platformFeeType: 'percentage' | 'fixed',
-    gatewayFee: number
-  ): number => {
-    let priceBeforeFee = costPrice;
-    
-    // Apply platform fee (profit margin)
-    if (platformFeeType === 'percentage') {
-      priceBeforeFee += (costPrice * platformFee / 100);
-    } else {
-      priceBeforeFee += platformFee;
-    }
-    
-    // Apply additional costs (if active)
-    if (settings?.additional_costs && Array.isArray(settings.additional_costs)) {
-      settings.additional_costs.forEach((cost: any) => {
-        if (cost.active) {
-          if (cost.type === 'percentage') {
-            priceBeforeFee += (costPrice * cost.value / 100);
-          } else {
-            priceBeforeFee += cost.value;
+  // Calculate price based on cost, desired margin and fees
+  // Formula: (cost + fixed_fees) / (1 - desired_margin/100 - percent_fees/100)
+  const calculatePrice = (costPrice: number, marginPercentage: number): number => {
+    let fixedFees = 0;
+    let percentFees = 0;
+
+    if (settings) {
+      if (settings.platform_fee_type === 'fixed') {
+        fixedFees += settings.platform_fee_value;
+      } else {
+        percentFees += settings.platform_fee_value / 100;
+      }
+      percentFees += (settings.gateway_fee_percentage || 0) / 100;
+
+      if (settings.additional_costs && Array.isArray(settings.additional_costs)) {
+        settings.additional_costs.forEach((c: any) => {
+          if (c.active) {
+            if (c.type === 'fixed') {
+              fixedFees += c.value;
+            } else {
+              percentFees += c.value / 100;
+            }
           }
-        }
-      });
+        });
+      }
     }
-    
-    // Apply gateway fee on final price (correct formula)
-    // Gateway fee should be calculated on the final amount, not the cost
-    const finalPrice = priceBeforeFee / (1 - gatewayFee / 100);
-    
-    // Round to 2 decimal places
-    return Math.round(finalPrice * 100) / 100;
+
+    const denominator = Math.max(0.05, 1 - (marginPercentage / 100) - percentFees);
+    let calculated = (costPrice + fixedFees) / denominator;
+
+    // Aplicar estratégia de arredondamento do fornecedor
+    const rounding = supplierSettings?.price_rounding_strategy ?? '90';
+    if (rounding === '90') {
+      calculated = Math.ceil(calculated - 0.90) + 0.90;
+    } else if (rounding === '99') {
+      calculated = Math.ceil(calculated - 0.99) + 0.99;
+    } else {
+      calculated = Math.round(calculated * 100) / 100;
+    }
+
+    return calculated;
   };
 
   // Get pricing breakdown for display
   const getPriceBreakdown = () => {
-    // Validação robusta: deve ser número válido e maior que zero
     if (!settings || !watchedCostPrice || isNaN(Number(watchedCostPrice)) || Number(watchedCostPrice) <= 0) {
       return null;
     }
 
     const costPrice = Number(watchedCostPrice);
-    const platformFeeAmount = settings.platform_fee_type === 'percentage'
-      ? (costPrice * settings.platform_fee_value / 100)
-      : settings.platform_fee_value;
-    
-    // Calculate additional costs total
+    const margin = watchedUseDefaultMargin 
+      ? (supplierSettings?.default_profit_margin_percentage ?? 20) 
+      : (watchedCustomMargin ?? 20);
+      
+    const totalPrice = calculatePrice(costPrice, margin);
+
+    let fixedFees = 0;
+    let percentFees = 0;
+
+    if (settings) {
+      if (settings.platform_fee_type === 'fixed') {
+        fixedFees += settings.platform_fee_value;
+      } else {
+        percentFees += settings.platform_fee_value / 100;
+      }
+      percentFees += (settings.gateway_fee_percentage || 0) / 100;
+    }
+
     const additionalCosts: Array<{ name: string; amount: number }> = [];
     let additionalCostsTotal = 0;
     
@@ -418,24 +453,20 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       settings.additional_costs.forEach((cost: any) => {
         if (cost.active) {
           const costAmount = cost.type === 'percentage'
-            ? (costPrice * cost.value / 100)
+            ? (totalPrice * cost.value / 100)
             : cost.value;
           additionalCosts.push({ name: cost.name, amount: costAmount });
           additionalCostsTotal += costAmount;
         }
       });
     }
-    
-    // Calculate total price first
-    const totalPrice = calculatePrice(
-      costPrice,
-      settings.platform_fee_value,
-      settings.platform_fee_type,
-      settings.gateway_fee_percentage
-    );
-    
-    // Gateway fee is now calculated on the final price (correct method)
-    const gatewayFeeAmount = totalPrice - (costPrice + platformFeeAmount + additionalCostsTotal);
+
+    const gatewayFeeAmount = totalPrice * (settings.gateway_fee_percentage || 0) / 100;
+    const platformFeeAmount = settings.platform_fee_type === 'percentage'
+      ? (totalPrice * settings.platform_fee_value / 100)
+      : settings.platform_fee_value;
+
+    const estimatedNetProfit = totalPrice * (1 - percentFees) - costPrice - fixedFees;
 
     return {
       costPrice,
@@ -448,6 +479,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       gatewayFeeAmount,
       gatewayFeeLabel: `${settings.gateway_fee_percentage}%`,
       totalPrice,
+      estimatedNetProfit,
+      margin
     };
   };
 
@@ -512,6 +545,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         stockQuantity: v.stock_quantity || 0,
         imageUrl: v.image_url || '',
         active: v.active ?? true,
+        sku: (v as any).sku || '',
       }));
       setVariants(mappedVariants);
     }
@@ -530,7 +564,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       }, {} as Record<string, string>);
 
       // First image is always the main image
-      const imageUrls = images.map(img => img.url || img.preview).filter(Boolean);
+      const imageUrls = images.map(img => img.url || img.preview).filter(url => isUsableProductImage(url));
       const mainImageUrl = imageUrls.length > 0 ? imageUrls[0] : null;
 
       // 1. Categorização Automática
@@ -544,18 +578,16 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         }
       }
 
-      // 2. Geração Automática de GTIN
+      // 2. Resolução do GTIN (se vazio, tenta obter da RPC oficial do banco, ou deixa vazio)
       let finalGtin = data.gtin_ean13 || null;
       if (!finalGtin) {
         try {
           const { data: remoteGtin } = await supabase.rpc('generate_gtin_ean13');
           if (remoteGtin) {
             finalGtin = remoteGtin;
-          } else {
-            finalGtin = generateRandomEan13();
           }
-        } catch {
-          finalGtin = generateRandomEan13();
+        } catch (gtinErr) {
+          console.error('Erro ao chamar rpc de gtin:', gtinErr);
         }
       }
 
@@ -567,10 +599,23 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         price: data.price,
         original_price: data.original_price || null,
         use_auto_pricing: data.use_auto_pricing,
+        use_default_profit_margin: data.use_default_profit_margin,
+        custom_profit_margin_percentage: data.custom_profit_margin_percentage || null,
+        calculated_price: data.use_auto_pricing ? data.price : null,
+        estimated_net_profit: priceBreakdown ? priceBreakdown.estimatedNetProfit : null,
+        pricing_calculation_snapshot: priceBreakdown ? {
+          cost_price: priceBreakdown.costPrice,
+          margin: priceBreakdown.margin,
+          gateway_fee: priceBreakdown.gatewayFeeAmount,
+          platform_fee: priceBreakdown.platformFeeAmount,
+          additional_costs: priceBreakdown.additionalCosts,
+          calculated_price: priceBreakdown.totalPrice,
+          rounding_strategy: supplierSettings?.price_rounding_strategy ?? '90'
+        } : null,
         category_id: finalCategoryId || null,
         subcategory_id: data.subcategory_id === 'none' ? null : data.subcategory_id,
         brand: data.brand || null,
-        sku: data.sku || null, // Will be auto-generated if empty
+        sku: data.sku ? data.sku.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() : null,
         gtin_ean13: finalGtin,
         stock_quantity: data.stock_quantity,
         min_stock_level: data.min_stock_level,
@@ -672,7 +717,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
           price_modifier: variant.priceModifier,
           stock_quantity: variant.stockQuantity,
           image_url: variant.imageUrl || null,
-          active: variant.active
+          active: variant.active,
+          sku: variant.sku ? variant.sku.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() : null
         }));
 
         // Delete existing variants for updates
@@ -723,10 +769,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       
       if (error) throw error;
       
-      form.setValue('sku', data);
+      const cleanSku = data ? data.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() : '';
+      form.setValue('sku', cleanSku);
       toast({
         title: "SKU gerado",
-        description: `SKU gerado automaticamente: ${data}`,
+        description: `SKU gerado automaticamente: ${cleanSku}`,
       });
     } catch (error) {
       console.error('Error generating SKU:', error);
@@ -867,6 +914,30 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
                             ))}
                           </SelectContent>
                         </Select>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="icon" 
+                          title="Categorizar automaticamente"
+                          className="px-3"
+                          onClick={async () => {
+                            const name = form.getValues('name');
+                            if (!name) {
+                              toast({ title: 'Digite o nome do produto primeiro', variant: 'destructive' });
+                              return;
+                            }
+                            try {
+                              const domainId = product?.domain_id || (product?.raw_data as any)?.domain_id;
+                              const catId = await ensureCategory(name, domainId);
+                              form.setValue('category_id', catId);
+                              toast({ title: 'Categoria identificada com sucesso!' });
+                            } catch (err: any) {
+                              toast({ title: 'Erro ao categorizar', description: err.message, variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          <Sparkles className="h-4 w-4 text-primary" />
+                        </Button>
                         <CategoryCreationModal
                           onCategoryCreated={(categoryId) => {
                             form.setValue('category_id', categoryId);
@@ -1057,6 +1128,55 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
               )}
             />
 
+            {watchedUseAutoPricing && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-lg border border-border bg-muted/10 my-2">
+                <FormField
+                  control={form.control}
+                  name="use_default_profit_margin"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg p-2 gap-4">
+                      <div className="space-y-0.5">
+                        <FormLabel>Usar Margem Padrão da Empresa</FormLabel>
+                        <FormDescription>
+                          Aplica a margem global ({supplierSettings?.default_profit_margin_percentage ?? 20}%) configurada nas configurações da empresa.
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {!form.watch('use_default_profit_margin') && (
+                  <FormField
+                    control={form.control}
+                    name="custom_profit_margin_percentage"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Margem Personalizada (%)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            placeholder="Ex: 25.0"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Insira a margem de lucro líquido desejada para este produto.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
@@ -1160,6 +1280,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
                     <span className="font-semibold">Preço de Venda Final:</span>
                     <span className="font-bold text-primary">R$ {priceBreakdown.totalPrice.toFixed(2)}</span>
                   </div>
+                  <div className="flex justify-between items-center text-green-600 font-semibold pt-1 border-t border-dashed">
+                    <span>Lucro Líquido Projetado:</span>
+                    <span>R$ {priceBreakdown.estimatedNetProfit.toFixed(2)} ({priceBreakdown.margin}%)</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -1170,23 +1294,48 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
               const salePrice = form.watch('price');
               
               if (costPrice && salePrice && costPrice > 0) {
-                const profitAmount = salePrice - costPrice;
-                const profitPercentage = (profitAmount / costPrice) * 100;
+                let fixedFees = 0;
+                let percentFees = 0;
+
+                if (settings) {
+                  if (settings.platform_fee_type === 'fixed') {
+                    fixedFees += settings.platform_fee_value;
+                  } else {
+                    percentFees += settings.platform_fee_value / 100;
+                  }
+                  percentFees += (settings.gateway_fee_percentage || 0) / 100;
+
+                  if (settings.additional_costs && Array.isArray(settings.additional_costs)) {
+                    settings.additional_costs.forEach((c: any) => {
+                      if (c.active) {
+                        if (c.type === 'fixed') {
+                          fixedFees += c.value;
+                        } else {
+                          percentFees += c.value / 100;
+                        }
+                      }
+                    });
+                  }
+                }
+
+                const feesAmount = fixedFees + (salePrice * percentFees);
+                const netProfit = salePrice - costPrice - feesAmount;
+                const netMargin = salePrice > 0 ? (netProfit / salePrice) * 100 : 0;
                 
                 return (
                   <div className="bg-muted/50 p-4 rounded-lg border">
-                    <h4 className="text-sm font-medium mb-2">Cálculo de Lucro</h4>
+                    <h4 className="text-sm font-medium mb-2">Cálculo de Lucro Líquido Real (Projeção)</h4>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <span className="text-muted-foreground">Margem:</span>
+                        <span className="text-muted-foreground">Margem Líquida:</span>
                         <div className="font-semibold text-primary">
-                          {profitPercentage.toFixed(2)}%
+                          {netMargin.toFixed(2)}%
                         </div>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Lucro:</span>
-                        <div className="font-semibold text-primary">
-                          R$ {profitAmount.toFixed(2)}
+                        <span className="text-muted-foreground">Lucro Líquido:</span>
+                        <div className={`font-semibold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          R$ {netProfit.toFixed(2)}
                         </div>
                       </div>
                     </div>

@@ -1,27 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { isInternalSku, skuCategoryFragment, skuPrefix, skuPreview } from '../skuPreview';
+import { isInternalSku, skuPrefix, skuPreview } from '../skuPreview';
 
 describe('skuPreview', () => {
-  it('gera fragmento de categoria de 3 letras', () => {
-    expect(skuCategoryFragment('Eletrônicos')).toBe('ELE');
-    expect(skuCategoryFragment('Moda e Acessórios')).toBe('MOD');
-    expect(skuCategoryFragment(null)).toBe('GEN');
-    expect(skuCategoryFragment('123')).toBe('GEN');
-  });
-
   it('monta prefixo com org_code e fallback ADM', () => {
-    expect(skuPrefix('A1B2', 'Casa')).toBe('LJF-A1B2-CAS');
-    expect(skuPrefix(null)).toBe('LJF-ADM-GEN');
+    expect(skuPrefix('FN')).toBe('LJFFN');
+    expect(skuPrefix(null)).toBe('LJFADM');
   });
 
   it('prévia mostra o padrão com sequência mascarada', () => {
-    expect(skuPreview('A1B2')).toBe('LJF-A1B2-GEN-#####');
+    expect(skuPreview('A1B2')).toBe('LJFA1B2######');
   });
 
-  it('reconhece SKUs internos', () => {
-    expect(isInternalSku('LJF-A1B2-ELE-00042')).toBe(true);
-    expect(isInternalSku('LJF-ADM-GEN-00001')).toBe(true);
-    expect(isInternalSku('CAM-PREM-001')).toBe(false);
+  it('reconhece SKUs internos apenas alfanuméricos com 6 dígitos de sequência', () => {
+    expect(isInternalSku('LJFA1B2000042')).toBe(true);
+    expect(isInternalSku('LJFADM000001')).toBe(true);
+    expect(isInternalSku('LJF-ADM-000001')).toBe(false); // contém traço
+    expect(isInternalSku('CAM-PREM-001')).toBe(false); // contém traço
     expect(isInternalSku(null)).toBe(false);
   });
 });

@@ -183,6 +183,9 @@ export const ImageUploadArea: React.FC<ImageUploadAreaProps> = ({
                     src={image.url || image.preview}
                     alt="Preview"
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = 'https://lojafy-supabase.d2x.site/storage/v1/object/public/system/placeholder.png';
+                    }}
                   />
                   
                   {image.isUploading && (

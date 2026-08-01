@@ -18,6 +18,7 @@ export interface ProductVariant {
   stockQuantity: number;
   imageUrl?: string;
   active: boolean;
+  sku?: string;
 }
 
 interface PlatformSettings {
@@ -242,7 +243,7 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {!useAutoPricing && (
                 <div className="space-y-2">
                   <Label>Preço de Custo (R$)</Label>
@@ -284,6 +285,15 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
                   placeholder="0"
                   value={newVariant.stockQuantity}
                   onChange={(e) => setNewVariant({ ...newVariant, stockQuantity: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>SKU da Variante</Label>
+                <Input
+                  placeholder="Ex: LJF-FN-000001-AZ"
+                  value={newVariant.sku || ''}
+                  onChange={(e) => setNewVariant({ ...newVariant, sku: e.target.value })}
                 />
               </div>
 
@@ -368,7 +378,7 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                           <Label>Preço de Custo (R$)</Label>
                           {useAutoPricing ? (
@@ -410,6 +420,15 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
                             onChange={(e) => updateVariant(variant.id, { stockQuantity: parseInt(e.target.value) || 0 })}
                           />
                         </div>
+
+                        <div className="space-y-2">
+                          <Label>SKU da Variante</Label>
+                          <Input
+                            value={variant.sku || ''}
+                            onChange={(e) => updateVariant(variant.id, { sku: e.target.value })}
+                            placeholder="Gerado se vazio"
+                          />
+                        </div>
                       </div>
 
                       <div className="flex justify-between items-center">
@@ -442,7 +461,8 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
                             <Badge variant="destructive">Inativo</Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+                          {variant.sku && <Badge variant="outline" className="font-mono text-[10px]">{variant.sku}</Badge>}
                           <span>Custo: {formatCurrency(variant.costPrice || 0)}</span>
                           <span className="text-green-600 font-medium">Venda: {formatCurrency(variant.priceModifier)}</span>
                           <span>Estoque: {variant.stockQuantity} unidades</span>

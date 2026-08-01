@@ -193,7 +193,7 @@ export async function importReference(
   candidateId: string,
   overrides: ImportOverrides = {},
 ): Promise<{ success: boolean; error?: string; stage?: string }> {
-  const { data, error } = await supabase.rpc('import_reference_data', {
+  const { data, error } = await supabase.rpc('import_reference_data_v2', {
     p_product_id: productId,
     p_candidate_id: candidateId,
     p_overrides: overrides as never,

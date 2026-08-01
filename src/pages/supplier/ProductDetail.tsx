@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { supplierKeys } from '@/lib/supplierQueryKeys';
 import { useSupplierOrganization } from '@/hooks/supplier/useSupplierOrganization';
-import { useReferenceMutations } from '@/hooks/supplier/useReferenceData';
+import { useReferenceMutations, useReferenceCandidates } from '@/hooks/supplier/useReferenceData';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,21 +25,6 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 
-// Função para gerar EAN-13 válido (padrão GS1 Brasil com prefixo 789 e checksum)
-const generateRandomEan13 = (): string => {
-  let ean = '789';
-  for (let i = 0; i < 9; i++) {
-    ean += Math.floor(Math.random() * 10).toString();
-  }
-  let sum = 0;
-  for (let i = 0; i < 12; i++) {
-    let val = parseInt(ean[i], 10);
-    sum += val * (i % 2 === 0 ? 1 : 3);
-  }
-  let checkDigit = (10 - (sum % 10)) % 10;
-  return ean + checkDigit.toString();
-};
-
 /** Hub de enriquecimento do fornecedor usando o formulário completo do superadmin como padrão. */
 const SupplierProductDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -55,6 +40,44 @@ const SupplierProductDetail = () => {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [candidateDescriptions, setCandidateDescriptions] = useState<Record<string, string>>({});
   const { search, doImport } = useReferenceMutations(id);
+  const { data: candidates } = useReferenceCandidates(id);
+  const [showGalleryToChange, setShowGalleryToChange] = useState(false);
+
+  const activeCandidate = candidates?.find(
+    c => c.id === product?.selected_reference_candidate_id || c.ml_item_id === product?.reference_item_id
+  );
+
+  const handleUndoLink = async () => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({
+          selected_reference_candidate_id: null,
+          reference_item_id: null,
+          stage: 'stage_1_basic',
+          gtin_ean13: null,
+          gtin_source: null,
+          gtin_status: 'pending_confirmation'
+        })
+        .eq('id', product!.id);
+      
+      if (error) throw error;
+      
+      await supabase
+        .from('product_reference_candidates')
+        .update({ status: 'available' })
+        .eq('product_id', product!.id);
+
+      if (orgId) {
+        queryClient.invalidateQueries({ queryKey: supplierKeys.product(orgId, id!) });
+        queryClient.invalidateQueries({ queryKey: supplierKeys.scope(orgId) });
+      }
+      
+      toast({ title: 'Vínculo desfeito com sucesso' });
+    } catch (err: any) {
+      toast({ title: 'Erro ao desfazer vínculo', description: err.message, variant: 'destructive' });
+    }
+  };
 
   const ensureDescriptionLoaded = async (candidate: ReferenceCandidate) => {
     const mlId = candidate.ml_item_id;
@@ -136,6 +159,7 @@ const SupplierProductDetail = () => {
       { 
         onSuccess: async () => {
           setImportCandidate(null);
+          setShowGalleryToChange(false);
           
           // Salva a descrição oficial e os atributos/especificações chave/valor se carregados
           const descText = candidateDescriptions[mlId];
@@ -166,25 +190,6 @@ const SupplierProductDetail = () => {
             if (updateError) console.error('Erro ao salvar especificações e descrição importadas:', updateError);
           }
 
-          if (!hasGtin) {
-            const autoGtin = generateRandomEan13();
-            const { error: updateGtinError } = await supabase
-              .from('products')
-              .update({ 
-                gtin_ean13: autoGtin,
-                gtin_status: 'valid'
-              })
-              .eq('id', product!.id);
-              
-            if (updateGtinError) {
-              console.error('Erro ao salvar GTIN automático:', updateGtinError);
-            } else {
-              toast({ 
-                title: 'GTIN Gerado Automaticamente', 
-                description: `O produto importado não possuía GTIN. Geramos o código ${autoGtin} automaticamente.` 
-              });
-            }
-          }
           // Invalida a query do produto para atualizar a tela
           if (orgId) {
             queryClient.invalidateQueries({ queryKey: supplierKeys.product(orgId, id!) });
@@ -237,13 +242,100 @@ const SupplierProductDetail = () => {
 
       <Separator />
 
-      <ReferenceSearchGallery
-        productId={product.id}
-        onSearch={() => search.mutate({ name: product.name, price: product.price })}
-        isSearching={search.isPending}
-        onSelect={handleSelectImport}
-        onViewOverview={handleViewOverview}
-      />
+      {product.selected_reference_candidate_id || product.reference_item_id ? (
+        !showGalleryToChange && activeCandidate ? (
+          <Card className="border border-green-200/50 bg-green-50/10 shadow-sm dark:bg-green-950/10">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <div>
+                <CardTitle className="text-base font-semibold text-green-700 dark:text-green-400">
+                  Referência Vinculada Ativa
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Este produto está enriquecido e vinculado a um anúncio do Mercado Livre.
+                </p>
+              </div>
+              <Badge variant="outline" className="border-green-600/30 text-green-600 font-mono">
+                {activeCandidate.ml_item_id}
+              </Badge>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-start gap-4">
+                {activeCandidate.image_url && (
+                  <img
+                    src={activeCandidate.image_url}
+                    alt=""
+                    className="h-16 w-16 rounded-md border object-contain bg-white"
+                  />
+                )}
+                <div className="min-w-0 flex-1 space-y-1">
+                  <h4 className="text-sm font-medium line-clamp-1">{activeCandidate.title}</h4>
+                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                    {activeCandidate.brand && <span>Marca: {activeCandidate.brand}</span>}
+                    {activeCandidate.model && <span>Modelo: {activeCandidate.model}</span>}
+                    {activeCandidate.price && (
+                      <span className="font-semibold text-foreground">
+                        Preço ML: {activeCandidate.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-border/40">
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => handleViewOverview(activeCandidate)}
+                >
+                  Ver referência
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => setShowGalleryToChange(true)}
+                >
+                  Trocar referência
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="destructive"
+                  onClick={() => {
+                    if (window.confirm("Tem certeza que deseja desfazer o vínculo com esta referência? Os dados já importados continuarão salvos, mas o produto voltará para o estágio básico.")) {
+                      handleUndoLink();
+                    }
+                  }}
+                >
+                  Desfazer vínculo
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-muted-foreground">Substituindo referência vinculada</span>
+              <Button size="sm" variant="ghost" onClick={() => setShowGalleryToChange(false)}>
+                Cancelar alteração
+              </Button>
+            </div>
+            <ReferenceSearchGallery
+              productId={product.id}
+              onSearch={() => search.mutate({ name: product.name, price: product.price })}
+              isSearching={search.isPending}
+              onSelect={handleSelectImport}
+              onViewOverview={handleViewOverview}
+            />
+          </div>
+        )
+      ) : (
+        <ReferenceSearchGallery
+          productId={product.id}
+          onSearch={() => search.mutate({ name: product.name, price: product.price })}
+          isSearching={search.isPending}
+          onSelect={handleSelectImport}
+          onViewOverview={handleViewOverview}
+        />
+      )}
 
       <ProductVersionHistory productId={product.id} />
 
