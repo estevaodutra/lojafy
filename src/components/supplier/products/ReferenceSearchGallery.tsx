@@ -10,6 +10,7 @@ interface ReferenceSearchGalleryProps {
   onSearch: () => void;
   isSearching: boolean;
   onSelect: (candidate: ReferenceCandidate) => void;
+  onViewOverview?: (candidate: ReferenceCandidate) => void;
 }
 
 /** Galeria de candidatos persistidos + botão de (re)busca no Mercado Livre. */
@@ -18,6 +19,7 @@ export const ReferenceSearchGallery = ({
   onSearch,
   isSearching,
   onSelect,
+  onViewOverview,
 }: ReferenceSearchGalleryProps) => {
   const { data: candidates, isLoading } = useReferenceCandidates(productId);
 
@@ -54,7 +56,12 @@ export const ReferenceSearchGallery = ({
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {candidates!.map((candidate) => (
-            <ReferenceCandidateCard key={candidate.id} candidate={candidate} onSelect={onSelect} />
+            <ReferenceCandidateCard
+              key={candidate.id}
+              candidate={candidate}
+              onSelect={onSelect}
+              onViewOverview={onViewOverview}
+            />
           ))}
         </div>
       )}

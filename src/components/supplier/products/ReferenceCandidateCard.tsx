@@ -7,9 +7,14 @@ import type { ReferenceCandidate } from '@/services/productReferenceService';
 interface ReferenceCandidateCardProps {
   candidate: ReferenceCandidate;
   onSelect: (candidate: ReferenceCandidate) => void;
+  onViewOverview?: (candidate: ReferenceCandidate) => void;
 }
 
-export const ReferenceCandidateCard = ({ candidate, onSelect }: ReferenceCandidateCardProps) => (
+export const ReferenceCandidateCard = ({
+  candidate,
+  onSelect,
+  onViewOverview,
+}: ReferenceCandidateCardProps) => (
   <Card className="flex flex-col">
     <CardContent className="flex-1 pt-4 space-y-2">
       <div className="flex items-start gap-3">
@@ -51,9 +56,12 @@ export const ReferenceCandidateCard = ({ candidate, onSelect }: ReferenceCandida
         <p className="font-mono">{candidate.ml_item_id}</p>
       </div>
     </CardContent>
-    <CardFooter>
-      <Button className="w-full" size="sm" onClick={() => onSelect(candidate)}>
-        Usar produto de referência
+    <CardFooter className="gap-2">
+      <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => onViewOverview?.(candidate)}>
+        Visão geral
+      </Button>
+      <Button size="sm" className="flex-1 text-xs" onClick={() => onSelect(candidate)}>
+        Usar
       </Button>
     </CardFooter>
   </Card>
