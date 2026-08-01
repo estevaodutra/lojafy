@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -9,8 +8,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import type { ReferenceCandidate, ImportOverrides } from '@/services/productReferenceService';
 
@@ -33,7 +30,7 @@ interface ReferenceImportModalProps {
 }
 
 const DiffRow = ({ label, before, after }: { label: string; before: string; after: string }) => (
-  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-1 text-sm">
+  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-1.5 text-sm">
     <div className="min-w-0">
       <p className="text-xs text-muted-foreground">{label} (atual)</p>
       <p className="truncate">{before || '—'}</p>
@@ -41,12 +38,12 @@ const DiffRow = ({ label, before, after }: { label: string; before: string; afte
     <ArrowRight className="h-4 w-4 text-muted-foreground" />
     <div className="min-w-0">
       <p className="text-xs text-muted-foreground">Após importação</p>
-      <p className="truncate font-medium">{after || '—'}</p>
+      <p className="truncate font-medium text-primary">{after || '—'}</p>
     </div>
   </div>
 );
 
-/** Diff lado a lado + confirmação explícita, com toggles de preservação. */
+/** Diff focado exclusivamente em Título, Descrição e Atributos. */
 export const ReferenceImportModal = ({
   candidate,
   product,
@@ -54,62 +51,66 @@ export const ReferenceImportModal = ({
   onClose,
   isImporting,
 }: ReferenceImportModalProps) => {
-  const [applyImage, setApplyImage] = useState(false);
-  const [applyPrice, setApplyPrice] = useState(false);
-
   if (!candidate) return null;
 
-  const rawGtin = (candidate.raw_data as Record<string, unknown> | null)?.gtin as string | null;
+  const candidateDesc = (candidate.raw_data as any)?.description as string | null;
 
   return (
     <Dialog open={!!candidate} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Importar dados de referência</DialogTitle>
+          <DialogTitle>Confirmar Importação de Referência</DialogTitle>
           <DialogDescription>
-            Revise o que muda. Foto, dimensões e preço do seu cadastro são preservados por padrão;
-            você pode restaurar a versão anterior a qualquer momento.
+            Serão atualizados o título, a descrição e a ficha técnica com os atributos oficiais do Mercado Livre. 
+            Suas fotos e preços cadastrados serão mantidos intocados.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-1">
+        <div className="space-y-3 my-2">
+          {/* Título */}
           <DiffRow label="Título" before={product.name} after={candidate.title ?? product.name} />
-          <DiffRow label="Marca" before={product.brand ?? ''} after={candidate.brand ?? product.brand ?? ''} />
-          <DiffRow label="GTIN" before={product.gtin_ean13 ?? ''} after={rawGtin ?? product.gtin_ean13 ?? ''} />
-          <DiffRow
-            label="Preço"
-            before={product.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-            after={
-              applyPrice && candidate.price != null
-                ? candidate.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-                : product.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-            }
-          />
+          
+          <Separator />
+
+          {/* Descrição */}
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-1.5 text-sm">
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Descrição (atual)</p>
+              <p className="truncate text-muted-foreground">{product.description || 'Nenhuma descrição cadastrada'}</p>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground animate-pulse" />
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Após importação</p>
+              <p className="truncate font-medium text-primary">
+                {candidateDesc ? 'Nova descrição detalhada importada' : 'Mantém atual'}
+              </p>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Atributos */}
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-1.5 text-sm">
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Especificações Técnicas</p>
+              <p className="truncate">Especificações atuais</p>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Após importação</p>
+              <p className="truncate font-medium text-primary">
+                {candidate.attribute_count ?? 0} atributos oficiais do catálogo
+              </p>
+            </div>
+          </div>
         </div>
 
-        <Separator />
-
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Checkbox id="apply-image" checked={applyImage} onCheckedChange={(c) => setApplyImage(!!c)} />
-            <Label htmlFor="apply-image" className="text-sm">
-              Substituir minha foto pela do anúncio de referência
-            </Label>
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox id="apply-price" checked={applyPrice} onCheckedChange={(c) => setApplyPrice(!!c)} />
-            <Label htmlFor="apply-price" className="text-sm">
-              Substituir meu preço pelo do anúncio de referência
-            </Label>
-          </div>
-        </div>
-
-        <DialogFooter>
+        <DialogFooter className="mt-4">
           <Button variant="outline" onClick={onClose}>
             Cancelar
           </Button>
           <Button
-            onClick={() => onConfirm({ apply_image: applyImage, apply_price: applyPrice })}
+            onClick={() => onConfirm({ apply_image: false, apply_price: false })}
             disabled={isImporting}
           >
             {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
