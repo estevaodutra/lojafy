@@ -251,9 +251,22 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         return specEntries.map(([key, value]) => ({ key, value: value as string }));
       }
     }
-    // Then try to load from attributes (new ML format: [{id, name, value_name, ...}])
-    if (product?.attributes && Array.isArray(product.attributes) && product.attributes.length > 0) {
-      return (product.attributes as any[]).map((attr: any) => ({
+    
+    // Then try to load from attributes (new ML format: [{id, name, value_name, ...}] or backend object)
+    let attrList: any[] = [];
+    if (product?.attributes) {
+      if (Array.isArray(product.attributes)) {
+        attrList = product.attributes;
+      } else if (typeof product.attributes === 'object') {
+        const legacyList = (product.attributes as any).ml_reference_attributes;
+        if (Array.isArray(legacyList)) {
+          attrList = legacyList;
+        }
+      }
+    }
+
+    if (attrList.length > 0) {
+      return attrList.map((attr: any) => ({
         key: attr.name || attr.id || '',
         value: attr.value_name || attr.value || '',
       }));

@@ -137,14 +137,33 @@ const SupplierProductDetail = () => {
         onSuccess: async () => {
           setImportCandidate(null);
           
-          // Salva a descrição oficial se foi carregada com sucesso
+          // Salva a descrição oficial e os atributos/especificações chave/valor se carregados
           const descText = candidateDescriptions[mlId];
+          const updatePayload: any = {};
+          
           if (descText && descText !== 'Erro ao carregar descrição.' && descText !== 'Descrição indisponível no Mercado Livre.') {
-            const { error: updateDescError } = await supabase
+            updatePayload.description = descText;
+          }
+
+          const rawAttrs = (importCandidate?.raw_data as any)?.attributes || (overviewDetail?.attributes);
+          if (Array.isArray(rawAttrs) && rawAttrs.length > 0) {
+            const specObj: Record<string, string> = {};
+            rawAttrs.forEach((attr: any) => {
+              const name = attr.name || attr.id;
+              const val = attr.value_name || attr.value;
+              if (name && val) {
+                specObj[name] = val;
+              }
+            });
+            updatePayload.specifications = specObj;
+          }
+
+          if (Object.keys(updatePayload).length > 0) {
+            const { error: updateError } = await supabase
               .from('products')
-              .update({ description: descText })
+              .update(updatePayload)
               .eq('id', product!.id);
-            if (updateDescError) console.error('Erro ao salvar descrição importada:', updateDescError);
+            if (updateError) console.error('Erro ao salvar especificações e descrição importadas:', updateError);
           }
 
           if (!hasGtin) {
