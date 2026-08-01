@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Download, Plus, Search, Send } from 'lucide-react';
+import { Download, Plus, Search, Send, Check, X, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { supplierKeys } from '@/lib/supplierQueryKeys';
@@ -14,6 +14,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +30,17 @@ import {
 import {
   Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious,
 } from '@/components/ui/pagination';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import type { Database } from '@/integrations/supabase/types';
 
 type ProductRow = Pick<
@@ -46,6 +58,94 @@ const SupplierProductManagement = () => {
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [isSelectAllChecked, setIsSelectAllChecked] = useState(false);
+
+  // Selecionar unitário
+  const handleSelectProduct = (productId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedProducts(prev => [...prev, productId]);
+    } else {
+      setSelectedProducts(prev => prev.filter(id => id !== productId));
+      setIsSelectAllChecked(false);
+    }
+  };
+
+  // Selecionar todos da página atual
+  const handleSelectAll = (checked: boolean) => {
+    const currentProducts = data?.rows ?? [];
+    if (checked) {
+      setSelectedProducts(currentProducts.map(p => p.id));
+      setIsSelectAllChecked(true);
+    } else {
+      setSelectedProducts([]);
+      setIsSelectAllChecked(false);
+    }
+  };
+
+  // Mutação para status em lote (Ativar/Desativar)
+  const bulkToggleStatus = useMutation({
+    mutationFn: async ({ productIds, active }: { productIds: string[], active: boolean }) => {
+      const { error } = await supabase
+        .from('products')
+        .update({ active, updated_at: new Date().toISOString() })
+        .in('id', productIds);
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      if (orgId) {
+        queryClient.invalidateQueries({ queryKey: supplierKeys.scope(orgId) });
+        queryClient.invalidateQueries({ queryKey: supplierKeys.all });
+      }
+      toast({
+        title: "Ação em lote executada",
+        description: `${variables.productIds.length} produto(s) ${variables.active ? 'ativado(s)' : 'desativado(s)'} com sucesso.`,
+      });
+      setSelectedProducts([]);
+      setIsSelectAllChecked(false);
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Erro ao executar ação em lote', description: err.message, variant: 'destructive' });
+    }
+  });
+
+  // Mutação para processar/excluir produtos em lote
+  const bulkDelete = useMutation({
+    mutationFn: async (productIds: string[]) => {
+      const checks = await Promise.all(
+        productIds.map(async (id) => {
+          const { error } = await supabase.from('products').delete().eq('id', id);
+          if (error) {
+            // Se houver FK (pedido associado), apenas inativa
+            await supabase.from('products').update({ active: false }).eq('id', id);
+            return { id, deleted: false };
+          }
+          return { id, deleted: true };
+        })
+      );
+      return checks;
+    },
+    onSuccess: (results) => {
+      const deletedCount = results.filter(r => r.deleted).length;
+      const deactivatedCount = results.filter(r => !r.deleted).length;
+
+      if (orgId) {
+        queryClient.invalidateQueries({ queryKey: supplierKeys.scope(orgId) });
+        queryClient.invalidateQueries({ queryKey: supplierKeys.all });
+      }
+
+      toast({
+        title: "Processamento em lote concluído",
+        description: `${deletedCount} produto(s) excluído(s) e ${deactivatedCount} produto(s) desativado(s) (possuem pedidos associados).`,
+      });
+      setSelectedProducts([]);
+      setIsSelectAllChecked(false);
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Erro ao processar lote', description: err.message, variant: 'destructive' });
+    }
+  });
   const [stageFilter, setStageFilter] = useState('all');
 
   const { data, isLoading } = useSupplierPaginatedQuery<ProductRow>({
@@ -159,6 +259,87 @@ const SupplierProductManagement = () => {
         </Select>
       </div>
 
+      {selectedProducts.length > 0 && (
+        <Card className="bg-muted/30 border border-border/50 shadow-sm">
+          <CardContent className="py-3 flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <span className="text-sm font-medium text-muted-foreground">
+                {selectedProducts.length} produto(s) selecionado(s)
+              </span>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => bulkToggleStatus.mutate({ productIds: selectedProducts, active: true })}
+                  disabled={bulkToggleStatus.isPending}
+                  className="h-8 gap-1.5"
+                >
+                  <Check className="h-4 w-4 text-green-600" />
+                  Ativar
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => bulkToggleStatus.mutate({ productIds: selectedProducts, active: false })}
+                  disabled={bulkToggleStatus.isPending}
+                  className="h-8 gap-1.5"
+                >
+                  <X className="h-4 w-4 text-orange-600" />
+                  Desativar
+                </Button>
+                
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      disabled={bulkDelete.isPending}
+                      className="h-8 gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Excluir / Processar
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-background border border-border shadow-2xl">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Processar produtos selecionados</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tem certeza que deseja processar os {selectedProducts.length} produtos selecionados?
+                        <br />
+                        <br />
+                        <strong>Produtos sem dependências:</strong> Serão excluídos permanentemente.
+                        <br />
+                        <strong>Produtos com dependências (pedidos associados):</strong> Serão apenas desativados para preservar o histórico.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => bulkDelete.mutate(selectedProducts)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Confirmar e Processar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedProducts([]);
+                setIsSelectAllChecked(false);
+              }}
+              className="h-8 text-xs hover:bg-muted"
+            >
+              Cancelar Seleção
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardContent className="pt-6">
           {isLoading ? (
@@ -176,6 +357,20 @@ const SupplierProductManagement = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead 
+                      className="w-[50px] cursor-pointer text-center align-middle"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectAll(!isSelectAllChecked);
+                      }}
+                    >
+                      <Checkbox
+                        checked={isSelectAllChecked}
+                        onCheckedChange={handleSelectAll}
+                        aria-label="Selecionar todos"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </TableHead>
                     <TableHead>Produto</TableHead>
                     <TableHead>SKU</TableHead>
                     <TableHead>Preço</TableHead>
@@ -193,6 +388,20 @@ const SupplierProductManagement = () => {
                       className="cursor-pointer"
                       onClick={() => navigate(`/supplier/produtos/${product.id}`)}
                     >
+                      <TableCell 
+                        className="cursor-pointer text-center align-middle"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectProduct(product.id, !selectedProducts.includes(product.id));
+                        }}
+                      >
+                        <Checkbox
+                          checked={selectedProducts.includes(product.id)}
+                          onCheckedChange={(checked) => handleSelectProduct(product.id, !!checked)}
+                          aria-label={`Selecionar ${product.name}`}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {product.main_image_url || product.image_url ? (

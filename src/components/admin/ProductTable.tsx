@@ -589,11 +589,18 @@ const ProductTable: React.FC<ProductTableProps> = ({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[50px]">
+                      <TableHead 
+                        className="w-[50px] cursor-pointer text-center align-middle"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectAll(!isSelectAllChecked);
+                        }}
+                      >
                         <Checkbox
                           checked={isSelectAllChecked}
                           onCheckedChange={handleSelectAll}
                           aria-label="Selecionar todos"
+                          onClick={(e) => e.stopPropagation()}
                         />
                       </TableHead>
                       <TableHead className="w-[100px]">Imagem</TableHead>
@@ -610,11 +617,18 @@ const ProductTable: React.FC<ProductTableProps> = ({
                   <TableBody>
                     {currentProducts.map((product) => (
                       <TableRow key={product.id}>
-                        <TableCell>
+                        <TableCell 
+                          className="cursor-pointer text-center align-middle"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectProduct(product.id, !selectedProducts.includes(product.id));
+                          }}
+                        >
                           <Checkbox
                             checked={selectedProducts.includes(product.id)}
                             onCheckedChange={(checked) => handleSelectProduct(product.id, !!checked)}
                             aria-label={`Selecionar ${product.name}`}
+                            onClick={(e) => e.stopPropagation()}
                           />
                         </TableCell>
                         <TableCell>
