@@ -26,16 +26,17 @@ serve(async (req) => {
 
     try {
       const { data: platSettings } = await supabase
-        .from('platform_settings')
-        .select('ml_client_id, ml_client_secret')
+        .from('marketplace_credentials')
+        .select('client_id, client_secret')
+        .eq('marketplace', 'mercadolivre')
         .maybeSingle();
 
       if (platSettings) {
-        if (platSettings.ml_client_id) mlClientId = platSettings.ml_client_id;
-        if (platSettings.ml_client_secret) mlClientSecret = platSettings.ml_client_secret;
+        if (platSettings.client_id) mlClientId = platSettings.client_id;
+        if (platSettings.client_secret) mlClientSecret = platSettings.client_secret;
       }
     } catch (platErr) {
-      console.warn('[ml-public-search] Failed to fetch custom credentials from platform_settings:', platErr);
+      console.warn('[ml-public-search] Failed to fetch custom credentials from marketplace_credentials:', platErr);
     }
 
     // 1. Gerar token de aplicação (client_credentials)

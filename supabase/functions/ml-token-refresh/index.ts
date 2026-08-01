@@ -20,20 +20,21 @@ export async function getValidToken(userId: string): Promise<{ access_token: str
 
   try {
     const { data: platSettings } = await supabase
-      .from('platform_settings')
-      .select('ml_client_id, ml_client_secret')
+      .from('marketplace_credentials')
+      .select('client_id, client_secret')
+      .eq('marketplace', 'mercadolivre')
       .maybeSingle();
 
     if (platSettings) {
-      if (platSettings.ml_client_id) mlClientId = platSettings.ml_client_id;
-      if (platSettings.ml_client_secret) mlClientSecret = platSettings.ml_client_secret;
+      if (platSettings.client_id) mlClientId = platSettings.client_id;
+      if (platSettings.client_secret) mlClientSecret = platSettings.client_secret;
     }
   } catch (dbErr) {
-    console.error('[ml-token-refresh] Failed to fetch credentials from platform_settings:', dbErr);
+    console.error('[ml-token-refresh] Failed to fetch credentials from marketplace_credentials:', dbErr);
   }
 
   if (!mlClientId || !mlClientSecret) {
-    throw new Error('Mercado Livre credentials (client_id or client_secret) are not configured. Please configure them in Platform Settings.');
+    throw new Error('Mercado Livre credentials (client_id or client_secret) are not configured. Please configure them in Marketplace Settings.');
   }
 
   const { data: integration, error } = await supabase

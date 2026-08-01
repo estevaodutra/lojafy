@@ -30,9 +30,6 @@ interface PlatformSettings {
   carteira_taxa_percentual?: number;
   carteira_valores_sugeridos?: number[];
   carteira_pagamento_parcial?: boolean;
-  ml_client_id?: string;
-  ml_client_secret?: string;
-  app_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -44,9 +41,6 @@ interface UpdatePlatformSettingsParams {
   reseller_withdrawal_fee_value?: number;
   reseller_withdrawal_fee_type?: 'percentage' | 'fixed';
   recalculate_prices?: boolean;
-  ml_client_id?: string;
-  ml_client_secret?: string;
-  app_url?: string;
 }
 
 export const usePlatformSettings = () => {

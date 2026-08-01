@@ -29,7 +29,7 @@ serve(async (req) => {
     // Tenta buscar no banco pela rede local do Docker
     let platSettings: any = null;
     try {
-      const platRes = await fetch(`${restUrl}/rest/v1/platform_settings?select=ml_client_id,ml_client_secret,app_url`, {
+      const platRes = await fetch(`${restUrl}/rest/v1/marketplace_credentials?marketplace=eq.mercadolivre&select=client_id,client_secret,app_url`, {
         headers: {
           'apikey': supabaseServiceKey,
           'Authorization': `Bearer ${supabaseServiceKey}`
@@ -42,13 +42,13 @@ serve(async (req) => {
           platSettings = platSettingsList[0];
         }
       } else {
-        console.error('[ml-oauth] Failed to fetch platform_settings via REST local API:', platRes.status);
+        console.error('[ml-oauth] Failed to fetch marketplace_credentials via REST local API:', platRes.status);
       }
     } catch (dbFetchErr) {
       console.error('[ml-oauth] Local database REST request failed, trying external URL:', dbFetchErr);
       // Fallback para URL externa caso a rede local do Docker mude
       try {
-        const platResExt = await fetch(`${supabaseUrl}/rest/v1/platform_settings?select=ml_client_id,ml_client_secret,app_url`, {
+        const platResExt = await fetch(`${supabaseUrl}/rest/v1/marketplace_credentials?marketplace=eq.mercadolivre&select=client_id,client_secret,app_url`, {
           headers: {
             'apikey': supabaseServiceKey,
             'Authorization': `Bearer ${supabaseServiceKey}`
@@ -67,8 +67,8 @@ serve(async (req) => {
 
     // Aplicar configurações obtidas do banco (prioridade máxima)
     if (platSettings) {
-      mlClientId = platSettings.ml_client_id || mlClientId || undefined;
-      mlClientSecret = platSettings.ml_client_secret || mlClientSecret || undefined;
+      mlClientId = platSettings.client_id || mlClientId || undefined;
+      mlClientSecret = platSettings.client_secret || mlClientSecret || undefined;
       // Se appUrl estiver configurado no banco, priorizar. Se não, usar o do env.
       if (platSettings.app_url) {
         appUrl = platSettings.app_url;

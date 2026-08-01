@@ -3,27 +3,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useMarketplaceCredentials } from '@/hooks/useMarketplaceCredentials';
 import { Loader2, Save, Key, Globe, Copy, Check, Eye, EyeOff, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export const MercadoLivreSettings = () => {
   const { toast } = useToast();
-  const { settings, updateSettings, isUpdating, isLoading } = usePlatformSettings();
+  const { credentials, updateCredentials, isUpdating, isLoading } = useMarketplaceCredentials('mercadolivre');
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
   const [appUrl, setAppUrl] = useState('');
   const [showSecret, setShowSecret] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Load values when settings are fetched
+  // Load values when credentials are fetched
   useEffect(() => {
-    if (settings) {
-      setClientId(settings.ml_client_id || '');
-      setClientSecret(settings.ml_client_secret || '');
-      setAppUrl(settings.app_url || '');
+    if (credentials) {
+      setClientId(credentials.client_id || '');
+      setClientSecret(credentials.client_secret || '');
+      setAppUrl(credentials.app_url || '');
     }
-  }, [settings]);
+  }, [credentials]);
 
   // Construct the Redirect URI based on current app configuration / supabaseUrl
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -42,10 +42,10 @@ export const MercadoLivreSettings = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await updateSettings({
-        ml_client_id: clientId.trim() || undefined,
-        ml_client_secret: clientSecret.trim() || undefined,
-        app_url: appUrl.trim() || undefined,
+      updateCredentials({
+        client_id: clientId.trim() || null,
+        client_secret: clientSecret.trim() || null,
+        app_url: appUrl.trim() || null,
       });
     } catch (error) {
       console.error('Error saving ML integration settings:', error);

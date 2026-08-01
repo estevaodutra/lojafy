@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { BetaWarningDialog } from '@/components/integrations/BetaWarningDialog';
-import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useMarketplaceCredentials } from '@/hooks/useMarketplaceCredentials';
 import { useToast } from '@/hooks/use-toast';
 import MlAnuncios from './MlAnuncios';
 import MlMensagens from './MlMensagens';
@@ -72,7 +72,7 @@ const NotConnected = () => (
 const LojafyIntegra = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { settings: platformSettings } = usePlatformSettings();
+  const { credentials } = useMarketplaceCredentials('mercadolivre');
   const [showBetaWarning, setShowBetaWarning] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'integracoes';
@@ -121,7 +121,7 @@ const LojafyIntegra = () => {
 
   const getMercadoLivreAuthUrl = () => {
     const userId = user?.id || '';
-    const clientId = platformSettings?.ml_client_id || import.meta.env.VITE_ML_CLIENT_ID || '2003351424267574';
+    const clientId = credentials?.client_id || import.meta.env.VITE_ML_CLIENT_ID || '2003351424267574';
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
     const cleanSupabaseUrl = supabaseUrl.replace(/\/$/, '');
     const redirectUri = `${cleanSupabaseUrl}/functions/v1/ml-oauth-callback`;

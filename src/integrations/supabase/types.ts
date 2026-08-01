@@ -1607,6 +1607,36 @@ export type Database = {
         }
         Relationships: []
       }
+      marketplace_credentials: {
+        Row: {
+          client_id: string | null
+          client_secret: string | null
+          app_url: string | null
+          created_at: string | null
+          id: string
+          marketplace: string
+          updated_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          client_secret?: string | null
+          app_url?: string | null
+          created_at?: string | null
+          id?: string
+          marketplace: string
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          client_secret?: string | null
+          app_url?: string | null
+          created_at?: string | null
+          id?: string
+          marketplace?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       mercadolivre_integrations: {
         Row: {
           access_token: string
@@ -2649,9 +2679,6 @@ export type Database = {
           reseller_withdrawal_fee_value: number | null
           updated_at: string | null
           withdrawal_processing_days: number | null
-          ml_client_id: string | null
-          ml_client_secret: string | null
-          app_url: string | null
         }
         Insert: {
           additional_costs?: Json | null
@@ -2674,9 +2701,6 @@ export type Database = {
           reseller_withdrawal_fee_value?: number | null
           updated_at?: string | null
           withdrawal_processing_days?: number | null
-          ml_client_id?: string | null
-          ml_client_secret?: string | null
-          app_url?: string | null
         }
         Update: {
           additional_costs?: Json | null
@@ -2699,9 +2723,6 @@ export type Database = {
           reseller_withdrawal_fee_value?: number | null
           updated_at?: string | null
           withdrawal_processing_days?: number | null
-          ml_client_id?: string | null
-          ml_client_secret?: string | null
-          app_url?: string | null
         }
         Relationships: []
       }
