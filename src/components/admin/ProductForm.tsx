@@ -358,7 +358,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
 
   // Auto-calculate price based on cost_price with auto pricing enabled
   useEffect(() => {
-    if (settings && watchedUseAutoPricing) {
+    if (watchedUseAutoPricing) {
       const costPrice = Number(watchedCostPrice);
       // Só calcular se for número válido e maior que zero
       if (!isNaN(costPrice) && costPrice > 0) {
