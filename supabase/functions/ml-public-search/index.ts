@@ -40,7 +40,7 @@ serve(async (req) => {
     const accessToken = tokenData.access_token;
 
     // 2. Fazer a requisição no Mercado Livre com o Token de Aplicação
-    const mlPath = path || `/products/search?status=active&site_id=MLB&q=${encodeURIComponent(query)}&limit=8`;
+    const mlPath = path || `/products/search?status=active&site_id=MLB&q=${encodeURIComponent(query)}&limit=15`;
     const mlUrl = `https://api.mercadolibre.com${mlPath}`;
     
     const mlRes = await fetch(mlUrl, {

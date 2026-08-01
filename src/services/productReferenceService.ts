@@ -81,7 +81,7 @@ export async function searchMlCandidates(product: {
 }): Promise<ScoredCandidate[]> {
   const query = extractSearchKeywords(product.name);
   const searchRes = await fetchFromMlProxy(
-    `/products/search?status=active&site_id=MLB&q=${encodeURIComponent(query)}&limit=8`,
+    `/products/search?status=active&site_id=MLB&q=${encodeURIComponent(query)}&limit=15`,
   );
   if (!searchRes.ok) throw new Error('Falha ao buscar anúncios no Mercado Livre');
   const searchData = await searchRes.json();
