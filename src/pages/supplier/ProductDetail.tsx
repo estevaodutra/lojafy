@@ -51,7 +51,46 @@ const SupplierProductDetail = () => {
 
   const [importCandidate, setImportCandidate] = useState<ReferenceCandidate | null>(null);
   const [overviewCandidate, setOverviewCandidate] = useState<ReferenceCandidate | null>(null);
+  const [candidateDescriptions, setCandidateDescriptions] = useState<Record<string, string>>({});
   const { search, doImport } = useReferenceMutations(id);
+
+  const ensureDescriptionLoaded = async (candidate: ReferenceCandidate) => {
+    const mlId = candidate.ml_item_id;
+    if (!mlId || candidateDescriptions[mlId]) return;
+    
+    try {
+      const { data: searchData, error: searchError } = await supabase.functions.invoke('ml-public-search', {
+        body: { path: `/sites/MLB/search?product_id=${mlId}&limit=1` }
+      });
+      if (searchError) throw searchError;
+      
+      const itemId = searchData?.results?.[0]?.id;
+      if (itemId) {
+        const { data: descData, error: descError } = await supabase.functions.invoke('ml-public-search', {
+          body: { path: `/items/${itemId}/description` }
+        });
+        if (descError) throw descError;
+        
+        const descText = descData?.plain_text || descData?.text || 'Sem descrição cadastrada.';
+        setCandidateDescriptions(prev => ({ ...prev, [mlId]: descText }));
+      } else {
+        setCandidateDescriptions(prev => ({ ...prev, [mlId]: 'Descrição indisponível no Mercado Livre.' }));
+      }
+    } catch (err) {
+      console.error('Erro ao buscar descrição:', err);
+      setCandidateDescriptions(prev => ({ ...prev, [mlId]: 'Erro ao carregar descrição.' }));
+    }
+  };
+
+  const handleViewOverview = (candidate: ReferenceCandidate) => {
+    setOverviewCandidate(candidate);
+    ensureDescriptionLoaded(candidate);
+  };
+
+  const handleSelectImport = (candidate: ReferenceCandidate) => {
+    setImportCandidate(candidate);
+    ensureDescriptionLoaded(candidate);
+  };
 
   const { data: product, isLoading } = useQuery({
     queryKey: orgId && id ? supplierKeys.product(orgId, id) : ['supplier', 'product', 'pending'],
@@ -69,6 +108,7 @@ const SupplierProductDetail = () => {
 
   const handleConfirmImport = (overrides: ImportOverrides) => {
     const hasGtin = importCandidate?.has_gtin || !!(importCandidate?.raw_data as any)?.gtin;
+    const mlId = importCandidate!.ml_item_id;
 
     doImport.mutate(
       { candidateId: importCandidate!.id, overrides },
@@ -76,6 +116,16 @@ const SupplierProductDetail = () => {
         onSuccess: async () => {
           setImportCandidate(null);
           
+          // Salva a descrição oficial se foi carregada com sucesso
+          const descText = candidateDescriptions[mlId];
+          if (descText && descText !== 'Erro ao carregar descrição.' && descText !== 'Descrição indisponível no Mercado Livre.') {
+            const { error: updateDescError } = await supabase
+              .from('products')
+              .update({ description: descText })
+              .eq('id', product!.id);
+            if (updateDescError) console.error('Erro ao salvar descrição importada:', updateDescError);
+          }
+
           if (!hasGtin) {
             const autoGtin = generateRandomEan13();
             const { error: updateGtinError } = await supabase
@@ -151,8 +201,8 @@ const SupplierProductDetail = () => {
         productId={product.id}
         onSearch={() => search.mutate({ name: product.name, price: product.price })}
         isSearching={search.isPending}
-        onSelect={setImportCandidate}
-        onViewOverview={setOverviewCandidate}
+        onSelect={handleSelectImport}
+        onViewOverview={handleViewOverview}
       />
 
       <ProductVersionHistory productId={product.id} />
@@ -168,6 +218,7 @@ const SupplierProductDetail = () => {
           image_url: product.image_url,
           gtin_ean13: product.gtin_ean13,
         }}
+        candidateDescription={candidateDescriptions[importCandidate?.ml_item_id ?? '']}
         onConfirm={handleConfirmImport}
         onClose={() => setImportCandidate(null)}
         isImporting={doImport.isPending}
@@ -178,7 +229,7 @@ const SupplierProductDetail = () => {
           <DialogHeader>
             <DialogTitle>Visão Geral do Produto de Referência</DialogTitle>
             <DialogDescription>
-              Ficha técnica e especificações oficiais do catálogo do Mercado Livre.
+              Ficha técnica, especificações e descrição oficial do catálogo do Mercado Livre.
             </DialogDescription>
           </DialogHeader>
 
@@ -218,6 +269,24 @@ const SupplierProductDetail = () => {
                   </div>
                 </div>
               </div>
+
+              <div>
+                <h5 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                  Descrição do Produto de Referência
+                </h5>
+                <div className="rounded-md border p-4 bg-muted/10 text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed max-h-[250px] overflow-y-auto font-sans">
+                  {candidateDescriptions[overviewCandidate.ml_item_id] === undefined ? (
+                    <div className="flex items-center gap-2 py-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      <span>Buscando descrição oficial no catálogo do Mercado Livre...</span>
+                    </div>
+                  ) : (
+                    candidateDescriptions[overviewCandidate.ml_item_id]
+                  )}
+                </div>
+              </div>
+
+              <Separator />
 
               <div>
                 <h5 className="font-semibold text-sm mb-3">Atributos e Ficha Técnica</h5>

@@ -27,6 +27,7 @@ interface ReferenceImportModalProps {
   onConfirm: (overrides: ImportOverrides) => void;
   onClose: () => void;
   isImporting?: boolean;
+  candidateDescription?: string;
 }
 
 const DiffRow = ({ label, before, after }: { label: string; before: string; after: string }) => (
@@ -50,10 +51,11 @@ export const ReferenceImportModal = ({
   onConfirm,
   onClose,
   isImporting,
+  candidateDescription,
 }: ReferenceImportModalProps) => {
   if (!candidate) return null;
 
-  const candidateDesc = (candidate.raw_data as any)?.description as string | null;
+  const candidateDesc = candidateDescription || (candidate.raw_data as any)?.description as string | null;
 
   return (
     <Dialog open={!!candidate} onOpenChange={(open) => !open && onClose()}>
