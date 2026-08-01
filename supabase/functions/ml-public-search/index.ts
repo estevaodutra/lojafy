@@ -46,7 +46,7 @@ serve(async (req) => {
         grant_type: 'client_credentials',
         client_id: mlClientId,
         client_secret: mlClientSecret,
-      }),
+      }).toString(),
     });
 
     if (!tokenRes.ok) {

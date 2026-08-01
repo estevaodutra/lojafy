@@ -121,7 +121,7 @@ serve(async (req) => {
         client_secret: mlClientSecret,
         code: code,
         redirect_uri: ML_REDIRECT_URI,
-      }),
+      }).toString(),
     });
 
     if (!tokenRes.ok) {

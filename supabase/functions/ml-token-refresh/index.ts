@@ -68,7 +68,7 @@ export async function getValidToken(userId: string): Promise<{ access_token: str
       client_id: mlClientId,
       client_secret: mlClientSecret,
       refresh_token: integration.refresh_token,
-    }),
+    }).toString(),
   });
 
   if (!refreshRes.ok) {
