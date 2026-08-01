@@ -1,12 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const ML_CLIENT_ID = Deno.env.get('ML_CLIENT_ID') || '2003351424267574';
-const ML_CLIENT_SECRET = Deno.env.get('ML_CLIENT_SECRET') || 'xxhhZC2YUeAi2GWMM222aPstgCfu0GTL';
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -17,14 +20,32 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { query, path } = body;
 
+    // Load credentials from database first, falling back to environment variables or defaults
+    let mlClientId = Deno.env.get('ML_CLIENT_ID') || '2003351424267574';
+    let mlClientSecret = Deno.env.get('ML_CLIENT_SECRET') || 'xxhhZC2YUeAi2GWMM222aPstgCfu0GTL';
+
+    try {
+      const { data: platSettings } = await supabase
+        .from('platform_settings')
+        .select('ml_client_id, ml_client_secret')
+        .maybeSingle();
+
+      if (platSettings) {
+        if (platSettings.ml_client_id) mlClientId = platSettings.ml_client_id;
+        if (platSettings.ml_client_secret) mlClientSecret = platSettings.ml_client_secret;
+      }
+    } catch (platErr) {
+      console.warn('[ml-public-search] Failed to fetch custom credentials from platform_settings:', platErr);
+    }
+
     // 1. Gerar token de aplicação (client_credentials)
     const tokenRes = await fetch('https://api.mercadolibre.com/oauth/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'client_credentials',
-        client_id: ML_CLIENT_ID,
-        client_secret: ML_CLIENT_SECRET,
+        client_id: mlClientId,
+        client_secret: mlClientSecret,
       }),
     });
 

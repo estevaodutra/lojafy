@@ -65,13 +65,15 @@ serve(async (req) => {
       }
     }
 
-    // Aplicar configurações obtidas do banco
+    // Aplicar configurações obtidas do banco (prioridade máxima)
     if (platSettings) {
-      if (!mlClientId) mlClientId = platSettings.ml_client_id || undefined;
-      if (!mlClientSecret) mlClientSecret = platSettings.ml_client_secret || undefined;
-      // Se appUrl estiver vazio ou apontar incorretamente para o Supabase (contendo 'supabase'), usa o do banco
-      if (!appUrl || appUrl.includes('supabase')) {
-        appUrl = platSettings.app_url || undefined;
+      mlClientId = platSettings.ml_client_id || mlClientId || undefined;
+      mlClientSecret = platSettings.ml_client_secret || mlClientSecret || undefined;
+      // Se appUrl estiver configurado no banco, priorizar. Se não, usar o do env.
+      if (platSettings.app_url) {
+        appUrl = platSettings.app_url;
+      } else if (!appUrl || appUrl.includes('supabase')) {
+        appUrl = undefined;
       }
     }
 

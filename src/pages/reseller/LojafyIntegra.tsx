@@ -11,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { BetaWarningDialog } from '@/components/integrations/BetaWarningDialog';
+import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useToast } from '@/hooks/use-toast';
 import MlAnuncios from './MlAnuncios';
 import MlMensagens from './MlMensagens';
 import MlReplicar from './MlReplicar';
@@ -69,6 +71,8 @@ const NotConnected = () => (
 
 const LojafyIntegra = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const { settings: platformSettings } = usePlatformSettings();
   const [showBetaWarning, setShowBetaWarning] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'integracoes';
@@ -90,6 +94,24 @@ const LojafyIntegra = () => {
 
   const isConnected = !!mlIntegration;
 
+  // Exibir toast descritivo de erro caso redirecionado com ml_error
+  useEffect(() => {
+    const mlError = searchParams.get('ml_error');
+    if (mlError) {
+      toast({
+        title: 'Falha na Integração Mercado Livre',
+        description: `Não foi possível integrar a conta: ${decodeURIComponent(mlError)}`,
+        variant: 'destructive',
+      });
+      // Limpar parâmetro para não redisparar
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.delete('ml_error');
+        return next;
+      });
+    }
+  }, [searchParams, toast, setSearchParams]);
+
   // Auto-redirect para integracoes se não conectado e tenta acessar aba ML
   useEffect(() => {
     if (!isConnected && activeTab !== 'integracoes') {
@@ -99,7 +121,7 @@ const LojafyIntegra = () => {
 
   const getMercadoLivreAuthUrl = () => {
     const userId = user?.id || '';
-    const clientId = import.meta.env.VITE_ML_CLIENT_ID || '2003351424267574';
+    const clientId = platformSettings?.ml_client_id || import.meta.env.VITE_ML_CLIENT_ID || '2003351424267574';
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const redirectUri = `${supabaseUrl}/functions/v1/ml-oauth-callback`;
     return `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${userId}`;

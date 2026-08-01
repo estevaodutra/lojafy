@@ -11,12 +11,31 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
-const ML_CLIENT_ID = Deno.env.get('ML_CLIENT_ID') ?? '';
-const ML_CLIENT_SECRET = Deno.env.get('ML_CLIENT_SECRET') ?? '';
-
 // Returns a valid (refreshed if needed) access_token for the given user_id.
 // Can also be imported as a shared utility by other edge functions.
 export async function getValidToken(userId: string): Promise<{ access_token: string; ml_user_id: number }> {
+  // Load credentials from database first or fallback to environment variables
+  let mlClientId = Deno.env.get('ML_CLIENT_ID') || '';
+  let mlClientSecret = Deno.env.get('ML_CLIENT_SECRET') || '';
+
+  try {
+    const { data: platSettings } = await supabase
+      .from('platform_settings')
+      .select('ml_client_id, ml_client_secret')
+      .maybeSingle();
+
+    if (platSettings) {
+      if (platSettings.ml_client_id) mlClientId = platSettings.ml_client_id;
+      if (platSettings.ml_client_secret) mlClientSecret = platSettings.ml_client_secret;
+    }
+  } catch (dbErr) {
+    console.error('[ml-token-refresh] Failed to fetch credentials from platform_settings:', dbErr);
+  }
+
+  if (!mlClientId || !mlClientSecret) {
+    throw new Error('Mercado Livre credentials (client_id or client_secret) are not configured. Please configure them in Platform Settings.');
+  }
+
   const { data: integration, error } = await supabase
     .from('mercadolivre_integrations')
     .select('access_token, refresh_token, expires_at, ml_user_id, is_active')
@@ -46,8 +65,8 @@ export async function getValidToken(userId: string): Promise<{ access_token: str
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
     body: new URLSearchParams({
       grant_type: 'refresh_token',
-      client_id: ML_CLIENT_ID,
-      client_secret: ML_CLIENT_SECRET,
+      client_id: mlClientId,
+      client_secret: mlClientSecret,
       refresh_token: integration.refresh_token,
     }),
   });

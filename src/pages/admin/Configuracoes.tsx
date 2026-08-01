@@ -5,6 +5,7 @@ import NotificationsManagement from "./NotificationsManagement";
 import AIKnowledgeBase from "./AIKnowledgeBase";
 import ShippingCutoffSettings from "@/components/admin/ShippingCutoffSettings";
 import WalletSettings from "@/components/admin/WalletSettings";
+import { MercadoLivreSettings } from "@/components/admin/MercadoLivreSettings";
 
 const Configuracoes = () => {
   return (
@@ -19,6 +20,7 @@ const Configuracoes = () => {
       <Tabs defaultValue="platform" className="space-y-6">
         <TabsList>
           <TabsTrigger value="platform">Plataforma</TabsTrigger>
+          <TabsTrigger value="mercadolivre">Mercado Livre</TabsTrigger>
           <TabsTrigger value="shipping">Envio</TabsTrigger>
           <TabsTrigger value="wallet">Carteira</TabsTrigger>
           <TabsTrigger value="support">Suporte</TabsTrigger>
@@ -28,6 +30,10 @@ const Configuracoes = () => {
 
         <TabsContent value="platform" className="space-y-4">
           <Plataforma />
+        </TabsContent>
+
+        <TabsContent value="mercadolivre" className="space-y-4">
+          <MercadoLivreSettings />
         </TabsContent>
 
         <TabsContent value="shipping" className="space-y-4">
