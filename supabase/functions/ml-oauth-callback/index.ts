@@ -33,11 +33,24 @@ serve(async (req) => {
 
     const userId = state;
 
-    const ML_CLIENT_ID = Deno.env.get('ML_CLIENT_ID');
-    const ML_CLIENT_SECRET = Deno.env.get('ML_CLIENT_SECRET');
+    // 2. Tentar obter chaves do Deno.env ou como Fallback da tabela platform_settings
+    let mlClientId = Deno.env.get('ML_CLIENT_ID');
+    let mlClientSecret = Deno.env.get('ML_CLIENT_SECRET');
 
-    if (!ML_CLIENT_ID || !ML_CLIENT_SECRET) {
-      throw new Error('Configuração ausente no Supabase: ML_CLIENT_ID ou ML_CLIENT_SECRET não definidos.');
+    if (!mlClientId || !mlClientSecret) {
+      const { data: platSettings, error: platError } = await supabase
+        .from('platform_settings')
+        .select('ml_client_id, ml_client_secret')
+        .maybeSingle();
+
+      if (!platError && platSettings) {
+        mlClientId = platSettings.ml_client_id || undefined;
+        mlClientSecret = platSettings.ml_client_secret || undefined;
+      }
+    }
+
+    if (!mlClientId || !mlClientSecret) {
+      throw new Error('Configuração ausente: preencha as credenciais do Mercado Livre (ml_client_id e ml_client_secret) na tabela platform_settings do seu Supabase.');
     }
 
     const ML_REDIRECT_URI = Deno.env.get('ML_REDIRECT_URI') ?? `${supabaseUrl}/functions/v1/ml-oauth-callback`;
@@ -48,8 +61,8 @@ serve(async (req) => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
-        client_id: ML_CLIENT_ID,
-        client_secret: ML_CLIENT_SECRET,
+        client_id: mlClientId,
+        client_secret: mlClientSecret,
         code,
         redirect_uri: ML_REDIRECT_URI,
       }),
