@@ -218,3 +218,6 @@ verify_jwt = false
 
 [functions.ml-oauth-callback]
 verify_jwt = false
+
+[functions.ml-public-search]
+verify_jwt = false
