@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, FileSpreadsheet, Loader2, Search, Upload, XCircle, AlertTriangle } from 'lucide-react';
@@ -8,11 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { parseCsv, csvRowsToObjects, buildCsv, downloadCsv } from '@/lib/csv';
 import { supplierKeys } from '@/lib/supplierQueryKeys';
 import { useSupplierOrganization } from '@/hooks/supplier/useSupplierOrganization';
-import {
-  searchMlCandidates,
-  persistCandidates,
-  extractSearchKeywords,
-} from '@/services/productReferenceService';
+import { bulkImportService, type ImportState } from '@/services/bulkImportService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -85,9 +81,19 @@ const SupplierImport = () => {
 
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [results, setResults] = useState<RowResult[]>([]);
-  const [processing, setProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [autoSearch, setAutoSearch] = useState(true);
+  const [importState, setImportState] = useState<ImportState>({
+    status: 'idle',
+    progress: 0,
+    processed: 0,
+    total: 0,
+  });
+
+  useEffect(() => {
+    const unsubscribe = bulkImportService.subscribe((state) => {
+      setImportState(state);
+    });
+    return unsubscribe;
+  }, []);
 
   const onDrop = useCallback(async (accepted: File[]) => {
     const file = accepted[0];
@@ -96,13 +102,13 @@ const SupplierImport = () => {
     const parsed = csvRowsToObjects(parseCsv(text)).map(parseRow);
     setRows(parsed);
     setResults(parsed.map(() => 'pending'));
-    setProgress(0);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'text/csv': ['.csv'], 'text/plain': ['.txt'] },
     maxFiles: 1,
+    disabled: importState.status === 'processing',
   });
 
   const downloadTemplate = () => {
@@ -120,80 +126,83 @@ const SupplierImport = () => {
   const runImport = async () => {
     const validRows = rows.filter((r) => r.errors.length === 0);
     if (validRows.length === 0) return;
-    setProcessing(true);
 
     const userId = getEffectiveUserId();
-    const updated = [...results];
+    if (!userId) return;
 
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      if (row.errors.length > 0) {
-        updated[i] = 'error';
-        continue;
-      }
-      try {
-        const { data: product, error } = await supabase
-          .from('products')
-          .insert({
-            name: row.title,
-            description: row.description,
-            price: row.price,
-            weight: row.weight,
-            height: row.height,
-            width: row.width,
-            length: row.length,
-            main_image_url: row.photo_url,
-            image_url: row.photo_url,
-            images: row.photo_urls,
-            supplier_id: userId!,
-            supplier_organization_id: orgData?.organization.id,
-            stage: 'stage_1_basic',
-            active: false,
-            approval_status: 'draft',
-          })
-          .select('id')
-          .single();
-        if (error) throw error;
-        updated[i] = 'inserted';
+    const items = validRows.map((r) => ({
+      title: r.title,
+      description: r.description,
+      price: r.price,
+      weight: r.weight,
+      height: r.height,
+      width: r.width,
+      length: r.length,
+      photo_url: r.photo_url,
+      photo_urls: r.photo_urls,
+    }));
 
-        if (autoSearch) {
-          updated[i] = 'searching';
-          setResults([...updated]);
-          try {
-            const candidates = await searchMlCandidates({ name: row.title, price: row.price });
-            if (candidates.length > 0) {
-              await persistCandidates(product.id, extractSearchKeywords(row.title), candidates);
-              updated[i] = 'candidates_found';
-            } else {
-              updated[i] = 'inserted';
-            }
-          } catch {
-            updated[i] = 'inserted';
-          }
+    toast({
+      title: 'Importação Iniciada',
+      description: 'A importação está rodando em segundo plano. Você pode navegar para outras páginas normalmente!',
+    });
+
+    setRows([]);
+
+    bulkImportService.startImport(
+      items,
+      userId,
+      orgData?.organization.id,
+      (inserted, errors) => {
+        toast({
+          title: 'Importação Concluída',
+          description: `${inserted} produtos importados com sucesso.${errors > 0 ? ` ${errors} falharam.` : ''}`,
+        });
+        if (orgData) {
+          queryClient.invalidateQueries({ queryKey: supplierKeys.scope(orgData.organization.id) });
         }
-      } catch {
-        updated[i] = 'error';
       }
-      setResults([...updated]);
-      setProgress(Math.round(((i + 1) / rows.length) * 100));
-    }
-
-    setProcessing(false);
-    if (orgData) queryClient.invalidateQueries({ queryKey: supplierKeys.scope(orgData.organization.id) });
-    const inserted = updated.filter((r) => r === 'inserted' || r === 'candidates_found').length;
-    toast({ title: `${inserted} produtos importados no Estágio 1` });
+    ).catch((err) => {
+      toast({
+        title: 'Erro ao iniciar importação',
+        description: err.message,
+        variant: 'destructive',
+      });
+    });
   };
 
   const validCount = rows.filter((r) => r.errors.length === 0).length;
 
   return (
     <div className="max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Importação de Produtos</h1>
-        <p className="text-muted-foreground">
-          Planilha de 8 colunas → cadastro em massa no Estágio 1, com busca automática de referências
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Importação de Produtos</h1>
+          <p className="text-muted-foreground">
+            Planilha de 8 colunas → cadastro de produtos em massa no Estágio 1.
+          </p>
+        </div>
+        {importState.status === 'processing' && (
+          <div className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-xs font-semibold animate-pulse">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span>Processando em segundo plano</span>
+          </div>
+        )}
       </div>
+
+      {importState.status === 'processing' && (
+        <Card className="border border-primary/20 bg-primary/5 shadow-sm">
+          <CardContent className="py-4 flex items-center justify-between gap-4">
+            <div className="flex-1 space-y-1">
+              <div className="flex justify-between text-sm font-medium">
+                <span>Importando produtos em segundo plano...</span>
+                <span>{importState.processed} de {importState.total} ({importState.progress}%)</span>
+              </div>
+              <Progress value={importState.progress} className="h-2" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -261,21 +270,11 @@ const SupplierImport = () => {
               ))}
             </ScrollArea>
 
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="auto-search"
-                checked={autoSearch}
-                onCheckedChange={(c) => setAutoSearch(!!c)}
-              />
-              <Label htmlFor="auto-search" className="text-sm">
-                Buscar referências no Mercado Livre automaticamente após importar
-              </Label>
-            </div>
-
-            {processing && <Progress value={progress} />}
-
-            <Button onClick={runImport} disabled={validCount === 0 || processing}>
-              {processing ? (
+            <Button 
+              onClick={runImport} 
+              disabled={validCount === 0 || importState.status === 'processing'}
+            >
+              {importState.status === 'processing' ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Upload className="mr-2 h-4 w-4" />
