@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSupplierPendingProducts, useSupplierApprovalStats } from "@/hooks/useSupplierPendingProducts";
+import { useSupplierOrganization } from "@/hooks/supplier/useSupplierOrganization";
 import { Clock, CheckCircle, XCircle, Package, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -21,8 +22,11 @@ const ProductApproval = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   
-  const { data: products = [], isLoading, refetch } = useSupplierPendingProducts();
-  const { data: stats } = useSupplierApprovalStats();
+  const { data: orgData } = useSupplierOrganization();
+  const orgId = orgData?.organization.id;
+  
+  const { data: products = [], isLoading, refetch } = useSupplierPendingProducts(orgId);
+  const { data: stats } = useSupplierApprovalStats(orgId);
   
   const approvedProducts = products.filter(p => p.approval_status === 'approved');
   const rejectedProducts = products.filter(p => p.approval_status === 'rejected');

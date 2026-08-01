@@ -1,14 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 
-export const useSupplierPendingProducts = () => {
-  const { user } = useAuth();
-
+export const useSupplierPendingProducts = (orgId?: string) => {
   return useQuery({
-    queryKey: ['supplier-pending-products', user?.id],
+    queryKey: ['supplier-pending-products', orgId],
     queryFn: async () => {
-      if (!user?.id) throw new Error('User not authenticated');
+      if (!orgId) return [];
 
       const { data, error } = await supabase
         .from('products')
@@ -20,29 +17,27 @@ export const useSupplierPendingProducts = () => {
             slug
           )
         `)
-        .eq('supplier_id', user.id)
+        .eq('supplier_organization_id', orgId)
         .in('approval_status', ['pending_approval', 'approved', 'rejected'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data;
     },
-    enabled: !!user?.id,
+    enabled: !!orgId,
   });
 };
 
-export const useSupplierApprovalStats = () => {
-  const { user } = useAuth();
-
+export const useSupplierApprovalStats = (orgId?: string) => {
   return useQuery({
-    queryKey: ['supplier-approval-stats', user?.id],
+    queryKey: ['supplier-approval-stats', orgId],
     queryFn: async () => {
-      if (!user?.id) throw new Error('User not authenticated');
+      if (!orgId) return { pending: 0, approved: 0, rejected: 0 };
 
       const { data, error } = await supabase
         .from('products')
         .select('approval_status')
-        .eq('supplier_id', user.id);
+        .eq('supplier_organization_id', orgId);
 
       if (error) throw error;
 
@@ -52,6 +47,6 @@ export const useSupplierApprovalStats = () => {
 
       return { pending, approved, rejected };
     },
-    enabled: !!user?.id,
+    enabled: !!orgId,
   });
 };
