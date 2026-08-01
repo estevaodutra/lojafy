@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { GtinStatusBadge, StageBadge } from '@/components/supplier/products/GtinStatusBadge';
 import { ReferenceSearchGallery } from '@/components/supplier/products/ReferenceSearchGallery';
 import { ReferenceImportModal } from '@/components/supplier/products/ReferenceImportModal';
