@@ -146,6 +146,7 @@ const SupplierImport = () => {
             image_url: row.photo_url,
             images: row.photo_urls,
             supplier_id: userId!,
+            supplier_organization_id: orgData?.organization.id,
             stage: 'stage_1_basic',
             active: false,
             approval_status: 'draft',
