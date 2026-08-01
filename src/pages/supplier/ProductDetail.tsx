@@ -61,25 +61,15 @@ const SupplierProductDetail = () => {
     if (!mlId || candidateDescriptions[mlId]) return;
     
     try {
-      const { data: searchData, error: searchError } = await supabase.functions.invoke('ml-public-search', {
-        body: { path: `/sites/MLB/search?product_id=${mlId}&limit=1` }
+      const { data: detailData, error: detailError } = await supabase.functions.invoke('ml-public-search', {
+        body: { path: `/products/${mlId}` }
       });
-      if (searchError) throw searchError;
+      if (detailError) throw detailError;
       
-      const itemId = searchData?.results?.[0]?.id;
-      if (itemId) {
-        const { data: descData, error: descError } = await supabase.functions.invoke('ml-public-search', {
-          body: { path: `/items/${itemId}/description` }
-        });
-        if (descError) throw descError;
-        
-        const descText = descData?.plain_text || descData?.text || 'Sem descrição cadastrada.';
-        setCandidateDescriptions(prev => ({ ...prev, [mlId]: descText }));
-      } else {
-        setCandidateDescriptions(prev => ({ ...prev, [mlId]: 'Descrição indisponível no Mercado Livre.' }));
-      }
+      const descText = detailData?.short_description?.content || 'Sem descrição cadastrada.';
+      setCandidateDescriptions(prev => ({ ...prev, [mlId]: descText }));
     } catch (err) {
-      console.error('Erro ao buscar descrição:', err);
+      console.error('Erro ao buscar descrição do catálogo:', err);
       setCandidateDescriptions(prev => ({ ...prev, [mlId]: 'Erro ao carregar descrição.' }));
     }
   };
@@ -103,8 +93,9 @@ const SupplierProductDetail = () => {
       if (detailError) throw detailError;
       setOverviewDetail(detailData);
 
-      // 2. Disparar a busca da descrição em paralelo se ainda não estiver carregada
-      await ensureDescriptionLoaded(candidate);
+      // 2. Extrair e salvar a descrição a partir do mesmo payload
+      const descText = detailData?.short_description?.content || 'Sem descrição cadastrada.';
+      setCandidateDescriptions(prev => ({ ...prev, [mlId]: descText }));
     } catch (err) {
       console.error('Erro ao carregar detalhes em tempo real do Mercado Livre:', err);
       toast({
