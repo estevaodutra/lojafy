@@ -51,6 +51,8 @@ const SupplierProductDetail = () => {
 
   const [importCandidate, setImportCandidate] = useState<ReferenceCandidate | null>(null);
   const [overviewCandidate, setOverviewCandidate] = useState<ReferenceCandidate | null>(null);
+  const [overviewDetail, setOverviewDetail] = useState<any | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [candidateDescriptions, setCandidateDescriptions] = useState<Record<string, string>>({});
   const { search, doImport } = useReferenceMutations(id);
 
@@ -82,9 +84,37 @@ const SupplierProductDetail = () => {
     }
   };
 
-  const handleViewOverview = (candidate: ReferenceCandidate) => {
+  const handleViewOverview = async (candidate: ReferenceCandidate) => {
     setOverviewCandidate(candidate);
-    ensureDescriptionLoaded(candidate);
+    setOverviewDetail(null);
+    setLoadingDetail(true);
+    
+    const mlId = candidate.ml_item_id;
+    if (!mlId) {
+      setLoadingDetail(false);
+      return;
+    }
+
+    try {
+      // 1. Fazer requisição em tempo real pro ML para obter todos os detalhes de catálogo
+      const { data: detailData, error: detailError } = await supabase.functions.invoke('ml-public-search', {
+        body: { path: `/products/${mlId}` }
+      });
+      if (detailError) throw detailError;
+      setOverviewDetail(detailData);
+
+      // 2. Disparar a busca da descrição em paralelo se ainda não estiver carregada
+      await ensureDescriptionLoaded(candidate);
+    } catch (err) {
+      console.error('Erro ao carregar detalhes em tempo real do Mercado Livre:', err);
+      toast({
+        title: 'Erro de conexão',
+        description: 'Não foi possível carregar os detalhes do Mercado Livre em tempo real.',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoadingDetail(false);
+    }
   };
 
   const handleSelectImport = (candidate: ReferenceCandidate) => {
@@ -229,56 +259,74 @@ const SupplierProductDetail = () => {
           <DialogHeader>
             <DialogTitle>Visão Geral do Produto de Referência</DialogTitle>
             <DialogDescription>
-              Ficha técnica, especificações e descrição oficial do catálogo do Mercado Livre.
+              Ficha técnica, especificações e descrição oficial obtidas em tempo real do catálogo do Mercado Livre.
             </DialogDescription>
           </DialogHeader>
 
           {overviewCandidate && (
             <div className="space-y-6 pt-4">
+              {/* Cabeçalho do Produto */}
               <div className="flex items-start gap-4">
-                {overviewCandidate.image_url && (
-                  <img
-                    src={overviewCandidate.image_url}
-                    alt=""
-                    className="h-28 w-28 rounded-md border object-contain bg-white"
-                  />
-                )}
-                <div className="space-y-1">
-                  <h4 className="font-semibold text-lg">{overviewCandidate.title}</h4>
+                {(() => {
+                  const imageUrl = overviewDetail?.pictures?.[0]?.secure_url || 
+                                   overviewDetail?.pictures?.[0]?.url || 
+                                   overviewCandidate.image_url;
+                  return imageUrl && (
+                    <img
+                      src={imageUrl}
+                      alt=""
+                      className="h-28 w-28 rounded-md border object-contain bg-white"
+                    />
+                  );
+                })()}
+                
+                <div className="space-y-1 flex-1">
+                  <h4 className="font-semibold text-lg">
+                    {overviewDetail?.name || overviewCandidate.title}
+                  </h4>
                   <p className="text-xl font-bold text-primary">
-                    {overviewCandidate.price != null
-                      ? overviewCandidate.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-                      : 'Preço sob consulta'}
+                    {(() => {
+                      const price = overviewDetail?.price ?? overviewCandidate.price;
+                      return price != null
+                        ? price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                        : 'Preço sob consulta';
+                    })()}
                   </p>
+                  
                   <div className="flex flex-wrap gap-2 pt-1">
-                    {overviewCandidate.brand && (
-                      <span className="text-xs bg-muted px-2 py-0.5 rounded-full font-medium">
-                        Marca: {overviewCandidate.brand}
-                      </span>
-                    )}
-                    {overviewCandidate.model && (
-                      <span className="text-xs bg-muted px-2 py-0.5 rounded-full font-medium">
-                        Modelo: {overviewCandidate.model}
-                      </span>
-                    )}
-                    {overviewCandidate.ml_item_id && (
-                      <span className="text-xs bg-muted px-2 py-0.5 rounded-full font-mono">
-                        ID: {overviewCandidate.ml_item_id}
-                      </span>
-                    )}
+                    {(() => {
+                      const brand = overviewDetail?.attributes?.find((a: any) => a.id === 'BRAND')?.value_name || overviewCandidate.brand;
+                      return brand && (
+                        <span className="text-xs bg-muted px-2 py-0.5 rounded-full font-medium">
+                          Marca: {brand}
+                        </span>
+                      );
+                    })()}
+                    {(() => {
+                      const model = overviewDetail?.attributes?.find((a: any) => a.id === 'MODEL')?.value_name || overviewCandidate.model;
+                      return model && (
+                        <span className="text-xs bg-muted px-2 py-0.5 rounded-full font-medium">
+                          Modelo: {model}
+                        </span>
+                      );
+                    })()}
+                    <span className="text-xs bg-muted px-2 py-0.5 rounded-full font-mono">
+                      ID: {overviewCandidate.ml_item_id}
+                    </span>
                   </div>
                 </div>
               </div>
 
+              {/* Descrição */}
               <div>
-                <h5 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                  Descrição do Produto de Referência
+                <h5 className="font-semibold text-sm mb-2">
+                  Descrição do Produto
                 </h5>
                 <div className="rounded-md border p-4 bg-muted/10 text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed max-h-[250px] overflow-y-auto font-sans">
                   {candidateDescriptions[overviewCandidate.ml_item_id] === undefined ? (
-                    <div className="flex items-center gap-2 py-2">
+                    <div className="flex items-center gap-2 py-1">
                       <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                      <span>Buscando descrição oficial no catálogo do Mercado Livre...</span>
+                      <span>Buscando descrição em tempo real...</span>
                     </div>
                   ) : (
                     candidateDescriptions[overviewCandidate.ml_item_id]
@@ -288,28 +336,40 @@ const SupplierProductDetail = () => {
 
               <Separator />
 
+              {/* Ficha Técnica */}
               <div>
-                <h5 className="font-semibold text-sm mb-3">Atributos e Ficha Técnica</h5>
-                <div className="border rounded-md overflow-hidden bg-muted/20">
-                  <div className="grid grid-cols-2 bg-muted/40 font-medium text-xs border-b py-2 px-3">
-                    <div>Nome do Atributo</div>
-                    <div>Valor Especificado</div>
+                <h5 className="font-semibold text-sm mb-3">Ficha Técnica e Atributos</h5>
+                
+                {loadingDetail ? (
+                  <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground border rounded-md border-dashed">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    <span>Carregando atributos em tempo real da API do Mercado Livre...</span>
                   </div>
-                  <div className="divide-y text-sm">
-                    {((overviewCandidate.raw_data as any)?.attributes?.length ?? 0) === 0 ? (
-                      <div className="py-4 text-center text-muted-foreground text-xs">
-                        Nenhum atributo adicional disponível.
-                      </div>
-                    ) : (
-                      (overviewCandidate.raw_data as any).attributes.map((attr: any) => (
-                        <div key={attr.id} className="grid grid-cols-2 py-2 px-3 gap-4 hover:bg-muted/10">
-                          <div className="font-medium text-muted-foreground text-xs">{attr.name || attr.id}</div>
-                          <div className="text-xs font-semibold">{attr.value_name || '—'}</div>
-                        </div>
-                      ))
-                    )}
+                ) : (
+                  <div className="border rounded-md overflow-hidden bg-muted/20">
+                    <div className="grid grid-cols-2 bg-muted/40 font-medium text-xs border-b py-2 px-3">
+                      <div>Nome do Atributo</div>
+                      <div>Valor Especificado</div>
+                    </div>
+                    <div className="divide-y text-sm">
+                      {(() => {
+                        const attributes = overviewDetail?.attributes || (overviewCandidate.raw_data as any)?.attributes || [];
+                        return attributes.length === 0 ? (
+                          <div className="py-4 text-center text-muted-foreground text-xs">
+                            Nenhum atributo adicional disponível.
+                          </div>
+                        ) : (
+                          attributes.map((attr: any) => (
+                            <div key={attr.id} className="grid grid-cols-2 py-2 px-3 gap-4 hover:bg-muted/10">
+                              <div className="font-medium text-muted-foreground text-xs">{attr.name || attr.id}</div>
+                              <div className="text-xs font-semibold">{attr.value_name || '—'}</div>
+                            </div>
+                          ))
+                        );
+                      })()}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}
