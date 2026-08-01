@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
 serve(async (req) => {
   const url = new URL(req.url);
@@ -18,8 +17,6 @@ serve(async (req) => {
       throw new Error('Configuração ausente no Supabase: SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não definidos.');
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
     // ML authorization error (user denied or app misconfigured)
     if (error) {
       console.error('[ml-oauth] ML returned error:', error, url.searchParams.get('error_description'));
@@ -33,19 +30,26 @@ serve(async (req) => {
 
     const userId = state;
 
-    // 2. Tentar obter chaves do Deno.env ou como Fallback da tabela platform_settings
+    // 2. Obter chaves do Deno.env ou como Fallback via API REST nativa (para evitar imports externos de SDK)
     let mlClientId = Deno.env.get('ML_CLIENT_ID');
     let mlClientSecret = Deno.env.get('ML_CLIENT_SECRET');
 
     if (!mlClientId || !mlClientSecret) {
-      const { data: platSettings, error: platError } = await supabase
-        .from('platform_settings')
-        .select('ml_client_id, ml_client_secret')
-        .maybeSingle();
+      const platRes = await fetch(`${supabaseUrl}/rest/v1/platform_settings?select=ml_client_id,ml_client_secret`, {
+        headers: {
+          'apikey': supabaseServiceKey,
+          'Authorization': `Bearer ${supabaseServiceKey}`
+        }
+      });
 
-      if (!platError && platSettings) {
-        mlClientId = platSettings.ml_client_id || undefined;
-        mlClientSecret = platSettings.ml_client_secret || undefined;
+      if (platRes.ok) {
+        const platSettingsList = await platRes.json();
+        if (platSettingsList && platSettingsList.length > 0) {
+          mlClientId = platSettingsList[0].ml_client_id || undefined;
+          mlClientSecret = platSettingsList[0].ml_client_secret || undefined;
+        }
+      } else {
+        console.error('[ml-oauth] Failed to fetch platform_settings via REST API:', platRes.status);
       }
     }
 
@@ -92,10 +96,16 @@ serve(async (req) => {
 
     const expiresAt = new Date(Date.now() + (expires_in ?? 21600) * 1000).toISOString();
 
-    // Save integration to database
-    const { error: dbError } = await supabase
-      .from('mercadolivre_integrations')
-      .upsert({
+    // Save integration to database via REST API POST (upsert)
+    const dbRes = await fetch(`${supabaseUrl}/rest/v1/mercadolivre_integrations`, {
+      method: 'POST',
+      headers: {
+        'apikey': supabaseServiceKey,
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({
         user_id: userId,
         access_token,
         refresh_token: refresh_token ?? null,
@@ -107,11 +117,13 @@ serve(async (req) => {
         is_active: true,
         last_refreshed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id' });
+      })
+    });
 
-    if (dbError) {
-      console.error('[ml-oauth] DB upsert error:', dbError);
-      throw new Error(`Erro ao salvar no banco de dados: ${dbError.message}`);
+    if (!dbRes.ok) {
+      const dbErrText = await dbRes.text();
+      console.error('[ml-oauth] DB REST upsert error:', dbRes.status, dbErrText);
+      throw new Error(`Erro ao salvar no banco de dados (REST HTTP ${dbRes.status}): ${dbErrText}`);
     }
 
     console.log(`✅ [ml-oauth] Integration saved for user ${userId}, ML user ${mlUserId}`);
