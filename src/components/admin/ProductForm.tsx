@@ -24,6 +24,20 @@ import { VariantsManager, ProductVariant } from './VariantsManager';
 import { DimensionsInput } from './DimensionsInput';
 import { CategoryCreationModal } from './CategoryCreationModal';
 import { SubcategoryCreationModal } from './SubcategoryCreationModal';
+import { useQueryClient } from '@tanstack/react-query';
+
+const generateRandomEan13 = (): string => {
+  let ean = '789';
+  for (let i = 0; i < 9; i++) {
+    ean += Math.floor(Math.random() * 10).toString();
+  }
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += parseInt(ean[i]) * (i % 2 === 0 ? 1 : 3);
+  }
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return ean + checkDigit.toString();
+};
 
 const productSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório').max(255, 'Nome muito longo'),
@@ -32,7 +46,7 @@ const productSchema = z.object({
   price: z.coerce.number().min(0.01, 'Preço de venda deve ser maior que zero').optional(),
   original_price: z.coerce.number().min(0, 'Preço promocional não pode ser negativo').optional(),
   use_auto_pricing: z.boolean().default(false),
-  category_id: z.string().uuid('Selecione uma categoria válida'),
+  category_id: z.string().optional().or(z.literal('')),
   subcategory_id: z.string().optional(),
   brand: z.string().optional(),
   sku: z.string().optional(),
@@ -61,10 +75,129 @@ interface ProductFormProps {
 }
 
 const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel }) => {
+  const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { isSuperAdmin, isSupplier } = useUserRole();
   const { user } = useAuth();
   const { settings } = usePlatformSettings();
+
+  const ensureCategory = async (productName: string, domainId?: string): Promise<string> => {
+    const lowerName = productName.toLowerCase();
+    const keywordMap = [
+      { keywords: ['bolo', 'doce', 'confeitaria', 'sobremesa', 'chocolate'], categoryName: 'Bolos e Confeitaria' },
+      { keywords: ['ventilador', 'climatizador', 'ar condicionado', 'aquecedor'], categoryName: 'Eletrodomésticos' },
+      { keywords: ['celular', 'smartphone', 'telefone', 'capinha', 'carregador'], categoryName: 'Celulares e Acessórios' },
+      { keywords: ['fone', 'headphone', 'caixa de som', 'audio'], categoryName: 'Eletrônicos e Áudio' },
+      { keywords: ['camiseta', 'calça', 'vestido', 'roupa', 'meia', 'casaco'], categoryName: 'Moda e Vestuário' },
+      { keywords: ['copo', 'prato', 'panela', 'cozinha', 'talher'], categoryName: 'Cozinha e Casa' },
+    ];
+
+    let targetCategoryName = 'Geral';
+    
+    for (const mapping of keywordMap) {
+      if (mapping.keywords.some(kw => lowerName.includes(kw))) {
+        targetCategoryName = mapping.categoryName;
+        break;
+      }
+    }
+
+    if (domainId && targetCategoryName === 'Geral') {
+      const mlDomainMap: Record<string, string> = {
+        'MLB-FANS': 'Ventiladores e Climatização',
+        'MLB-CELLPHONES': 'Celulares e Acessórios',
+        'MLB-SMARTWATCHES': 'Relógios e Smartwatches',
+        'MLB-HEADPHONES': 'Áudio e Fones',
+        'MLB-CAKES': 'Bolos e Doces',
+        'MLB-COFFEEMAKERS': 'Cafeteiras e Eletro',
+        'MLB-AIR_CONDITIONERS': 'Ar Condicionado',
+        'MLB-SHOES': 'Calçados',
+        'MLB-T_SHIRTS': 'Camisetas e Moda',
+        'MLB-PANTS': 'Calças e Moda',
+      };
+      const mapped = mlDomainMap[domainId.toUpperCase()];
+      if (mapped) {
+        targetCategoryName = mapped;
+      }
+    }
+
+    const existing = categories.find((cat: any) => cat.name.toLowerCase() === targetCategoryName.toLowerCase());
+    if (existing) {
+      return existing.id;
+    }
+
+    const slug = targetCategoryName
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '');
+
+    try {
+      const { data: newCat, error } = await supabase
+        .from('categories')
+        .insert({
+          name: targetCategoryName,
+          slug: slug,
+          active: true
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      
+      return newCat.id;
+    } catch (e) {
+      console.error('Erro ao criar categoria automática:', e);
+      if (categories.length > 0) {
+        return categories[0].id;
+      }
+      throw new Error('Nenhuma categoria disponível.');
+    }
+  };
+
+  const watchedName = form.watch('name');
+
+  useEffect(() => {
+    if (watchedName && categories.length > 0) {
+      const currentCategory = form.getValues('category_id');
+      if (!currentCategory || currentCategory === '') {
+        const lowerName = watchedName.toLowerCase();
+        const keywordMap = [
+          { keywords: ['bolo', 'doce', 'confeitaria', 'sobremesa', 'chocolate'], categoryName: 'Bolos e Confeitaria' },
+          { keywords: ['ventilador', 'climatizador', 'ar condicionado', 'aquecedor'], categoryName: 'Eletrodomésticos' },
+          { keywords: ['celular', 'smartphone', 'telefone', 'capinha', 'carregador'], categoryName: 'Celulares e Acessórios' },
+          { keywords: ['fone', 'headphone', 'caixa de som', 'audio'], categoryName: 'Eletrônicos e Áudio' },
+          { keywords: ['camiseta', 'calça', 'vestido', 'roupa', 'meia', 'casaco'], categoryName: 'Moda e Vestuário' },
+          { keywords: ['copo', 'prato', 'panela', 'cozinha', 'talher'], categoryName: 'Cozinha e Casa' },
+        ];
+
+        let matchedCategory = null;
+        for (const mapping of keywordMap) {
+          if (mapping.keywords.some(kw => lowerName.includes(kw))) {
+            const found = categories.find((cat: any) => cat.name.toLowerCase() === mapping.categoryName.toLowerCase());
+            if (found) {
+              matchedCategory = found.id;
+              break;
+            }
+          }
+        }
+
+        if (!matchedCategory) {
+          const foundDirect = categories.find((cat: any) => lowerName.includes(cat.name.toLowerCase()));
+          if (foundDirect) {
+            matchedCategory = foundDirect.id;
+          }
+        }
+
+        if (matchedCategory) {
+          form.setValue('category_id', matchedCategory);
+        }
+      }
+    }
+  }, [watchedName, categories, form]);
+
   const [specifications, setSpecifications] = useState<{ key: string; value: string }[]>(() => {
     // First try to load from specifications (legacy format: {key: value})
     // Filter out null/empty values to avoid using empty legacy data over real attributes
@@ -176,9 +309,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
   const watchedUseAutoPricing = form.watch('use_auto_pricing');
   const watchedReferenceUrl = form.watch('reference_ad_url');
 
-  // Auto-calculate price based on cost_price (only for super_admin with auto pricing enabled)
+  // Auto-calculate price based on cost_price with auto pricing enabled
   useEffect(() => {
-    if (isSuperAdmin() && settings && watchedUseAutoPricing) {
+    if (settings && watchedUseAutoPricing) {
       const costPrice = Number(watchedCostPrice);
       // Só calcular se for número válido e maior que zero
       if (!isNaN(costPrice) && costPrice > 0) {
@@ -191,7 +324,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         form.setValue('price', calculatedPrice);
       }
     }
-  }, [watchedCostPrice, watchedUseAutoPricing, settings, isSuperAdmin, form]);
+  }, [watchedCostPrice, watchedUseAutoPricing, settings, form]);
 
   // Auto-set featured when reference_ad_url is filled
   useEffect(() => {
@@ -389,6 +522,32 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
       const imageUrls = images.map(img => img.url || img.preview).filter(Boolean);
       const mainImageUrl = imageUrls.length > 0 ? imageUrls[0] : null;
 
+      // 1. Categorização Automática
+      let finalCategoryId = data.category_id;
+      if (!finalCategoryId || finalCategoryId === '') {
+        try {
+          const domainId = product?.domain_id || (product?.raw_data as any)?.domain_id;
+          finalCategoryId = await ensureCategory(data.name, domainId);
+        } catch (catErr) {
+          console.error('Erro ao categorizar automaticamente:', catErr);
+        }
+      }
+
+      // 2. Geração Automática de GTIN
+      let finalGtin = data.gtin_ean13 || null;
+      if (!finalGtin) {
+        try {
+          const { data: remoteGtin } = await supabase.rpc('generate_gtin_ean13');
+          if (remoteGtin) {
+            finalGtin = remoteGtin;
+          } else {
+            finalGtin = generateRandomEan13();
+          }
+        } catch {
+          finalGtin = generateRandomEan13();
+        }
+      }
+
       // Prepare product data
       const productData: any = {
         name: data.name,
@@ -397,11 +556,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         price: data.price,
         original_price: data.original_price || null,
         use_auto_pricing: data.use_auto_pricing,
-        category_id: data.category_id,
+        category_id: finalCategoryId || null,
         subcategory_id: data.subcategory_id === 'none' ? null : data.subcategory_id,
         brand: data.brand || null,
         sku: data.sku || null, // Will be auto-generated if empty
-        gtin_ean13: data.gtin_ean13 || null, // Will be auto-generated if empty
+        gtin_ean13: finalGtin,
         stock_quantity: data.stock_quantity,
         min_stock_level: data.min_stock_level,
         low_stock_alert: data.low_stock_alert,
@@ -850,12 +1009,12 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
               <div>
                 <CardTitle>Preços</CardTitle>
                 <CardDescription>
-                  {isSuperAdmin() && watchedUseAutoPricing 
+                  {watchedUseAutoPricing 
                     ? 'Precificação automática baseada no custo' 
                     : 'Configuração de valores e margem de lucro'}
                 </CardDescription>
               </div>
-              {isSuperAdmin() && watchedUseAutoPricing && (
+              {watchedUseAutoPricing && (
                 <Badge variant="secondary" className="gap-1">
                   <RefreshCw className="h-3 w-3" />
                   Automático
@@ -864,30 +1023,28 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {isSuperAdmin() && (
-              <FormField
-                control={form.control}
-                name="use_auto_pricing"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border border-border p-4 bg-muted/30">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">
-                        Precificação Automática
-                      </FormLabel>
-                      <FormDescription>
-                        Calcular preço automaticamente com base no custo, margem e taxas da plataforma
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            )}
+            <FormField
+              control={form.control}
+              name="use_auto_pricing"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border border-border p-4 bg-muted/30">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">
+                      Precificação Automática
+                    </FormLabel>
+                    <FormDescription>
+                      Calcular preço automaticamente com base no custo, margem e taxas da plataforma
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField
@@ -923,13 +1080,13 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
                         type="number" 
                         step="0.01" 
                         placeholder="0,00" 
-                        readOnly={isSuperAdmin() && watchedUseAutoPricing}
-                        className={isSuperAdmin() && watchedUseAutoPricing ? 'bg-muted cursor-not-allowed' : ''}
+                        readOnly={watchedUseAutoPricing}
+                        className={watchedUseAutoPricing ? 'bg-muted cursor-not-allowed' : ''}
                         {...field}
                       />
                     </FormControl>
                     <FormDescription>
-                      {isSuperAdmin() && watchedUseAutoPricing 
+                      {watchedUseAutoPricing 
                         ? 'Calculado automaticamente' 
                         : 'Preço principal do produto'}
                     </FormDescription>
@@ -962,7 +1119,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
             </div>
 
             {/* Automatic Price Breakdown */}
-            {isSuperAdmin() && watchedUseAutoPricing && priceBreakdown && (
+            {watchedUseAutoPricing && priceBreakdown && (
               <div className="bg-primary/5 p-4 rounded-lg border border-primary/10">
                 <div className="flex items-center gap-2 mb-3">
                   <RefreshCw className="h-4 w-4 text-primary" />
@@ -997,7 +1154,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
             )}
 
             {/* Manual Profit Calculation (for non-super-admin or when auto pricing is disabled) */}
-            {(!isSuperAdmin() || !watchedUseAutoPricing) && (() => {
+            {!watchedUseAutoPricing && (() => {
               const costPrice = form.watch('cost_price');
               const salePrice = form.watch('price');
               
@@ -1196,7 +1353,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
           onVariantsChange={setVariants}
           platformSettings={settings}
           productCostPrice={Number(watchedCostPrice) || 0}
-          useAutoPricing={isSuperAdmin() && !!watchedUseAutoPricing}
+          useAutoPricing={!!watchedUseAutoPricing}
         />
 
         {/* Settings */}
