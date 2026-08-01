@@ -81,6 +81,21 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
   const { user } = useAuth();
   const { settings } = usePlatformSettings();
 
+  // Fetch categories (moved to top of component to avoid initialization order ReferenceError)
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('active', true)
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const ensureCategory = async (productName: string, domainId?: string): Promise<string> => {
     const lowerName = productName.toLowerCase();
     const keywordMap = [
@@ -426,21 +441,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
   };
 
   const priceBreakdown = getPriceBreakdown();
-
-  // Fetch categories
-  const { data: categories = [], isLoading: categoriesLoading } = useQuery({
-    queryKey: ['categories'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .eq('active', true)
-        .order('name');
-      
-      if (error) throw error;
-      return data;
-    },
-  });
 
   // Fetch subcategories based on selected category
   const { data: subcategories = [], isLoading: subcategoriesLoading } = useQuery({
