@@ -6,7 +6,8 @@ serve(async (req) => {
   const state = url.searchParams.get('state'); // user_id
   const error = url.searchParams.get('error');
 
-  const APP_URL = Deno.env.get('APP_URL') ?? 'https://lojafy.app';
+  // Fallbacks temporários caso o banco ou Deno falhem
+  let finalAppUrl = 'https://lojafy.app'; 
 
   try {
     // 1. Validar se variáveis básicas do Supabase estão no ambiente (evitando crash no topo)
@@ -17,12 +18,43 @@ serve(async (req) => {
       throw new Error('Configuração ausente no Supabase: SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não definidos.');
     }
 
+    // 2. Tentar obter chaves e APP_URL do Deno.env ou do banco de dados (tabela platform_settings)
+    let mlClientId = Deno.env.get('ML_CLIENT_ID');
+    let mlClientSecret = Deno.env.get('ML_CLIENT_SECRET');
+    let appUrl = Deno.env.get('APP_URL');
+
+    const platRes = await fetch(`${supabaseUrl}/rest/v1/platform_settings?select=ml_client_id,ml_client_secret,app_url`, {
+      headers: {
+        'apikey': supabaseServiceKey,
+        'Authorization': `Bearer ${supabaseServiceKey}`
+      }
+    });
+
+    if (platRes.ok) {
+      const platSettingsList = await platRes.json();
+      if (platSettingsList && platSettingsList.length > 0) {
+        const platSettings = platSettingsList[0];
+        if (!mlClientId) mlClientId = platSettings.ml_client_id || undefined;
+        if (!mlClientSecret) mlClientSecret = platSettings.ml_client_secret || undefined;
+        // Se appUrl estiver vazio ou apontar incorretamente para o Supabase (contendo 'supabase'), usa o do banco
+        if (!appUrl || appUrl.includes('supabase')) {
+          appUrl = platSettings.app_url || undefined;
+        }
+      }
+    } else {
+      console.error('[ml-oauth] Failed to fetch platform_settings via REST API:', platRes.status);
+    }
+
+    if (appUrl) {
+      finalAppUrl = appUrl;
+    }
+
     // ML authorization error (user denied or app misconfigured)
     if (error) {
       console.error('[ml-oauth] ML returned error:', error, url.searchParams.get('error_description'));
       return new Response(null, {
         status: 302,
-        headers: { 'Location': `${APP_URL}/reseller/integracoes?ml_error=${encodeURIComponent(error)}` }
+        headers: { 'Location': `${finalAppUrl}/reseller/integracoes?ml_error=${encodeURIComponent(error)}` }
       });
     }
 
@@ -30,37 +62,14 @@ serve(async (req) => {
       console.error('[ml-oauth] Missing code or state');
       return new Response(null, {
         status: 302,
-        headers: { 'Location': `${APP_URL}/reseller/integracoes?ml_error=missing_params` }
+        headers: { 'Location': `${finalAppUrl}/reseller/integracoes?ml_error=missing_params` }
       });
     }
 
     const userId = state;
 
-    // 2. Obter chaves do Deno.env ou como Fallback via API REST nativa (para evitar imports externos de SDK)
-    let mlClientId = Deno.env.get('ML_CLIENT_ID');
-    let mlClientSecret = Deno.env.get('ML_CLIENT_SECRET');
-
     if (!mlClientId || !mlClientSecret) {
-      const platRes = await fetch(`${supabaseUrl}/rest/v1/platform_settings?select=ml_client_id,ml_client_secret`, {
-        headers: {
-          'apikey': supabaseServiceKey,
-          'Authorization': `Bearer ${supabaseServiceKey}`
-        }
-      });
-
-      if (platRes.ok) {
-        const platSettingsList = await platRes.json();
-        if (platSettingsList && platSettingsList.length > 0) {
-          mlClientId = platSettingsList[0].ml_client_id || undefined;
-          mlClientSecret = platSettingsList[0].ml_client_secret || undefined;
-        }
-      } else {
-        console.error('[ml-oauth] Failed to fetch platform_settings via REST API:', platRes.status);
-      }
-    }
-
-    if (!mlClientId || !mlClientSecret) {
-      throw new Error('Configuração ausente: preencha as credenciais do Mercado Livre (ml_client_id e ml_client_secret) na tabela platform_settings do seu Supabase.');
+      throw new Error('Configuração ausente: preencha o ml_client_id e ml_client_secret na tabela platform_settings do seu Supabase.');
     }
 
     const ML_REDIRECT_URI = Deno.env.get('ML_REDIRECT_URI') ?? `${supabaseUrl}/functions/v1/ml-oauth-callback`;
@@ -135,14 +144,14 @@ serve(async (req) => {
     console.log(`✅ [ml-oauth] Integration saved for user ${userId}, ML user ${mlUserId}`);
     return new Response(null, {
       status: 302,
-      headers: { 'Location': `${APP_URL}/reseller/ml-sucesso` }
+      headers: { 'Location': `${finalAppUrl}/reseller/ml-sucesso` }
     });
 
   } catch (err: any) {
     console.error('[ml-oauth] Unexpected error:', err);
     return new Response(null, {
       status: 302,
-      headers: { 'Location': `${APP_URL}/reseller/integracoes?ml_error=${encodeURIComponent(err.message)}` }
+      headers: { 'Location': `${finalAppUrl}/reseller/integracoes?ml_error=${encodeURIComponent(err.message)}` }
     });
   }
 });
