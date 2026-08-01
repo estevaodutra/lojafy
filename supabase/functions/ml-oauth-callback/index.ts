@@ -18,31 +18,60 @@ serve(async (req) => {
       throw new Error('Configuração ausente no Supabase: SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não definidos.');
     }
 
-    // 2. Tentar obter chaves e APP_URL do Deno.env ou do banco de dados (tabela platform_settings)
+    // 2. Determinar a URL da API REST (usar rede interna do Docker 'http://supabase-kong:8000' para evitar NAT Loopback)
+    const restUrl = 'http://supabase-kong:8000';
+
+    // 3. Tentar obter chaves e APP_URL do Deno.env ou da tabela platform_settings via API REST interna
     let mlClientId = Deno.env.get('ML_CLIENT_ID');
     let mlClientSecret = Deno.env.get('ML_CLIENT_SECRET');
     let appUrl = Deno.env.get('APP_URL');
 
-    const platRes = await fetch(`${supabaseUrl}/rest/v1/platform_settings?select=ml_client_id,ml_client_secret,app_url`, {
-      headers: {
-        'apikey': supabaseServiceKey,
-        'Authorization': `Bearer ${supabaseServiceKey}`
-      }
-    });
-
-    if (platRes.ok) {
-      const platSettingsList = await platRes.json();
-      if (platSettingsList && platSettingsList.length > 0) {
-        const platSettings = platSettingsList[0];
-        if (!mlClientId) mlClientId = platSettings.ml_client_id || undefined;
-        if (!mlClientSecret) mlClientSecret = platSettings.ml_client_secret || undefined;
-        // Se appUrl estiver vazio ou apontar incorretamente para o Supabase (contendo 'supabase'), usa o do banco
-        if (!appUrl || appUrl.includes('supabase')) {
-          appUrl = platSettings.app_url || undefined;
+    // Tenta buscar no banco pela rede local do Docker
+    let platSettings: any = null;
+    try {
+      const platRes = await fetch(`${restUrl}/rest/v1/platform_settings?select=ml_client_id,ml_client_secret,app_url`, {
+        headers: {
+          'apikey': supabaseServiceKey,
+          'Authorization': `Bearer ${supabaseServiceKey}`
         }
+      });
+
+      if (platRes.ok) {
+        const platSettingsList = await platRes.json();
+        if (platSettingsList && platSettingsList.length > 0) {
+          platSettings = platSettingsList[0];
+        }
+      } else {
+        console.error('[ml-oauth] Failed to fetch platform_settings via REST local API:', platRes.status);
       }
-    } else {
-      console.error('[ml-oauth] Failed to fetch platform_settings via REST API:', platRes.status);
+    } catch (dbFetchErr) {
+      console.error('[ml-oauth] Local database REST request failed, trying external URL:', dbFetchErr);
+      // Fallback para URL externa caso a rede local do Docker mude
+      try {
+        const platResExt = await fetch(`${supabaseUrl}/rest/v1/platform_settings?select=ml_client_id,ml_client_secret,app_url`, {
+          headers: {
+            'apikey': supabaseServiceKey,
+            'Authorization': `Bearer ${supabaseServiceKey}`
+          }
+        });
+        if (platResExt.ok) {
+          const platSettingsList = await platResExt.json();
+          if (platSettingsList && platSettingsList.length > 0) {
+            platSettings = platSettingsList[0];
+          }
+        }
+      } catch (extFetchErr) {
+        console.error('[ml-oauth] External database REST request also failed:', extFetchErr);
+      }
+    }
+
+    // Aplicar configurações obtidas do banco
+    if (platSettings) {
+      if (!mlClientId) mlClientId = platSettings.ml_client_id || undefined;
+      if (!mlClientSecret) mlClientSecret = platSettings.ml_client_secret || undefined;
+      if (!appUrl || appUrl.includes('supabase')) {
+        appUrl = platSettings.app_url || undefined;
+      }
     }
 
     if (appUrl) {
@@ -111,34 +140,77 @@ serve(async (req) => {
 
     const expiresAt = new Date(Date.now() + (expires_in ?? 21600) * 1000).toISOString();
 
-    // Save integration to database via REST API POST (upsert)
-    const dbRes = await fetch(`${supabaseUrl}/rest/v1/mercadolivre_integrations`, {
-      method: 'POST',
-      headers: {
-        'apikey': supabaseServiceKey,
-        'Authorization': `Bearer ${supabaseServiceKey}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates'
-      },
-      body: JSON.stringify({
-        user_id: userId,
-        access_token,
-        refresh_token: refresh_token ?? null,
-        token_type: token_type ?? 'Bearer',
-        expires_in: expires_in ?? null,
-        expires_at: expiresAt,
-        scope: scope ?? null,
-        ml_user_id: mlUserId,
-        is_active: true,
-        last_refreshed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-    });
+    // Save integration to database via REST API POST (upsert) - tentamos primeiro na rede interna local
+    let dbSuccess = false;
+    let dbErrText = '';
+    
+    try {
+      const dbRes = await fetch(`${restUrl}/rest/v1/mercadolivre_integrations`, {
+        method: 'POST',
+        headers: {
+          'apikey': supabaseServiceKey,
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          access_token,
+          refresh_token: refresh_token ?? null,
+          token_type: token_type ?? 'Bearer',
+          expires_in: expires_in ?? null,
+          expires_at: expiresAt,
+          scope: scope ?? null,
+          ml_user_id: mlUserId,
+          is_active: true,
+          last_refreshed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+      });
 
-    if (!dbRes.ok) {
-      const dbErrText = await dbRes.text();
-      console.error('[ml-oauth] DB REST upsert error:', dbRes.status, dbErrText);
-      throw new Error(`Erro ao salvar no banco de dados (REST HTTP ${dbRes.status}): ${dbErrText}`);
+      if (dbRes.ok) {
+        dbSuccess = true;
+      } else {
+        dbErrText = await dbRes.text();
+        console.error('[ml-oauth] Local DB upsert failed, trying external:', dbRes.status, dbErrText);
+      }
+    } catch (localDbErr: any) {
+      console.error('[ml-oauth] Local DB request threw error, trying external:', localDbErr);
+      dbErrText = localDbErr.message;
+    }
+
+    // Fallback para URL externa caso o local falhe
+    if (!dbSuccess) {
+      const dbResExt = await fetch(`${supabaseUrl}/rest/v1/mercadolivre_integrations`, {
+        method: 'POST',
+        headers: {
+          'apikey': supabaseServiceKey,
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          access_token,
+          refresh_token: refresh_token ?? null,
+          token_type: token_type ?? 'Bearer',
+          expires_in: expires_in ?? null,
+          expires_at: expiresAt,
+          scope: scope ?? null,
+          ml_user_id: mlUserId,
+          is_active: true,
+          last_refreshed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+      });
+
+      if (dbResExt.ok) {
+        dbSuccess = true;
+      } else {
+        const extDbErrText = await dbResExt.text();
+        console.error('[ml-oauth] External DB upsert failed:', dbResExt.status, extDbErrText);
+        throw new Error(`Erro ao salvar no banco de dados (REST HTTP ${dbResExt.status}): ${extDbErrText}`);
+      }
     }
 
     console.log(`✅ [ml-oauth] Integration saved for user ${userId}, ML user ${mlUserId}`);
