@@ -101,7 +101,7 @@ serve(async (req) => {
     // O state contém o formato "userId:redirectUri"
     const stateParts = (state || '').split(':');
     const userId = stateParts[0];
-    const stateRedirectUri = stateParts[1];
+    const stateRedirectUri = stateParts.slice(1).join(':');
 
     if (!mlClientId || !mlClientSecret) {
       throw new Error('Configuração ausente: preencha o client_id e client_secret na tabela marketplace_credentials do seu Supabase.');
@@ -120,6 +120,13 @@ serve(async (req) => {
         ML_REDIRECT_URI = `${proto}://${host}${requestUrl.pathname}`;
       }
     }
+
+    console.log('[ml-oauth] Exchange attempt:', {
+      userId,
+      stateRedirectUri,
+      resolvedRedirectUri: ML_REDIRECT_URI,
+      clientId: mlClientId
+    });
 
     // Exchange authorization code for access token
     const tokenRes = await fetch('https://api.mercadolibre.com/oauth/token', {
