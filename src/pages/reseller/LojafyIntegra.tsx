@@ -125,7 +125,8 @@ const LojafyIntegra = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
     const cleanSupabaseUrl = supabaseUrl.replace(/\/$/, '');
     const redirectUri = `${cleanSupabaseUrl}/functions/v1/ml-oauth-callback`;
-    return `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${userId}`;
+    const state = `${userId}:${redirectUri}`;
+    return `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
   };
 
   const handleConfirmBeta = () => {

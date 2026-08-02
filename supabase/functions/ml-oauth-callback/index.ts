@@ -98,17 +98,28 @@ serve(async (req) => {
       });
     }
 
-    const userId = state;
+    // O state contém o formato "userId:redirectUri"
+    const stateParts = (state || '').split(':');
+    const userId = stateParts[0];
+    const stateRedirectUri = stateParts[1];
 
     if (!mlClientId || !mlClientSecret) {
       throw new Error('Configuração ausente: preencha o client_id e client_secret na tabela marketplace_credentials do seu Supabase.');
     }
 
-    // Define o redirect_uri dinamicamente com base na URL da própria requisição (mantendo HTTPS e o host público correto)
+    // Define o redirect_uri dinamicamente com base no state, x-forwarded headers ou URL da própria requisição
     const requestUrl = new URL(req.url);
     const proto = req.headers.get('x-forwarded-proto') || requestUrl.protocol.replace(':', '');
     const host = req.headers.get('x-forwarded-host') || requestUrl.host;
-    const ML_REDIRECT_URI = Deno.env.get('ML_REDIRECT_URI') || `${proto}://${host}${requestUrl.pathname}`;
+    
+    let ML_REDIRECT_URI = stateRedirectUri || Deno.env.get('ML_REDIRECT_URI');
+    if (!ML_REDIRECT_URI) {
+      if (host.includes('supabase-kong') || host.includes('localhost') || host.includes('127.0.0.1')) {
+        ML_REDIRECT_URI = `https://lojafy-supabase.d2x.site/functions/v1/ml-oauth-callback`;
+      } else {
+        ML_REDIRECT_URI = `${proto}://${host}${requestUrl.pathname}`;
+      }
+    }
 
     // Exchange authorization code for access token
     const tokenRes = await fetch('https://api.mercadolibre.com/oauth/token', {
