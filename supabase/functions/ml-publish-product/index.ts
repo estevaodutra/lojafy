@@ -135,13 +135,65 @@ serve(async (req) => {
     }
 
     // Construir atributos do produto usando os dados que temos
-    const attributes: unknown[] = Array.isArray(validated.attributes) && validated.attributes.length > 0
-      ? validated.attributes
+    const attributes: any[] = Array.isArray(validated.attributes) && validated.attributes.length > 0
+      ? [...validated.attributes]
       : [];
 
     // Adicionar peso e dimensões como atributos se disponíveis
     if (product.weight && attributes.findIndex((a: any) => a.id === 'WEIGHT') === -1) {
       attributes.push({ id: 'WEIGHT', value_name: `${product.weight} kg` });
+    }
+
+    // Buscar atributos obrigatórios da categoria para auto-preencher valores ausentes
+    if (categoryId) {
+      try {
+        console.log(`[ml-publish] Fetching attributes for category ${categoryId}...`);
+        const catAttrsRes = await fetch(`https://api.mercadolibre.com/categories/${categoryId}/attributes`);
+        if (catAttrsRes.ok) {
+          const catAttrs = await catAttrsRes.json();
+          for (const attr of catAttrs) {
+            const isRequired = attr.tags?.required === true || attr.tags?.catalog_required === true;
+            if (isRequired) {
+              const exists = attributes.some((a: any) => a.id === attr.id);
+              if (!exists) {
+                let value_name = '';
+                let value_id = undefined;
+
+                if (attr.id === 'BRAND') {
+                  value_name = product.brand || 'Genérica';
+                } else if (attr.id === 'MODEL') {
+                  value_name = product.model || 'Padrão';
+                } else if (Array.isArray(attr.values) && attr.values.length > 0) {
+                  const productNameLower = (product.name || '').toLowerCase();
+                  const matchedVal = attr.values.find((v: any) => 
+                    v.name && productNameLower.includes(v.name.toLowerCase())
+                  );
+                  if (matchedVal) {
+                    value_id = matchedVal.id;
+                    value_name = matchedVal.name;
+                  } else {
+                    value_id = attr.values[0].id;
+                    value_name = attr.values[0].name;
+                  }
+                } else if (attr.value_type === 'boolean') {
+                  value_name = 'Não';
+                } else {
+                  value_name = 'Padrão';
+                }
+
+                console.log(`[ml-publish] Auto-filling required attribute ${attr.id} with:`, { value_name, value_id });
+                attributes.push({
+                  id: attr.id,
+                  ...(value_id ? { value_id } : {}),
+                  value_name
+                });
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[ml-publish] Failed to fetch category attributes or auto-fill:', err);
+      }
     }
 
     const mlPayload: Record<string, unknown> = {
@@ -156,8 +208,12 @@ serve(async (req) => {
       pictures: imageUrls.slice(0, 12).map((url) => ({ source: url })),
     };
 
-    // Shipping
-    mlPayload.shipping = validated.shipping ?? { mode: 'me2', free_shipping: false };
+    // Shipping: default to me2 unless verified otherwise. Force me2 if it is me1 to avoid "User has not mode me1" error
+    let shipping = validated.shipping ?? { mode: 'me2', free_shipping: false };
+    if (shipping.mode === 'me1') {
+      shipping = { ...shipping, mode: 'me2' };
+    }
+    mlPayload.shipping = shipping;
 
     // Attributes
     if (attributes.length > 0) {
