@@ -284,10 +284,10 @@ export const useMercadoLivreIntegration = () => {
         }
       }
 
-      // Atualizar status local
+      // Atualizar status local (limpar ml_item_id e permalink para permitir nova publicação)
       const { error: updateError } = await supabase
         .from('mercadolivre_published_products')
-        .update({ status: 'unpublished' })
+        .update({ status: 'unpublished', ml_item_id: null, permalink: null })
         .eq('user_id', user.id)
         .eq('product_id', productId);
 

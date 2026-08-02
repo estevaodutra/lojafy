@@ -48,7 +48,7 @@ serve(async (req) => {
 
     const accessToken = await getValidToken(user_id);
 
-    // ── Unpublish (pause) ────────────────────────────────────────────────────
+    // ── Unpublish (close and delete) ─────────────────────────────────────────
     if (action === 'unpublish') {
       if (!ml_item_id) {
         return new Response(JSON.stringify({ error: 'ml_item_id required for unpublish' }), {
@@ -56,18 +56,35 @@ serve(async (req) => {
         });
       }
 
-      const pauseRes = await fetch(`https://api.mercadolibre.com/items/${ml_item_id}`, {
+      console.log(`[ml-publish] Closing item ${ml_item_id}...`);
+      const closeRes = await fetch(`https://api.mercadolibre.com/items/${ml_item_id}`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'paused' }),
+        body: JSON.stringify({ status: 'closed' }),
       });
 
-      if (!pauseRes.ok) {
-        const err = await pauseRes.json().catch(() => ({}));
-        throw new Error(err.message || `ML API error: ${pauseRes.status}`);
+      if (!closeRes.ok) {
+        const err = await closeRes.json().catch(() => ({}));
+        throw new Error(err.message || `ML API error when closing: ${closeRes.status}`);
       }
 
-      console.log(`[ml-publish] ✅ Paused item ${ml_item_id}`);
+      console.log(`[ml-publish] Deleting item ${ml_item_id}...`);
+      try {
+        const deleteRes = await fetch(`https://api.mercadolibre.com/items/${ml_item_id}`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deleted: 'true' }),
+        });
+        if (!deleteRes.ok) {
+          const deleteErr = await deleteRes.json().catch(() => ({}));
+          console.warn(`[ml-publish] Could not delete item completely (maybe it has bids): ${deleteRes.status}`, deleteErr);
+        } else {
+          console.log(`[ml-publish] ✅ Item ${ml_item_id} deleted successfully from Mercado Livre`);
+        }
+      } catch (e) {
+        console.warn(`[ml-publish] Exception during delete item request:`, e);
+      }
+
       return new Response(JSON.stringify({ success: true, action: 'unpublished', ml_item_id }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -85,9 +102,12 @@ serve(async (req) => {
     const rawPrice = reseller_price ?? product.price;
     const price = Math.round(Number(rawPrice) * 100) / 100;
 
+    let activeMlItemId = ml_item_id;
+
     // Re-activate existing listing
-    if (ml_item_id) {
-      const activateRes = await fetch(`https://api.mercadolibre.com/items/${ml_item_id}`, {
+    if (activeMlItemId) {
+      console.log(`[ml-publish] Attempting to reactivate existing item ${activeMlItemId}...`);
+      const activateRes = await fetch(`https://api.mercadolibre.com/items/${activeMlItemId}`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'active', price: Math.round(Number(price) * 100) / 100 }),
@@ -95,13 +115,40 @@ serve(async (req) => {
 
       if (!activateRes.ok) {
         const err = await activateRes.json().catch(() => ({}));
-        throw new Error(err.message || `ML API error: ${activateRes.status}`);
-      }
+        const errMsg = err.message || `ML API error: ${activateRes.status}`;
+        
+        if (
+          activateRes.status === 404 || 
+          activateRes.status === 400 ||
+          errMsg.includes('status:closed') || 
+          errMsg.includes('status:inactive') || 
+          errMsg.includes('Cannot update item') ||
+          errMsg.includes('not_found')
+        ) {
+          console.warn(`[ml-publish] Existing item ${activeMlItemId} is closed, not found, or invalid. Clearing and creating new listing...`);
+          
+          await supabase
+            .from('mercadolivre_published_products')
+            .delete()
+            .eq('user_id', user_id)
+            .eq('ml_item_id', activeMlItemId);
+          
+          await supabase
+            .from('ml_listing_variants')
+            .update({ ml_item_id: null, status: 'draft', permalink: null })
+            .eq('user_id', user_id)
+            .eq('ml_item_id', activeMlItemId);
 
-      const item = await activateRes.json();
-      return new Response(JSON.stringify({ success: true, ml_item_id: item.id, permalink: item.permalink, status: item.status }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+          activeMlItemId = null; // Zera para cair no fluxo de criação de anúncio novo
+        } else {
+          throw new Error(errMsg);
+        }
+      } else {
+        const item = await activateRes.json();
+        return new Response(JSON.stringify({ success: true, ml_item_id: item.id, permalink: item.permalink, status: item.status }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     // Build pictures array from product images
