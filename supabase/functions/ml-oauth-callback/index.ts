@@ -101,7 +101,7 @@ serve(async (req) => {
     const userId = state;
 
     if (!mlClientId || !mlClientSecret) {
-      throw new Error('Configuração ausente: preencha o ml_client_id e ml_client_secret na tabela platform_settings do seu Supabase.');
+      throw new Error('Configuração ausente: preencha o client_id e client_secret na tabela marketplace_credentials do seu Supabase.');
     }
 
     // Higieniza a URL do Supabase para evitar barras duplas no redirect_uri
