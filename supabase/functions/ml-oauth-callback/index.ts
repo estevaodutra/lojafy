@@ -104,12 +104,11 @@ serve(async (req) => {
       throw new Error('Configuração ausente: preencha o client_id e client_secret na tabela marketplace_credentials do seu Supabase.');
     }
 
-    // Higieniza a URL do Supabase para evitar barras duplas no redirect_uri
-    let cleanSupabaseUrl = supabaseUrl.trim();
-    if (cleanSupabaseUrl.endsWith('/')) {
-      cleanSupabaseUrl = cleanSupabaseUrl.slice(0, -1);
-    }
-    const ML_REDIRECT_URI = Deno.env.get('ML_REDIRECT_URI') ?? `${cleanSupabaseUrl}/functions/v1/ml-oauth-callback`;
+    // Define o redirect_uri dinamicamente com base na URL da própria requisição (mantendo HTTPS e o host público correto)
+    const requestUrl = new URL(req.url);
+    const proto = req.headers.get('x-forwarded-proto') || requestUrl.protocol.replace(':', '');
+    const host = req.headers.get('x-forwarded-host') || requestUrl.host;
+    const ML_REDIRECT_URI = Deno.env.get('ML_REDIRECT_URI') || `${proto}://${host}${requestUrl.pathname}`;
 
     // Exchange authorization code for access token
     const tokenRes = await fetch('https://api.mercadolibre.com/oauth/token', {
