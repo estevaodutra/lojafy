@@ -117,6 +117,10 @@ Deno.serve(async (req) => {
       updated_at: new Date().toISOString()
     };
 
+    if (['pago', 'recebido', 'enviado'].includes(status)) {
+      updateData.payment_status = 'paid';
+    }
+
     // If status is 'pago', calculate shipping estimate
     if (status === 'pago') {
       updateData.pago_em = new Date().toISOString();
