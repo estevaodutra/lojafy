@@ -73,9 +73,12 @@ const Categorias = () => {
     queryFn: async () => {
       let query = supabase
         .from('store_products')
-        .select(`
+        .select(slug ? `
           *,
           categories!inner(slug, name)
+        ` : `
+          *,
+          categories(slug, name)
         `)
         .eq('active', true);
 
