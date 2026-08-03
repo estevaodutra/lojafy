@@ -57,30 +57,32 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, banner
 
   // Reset form when banner changes or dialog opens/closes
   useEffect(() => {
-    if (banner) {
-      setImageOnly(true);
-      setFormData({
-        title: banner.title || '',
-        image_url: banner.image_url,
-        mobile_image_url: banner.mobile_image_url || '',
-        link_url: banner.link_url || '',
-        open_new_tab: banner.open_new_tab,
-        position: banner.position,
-        active: banner.active
-      });
-    } else {
-      setImageOnly(true);
-      setFormData({
-        title: '',
-        image_url: '',
-        mobile_image_url: '',
-        link_url: '',
-        open_new_tab: false,
-        position: getNextAvailablePosition(),
-        active: true
-      });
+    if (isOpen) {
+      if (banner) {
+        setImageOnly(true);
+        setFormData({
+          title: banner.title || '',
+          image_url: banner.image_url,
+          mobile_image_url: banner.mobile_image_url || '',
+          link_url: banner.link_url || '',
+          open_new_tab: banner.open_new_tab,
+          position: banner.position,
+          active: banner.active
+        });
+      } else {
+        setImageOnly(true);
+        setFormData({
+          title: '',
+          image_url: '',
+          mobile_image_url: '',
+          link_url: '',
+          open_new_tab: false,
+          position: getNextAvailablePosition(),
+          active: true
+        });
+      }
     }
-  }, [banner, existingBanners, isOpen]);
+  }, [banner, isOpen]);
 
   const getNextAvailablePosition = () => {
     const activeBanners = existingBanners.filter(b => b.active && b.banner_type === bannerType);
