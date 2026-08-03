@@ -36,6 +36,13 @@ export async function logApiRequest(data: ApiLogData): Promise<void> {
       error_message: data.error_message || null,
       duration_ms: data.duration_ms,
     });
+
+    // Clean up old logs (older than 7 days) occasionally (5% probability)
+    if (Math.random() < 0.05) {
+      supabase.rpc('cleanup_old_api_logs').then(({ error }) => {
+        if (error) console.error('[LOG_CLEANUP] Failed to run cleanup:', error);
+      });
+    }
   } catch (error) {
     console.error('[LOG_ERROR] Failed to log API request:', error);
   }

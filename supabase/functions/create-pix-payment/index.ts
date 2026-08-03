@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+import { logApiRequest, getClientIp } from '../_shared/logApiRequest.ts';
 
 // Headers CORS para acesso do front-end
 const corsHeaders = {
@@ -43,9 +44,7 @@ interface PixPaymentRequest {
   metadata?: any;
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
-
+async function handleRequest(req: Request): Promise<Response> {
   try {
     if (!MP_ACCESS_TOKEN) {
       console.warn('MERCADO_PAGO_ACCESS_TOKEN not configured, proceeding with webhook payment creation');
@@ -133,17 +132,33 @@ serve(async (req) => {
       },
     };
 
-    const webhookUrl = 'https://n8n.6ksfuf.easypanel.host/webhook/generate_payment';
+    const n8nBaseUrl = Deno.env.get('N8N_WEBHOOK_BASE_URL') || 'https://n8n.6ksfuf.easypanel.host';
+    const webhookUrl = Deno.env.get('N8N_WEBHOOK_URL') || `${n8nBaseUrl}/webhook/generate_payment`;
     console.log('[pix] Calling webhook for PIX payment:', webhookUrl);
 
-    const webhookRes = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(n8nPayload),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
 
+    let webhookRes: Response;
+    try {
+      webhookRes = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(n8nPayload),
+        signal: controller.signal,
+      });
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      console.error('[pix] Webhook fetch failed or timed out:', fetchError);
+      return new Response(
+        JSON.stringify({ error: 'O serviço de PIX demorou para responder ou está fora do ar. Verifique as configurações do N8N na VPS.' }),
+        { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    clearTimeout(timeoutId);
     const responseText = await webhookRes.text();
     console.log('[pix] Webhook Response Status:', webhookRes.status);
 
@@ -291,4 +306,76 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+
+  const startTime = Date.now();
+  const ipAddress = getClientIp(req);
+  let userId: string | undefined = undefined;
+  let requestBody: any = null;
+
+  try {
+    const clone = req.clone();
+    requestBody = await clone.json();
+  } catch (_) {}
+
+  try {
+    const authHeader = req.headers.get('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user } } = await supabase.auth.getUser(token);
+      if (user) userId = user.id;
+    }
+  } catch (_) {}
+
+  let response: Response;
+  try {
+    response = await handleRequest(req);
+  } catch (error) {
+    console.error('[pix] Handler uncaught error:', error);
+    response = new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Log to database
+  try {
+    const duration = Date.now() - startTime;
+    const responseClone = response.clone();
+    const responseText = await responseClone.text();
+    let responseSummary: any = null;
+    let errorMessage: string | undefined = undefined;
+    
+    try {
+      responseSummary = JSON.parse(responseText);
+      if (response.status >= 400 && responseSummary?.error) {
+        errorMessage = responseSummary.error;
+      }
+    } catch (_) {
+      responseSummary = { text: responseText.substring(0, 200) };
+      if (response.status >= 400) {
+        errorMessage = responseText.substring(0, 200);
+      }
+    }
+
+    await logApiRequest({
+      function_name: 'create-pix-payment',
+      method: req.method,
+      path: '/functions/v1/create-pix-payment',
+      user_id: userId,
+      ip_address: ipAddress,
+      request_body: requestBody,
+      status_code: response.status,
+      response_summary: responseSummary,
+      error_message: errorMessage,
+      duration_ms: duration,
+    });
+  } catch (logError) {
+    console.error('[pix] Failed to write API log:', logError);
+  }
+
+  return response;
 });

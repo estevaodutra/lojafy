@@ -1,11 +1,12 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
+import { logApiRequest, getClientIp } from '../_shared/logApiRequest.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-Deno.serve(async (req) => {
+async function handleRequest(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -277,4 +278,81 @@ Deno.serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  const startTime = Date.now();
+  const ipAddress = getClientIp(req);
+  let userId: string | undefined = undefined;
+  let requestBody: any = null;
+
+  try {
+    const clone = req.clone();
+    requestBody = await clone.json();
+  } catch (_) {}
+
+  // Initialize Supabase inside the wrapper to query user
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  try {
+    const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user } } = await supabase.auth.getUser(token);
+      if (user) userId = user.id;
+    }
+  } catch (_) {}
+
+  let response: Response;
+  try {
+    response = await handleRequest(req);
+  } catch (error) {
+    console.error('Wallet recharge handler uncaught error:', error);
+    response = new Response(
+      JSON.stringify({ success: false, error: error.message || 'Erro interno' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Log to database
+  try {
+    const duration = Date.now() - startTime;
+    const responseClone = response.clone();
+    const responseText = await responseClone.text();
+    let responseSummary: any = null;
+    let errorMessage: string | undefined = undefined;
+    
+    try {
+      responseSummary = JSON.parse(responseText);
+      if (response.status >= 400 && responseSummary?.error) {
+        errorMessage = responseSummary.error;
+      }
+    } catch (_) {
+      responseSummary = { text: responseText.substring(0, 200) };
+      if (response.status >= 400) {
+        errorMessage = responseText.substring(0, 200);
+      }
+    }
+
+    await logApiRequest({
+      function_name: 'wallet-recharge',
+      method: req.method,
+      path: '/functions/v1/wallet-recharge',
+      user_id: userId,
+      ip_address: ipAddress,
+      request_body: requestBody,
+      status_code: response.status,
+      response_summary: responseSummary,
+      error_message: errorMessage,
+      duration_ms: duration,
+    });
+  } catch (logError) {
+    console.error('Wallet recharge failed to write API log:', logError);
+  }
+
+  return response;
 });
