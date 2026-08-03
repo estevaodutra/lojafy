@@ -38,6 +38,7 @@ const SupplierProductDetail = () => {
   const [importCandidate, setImportCandidate] = useState<ReferenceCandidate | null>(null);
   const [overviewCandidate, setOverviewCandidate] = useState<ReferenceCandidate | null>(null);
   const [overviewDetail, setOverviewDetail] = useState<any | null>(null);
+  const [selectedOverviewImage, setSelectedOverviewImage] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [candidateDescriptions, setCandidateDescriptions] = useState<Record<string, string>>({});
   const { search, doImport } = useReferenceMutations(id);
@@ -97,6 +98,7 @@ const SupplierProductDetail = () => {
   const handleViewOverview = async (candidate: ReferenceCandidate) => {
     setOverviewCandidate(candidate);
     setOverviewDetail(null);
+    setSelectedOverviewImage(null);
     setLoadingDetail(true);
     
     const mlId = candidate.ml_item_id;
@@ -357,7 +359,12 @@ const SupplierProductDetail = () => {
         isImporting={doImport.isPending}
       />
 
-      <Dialog open={!!overviewCandidate} onOpenChange={(open) => !open && setOverviewCandidate(null)}>
+      <Dialog open={!!overviewCandidate} onOpenChange={(open) => {
+        if (!open) {
+          setOverviewCandidate(null);
+          setSelectedOverviewImage(null);
+        }
+      }}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Visão Geral do Produto de Referência</DialogTitle>
@@ -371,15 +378,39 @@ const SupplierProductDetail = () => {
               {/* Cabeçalho do Produto */}
               <div className="flex items-start gap-4">
                 {(() => {
-                  const imageUrl = overviewDetail?.pictures?.[0]?.secure_url || 
-                                   overviewDetail?.pictures?.[0]?.url || 
-                                   overviewCandidate.image_url;
-                  return imageUrl && (
-                    <img
-                      src={imageUrl}
-                      alt=""
-                      className="h-28 w-28 rounded-md border object-contain bg-white"
-                    />
+                  const pictures = overviewDetail?.pictures || [];
+                  const displayImageUrl = selectedOverviewImage || 
+                                          pictures[0]?.secure_url || 
+                                          pictures[0]?.url || 
+                                          overviewCandidate.image_url;
+                  return (
+                    <div className="flex flex-col gap-2">
+                      {displayImageUrl && (
+                        <img
+                          src={displayImageUrl}
+                          alt=""
+                          className="h-32 w-32 rounded-md border object-contain bg-white"
+                        />
+                      )}
+                      {pictures.length > 1 && (
+                        <div className="flex gap-1 overflow-x-auto max-w-[130px] py-1 scrollbar-thin">
+                          {pictures.slice(0, 6).map((pic: any, idx: number) => {
+                            const thumbUrl = pic.secure_url || pic.url;
+                            return (
+                              <img
+                                key={idx}
+                                src={thumbUrl}
+                                alt=""
+                                onClick={() => setSelectedOverviewImage(thumbUrl)}
+                                className={`h-8 w-8 rounded border object-contain bg-white cursor-pointer hover:border-primary transition flex-shrink-0 ${
+                                  displayImageUrl === thumbUrl ? 'border-primary ring-1 ring-primary' : 'border-muted'
+                                }`}
+                              />
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   );
                 })()}
                 
@@ -389,7 +420,7 @@ const SupplierProductDetail = () => {
                   </h4>
                   <p className="text-xl font-bold text-primary">
                     {(() => {
-                      const price = overviewDetail?.price ?? overviewCandidate.price;
+                      const price = overviewDetail?.buy_box_winner?.price ?? overviewDetail?.price ?? overviewCandidate.price;
                       return price != null
                         ? price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
                         : 'Preço sob consulta';

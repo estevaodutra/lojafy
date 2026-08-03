@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -55,6 +56,9 @@ export const ReferenceImportModal = ({
 }: ReferenceImportModalProps) => {
   if (!candidate) return null;
 
+  const [applyImage, setApplyImage] = useState(true);
+  const [applyPrice, setApplyPrice] = useState(true);
+
   const candidateDesc = candidateDescription || (candidate.raw_data as any)?.description as string | null;
 
   return (
@@ -105,6 +109,32 @@ export const ReferenceImportModal = ({
               </p>
             </div>
           </div>
+          <Separator />
+
+          {/* Opções de Importação */}
+          <div className="space-y-3 my-4 p-4 rounded-md border bg-muted/10">
+            <h5 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">Opções de Importação</h5>
+            <div className="flex flex-col gap-3">
+              <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={applyImage}
+                  onChange={(e) => setApplyImage(e.target.checked)}
+                  className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                />
+                <span>Importar fotos do anúncio de referência (substitui a galeria atual)</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={applyPrice}
+                  onChange={(e) => setApplyPrice(e.target.checked)}
+                  className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                />
+                <span>Importar preço sugerido do anúncio (substitui o preço de venda atual)</span>
+              </label>
+            </div>
+          </div>
         </div>
 
         <DialogFooter className="mt-4">
@@ -112,7 +142,7 @@ export const ReferenceImportModal = ({
             Cancelar
           </Button>
           <Button
-            onClick={() => onConfirm({ apply_image: false, apply_price: false })}
+            onClick={() => onConfirm({ apply_image: applyImage, apply_price: applyPrice })}
             disabled={isImporting}
           >
             {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

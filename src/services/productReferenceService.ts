@@ -95,16 +95,17 @@ export async function searchMlCandidates(product: {
         const detail: any = await detailRes.json();
         let description = ''; // Produtos de catálogo não possuem descrição separada
 
+        const pictures = detail.pictures?.map((p: any) => p.secure_url || p.url).filter(Boolean) || [];
+        const price = detail.buy_box_winner?.price ?? detail.price ?? result.price ?? null;
         const gtin = attr(detail.attributes, 'GTIN');
         const image =
-          detail.pictures?.[0]?.secure_url ||
-          detail.pictures?.[0]?.url ||
+          pictures[0] ||
           (detail.thumbnail ? detail.thumbnail.replace(/^http:/, 'https:') : null);
 
         const candidate: ScoredCandidate = {
           mlItemId: detail.id,
           title: detail.name || detail.title,
-          price: detail.price ?? null,
+          price: price,
           imageUrl: image,
           mlCategoryId: detail.category_id ?? null,
           brand: attr(detail.attributes, 'BRAND'),
@@ -118,6 +119,7 @@ export async function searchMlCandidates(product: {
             attributes: detail.attributes ?? [],
             domain_id: detail.domain_id ?? null,
             permalink: `https://www.mercadolivre.com.br/p/${detail.id}`,
+            pictures: pictures,
           },
         };
         candidate.score = computeCompatibilityScore(
