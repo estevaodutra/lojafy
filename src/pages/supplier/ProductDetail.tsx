@@ -186,12 +186,33 @@ const SupplierProductDetail = () => {
             updatePayload.specifications = specObj;
           }
 
+          // Se apply_image for true, extrai e força a galeria de imagens e imagem principal
+          if (overrides.apply_image) {
+            const picturesList = overviewDetail?.pictures?.map((p: any) => p.secure_url || p.url).filter(Boolean) || 
+                                 (importCandidate?.raw_data as any)?.pictures || [];
+            if (picturesList.length > 0) {
+              updatePayload.images = picturesList;
+              updatePayload.main_image_url = picturesList[0];
+              updatePayload.image_url = picturesList[0];
+            }
+          }
+
+          // Se apply_price for true, extrai e força o preço
+          if (overrides.apply_price) {
+            const refPrice = overviewDetail?.buy_box_winner?.price ?? 
+                             overviewDetail?.price ?? 
+                             importCandidate?.price;
+            if (refPrice != null) {
+              updatePayload.price = refPrice;
+            }
+          }
+
           if (Object.keys(updatePayload).length > 0) {
             const { error: updateError } = await supabase
               .from('products')
               .update(updatePayload)
               .eq('id', product!.id);
-            if (updateError) console.error('Erro ao salvar especificações e descrição importadas:', updateError);
+            if (updateError) console.error('Erro ao salvar especificações, descrição, imagens ou preço importados:', updateError);
           }
 
           // Invalida a query do produto para atualizar a tela
@@ -199,8 +220,7 @@ const SupplierProductDetail = () => {
             queryClient.invalidateQueries({ queryKey: supplierKeys.product(orgId, id!) });
             queryClient.invalidateQueries({ queryKey: supplierKeys.scope(orgId) });
           }
-        } 
-      },
+        }       },
     );
   };
 
