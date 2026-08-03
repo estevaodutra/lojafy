@@ -87,20 +87,6 @@ const SupplierProductManagement = () => {
   // Mutação para status em lote (Ativar/Desativar)
   const bulkToggleStatus = useMutation({
     mutationFn: async ({ productIds, active }: { productIds: string[], active: boolean }) => {
-      if (active) {
-        const { data: productsToCheck, error: checkError } = await supabase
-          .from('products')
-          .select('id, stage')
-          .in('id', productIds);
-          
-        if (checkError) throw checkError;
-        
-        const ineligible = productsToCheck?.some(p => p.stage && p.stage !== 'stage_2_enabled');
-        if (ineligible) {
-          throw new Error('Alguns produtos selecionados estão no estágio básico ou requerem revisão e não podem ser ativados.');
-        }
-      }
-
       const { error } = await supabase
         .from('products')
         .update({ active, updated_at: new Date().toISOString() })
@@ -532,17 +518,7 @@ const SupplierProductManagement = () => {
 
                             {product.approval_status === 'approved' && (
                               <DropdownMenuItem
-                                onClick={() => {
-                                  if (!product.active && product.stage && product.stage !== 'stage_2_enabled') {
-                                    toast({
-                                      title: 'Impossível Ativar',
-                                      description: 'Este produto está no estágio básico ou requer revisão de dados de referência (GTIN/Mercado Livre). Complete o cadastro para ativá-lo.',
-                                      variant: 'destructive'
-                                    });
-                                    return;
-                                  }
-                                  bulkToggleStatus.mutate({ productIds: [product.id], active: !product.active });
-                                }}
+                                onClick={() => bulkToggleStatus.mutate({ productIds: [product.id], active: !product.active })}
                                 disabled={bulkToggleStatus.isPending}
                                 className="gap-2 cursor-pointer"
                               >
