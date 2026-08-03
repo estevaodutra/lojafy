@@ -8,7 +8,7 @@ import { supplierKeys } from '@/lib/supplierQueryKeys';
 import { useSupplierOrganization } from '@/hooks/supplier/useSupplierOrganization';
 import { useSupplierPaginatedQuery } from '@/hooks/supplier/useSupplierPaginatedQuery';
 import { exportCatalogCsv, exportCatalogJson } from '@/services/supplierExportService';
-import { GtinStatusBadge, StageBadge } from '@/components/supplier/products/GtinStatusBadge';
+import { StageBadge } from '@/components/supplier/products/GtinStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -87,6 +87,20 @@ const SupplierProductManagement = () => {
   // Mutação para status em lote (Ativar/Desativar)
   const bulkToggleStatus = useMutation({
     mutationFn: async ({ productIds, active }: { productIds: string[], active: boolean }) => {
+      if (active) {
+        const { data: productsToCheck, error: checkError } = await supabase
+          .from('products')
+          .select('id, stage')
+          .in('id', productIds);
+          
+        if (checkError) throw checkError;
+        
+        const ineligible = productsToCheck?.some(p => p.stage && p.stage !== 'stage_2_enabled');
+        if (ineligible) {
+          throw new Error('Alguns produtos selecionados estão no estágio básico ou requerem revisão e não podem ser ativados.');
+        }
+      }
+
       const { error } = await supabase
         .from('products')
         .update({ active, updated_at: new Date().toISOString() })
@@ -400,7 +414,6 @@ const SupplierProductManagement = () => {
                     <TableHead>Preço</TableHead>
                     <TableHead>Estoque</TableHead>
                     <TableHead>Estágio</TableHead>
-                    <TableHead>GTIN</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
@@ -450,9 +463,6 @@ const SupplierProductManagement = () => {
                       <TableCell>{product.stock_quantity ?? 0}</TableCell>
                       <TableCell>
                         <StageBadge stage={product.stage} />
-                      </TableCell>
-                      <TableCell>
-                        <GtinStatusBadge status={product.gtin_status} />
                       </TableCell>
                       <TableCell>
                         {product.active ? (
@@ -522,7 +532,17 @@ const SupplierProductManagement = () => {
 
                             {product.approval_status === 'approved' && (
                               <DropdownMenuItem
-                                onClick={() => bulkToggleStatus.mutate({ productIds: [product.id], active: !product.active })}
+                                onClick={() => {
+                                  if (!product.active && product.stage && product.stage !== 'stage_2_enabled') {
+                                    toast({
+                                      title: 'Impossível Ativar',
+                                      description: 'Este produto está no estágio básico ou requer revisão de dados de referência (GTIN/Mercado Livre). Complete o cadastro para ativá-lo.',
+                                      variant: 'destructive'
+                                    });
+                                    return;
+                                  }
+                                  bulkToggleStatus.mutate({ productIds: [product.id], active: !product.active });
+                                }}
                                 disabled={bulkToggleStatus.isPending}
                                 className="gap-2 cursor-pointer"
                               >
