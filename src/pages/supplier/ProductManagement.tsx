@@ -210,7 +210,7 @@ const SupplierProductManagement = () => {
         queryClient.invalidateQueries({ queryKey: supplierKeys.scope(orgId) });
         queryClient.invalidateQueries({ queryKey: supplierKeys.all });
       }
-      toast({ title: 'Produto publicado e ativado com sucesso!' });
+      toast({ title: 'Produto publicado com sucesso!' });
     },
     onError: (error: Error) =>
       toast({ title: 'Erro ao publicar produto', description: error.message, variant: 'destructive' }),
@@ -504,7 +504,7 @@ const SupplierProductManagement = () => {
                                   className="gap-2 cursor-pointer text-green-600 focus:text-green-600 font-semibold"
                                 >
                                   <Check className="h-4 w-4" />
-                                  Publicar e Ativar
+                                  Publicar
                                 </DropdownMenuItem>
 
                                 {product.approval_status === 'draft' && (
