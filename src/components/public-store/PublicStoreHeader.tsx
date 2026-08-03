@@ -56,7 +56,7 @@ const PublicStoreHeader = ({ store }: PublicStoreHeaderProps) => {
                 <img 
                   src={store.logo_url} 
                   alt={store.store_name}
-                  className="h-10 w-auto"
+                  className="h-14 md:h-16 w-auto object-contain"
                 />
               ) : (
                 <h1 className="text-xl md:text-2xl font-bold text-foreground">

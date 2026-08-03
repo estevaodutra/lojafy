@@ -92,7 +92,7 @@ const Header = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
             {config?.logo_url ? (
-              <img src={config.logo_url} alt={config.store_name || 'Logo'} className="h-10 w-auto" />
+              <img src={config.logo_url} alt={config.store_name || 'Logo'} className="h-14 md:h-16 w-auto object-contain" />
             ) : (
               <>
                 <div className="w-10 h-10 bg-hero-gradient rounded-lg flex items-center justify-center">
