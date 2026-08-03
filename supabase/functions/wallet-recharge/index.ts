@@ -153,8 +153,8 @@ async function handleRequest(req: Request): Promise<Response> {
     };
 
     const n8nBaseUrl = Deno.env.get('N8N_WEBHOOK_BASE_URL') || 'https://n8n.d2x.site';
-    const primaryWebhookUrl = Deno.env.get('N8N_WEBHOOK_URL') || `${n8nBaseUrl}/webhook/gerar_pix`;
-    const testWebhookUrl = Deno.env.get('N8N_WEBHOOK_TEST_URL') || `${n8nBaseUrl}/webhook-test/gerar_pix`;
+    const primaryWebhookUrl = Deno.env.get('N8N_WEBHOOK_URL') || `${n8nBaseUrl}/webhook/generate_payments`;
+    const testWebhookUrl = Deno.env.get('N8N_WEBHOOK_TEST_URL') || `${n8nBaseUrl}/webhook-test/generate_payments`;
 
     let n8nResult: any;
 
