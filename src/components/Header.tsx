@@ -91,12 +91,18 @@ const Header = () => {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-            {config?.logo_url ? <img src={config.logo_url} alt={config.store_name} className="h-10 w-auto" /> : <div className="w-10 h-10 bg-hero-gradient rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xl">E</span>
-              </div>}
-            <span className="hidden md:block text-2xl font-bold text-foreground">
-              {config?.store_name || 'Lojafy'}
-            </span>
+            {config?.logo_url ? (
+              <img src={config.logo_url} alt={config.store_name || 'Logo'} className="h-10 w-auto" />
+            ) : (
+              <>
+                <div className="w-10 h-10 bg-hero-gradient rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-xl">E</span>
+                </div>
+                <span className="hidden md:block text-2xl font-bold text-foreground">
+                  {config?.store_name || 'Lojafy'}
+                </span>
+              </>
+            )}
           </Link>
 
           {/* Search Bar - Desktop only */}
