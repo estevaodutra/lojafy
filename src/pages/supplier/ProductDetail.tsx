@@ -24,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 
 /** Hub de enriquecimento do fornecedor usando o formulário completo do superadmin como padrão. */
@@ -505,6 +506,25 @@ const SupplierProductDetail = () => {
                   </div>
                 )}
               </div>
+              <DialogFooter className="mt-6 border-t pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setOverviewCandidate(null);
+                    setSelectedOverviewImage(null);
+                  }}
+                >
+                  Fechar
+                </Button>
+                <Button
+                  onClick={() => {
+                    setImportCandidate(overviewCandidate);
+                    setOverviewCandidate(null);
+                  }}
+                >
+                  Importar / Atualizar com esta Referência
+                </Button>
+              </DialogFooter>
             </div>
           )}
         </DialogContent>
