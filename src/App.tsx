@@ -85,6 +85,7 @@ const Depoimentos = lazy(() => import("./pages/admin/Depoimentos"));
 const NewsletterConfig = lazy(() => import("./pages/admin/NewsletterConfig"));
 const ConfiguracaoVisual = lazy(() => import("./pages/admin/ConfiguracaoVisual"));
 const Frete = lazy(() => import("./pages/admin/Frete"));
+const Logistica = lazy(() => import("./pages/admin/Logistica"));
 const Catalogo = lazy(() => import("./pages/admin/Catalogo"));
 const Clientes = lazy(() => import("./pages/admin/Clientes"));
 const Design = lazy(() => import("./pages/admin/Design"));
@@ -359,6 +360,7 @@ const App = () => {
                   <Route path="clientes" element={<Clientes />} />
                   <Route path="design" element={<Design />} />
                   <Route path="configuracoes" element={<Configuracoes />} />
+                  <Route path="logistica" element={<Logistica />} />
                   <Route path="financeiro" element={<AdminFinanceiro />}>
                     <Route index element={<Navigate to="carteiras" replace />} />
                     <Route path="carteiras" element={<FinanceiroWallets />} />
@@ -384,6 +386,7 @@ const App = () => {
                   <Route path="depoimentos" element={<Depoimentos />} />
                   <Route path="newsletter-config" element={<NewsletterConfig />} />
                   <Route path="frete" element={<Frete />} />
+                  <Route path="logistica" element={<Logistica />} />
                   <Route path="aulas" element={<AdminCourses />} />
                   <Route path="aulas/:courseId/conteudo" element={<CourseContent />} />
                   <Route path="aulas/:courseId/matriculas" element={<CourseEnrollments />} />

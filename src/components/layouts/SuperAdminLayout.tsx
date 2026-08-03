@@ -78,6 +78,11 @@ const superAdminMenuItems = [
     icon: Settings,
   },
   {
+    title: 'Logística',
+    url: '/super-admin/logistica',
+    icon: Truck,
+  },
+  {
     title: 'Financeiro',
     icon: DollarSign,
     submenu: [
