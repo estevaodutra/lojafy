@@ -195,9 +195,21 @@ async function handleRequest(req: Request): Promise<Response> {
       );
     }
 
-    const qrCode = pixData.qrCodeCopyPaste ?? pixData.qr_code ?? null;
-    const qrCodeBase64 = pixData.qrCodeBase64 ?? pixData.qr_code_base64 ?? null;
-    const paymentId = pixData.paymentId ? String(pixData.paymentId) : null;
+    // Suporte para o formato aninhado do Mercado Pago (transactions.payments[0])
+    const firstPayment = pixData.transactions?.payments?.[0];
+    
+    const qrCode = pixData.qrCodeCopyPaste ?? 
+                   pixData.qr_code ?? 
+                   firstPayment?.payment_method?.qr_code ?? 
+                   null;
+                   
+    const qrCodeBase64 = pixData.qrCodeBase64 ?? 
+                         pixData.qr_code_base64 ?? 
+                         firstPayment?.payment_method?.qr_code_base64 ?? 
+                         null;
+                         
+    const paymentId = pixData.paymentId ? String(pixData.paymentId) : 
+                      (firstPayment?.id ? String(firstPayment.id) : null);
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
     if (!qrCode || !paymentId) {

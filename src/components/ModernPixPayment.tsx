@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Copy, Check, QrCode, RefreshCw } from 'lucide-react';
@@ -22,7 +22,17 @@ export const ModernPixPayment: React.FC<ModernPixPaymentProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768 || /Mobi|Android/i.test(navigator.userAgent));
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const copyPixCode = async () => {
     try {
@@ -90,6 +100,92 @@ export const ModernPixPayment: React.FC<ModernPixPaymentProps> = ({
     }
   };
 
+  const qrCodeCard = (
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-center text-sm font-medium">
+          {isMobile ? "Código QR (caso queira pagar em outro aparelho)" : "Escaneie com seu app bancário"}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex justify-center pb-6">
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-accent/20 rounded-xl blur-xl"></div>
+          <div className="relative bg-white p-4 rounded-xl shadow-lg">
+            {qrCodeBase64 ? (
+              <img 
+                src={`data:image/png;base64,${qrCodeBase64}`}
+                alt="QR Code PIX"
+                className="w-48 h-48 object-contain"
+              />
+            ) : (
+              <div className="w-48 h-48 bg-muted rounded-lg flex items-center justify-center">
+                <QrCode className="h-12 w-12 text-muted-foreground" />
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const pixCodeCard = (
+    <Card>
+      <CardHeader className="pb-4">
+        <CardTitle className="text-center text-sm font-medium">
+          {isMobile ? "Copie o código PIX abaixo" : "Ou copie o código PIX"}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="bg-accent/20 border border-accent/30 rounded-lg p-4">
+          <p className="text-sm font-mono break-all text-center text-foreground font-medium">
+            {qrCode}
+          </p>
+        </div>
+        
+        <div className="space-y-3">
+          <Button 
+            onClick={copyPixCode}
+            className="w-full h-14 text-lg font-semibold relative overflow-hidden group shadow-lg text-white hover:opacity-90"
+            style={{ backgroundColor: '#3fc356' }}
+            size="lg"
+            disabled={!qrCode}
+          >
+            {copied ? (
+              <>
+                <Check className="mr-2 h-6 w-6" />
+                Copiado!
+              </>
+            ) : (
+              <>
+                <Copy className="mr-2 h-6 w-6" />
+                Copiar código PIX
+              </>
+            )}
+          </Button>
+
+          <Button 
+            onClick={checkPaymentStatus}
+            variant="outline"
+            className="w-full h-12 text-base font-medium"
+            disabled={checking || !paymentId}
+          >
+            {checking ? (
+              <>
+                <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                Verificando...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mr-2 h-5 w-5" />
+                Verificar status
+              </>
+            )}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="w-full max-w-md mx-auto space-y-6">
       {/* Header */}
@@ -99,7 +195,7 @@ export const ModernPixPayment: React.FC<ModernPixPaymentProps> = ({
           <span className="text-lg font-semibold">Pagamento PIX</span>
         </div>
         <p className="text-muted-foreground text-sm">
-          Escaneie o QR Code ou copie o código PIX
+          {isMobile ? "Copie o código PIX abaixo para pagar" : "Escaneie o QR Code ou copie o código PIX"}
         </p>
       </div>
 
@@ -115,89 +211,18 @@ export const ModernPixPayment: React.FC<ModernPixPaymentProps> = ({
         </CardContent>
       </Card>
 
-      {/* QR Code */}
-      <Card className="overflow-hidden">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-center text-sm font-medium">
-            Escaneie com seu app bancário
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex justify-center pb-6">
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-accent/20 rounded-xl blur-xl"></div>
-            <div className="relative bg-white p-4 rounded-xl shadow-lg">
-              {qrCodeBase64 ? (
-                <img 
-                  src={`data:image/png;base64,${qrCodeBase64}`}
-                  alt="QR Code PIX"
-                  className="w-48 h-48 object-contain"
-                />
-              ) : (
-                <div className="w-48 h-48 bg-muted rounded-lg flex items-center justify-center">
-                  <QrCode className="h-12 w-12 text-muted-foreground" />
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* PIX Code */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-center text-sm font-medium">
-            Ou copie o código PIX
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="bg-accent/20 border border-accent/30 rounded-lg p-4">
-            <p className="text-sm font-mono break-all text-center text-foreground font-medium">
-              {qrCode}
-            </p>
-          </div>
-          
-          <div className="space-y-3">
-            <Button 
-              onClick={copyPixCode}
-              className="w-full h-14 text-lg font-semibold relative overflow-hidden group shadow-lg text-white hover:opacity-90"
-              style={{ backgroundColor: '#3fc356' }}
-              size="lg"
-              disabled={!qrCode}
-            >
-              {copied ? (
-                <>
-                  <Check className="mr-2 h-6 w-6" />
-                  Copiado!
-                </>
-              ) : (
-                <>
-                  <Copy className="mr-2 h-6 w-6" />
-                  Copiar código PIX
-                </>
-              )}
-            </Button>
-
-            <Button 
-              onClick={checkPaymentStatus}
-              variant="outline"
-              className="w-full h-12 text-base font-medium"
-              disabled={checking || !paymentId}
-            >
-              {checking ? (
-                <>
-                  <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
-                  Verificando...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="mr-2 h-5 w-5" />
-                  Verificar status
-                </>
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Conditional Layout */}
+      {isMobile ? (
+        <>
+          {pixCodeCard}
+          {qrCodeCard}
+        </>
+      ) : (
+        <>
+          {qrCodeCard}
+          {pixCodeCard}
+        </>
+      )}
 
       {/* Instructions */}
       <Card className="bg-accent/10 border-accent/30">
@@ -215,7 +240,7 @@ export const ModernPixPayment: React.FC<ModernPixPaymentProps> = ({
               </li>
               <li className="flex gap-2">
                 <span className="text-accent font-bold">3.</span>
-                Escaneie o QR Code ou cole o código
+                {isMobile ? "Escolha a opção PIX Copia e Cola e cole o código" : "Escaneie o QR Code ou copie o código"}
               </li>
               <li className="flex gap-2">
                 <span className="text-accent font-bold">4.</span>

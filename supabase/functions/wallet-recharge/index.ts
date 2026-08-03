@@ -244,13 +244,26 @@ async function handleRequest(req: Request): Promise<Response> {
       throw new Error('Formato de resposta PIX inválido');
     }
 
-    if (!pixData.qrCodeBase64 || !pixData.qrCodeCopyPaste) {
+    // Suporte para o formato aninhado do Mercado Pago (transactions.payments[0])
+    const firstPayment = pixData.transactions?.payments?.[0];
+    
+    const qrCode = pixData.qrCodeCopyPaste ?? 
+                   pixData.qr_code ?? 
+                   firstPayment?.payment_method?.qr_code ?? 
+                   null;
+                   
+    const qrCodeBase64 = pixData.qrCodeBase64 ?? 
+                         pixData.qr_code_base64 ?? 
+                         firstPayment?.payment_method?.qr_code_base64 ?? 
+                         null;
+                         
+    const paymentId = pixData.paymentId ? String(pixData.paymentId) : 
+                      (firstPayment?.id ? String(firstPayment.id) : `wallet_${transaction.id}`);
+
+    if (!qrCodeBase64 || !qrCode) {
       await supabase.from('wallet_transactions').delete().eq('id', transaction.id);
       throw new Error('Dados do QR Code PIX não disponíveis');
     }
-
-    // Update transaction with payment_id
-    const paymentId = pixData.paymentId || `wallet_${transaction.id}`;
     await supabase
       .from('wallet_transactions')
       .update({ payment_id: paymentId })
