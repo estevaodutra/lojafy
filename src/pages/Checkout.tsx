@@ -137,14 +137,14 @@ const Checkout = ({
   useEffect(() => {
     const loadUserData = async () => {
       if (user && session) {
-        // Prefill with user profile data
+        // Prefill with user profile data if not already entered by the user
         setFormData(prev => ({
           ...prev,
-          email: user.email || "",
-          firstName: profile?.first_name || "",
-          lastName: profile?.last_name || "",
-          phone: profile?.phone || "",
-          cpf: profile?.cpf || ""
+          email: prev.email || user.email || "",
+          firstName: prev.firstName || profile?.first_name || "",
+          lastName: prev.lastName || profile?.last_name || "",
+          phone: prev.phone || profile?.phone || "",
+          cpf: prev.cpf || profile?.cpf || ""
         }));
 
         // Try to get user's default address
