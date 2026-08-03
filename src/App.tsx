@@ -99,6 +99,7 @@ const SupportManagement = lazy(() => import("./pages/admin/SupportManagement"));
 const ChatSupport = lazy(() => import("./pages/admin/ChatSupport"));
 const AdminAcademy = lazy(() => import("./pages/admin/Academy"));
 const ApiDocumentation = lazy(() => import("./pages/admin/ApiDocumentation"));
+const SystemLogs = lazy(() => import("./pages/admin/SystemLogs"));
 const Features = lazy(() => import("./pages/admin/Features"));
 const Planos = lazy(() => import("./pages/admin/Planos"));
 const Marketplaces = lazy(() => import("./pages/admin/Marketplaces"));
@@ -390,6 +391,7 @@ const App = () => {
                   <Route path="base-conhecimento" element={<AIKnowledgeBase />} />
                   <Route path="suporte" element={<SupportManagement />} />
                   <Route path="api-docs" element={<ApiDocumentation />} />
+                  <Route path="logs" element={<SystemLogs />} />
                 </Route>
 
                 {/* Supplier Panel Routes */}

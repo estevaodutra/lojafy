@@ -26,7 +26,8 @@ import {
   CreditCard,
   ShoppingBag,
   Wallet,
-  Clock
+  Clock,
+  ScrollText
 } from 'lucide-react';
 import {
   Sidebar,
@@ -121,6 +122,11 @@ const superAdminMenuItems = [
     title: 'API Docs',
     url: '/super-admin/api-docs',
     icon: Code,
+  },
+  {
+    title: 'Logs de API',
+    url: '/super-admin/logs',
+    icon: ScrollText,
   },
 ];
 

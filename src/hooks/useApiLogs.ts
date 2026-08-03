@@ -14,6 +14,8 @@ interface UseApiLogsParams {
   status?: LogStatus;
   page?: number;
   pageSize?: number;
+  method?: string;
+  search?: string;
 }
 
 interface UnifiedLog {
@@ -30,6 +32,9 @@ interface UnifiedLog {
   duration_ms?: number | null;
   timestamp: string;
   webhook_url?: string | null;
+  path?: string | null;
+  ip_address?: string | null;
+  user_id?: string | null;
 }
 
 interface UseApiLogsResult {
@@ -69,11 +74,13 @@ export const useApiLogs = ({
   status = 'all',
   page = 1,
   pageSize = 20,
+  method = 'all',
+  search = '',
 }: UseApiLogsParams = {}): UseApiLogsResult => {
   const [currentPage, setCurrentPage] = useState(page);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['api-logs', source, eventType, period, status, currentPage, pageSize],
+    queryKey: ['api-logs', source, eventType, period, status, currentPage, pageSize, method, search],
     queryFn: async () => {
       const periodDate = getPeriodDate(period);
       const logs: UnifiedLog[] = [];
@@ -81,7 +88,8 @@ export const useApiLogs = ({
       let apiCount = 0;
 
       // Fetch webhook logs if needed
-      if (source === 'all' || source === 'webhook') {
+      const matchesWebhookMethod = method === 'all' || method.toUpperCase() === 'POST';
+      if ((source === 'all' || source === 'webhook') && matchesWebhookMethod) {
         let webhookQuery = supabase
           .from('webhook_dispatch_logs')
           .select('*', { count: 'exact' });
@@ -100,6 +108,10 @@ export const useApiLogs = ({
           webhookQuery = webhookQuery.or('status_code.gte.400,status_code.is.null');
         }
 
+        if (search) {
+          webhookQuery = webhookQuery.ilike('event_type', `%${search}%`);
+        }
+
         const { data: webhookLogs, count: wCount } = await webhookQuery
           .order('dispatched_at', { ascending: false })
           .limit(source === 'webhook' ? pageSize : 100);
@@ -115,7 +127,7 @@ export const useApiLogs = ({
             status_code: log.status_code,
             response_body: log.response_body,
             error_message: log.error_message,
-            timestamp: log.dispatched_at,
+            timestamp: log.dispatched_at || new Date().toISOString(),
             webhook_url: (log as any).webhook_url || null,
           });
         });
@@ -137,6 +149,14 @@ export const useApiLogs = ({
           apiQuery = apiQuery.or('status_code.gte.400,status_code.is.null');
         }
 
+        if (method && method !== 'all') {
+          apiQuery = apiQuery.eq('method', method.toUpperCase());
+        }
+
+        if (search) {
+          apiQuery = apiQuery.or(`function_name.ilike.%${search}%,path.ilike.%${search}%`);
+        }
+
         const { data: apiLogs, count: aCount } = await apiQuery
           .order('created_at', { ascending: false })
           .limit(source === 'api_request' ? pageSize : 100);
@@ -150,11 +170,16 @@ export const useApiLogs = ({
             event_type: `api.${log.function_name}`,
             function_name: log.function_name,
             method: log.method,
+            path: log.path,
             query_params: log.query_params as Record<string, unknown>,
+            payload: log.request_body as Record<string, unknown>,
+            response_body: log.response_summary ? JSON.stringify(log.response_summary, null, 2) : null,
             status_code: log.status_code,
             error_message: log.error_message,
             duration_ms: log.duration_ms,
-            timestamp: log.created_at,
+            timestamp: log.created_at || new Date().toISOString(),
+            ip_address: log.ip_address,
+            user_id: log.user_id,
           });
         });
       }
