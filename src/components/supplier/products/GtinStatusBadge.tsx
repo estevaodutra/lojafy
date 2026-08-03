@@ -16,15 +16,35 @@ export const GtinStatusBadge = ({ status }: { status: string | null }) => {
 };
 
 export const STAGE_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
-  stage_1_basic: { label: 'Estágio 1 — Básico', variant: 'secondary' },
-  stage_2_enriching: { label: 'Estágio 2 — Enriquecendo', variant: 'secondary' },
-  stage_2_requires_review: { label: 'Estágio 2 — Requer revisão', variant: 'destructive' },
-  stage_2_enabled: { label: 'Habilitado', variant: 'default' },
+  stage_1_basic: { label: 'Estágio 1', variant: 'secondary' },
+  stage_2_enriching: { label: 'Estágio 2', variant: 'default' },
+  stage_2_requires_review: { label: 'Estágio 2', variant: 'default' },
+  stage_2_enabled: { label: 'Estágio 2', variant: 'default' },
   stage_2_blocked: { label: 'Bloqueado', variant: 'destructive' },
 };
 
 export const StageBadge = ({ stage }: { stage: string | null }) => {
-  const config = stage ? STAGE_CONFIG[stage] : null;
-  if (!config) return <Badge variant="outline">Legado</Badge>;
-  return <Badge variant={config.variant}>{config.label}</Badge>;
+  if (!stage) return <Badge variant="outline">Legado</Badge>;
+
+  if (stage === 'stage_1_basic') {
+    return (
+      <Badge className="bg-amber-500 hover:bg-amber-500 text-white border-none">
+        Estágio 1
+      </Badge>
+    );
+  }
+
+  if (stage === 'stage_2_blocked') {
+    return (
+      <Badge variant="destructive">
+        Bloqueado
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge className="bg-green-600 hover:bg-green-600 text-white border-none">
+      Estágio 2
+    </Badge>
+  );
 };
