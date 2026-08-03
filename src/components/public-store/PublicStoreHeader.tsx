@@ -34,13 +34,13 @@ const PublicStoreHeader = ({ store }: PublicStoreHeaderProps) => {
           color: store.primary_color === '#000000' ? '#ffffff' : '#000000'
         }}
       >
-        <div className="container mx-auto px-4 text-center text-sm">
+        <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl text-center text-sm">
           <span>🛍️ Loja de {store.store_name} | 📱 Vendas Online</span>
         </div>
       </div>
 
       {/* Main Header */}
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl py-4">
         <div className="flex items-center justify-between">
           {/* Back Button & Logo */}
           <div className="flex items-center space-x-4">

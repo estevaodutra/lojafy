@@ -41,8 +41,8 @@ const Benefits = () => {
   
   return (
     <section className="py-16 bg-[#f7f9fa]">
-      <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+      <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
           {displayBenefits.map((benefit) => {
             const IconComponent = iconMap[benefit.icon as keyof typeof iconMap] || benefit.icon;
             return (

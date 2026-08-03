@@ -81,13 +81,13 @@ const Header = () => {
       backgroundColor: config?.header_background_color || '#000000',
       color: config?.header_message_color || '#ffffff'
     }}>
-        <div className="container mx-auto px-4 text-center text-sm">
+        <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl text-center text-sm">
           {config?.header_message || '🚚 Frete GRÁTIS para compras acima de R$ 199 | 📦 Entrega em todo o Brasil'}
         </div>
       </div>
 
       {/* Main Header */}
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">

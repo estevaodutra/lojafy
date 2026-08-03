@@ -22,7 +22,7 @@ const Testimonials = () => {
   if (isLoading) {
     return (
       <section className="py-16 bg-muted/30">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
           <div className="text-center mb-12">
             <Skeleton className="h-10 w-96 mx-auto mb-4" />
             <Skeleton className="h-6 w-64 mx-auto" />
@@ -58,7 +58,7 @@ const Testimonials = () => {
 
   return (
     <section className="py-16 bg-muted/30">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
             O Que Nossos Clientes Dizem

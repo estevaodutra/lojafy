@@ -57,7 +57,7 @@ const Hero = () => {
   if (isLoading) {
     return (
       <section className="relative bg-hero-gradient text-white overflow-hidden">
-        <div className="container mx-auto px-4 py-20">
+        <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl py-20">
           <div className="text-center">
             <div className="animate-spin h-8 w-8 border-2 border-white border-t-transparent rounded-full mx-auto"></div>
             <p className="mt-4 text-white/80">Carregando...</p>
@@ -119,7 +119,7 @@ const Hero = () => {
     
     return (
       <section className="relative bg-hero-gradient text-white overflow-hidden">
-        <div className="container mx-auto px-4 py-20">
+        <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl py-20">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
               <h1 className="text-4xl md:text-6xl font-bold leading-tight">
@@ -234,7 +234,7 @@ const Hero = () => {
             
             return (
               <CarouselItem key={banner.id}>
-                <div className="container mx-auto px-4 py-20">
+                <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl py-20">
                   <div className="grid md:grid-cols-2 gap-12 items-center">
                     <div className="space-y-6">
                       <h1 className="text-4xl md:text-6xl font-bold leading-tight">

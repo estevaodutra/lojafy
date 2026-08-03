@@ -16,7 +16,7 @@ const Newsletter = () => {
 
   return (
     <section className="py-16 bg-hero-gradient">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
         <Card className="max-w-4xl mx-auto border-0 shadow-2xl">
           <CardContent className="p-8 md:p-12">
             <div className="grid md:grid-cols-2 gap-8 items-center">
