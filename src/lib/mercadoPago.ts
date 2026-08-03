@@ -48,7 +48,9 @@ export async function createModernPixPayment(paymentData: PixPaymentRequest): Pr
         payer: paymentData.payer,
         orderItems: paymentData.orderItems || [],
         shippingAddress: paymentData.shippingAddress || null,
-        reseller_id: paymentData.reseller_id || null
+        reseller_id: paymentData.reseller_id || null,
+        shippingLabel: paymentData.shippingLabel || null,
+        metadata: { platform: 'lojafy' }
       }
     });
 

@@ -250,7 +250,11 @@ const PublicStoreCart = () => {
                     </span>
                   </div>
 
-                  {!freeShipping}
+                  {!freeShipping && (
+                    <p className="text-xs text-muted-foreground italic">
+                      *Adicione mais {formatPrice(shippingThreshold - totalPrice)} para ganhar frete grátis!*
+                    </p>
+                  )}
 
                   <Separator />
                   

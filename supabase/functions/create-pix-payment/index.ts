@@ -40,6 +40,7 @@ interface PixPaymentRequest {
     extractionMethod: string;
     manuallyEdited: boolean;
   };
+  metadata?: any;
 }
 
 serve(async (req) => {
@@ -67,7 +68,7 @@ serve(async (req) => {
       );
     }
 
-    const { amount, description, payer, orderItems, shippingAddress, reseller_id, shippingLabel }: PixPaymentRequest = await req.json();
+    const { amount, description, payer, orderItems, shippingAddress, reseller_id, shippingLabel, metadata }: PixPaymentRequest = await req.json();
 
     if (!amount || !payer?.email || !payer?.cpf) {
       return new Response(
@@ -97,6 +98,10 @@ serve(async (req) => {
       reseller_id,
       externalReference,
       notificationUrl,
+      metadata: {
+        ...(metadata || {}),
+        platform: 'lojafy'
+      },
 
       // Structured format for compatibility with wallet-recharge style consumers
       pedido: {

@@ -75,6 +75,7 @@ const Checkout = ({
   } | null>(null);
   const [showHighRotationAlert, setShowHighRotationAlert] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credit_card' | 'wallet'>('pix');
+  const [isPayingWithWallet, setIsPayingWithWallet] = useState(false);
   const [useWalletPartial, setUseWalletPartial] = useState(false);
   const { data: walletData } = useWallet();
   const walletSaldo = walletData?.saldo ?? 0;
@@ -503,7 +504,7 @@ const Checkout = ({
           // Para simplicidade, manteremos como está e salvamos o path correto.
           
           // Atualiza o registro de auditoria para vincular ao order_id
-          await supabase.from('shipment_label_extractions')
+          await (supabase as any).from('shipment_label_extractions')
             .update({ order_id: response.order_id })
             .eq('file_path', shippingLabelData.filePath);
             
@@ -719,7 +720,7 @@ const Checkout = ({
           
           if (dbError) console.error('Error saving shipping label to db:', dbError);
           
-          await supabase.from('shipment_label_extractions')
+          await (supabase as any).from('shipment_label_extractions')
             .update({ order_id: orderId })
             .eq('file_path', shippingLabelData.filePath);
             
@@ -1044,8 +1045,8 @@ const Checkout = ({
                   {/* Wallet payment option */}
                   {user && walletSaldo > 0 && (
                     <div 
-                      className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${walletPaymentMethod === 'wallet' ? 'border-primary bg-primary/5' : 'border-muted hover:border-primary/50'}`}
-                      onClick={() => setWalletPaymentMethod('wallet')}
+                      className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${paymentMethod === 'wallet' ? 'border-primary bg-primary/5' : 'border-muted hover:border-primary/50'}`}
+                      onClick={() => setPaymentMethod('wallet')}
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center text-xl">
@@ -1062,15 +1063,15 @@ const Checkout = ({
                             <p className="text-xs text-amber-600 font-medium mt-0.5">⚠️ Saldo insuficiente. Faltam {formatPrice(total - walletSaldo)}</p>
                           )}
                         </div>
-                        <input type="radio" checked={walletPaymentMethod === 'wallet'} onChange={() => setWalletPaymentMethod('wallet')} className="w-4 h-4" />
+                        <input type="radio" checked={paymentMethod === 'wallet'} onChange={() => setPaymentMethod('wallet')} className="w-4 h-4" />
                       </div>
                     </div>
                   )}
 
                   {/* PIX option */}
                   <div 
-                    className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${walletPaymentMethod === 'pix' ? 'border-primary bg-primary/5' : 'border-muted hover:border-primary/50'}`}
-                    onClick={() => setWalletPaymentMethod('pix')}
+                    className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${paymentMethod === 'pix' ? 'border-primary bg-primary/5' : 'border-muted hover:border-primary/50'}`}
+                    onClick={() => setPaymentMethod('pix')}
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-xl">
@@ -1082,13 +1083,13 @@ const Checkout = ({
                           Pagamento instantâneo e seguro
                         </p>
                       </div>
-                      <input type="radio" checked={walletPaymentMethod === 'pix'} onChange={() => setWalletPaymentMethod('pix')} className="w-4 h-4 ml-auto" />
+                      <input type="radio" checked={paymentMethod === 'pix'} onChange={() => setPaymentMethod('pix')} className="w-4 h-4 ml-auto" />
                     </div>
                   </div>
 
                   <BannerPrevisaoEnvio />
                   
-                  {walletPaymentMethod === 'pix' ? (
+                  {paymentMethod === 'pix' ? (
                     <>
                       <p className="text-sm text-muted-foreground">
                         Clique no botão abaixo para gerar o QR Code PIX para pagamento.

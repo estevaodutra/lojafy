@@ -146,6 +146,9 @@ Deno.serve(async (req) => {
         metodo: 'pix',
         valor: totalPagar,
       },
+      metadata: {
+        platform: 'lojafy'
+      },
     };
 
     const n8nBaseUrl = Deno.env.get('N8N_WEBHOOK_BASE_URL') || 'https://n8n-n8n.nuwfic.easypanel.host';
