@@ -34,6 +34,51 @@ async function getValidToken(userId: string): Promise<string> {
   return data.access_token;
 }
 
+async function sanitizeImageForMl(url: string): Promise<string> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  if (!url) return url;
+  if (!url.includes('mlstatic.com') && url.includes(supabaseUrl) && url.includes('product-images')) {
+    return url;
+  }
+  
+  try {
+    console.log(`[ml-publish] Sanitizing image for ML: ${url}`);
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+    });
+    if (!res.ok) return url;
+    
+    const contentType = res.headers.get('content-type') || 'image/jpeg';
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    
+    let ext = 'jpg';
+    if (contentType.includes('png')) ext = 'png';
+    else if (contentType.includes('webp')) ext = 'webp';
+    
+    const timestamp = Date.now();
+    const randomHex = Math.random().toString(36).substring(2, 10);
+    const filePath = `sanitized/ml_clean_${timestamp}_${randomHex}.${ext}`;
+    
+    const { data: uploadData, error } = await supabase.storage
+      .from('product-images')
+      .upload(filePath, bytes, { contentType, upsert: true });
+      
+    if (error) {
+      console.warn('[ml-publish] Upload to product-images failed:', error);
+      return url;
+    }
+    
+    const { data: pubData } = supabase.storage.from('product-images').getPublicUrl(filePath);
+    console.log(`[ml-publish] Image sanitized successfully. New URL: ${pubData.publicUrl}`);
+    return pubData.publicUrl;
+  } catch (err) {
+    console.warn(`[ml-publish] Image sanitization failed for ${url}:`, err);
+    return url;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -243,6 +288,14 @@ serve(async (req) => {
       }
     }
 
+    // Sanitizar imagens (garantir que não sejam links brutos do mlstatic.com)
+    console.log('[ml-publish] Sanitizing product pictures prior to Mercado Livre payload creation...');
+    const sanitizedImageUrls: string[] = [];
+    for (const url of imageUrls.slice(0, 12)) {
+      const cleanUrl = await sanitizeImageForMl(url);
+      sanitizedImageUrls.push(cleanUrl);
+    }
+
     const mlPayload: Record<string, unknown> = {
       title: product.name.substring(0, 60), // ML limita título a 60 chars
       category_id: categoryId ?? 'MLB1051',  // fallback: Outros
@@ -252,7 +305,7 @@ serve(async (req) => {
       buying_mode: 'buy_it_now',
       listing_type_id: validated.listing_type_id ?? 'gold_pro',
       condition: validated.condition ?? 'new',
-      pictures: imageUrls.slice(0, 12).map((url) => ({ source: url })),
+      pictures: sanitizedImageUrls.map((url) => ({ source: url })),
     };
 
     // Shipping: default to me2 unless verified otherwise. Force me2 if it is me1 to avoid "User has not mode me1" error

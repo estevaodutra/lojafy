@@ -591,6 +591,28 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         }
       }
 
+      // Sanitizar imagens externas (ex: mlstatic.com) para salvar no bucket product-images
+      let sanitizedImageUrls = [...imageUrls];
+      let sanitizedMainImageUrl = mainImageUrl;
+
+      if (imageUrls.some(url => typeof url === 'string' && (url.includes('mlstatic.com') || (!url.includes('product-images') && url.startsWith('http'))))) {
+        try {
+          const { data: sanitizeRes } = await supabase.functions.invoke('ml-sanitize-image', {
+            body: { urls: imageUrls }
+          });
+          if (sanitizeRes?.sanitizedUrls && Array.isArray(sanitizeRes.sanitizedUrls)) {
+            sanitizedImageUrls = sanitizeRes.sanitizedUrls;
+            if (mainImageUrl && sanitizeRes.mapping?.[mainImageUrl]) {
+              sanitizedMainImageUrl = sanitizeRes.mapping[mainImageUrl];
+            } else {
+              sanitizedMainImageUrl = sanitizedImageUrls[0] || '';
+            }
+          }
+        } catch (sanitizeErr) {
+          console.warn('Erro ao sanitizar mídias no formulário:', sanitizeErr);
+        }
+      }
+
       // Prepare product data
       const productData: any = {
         name: data.name,
@@ -625,14 +647,14 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel 
         width: dimensions.width || null,
         length: dimensions.length || null,
         weight: dimensions.weight || null,
-        main_image_url: mainImageUrl,
-        image_url: mainImageUrl, // Backward compatibility
+        main_image_url: sanitizedMainImageUrl,
+        image_url: sanitizedMainImageUrl, // Backward compatibility
         active: data.active,
         featured: data.reference_ad_url && data.reference_ad_url.trim() !== '' ? true : data.featured,
         badge: data.badge || null,
         reference_ad_url: data.reference_ad_url || null,
         specifications: specificationsObj,
-        images: imageUrls,
+        images: sanitizedImageUrls,
         updated_at: new Date().toISOString(),
       };
 

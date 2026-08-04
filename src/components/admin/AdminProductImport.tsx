@@ -349,7 +349,27 @@ export function AdminProductImport({ onSuccess, onCancel }: AdminProductImportPr
 
       const activeImages = images.filter(url => selectedImages.has(url));
 
-      // 1. Prepare product payload
+      // 1. Sanitizar imagens para armazenar no container product-images
+      let sanitizedActiveImages = [...activeImages];
+      let sanitizedMainImage = mainImageUrl || activeImages[0] || null;
+
+      try {
+        const { data: sanitizeResult } = await supabase.functions.invoke('ml-sanitize-image', {
+          body: { urls: activeImages }
+        });
+        if (sanitizeResult?.sanitizedUrls && Array.isArray(sanitizeResult.sanitizedUrls)) {
+          sanitizedActiveImages = sanitizeResult.sanitizedUrls;
+          if (mainImageUrl && sanitizeResult.mapping?.[mainImageUrl]) {
+            sanitizedMainImage = sanitizeResult.mapping[mainImageUrl];
+          } else {
+            sanitizedMainImage = sanitizedActiveImages[0] || null;
+          }
+        }
+      } catch (err) {
+        console.warn('Falha na sanitização de mídias durante importação, prosseguindo com fallback:', err);
+      }
+
+      // 2. Prepare product payload
       const productPayload = {
         name,
         description: description || null,
@@ -361,9 +381,9 @@ export function AdminProductImport({ onSuccess, onCancel }: AdminProductImportPr
         gtin_ean13: gtin || null,
         stock_quantity: parseInt(stock) || 0,
         min_stock_level: 5,
-        main_image_url: mainImageUrl || activeImages[0] || null,
-        image_url: mainImageUrl || activeImages[0] || null,
-        images: activeImages,
+        main_image_url: sanitizedMainImage,
+        image_url: sanitizedMainImage,
+        images: sanitizedActiveImages,
         active: true,
         featured: false,
         approval_status: 'approved', // Superadmin products are auto-approved

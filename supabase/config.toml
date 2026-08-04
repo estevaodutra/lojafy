@@ -221,3 +221,14 @@ verify_jwt = false
 
 [functions.ml-public-search]
 verify_jwt = false
+
+[functions.ml-sanitize-image]
+verify_jwt = false
+
+[functions.ml-publish-product]
+verify_jwt = false
+
+[functions.migrate-product-images]
+verify_jwt = false
+
+
