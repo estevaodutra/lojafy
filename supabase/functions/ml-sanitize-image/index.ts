@@ -58,8 +58,11 @@ async function sanitizeSingleImage(imageUrl: string): Promise<string> {
     }
 
     const { data: publicData } = supabase.storage.from('product-images').getPublicUrl(filePath);
-    console.log(`[ml-sanitize-image] Successfully sanitized image. New URL: ${publicData.publicUrl}`);
-    return publicData.publicUrl;
+    const publicDomain = Deno.env.get('SUPABASE_PUBLIC_URL') || 'https://lojafy-supabase.d2x.site';
+    const cleanPublicUrl = publicData.publicUrl.replace(/^http:\/\/(kong|localhost|127\.0\.0\.1):8000/, publicDomain);
+    
+    console.log(`[ml-sanitize-image] Successfully sanitized image. New URL: ${cleanPublicUrl}`);
+    return cleanPublicUrl;
   } catch (err) {
     console.error(`[ml-sanitize-image] Error sanitizing image ${imageUrl}:`, err);
     return imageUrl;

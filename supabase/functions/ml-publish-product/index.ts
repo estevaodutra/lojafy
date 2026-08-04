@@ -71,8 +71,11 @@ async function sanitizeImageForMl(url: string): Promise<string> {
     }
     
     const { data: pubData } = supabase.storage.from('product-images').getPublicUrl(filePath);
-    console.log(`[ml-publish] Image sanitized successfully. New URL: ${pubData.publicUrl}`);
-    return pubData.publicUrl;
+    const publicDomain = Deno.env.get('SUPABASE_PUBLIC_URL') || 'https://lojafy-supabase.d2x.site';
+    const cleanPublicUrl = pubData.publicUrl.replace(/^http:\/\/(kong|localhost|127\.0\.0\.1):8000/, publicDomain);
+    
+    console.log(`[ml-publish] Image sanitized successfully. New URL: ${cleanPublicUrl}`);
+    return cleanPublicUrl;
   } catch (err) {
     console.warn(`[ml-publish] Image sanitization failed for ${url}:`, err);
     return url;

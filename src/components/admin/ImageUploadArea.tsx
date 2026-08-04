@@ -51,12 +51,20 @@ export const ImageUploadArea: React.FC<ImageUploadAreaProps> = ({
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  const PUBLIC_DOMAIN = import.meta.env.VITE_SUPABASE_URL || 'https://lojafy-supabase.d2x.site';
+
+  const fixInternalDockerHost = (url: string): string => {
+    if (!url) return url;
+    return url.replace(/^http:\/\/(kong|localhost|127\.0\.0\.1):8000/, PUBLIC_DOMAIN);
+  };
+
   // Helper para verificar se a imagem já está hospedada no nosso servidor Supabase
   const isHostedOnOurServer = (url?: string) => {
     if (!url) return false;
     const isOurBucket = url.includes('product-images') || url.includes('catalog-images');
     const isNotMl = !url.includes('mlstatic.com') && !url.includes('mercadolibre.com');
-    return isOurBucket && isNotMl;
+    const isNotInternalHost = !url.includes('kong:8000') && !url.includes('localhost:8000');
+    return isOurBucket && isNotMl && isNotInternalHost;
   };
 
   const uploadImage = useCallback(async (file: File) => {
@@ -75,7 +83,7 @@ export const ImageUploadArea: React.FC<ImageUploadAreaProps> = ({
         .from('product-images')
         .getPublicUrl(filePath);
 
-      return publicUrl;
+      return fixInternalDockerHost(publicUrl);
     } catch (error) {
       console.error('Error uploading image:', error);
       throw error;
@@ -177,7 +185,7 @@ export const ImageUploadArea: React.FC<ImageUploadAreaProps> = ({
       });
 
       if (!error && res?.sanitizedUrls?.[0]) {
-        const cleanUrl = res.sanitizedUrls[0];
+        const cleanUrl = fixInternalDockerHost(res.sanitizedUrls[0]);
         return {
           ...imageItem,
           url: cleanUrl,
@@ -216,10 +224,12 @@ export const ImageUploadArea: React.FC<ImageUploadAreaProps> = ({
         .from('product-images')
         .getPublicUrl(filePath);
 
+      const fixedUrl = fixInternalDockerHost(publicUrl);
+
       return {
         ...imageItem,
-        url: publicUrl,
-        preview: publicUrl,
+        url: fixedUrl,
+        preview: fixedUrl,
         isUploading: false
       };
     } catch (err) {
