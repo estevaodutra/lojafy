@@ -27,6 +27,8 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+
 /** Hub de enriquecimento do fornecedor usando o formulário completo do superadmin como padrão. */
 const SupplierProductDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -229,7 +231,8 @@ const SupplierProductDetail = () => {
   }
 
   return (
-    <div className="w-full space-y-6">
+    <ErrorBoundary fallbackTitle="Erro ao carregar os detalhes do produto">
+      <div className="w-full space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={() => navigate('/supplier/produtos')}>
           <ArrowLeft className="mr-1 h-4 w-4" />
@@ -545,6 +548,7 @@ const SupplierProductDetail = () => {
         </DialogContent>
       </Dialog>
     </div>
+    </ErrorBoundary>
   );
 };
 
