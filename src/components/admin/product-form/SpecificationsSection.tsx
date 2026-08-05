@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, X, Search, Filter, ListChecks, CheckCircle2 } from 'lucide-react';
+import { Plus, X, Search, Filter, ListChecks, CheckCircle2, Sparkles } from 'lucide-react';
 
 export interface SpecificationItem {
   key: string;
@@ -17,6 +17,22 @@ interface SpecificationsSectionProps {
   onRemoveSpecification: (index: number) => void;
 }
 
+const DEFAULT_SPEC_KEYS = [
+  'Voltagem',
+  'Material',
+  'Garantia',
+  'Resolução',
+  'Conectividade',
+  'Potência',
+  'Capacidade',
+  'Peso líquido',
+  'Origem',
+  'Dimensões',
+  'Cor Principal',
+];
+
+const LOCAL_STORAGE_KEY_SPECS = 'lojafy_custom_spec_keys';
+
 export const SpecificationsSection: React.FC<SpecificationsSectionProps> = ({
   specifications,
   onAddSpecification,
@@ -26,6 +42,51 @@ export const SpecificationsSection: React.FC<SpecificationsSectionProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'filled' | 'empty'>('all');
   const [showAll, setShowAll] = useState(false);
+
+  // Atributos salvos pelo usuário (persistidos em localStorage)
+  const [customSpecKeys, setCustomSpecKeys] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY_SPECS);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  // Lista unificada de sugestões sem duplicatas
+  const allSuggestedKeys = Array.from(new Set([...DEFAULT_SPEC_KEYS, ...customSpecKeys]));
+
+  const handleSaveCustomKey = (keyName: string) => {
+    const trimmed = keyName.trim();
+    if (!trimmed) return;
+
+    if (!allSuggestedKeys.some(k => k.toLowerCase() === trimmed.toLowerCase())) {
+      const updated = [...customSpecKeys, trimmed];
+      setCustomSpecKeys(updated);
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY_SPECS, JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Erro ao salvar atributo no localStorage:', e);
+      }
+    }
+  };
+
+  const handleQuickAddSpec = (keyName: string) => {
+    // 1. Salvar no localStorage se for novo
+    handleSaveCustomKey(keyName);
+
+    // 2. Verificar se já existe um campo com essa chave vazio
+    const emptyIndex = specifications.findIndex(s => s.key === '' || s.key.toLowerCase() === keyName.toLowerCase());
+    if (emptyIndex !== -1) {
+      onUpdateSpecification(emptyIndex, 'key', keyName);
+    } else {
+      // Adicionar novo atributo e definir a chave
+      onAddSpecification();
+      setTimeout(() => {
+        onUpdateSpecification(specifications.length, 'key', keyName);
+      }, 50);
+    }
+  };
 
   // Filtragem
   const filteredSpecs = specifications.filter((spec) => {
@@ -109,6 +170,40 @@ export const SpecificationsSection: React.FC<SpecificationsSectionProps> = ({
 
       </div>
 
+      {/* Sugestões de Atributos Frequentes & Salvos (Pílulas de 1-Clique) */}
+      <div className="p-2.5 rounded-lg bg-muted/20 border space-y-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
+            <Sparkles className="h-3 w-3 text-amber-500" />
+            Atributos Frequentes e Salvos (Clique para adicionar rapidamente):
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+          {allSuggestedKeys.map((keyName) => {
+            const isAlreadyAdded = specifications.some(s => s.key.toLowerCase() === keyName.toLowerCase());
+            return (
+              <Badge
+                key={keyName}
+                variant={isAlreadyAdded ? "secondary" : "outline"}
+                className={`text-[10px] cursor-pointer transition-all hover:bg-primary hover:text-primary-foreground ${
+                  isAlreadyAdded ? 'opacity-60 cursor-default' : 'bg-background'
+                }`}
+                onClick={() => !isAlreadyAdded && handleQuickAddSpec(keyName)}
+              >
+                + {keyName}
+              </Badge>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Datalist para Autocomplete nos Inputs */}
+      <datalist id="spec-keys-list">
+        {allSuggestedKeys.map(k => (
+          <option key={k} value={k} />
+        ))}
+      </datalist>
+
       {/* Tabela Compacta de Atributos */}
       {visibleSpecs.length > 0 ? (
         <div className="border rounded-lg overflow-hidden bg-background shadow-2xs">
@@ -127,9 +222,11 @@ export const SpecificationsSection: React.FC<SpecificationsSectionProps> = ({
                   <TableRow key={index} className="h-10 hover:bg-muted/20">
                     <TableCell className="py-1 px-3">
                       <Input
+                        list="spec-keys-list"
                         placeholder="Ex: Voltagem, Material, Resolução"
                         value={spec.key}
                         onChange={(e) => onUpdateSpecification(realIndex, 'key', e.target.value)}
+                        onBlur={(e) => handleSaveCustomKey(e.target.value)}
                         className="h-7 text-xs font-semibold bg-transparent border-transparent hover:border-input focus:border-input transition-colors"
                       />
                     </TableCell>

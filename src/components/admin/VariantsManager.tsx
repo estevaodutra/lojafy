@@ -7,10 +7,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from '@/components/ui/dialog';
 
 export interface ProductVariant {
   id: string;
-  type: 'color' | 'size' | 'model';
+  type: string;
   name: string;
   value: string;
   costPrice: number;
@@ -79,6 +87,19 @@ const calculateSellingPrice = (
   return Math.round(price * 100) / 100;
 };
 
+export interface CustomVariantType {
+  id: string;
+  label: string;
+}
+
+const DEFAULT_VARIANT_TYPES: CustomVariantType[] = [
+  { id: 'color', label: 'Cor' },
+  { id: 'size', label: 'Tamanho' },
+  { id: 'model', label: 'Modelo' },
+];
+
+const LOCAL_STORAGE_KEY_VARIANTS = 'lojafy_custom_variant_types';
+
 export const VariantsManager: React.FC<VariantsManagerProps> = ({
   variants,
   onVariantsChange,
@@ -87,6 +108,56 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
   useAutoPricing = false
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
+  
+  // Tipos de variação customizados salvos pelo usuário (persistidos em localStorage)
+  const [customTypes, setCustomTypes] = useState<CustomVariantType[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY_VARIANTS);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [isAddTypeDialogOpen, setIsAddTypeDialogOpen] = useState(false);
+  const [newTypeName, setNewTypeName] = useState('');
+
+  const allVariantTypes = [...DEFAULT_VARIANT_TYPES, ...customTypes];
+
+  const handleCreateCustomType = () => {
+    const trimmed = newTypeName.trim();
+    if (!trimmed) return;
+
+    const slug = trimmed.toLowerCase().replace(/\s+/g, '_');
+    const existing = allVariantTypes.find(t => t.id === slug || t.label.toLowerCase() === trimmed.toLowerCase());
+    
+    if (existing) {
+      setNewVariant(prev => ({ ...prev, type: existing.id }));
+      setNewTypeName('');
+      setIsAddTypeDialogOpen(false);
+      return;
+    }
+
+    const newTypeObj: CustomVariantType = { id: slug, label: trimmed };
+    const updatedCustom = [...customTypes, newTypeObj];
+    setCustomTypes(updatedCustom);
+
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY_VARIANTS, JSON.stringify(updatedCustom));
+    } catch (e) {
+      console.warn('Erro ao salvar tipo no localStorage:', e);
+    }
+
+    setNewVariant(prev => ({ ...prev, type: slug }));
+    setNewTypeName('');
+    setIsAddTypeDialogOpen(false);
+  };
+
+  const getVariantTypeLabel = (typeId: string): string => {
+    const found = allVariantTypes.find(t => t.id === typeId || t.label.toLowerCase() === typeId.toLowerCase());
+    return found ? found.label : (typeId.charAt(0).toUpperCase() + typeId.slice(1));
+  };
+
   const [newVariant, setNewVariant] = useState<Partial<ProductVariant>>({
     type: 'color',
     name: '',
@@ -208,18 +279,39 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>Tipo</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Tipo</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 px-1.5 text-[11px] text-primary hover:text-primary/80"
+                    onClick={() => setIsAddTypeDialogOpen(true)}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Novo Tipo
+                  </Button>
+                </div>
                 <Select
                   value={newVariant.type}
-                  onValueChange={(value) => setNewVariant({ ...newVariant, type: value as ProductVariant['type'] })}
+                  onValueChange={(value) => {
+                    if (value === '__add_new_type__') {
+                      setIsAddTypeDialogOpen(true);
+                    } else {
+                      setNewVariant({ ...newVariant, type: value });
+                    }
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="color">Cor</SelectItem>
-                    <SelectItem value="size">Tamanho</SelectItem>
-                    <SelectItem value="model">Modelo</SelectItem>
+                    {allVariantTypes.map(vt => (
+                      <SelectItem key={vt.id} value={vt.id}>{vt.label}</SelectItem>
+                    ))}
+                    <SelectItem value="__add_new_type__" className="text-primary font-medium border-t mt-1">
+                      + Criar novo tipo...
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -348,15 +440,24 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
                           <Label>Tipo</Label>
                           <Select
                             value={variant.type}
-                            onValueChange={(value) => updateVariant(variant.id, { type: value as ProductVariant['type'] })}
+                            onValueChange={(value) => {
+                              if (value === '__add_new_type__') {
+                                setIsAddTypeDialogOpen(true);
+                              } else {
+                                updateVariant(variant.id, { type: value });
+                              }
+                            }}
                           >
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="color">Cor</SelectItem>
-                              <SelectItem value="size">Tamanho</SelectItem>
-                              <SelectItem value="model">Modelo</SelectItem>
+                              {allVariantTypes.map(vt => (
+                                <SelectItem key={vt.id} value={vt.id}>{vt.label}</SelectItem>
+                              ))}
+                              <SelectItem value="__add_new_type__" className="text-primary font-medium border-t mt-1">
+                                + Criar novo tipo...
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -453,7 +554,7 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <Badge variant="secondary">
-                            {variantTypeLabels[variant.type]}
+                            {getVariantTypeLabel(variant.type)}
                           </Badge>
                           <span className="font-medium">{variant.name}</span>
                           <span className="text-muted-foreground">({variant.value})</span>
@@ -494,6 +595,66 @@ export const VariantsManager: React.FC<VariantsManagerProps> = ({
           </CardContent>
         </Card>
       )}
+
+      {/* Modal para Adicionar Novo Tipo de Variação */}
+      <Dialog open={isAddTypeDialogOpen} onOpenChange={setIsAddTypeDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <Plus className="h-4 w-4 text-primary" />
+              Novo Tipo de Variação
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Crie um tipo de variação personalizado (ex: Voltagem, Sabor, Fragrância, Material). Ele ficará <strong>salvo para sempre</strong> para todos os seus produtos.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Nome do Tipo de Variação</Label>
+              <Input
+                placeholder="Ex: Voltagem, Sabor, Capacidade, Tensão"
+                value={newTypeName}
+                onChange={(e) => setNewTypeName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateCustomType()}
+                className="h-9 text-xs"
+              />
+            </div>
+
+            {customTypes.length > 0 && (
+              <div className="space-y-1.5 pt-2">
+                <Label className="text-[11px] text-muted-foreground">Tipos personalizados salvos:</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {customTypes.map((ct) => (
+                    <Badge key={ct.id} variant="outline" className="text-[10px] bg-muted/30">
+                      {ct.label}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAddTypeDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleCreateCustomType}
+              disabled={!newTypeName.trim()}
+            >
+              Salvar e Selecionar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
