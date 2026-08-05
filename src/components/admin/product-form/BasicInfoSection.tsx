@@ -46,18 +46,6 @@ export const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
               <Tag className="h-4 w-4 text-primary" />
               <h3 className="text-sm font-semibold text-foreground">Identificação Comercial</h3>
             </div>
-            {onOpenAiExtractor && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onOpenAiExtractor}
-                className="h-7 text-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30 font-semibold"
-              >
-                <Sparkles className="h-3.5 w-3.5 mr-1.5 text-amber-500 animate-pulse" />
-                ⚡ Cadastrar via Foto / Print (IA)
-              </Button>
-            )}
           </div>
 
           {/* Nome do Produto */}
@@ -73,20 +61,6 @@ export const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
                   <FormControl>
                     <Input placeholder="Ex: Mini Balança Digital De Alta Precisão" {...field} className="h-9 text-sm min-w-0 flex-1" />
                   </FormControl>
-
-                  {onOpenMlSearch && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={onOpenMlSearch}
-                      className="h-9 text-xs px-2.5 shrink-0 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 border-emerald-500/30 dark:text-emerald-400 font-semibold"
-                      title="Buscar anúncio de referência no Mercado Livre e preencher tudo com 1 clique"
-                    >
-                      <ShoppingBag className="h-3.5 w-3.5 mr-1" />
-                      Puxar do Mercado Livre
-                    </Button>
-                  )}
 
                   <Button
                     type="button"

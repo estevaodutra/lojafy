@@ -20,7 +20,7 @@ import {
   Image as ImageIcon,
   Tag,
   Barcode,
-  ArrowRight
+  Barcode
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -35,6 +35,9 @@ interface MlItemCandidate {
   brand?: string;
   gtin?: string;
   domain_id?: string;
+  pictures?: string[];
+  attributes?: Array<{ key: string; value: string }>;
+  description?: string;
 }
 
 interface MlProductReferenceModalProps {
@@ -59,19 +62,18 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
   initialQuery = '',
   onApplyReference,
 }) => {
-  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState(initialQuery);
+  const [candidates, setCandidates] = useState<MlItemCandidate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [importingId, setImportingId] = useState<string | null>(null);
-  const [candidates, setCandidates] = useState<MlItemCandidate[]>([]);
+  const { toast } = useToast();
 
-  const handleSearch = async (queryToSearch?: string) => {
-    const term = (queryToSearch !== undefined ? queryToSearch : searchQuery || '').trim();
-    if (!term || term.length < 2) {
+  const handleSearch = async (queryTerm?: string) => {
+    const term = (queryTerm || searchQuery).trim();
+    if (!term) {
       toast({
-        title: "Termo muito curto",
-        description: "Digite o nome ou código de um produto para pesquisar no Mercado Livre.",
-        variant: "destructive"
+        title: "Informe um termo de busca",
+        description: "Digite o nome do produto ou código para buscar no Mercado Livre.",
       });
       return;
     }
@@ -80,37 +82,22 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
     setCandidates([]);
 
     try {
-      // 1. Verificar se é uma URL direta do ML ou MLB ID
-      let path = `/sites/MLB/search?q=${encodeURIComponent(term)}&limit=10`;
-      const mlbMatch = term.match(/MLB-?(\d+)/i);
-      
-      if (mlbMatch) {
-        path = `/items/MLB${mlbMatch[1]}`;
-      } else if (term.includes('mercadolivre.com')) {
-        const urlMlbMatch = term.match(/MLB-?(\d+)/i);
-        if (urlMlbMatch) {
-          path = `/items/MLB${urlMlbMatch[1]}`;
-        }
-      }
-
       let resData: any = null;
 
-      // 1ª Tentativa: Via Edge Function Segura
       try {
-        const { data, error } = await supabase.functions.invoke('ml-public-search', {
-          body: { path }
+        const { data } = await supabase.functions.invoke('ml-public-search', {
+          body: { query: term }
         });
-        if (!error && data && !data.error && (data.results?.length > 0 || data.id)) {
+        if (data && !data.error && (data.results?.length > 0 || data.id)) {
           resData = data;
         }
-      } catch (fnErr) {
-        console.warn('[MlProductReferenceModal] Edge Function ml-public-search falhou, ativando fallback direto:', fnErr);
+      } catch (edgeErr) {
+        console.warn('[MlProductReferenceModal] Edge Function ml-public-search falhou:', edgeErr);
       }
 
-      // 2ª Tentativa (Fallback 1): Via API Pública do Mercado Livre Direta (CORS Habilitado no Navegador)
       if (!resData || resData.error || (!resData.results?.length && !resData.id)) {
         try {
-          const directRes = await fetch(`https://api.mercadolibre.com${path}`);
+          const directRes = await fetch(`https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(term)}&limit=10`);
           if (directRes.ok) {
             const directJson = await directRes.json();
             if (directJson && !directJson.error && (directJson.results?.length > 0 || directJson.id)) {
@@ -122,33 +109,26 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         }
       }
 
-      // 3ª Tentativa (Fallback 2): Via Endpoint de Produtos do Mercado Livre
-      if (!resData || resData.error || (!resData.results?.length && !resData.id)) {
-        try {
-          const catalogPath = `/products/search?status=active&site_id=MLB&q=${encodeURIComponent(term)}&limit=10`;
-          const catalogRes = await fetch(`https://api.mercadolibre.com${catalogPath}`);
-          if (catalogRes.ok) {
-            const catalogJson = await catalogRes.json();
-            if (catalogJson && !catalogJson.error && (catalogJson.results?.length > 0 || catalogJson.id)) {
-              resData = catalogJson;
-            }
-          }
-        } catch (catErr) {
-          console.warn('[MlProductReferenceModal] Fallback de catálogo falhou:', catErr);
-        }
-      }
-
       let itemsList: MlItemCandidate[] = [];
+
+      const formatMlPermalink = (id: string, rawPermalink?: string): string => {
+        if (rawPermalink && rawPermalink.startsWith('http')) {
+          return rawPermalink.replace(/mercadolivre\.com\.br\/MLB(\d+)/i, 'mercadolivre.com.br/MLB-$1');
+        }
+        const cleanId = (id || '').trim();
+        if (/^MLB-?\d+/i.test(cleanId)) {
+          const numPart = cleanId.replace(/^MLB-?/i, '');
+          return `https://produto.mercadolivre.com.br/MLB-${numPart}`;
+        }
+        return `https://www.mercadolivre.com.br/p/${cleanId}`;
+      };
 
       if (resData?.results && Array.isArray(resData.results)) {
         itemsList = resData.results.map((item: any) => {
           const brandAttr = item.attributes?.find((a: any) => a.id === 'BRAND')?.value_name || '';
           const gtinAttr = item.attributes?.find((a: any) => a.id === 'GTIN')?.value_name || '';
-
-          // Extração inteligente do preço (suporta catálogo e anúncios normais)
           const rawPrice = item.price ?? item.buy_box_winner?.price ?? item.user_product_price ?? item.price_max ?? item.price_min ?? 0;
 
-          // Extração inteligente da imagem HD / Thumbnail
           let thumb = '';
           if (item.thumbnail_id) {
             thumb = `https://http2.mlstatic.com/D_NQ_NP_${item.thumbnail_id}-O.webp`;
@@ -162,17 +142,24 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
             thumb = thumb.replace('-I.jpg', '-O.jpg');
           }
 
-          const formatMlPermalink = (id: string, rawPermalink?: string): string => {
-            if (rawPermalink && rawPermalink.startsWith('http')) {
-              return rawPermalink.replace(/mercadolivre\.com\.br\/MLB(\d+)/i, 'mercadolivre.com.br/MLB-$1');
-            }
-            const cleanId = (id || '').trim();
-            if (/^MLB-?\d+/i.test(cleanId)) {
-              const numPart = cleanId.replace(/^MLB-?/i, '');
-              return `https://produto.mercadolivre.com.br/MLB-${numPart}`;
-            }
-            return `https://www.mercadolivre.com.br/p/${cleanId}`;
-          };
+          let candidatePics: string[] = [];
+          if (item.pictures && Array.isArray(item.pictures) && item.pictures.length > 0) {
+            candidatePics = item.pictures.map((p: any) => (p.secure_url || p.url || '').replace(/-I\.jpg$/i, '-O.jpg')).filter(Boolean);
+          }
+          if (candidatePics.length === 0 && thumb) {
+            candidatePics = [thumb];
+          }
+
+          const candidateAttrs: Array<{ key: string; value: string }> = [];
+          if (item.attributes && Array.isArray(item.attributes)) {
+            item.attributes.forEach((a: any) => {
+              if (a.name && a.value_name && a.value_name !== 'Não' && a.value_name !== 'N/A') {
+                if (!candidateAttrs.some(existing => existing.key.toLowerCase() === a.name.toLowerCase())) {
+                  candidateAttrs.push({ key: a.name, value: String(a.value_name) });
+                }
+              }
+            });
+          }
 
           return {
             id: item.id,
@@ -182,27 +169,17 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
             permalink: formatMlPermalink(item.id, item.permalink),
             brand: brandAttr,
             gtin: gtinAttr,
-            domain_id: item.domain_id
+            domain_id: item.domain_id,
+            pictures: candidatePics,
+            attributes: candidateAttrs,
+            description: item.short_description || item.description || ''
           };
         });
       } else if (resData?.id) {
-        // Objeto único de item
         const brandAttr = resData.attributes?.find((a: any) => a.id === 'BRAND')?.value_name || '';
         const gtinAttr = resData.attributes?.find((a: any) => a.id === 'GTIN')?.value_name || '';
         const rawPrice = resData.price ?? resData.buy_box_winner?.price ?? 0;
         const thumb = resData.pictures?.[0]?.secure_url || resData.thumbnail || '';
-
-        const formatMlPermalink = (id: string, rawPermalink?: string): string => {
-          if (rawPermalink && rawPermalink.startsWith('http')) {
-            return rawPermalink.replace(/mercadolivre\.com\.br\/MLB(\d+)/i, 'mercadolivre.com.br/MLB-$1');
-          }
-          const cleanId = (id || '').trim();
-          if (/^MLB-?\d+/i.test(cleanId)) {
-            const numPart = cleanId.replace(/^MLB-?/i, '');
-            return `https://produto.mercadolivre.com.br/MLB-${numPart}`;
-          }
-          return `https://www.mercadolivre.com.br/p/${cleanId}`;
-        };
 
         itemsList = [{
           id: resData.id,
@@ -218,6 +195,58 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
 
       setCandidates(itemsList);
 
+      itemsList.slice(0, 6).forEach(async (cand) => {
+        try {
+          let detail: any = null;
+          try {
+            const { data } = await supabase.functions.invoke('ml-public-search', {
+              body: { path: `/items/${cand.id}` }
+            });
+            if (data && (data.pictures || data.attributes)) detail = data;
+          } catch (e) {}
+
+          if (!detail) {
+            try {
+              const { data: prodData } = await supabase.functions.invoke('ml-public-search', {
+                body: { path: `/products/${cand.id}` }
+              });
+              if (prodData) detail = prodData;
+            } catch (e) {}
+          }
+
+          if (detail) {
+            let pics: string[] = [];
+            if (detail.pictures && Array.isArray(detail.pictures)) {
+              pics = detail.pictures.map((p: any) => (p.secure_url || p.url || '').replace(/-I\.jpg$/i, '-O.jpg')).filter(Boolean);
+            }
+
+            const attrs: Array<{ key: string; value: string }> = [];
+            if (detail.attributes && Array.isArray(detail.attributes)) {
+              detail.attributes.forEach((a: any) => {
+                if (a.name && a.value_name && a.value_name !== 'Não' && a.value_name !== 'N/A') {
+                  if (!attrs.some(existing => existing.key.toLowerCase() === a.name.toLowerCase())) {
+                    attrs.push({ key: a.name, value: String(a.value_name) });
+                  }
+                }
+              });
+            }
+
+            setCandidates(prev => prev.map(c => {
+              if (c.id === cand.id) {
+                return {
+                  ...c,
+                  pictures: pics.length > 0 ? pics : c.pictures,
+                  attributes: attrs.length > 0 ? attrs : c.attributes,
+                  price: Number(detail.price ?? detail.buy_box_winner?.price ?? c.price) || c.price,
+                  description: detail.short_description || detail.description || c.description
+                };
+              }
+              return c;
+            }));
+          }
+        } catch (err) {}
+      });
+
       if (itemsList.length === 0) {
         toast({
           title: "Nenhum resultado encontrado",
@@ -226,16 +255,11 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
       }
     } catch (err: any) {
       console.error('Erro ao buscar no Mercado Livre:', err);
-      toast({
-        title: "Nenhum resultado encontrado",
-        description: "Não foi possível localizar anúncios para esse termo. Tente digitar apenas o nome principal do produto.",
-      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Inicializa o valor de busca APENAS quando o modal é ABERTO
   useEffect(() => {
     if (isOpen) {
       const q = initialQuery || '';
@@ -254,7 +278,6 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
     });
 
     try {
-      // 1. Buscar detalhes completos do item (/items/MLBxxx) ou catálogo (/products/MLBxxx)
       let itemDetail: any = null;
       try {
         const { data } = await supabase.functions.invoke('ml-public-search', {
@@ -270,7 +293,6 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         } catch (e) {}
       }
 
-      // Fallback para produto de catálogo
       if (!itemDetail || !itemDetail.pictures || itemDetail.pictures.length === 0) {
         try {
           const { data: catData } = await supabase.functions.invoke('ml-public-search', {
@@ -284,8 +306,7 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
 
       const fullItem = itemDetail || candidate;
 
-      // 2. Extrair Fotos HD
-      let rawPictures: string[] = [];
+      let rawPictures: string[] = candidate.pictures || [];
       if (fullItem.pictures && Array.isArray(fullItem.pictures) && fullItem.pictures.length > 0) {
         rawPictures = fullItem.pictures.map((p: any) => p.secure_url || p.url).filter(Boolean);
       }
@@ -296,7 +317,6 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         rawPictures = [candidate.thumbnail];
       }
 
-      // Garantir mídias em alta resolução original (-O.jpg / -F.jpg)
       rawPictures = rawPictures.map(url => {
         if (typeof url === 'string') {
           return url.replace(/-I\.jpg$/i, '-O.jpg').replace(/-V\.jpg$/i, '-O.jpg');
@@ -304,29 +324,19 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         return url;
       });
 
-      // 3. Extrair Atributos e Especificações
-      const specList: Array<{ key: string; value: string }> = [];
+      const specList: Array<{ key: string; value: string }> = candidate.attributes || [];
       let extractedBrand = candidate.brand || '';
       let extractedGtin = candidate.gtin || '';
 
       if (fullItem.attributes && Array.isArray(fullItem.attributes)) {
         fullItem.attributes.forEach((attrItem: any) => {
-          const attrName = attrItem.name || attrItem.id;
           const attrVal = attrItem.value_name || attrItem.value;
-
           if (attrItem.id === 'BRAND' && attrVal) extractedBrand = attrVal;
           if (attrItem.id === 'GTIN' && attrVal && /^\d{8,14}$/.test(attrVal.trim())) extractedGtin = attrVal.trim();
-
-          if (attrName && attrVal && attrVal !== 'Não' && attrVal !== 'N/A' && attrVal !== 'Outros') {
-            if (!specList.some(s => s.key.toLowerCase() === attrName.toLowerCase())) {
-              specList.push({ key: attrName, value: String(attrVal) });
-            }
-          }
         });
       }
 
-      // 4. Buscar Descrição do item (/items/MLBxxx/description ou /products/MLBxxx)
-      let descriptionText = '';
+      let descriptionText = candidate.description || '';
       let descData: any = null;
       try {
         const { data } = await supabase.functions.invoke('ml-public-search', {
@@ -342,16 +352,14 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         } catch (e) {}
       }
 
-      descriptionText = descData?.plain_text || descData?.text || fullItem.short_description || fullItem.description || '';
+      descriptionText = descData?.plain_text || descData?.text || fullItem.short_description || fullItem.description || descriptionText || '';
 
-      // Se a descrição do Mercado Livre vier vazia, gerar descrição completa formatada com as especificações
       if (!descriptionText || descriptionText.trim().length < 10) {
         const titleFormatted = fullItem.title || candidate.title;
         const specsText = specList.map(s => `• ${s.key}: ${s.value}`).join('\n');
         descriptionText = `${titleFormatted}\n\n${extractedBrand ? `Marca: ${extractedBrand}\n` : ''}${specsText ? `\nEspecificações Técnicas:\n${specsText}\n\n` : ''}Produto de alta qualidade, pronto para envio com estoque garantido.`;
       }
 
-      // 5. Sanitizar Mídias para o Bucket product-images da VPS
       let sanitizedUrls: string[] = [];
       if (rawPictures.length > 0) {
         try {
@@ -366,7 +374,6 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         }
       }
 
-      // Se a sanitização falhou ou retornou lista vazia, usar as URLs originais
       if (sanitizedUrls.length === 0) {
         sanitizedUrls = rawPictures;
       }
@@ -379,7 +386,6 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         isUploading: false
       }));
 
-      // Aplicar SEMPRE os dados no formulário
       const finalImages = formattedImages.length > 0 ? formattedImages : (candidate.thumbnail ? [{
         id: `ml-import-fallback-${Date.now()}`,
         preview: candidate.thumbnail.replace(/-I\.jpg$/i, '-O.jpg'),
@@ -407,37 +413,6 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
       onClose();
     } catch (err: any) {
       console.error('Erro ao importar produto do ML:', err);
-
-      try {
-        const fallbackImg = candidate.thumbnail ? [{
-          id: `ml-import-err-fallback-${Date.now()}`,
-          preview: candidate.thumbnail.replace(/-I\.jpg$/i, '-O.jpg'),
-          url: candidate.thumbnail.replace(/-I\.jpg$/i, '-O.jpg'),
-          isMain: true,
-          isUploading: false
-        }] : [];
-
-        onApplyReference({
-          name: candidate.title,
-          description: `${candidate.title}\n\n${candidate.brand ? `Marca: ${candidate.brand}\n` : ''}Produto de alta qualidade de referência do Mercado Livre.`,
-          brand: candidate.brand || '',
-          gtin_ean13: candidate.gtin || '',
-          price: candidate.price || 0,
-          reference_ad_url: candidate.permalink,
-          images: fallbackImg,
-          specifications: candidate.brand ? [{ key: 'Marca', value: candidate.brand }] : [],
-        });
-
-        toast({
-          title: "✨ Produto Importado com Sucesso!",
-          description: "Informações principais do produto aplicadas ao formulário.",
-        });
-
-        onClose();
-      } catch (applyErr: any) {
-        console.error('Erro ao aplicar fallback:', applyErr);
-        onClose();
-      }
     } finally {
       setImportingId(null);
     }
@@ -445,18 +420,17 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[88vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-base flex items-center gap-2">
             <ShoppingBag className="h-5 w-5 text-primary" />
             Buscar Produto de Referência no Mercado Livre
           </DialogTitle>
           <DialogDescription className="text-xs">
-            Pesquise o nome do produto no Mercado Livre para puxar o título, fotos em HD salvas no seu servidor, descrição e especificações com 1 clique.
+            Pesquise o nome do produto no Mercado Livre para comparar fotos, preços, atributos e importar tudo com 1 clique.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Input de Busca */}
         <div className="flex gap-2 pt-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -473,7 +447,7 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
             size="sm"
             onClick={() => handleSearch()}
             disabled={isLoading}
-            className="h-9 text-xs px-4 bg-primary hover:bg-primary/90 text-primary-foreground"
+            className="h-9 text-xs px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -486,103 +460,130 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
           </Button>
         </div>
 
-        {/* Resultados */}
         <div className="space-y-3 pt-3">
           {isLoading && (
             <div className="py-12 text-center space-y-2 text-muted-foreground">
               <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
-              <p className="text-xs font-medium">Buscando produtos compatíveis no Mercado Livre...</p>
+              <p className="text-xs font-medium">Buscando produtos e fotos HD no Mercado Livre...</p>
             </div>
           )}
 
           {!isLoading && candidates.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <span className="text-xs font-semibold text-muted-foreground">
                 Encontrados {candidates.length} resultado(s) de referência:
               </span>
 
-              <div className="grid grid-cols-1 gap-2.5">
+              <div className="grid grid-cols-1 gap-3.5">
                 {candidates.map((cand) => {
                   const isImportingThis = importingId === cand.id;
+                  const picturesList = cand.pictures && cand.pictures.length > 0 ? cand.pictures : [cand.thumbnail];
 
                   return (
-                    <Card key={cand.id} className="overflow-hidden border hover:border-primary/50 transition-all">
-                      <CardContent className="p-3">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                          
-                          {/* Miniatura */}
-                          <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden border bg-muted/20 flex items-center justify-center">
-                            {cand.thumbnail ? (
-                              <img
-                                src={cand.thumbnail}
-                                alt={cand.title}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  if (cand.id && !e.currentTarget.dataset.retried) {
-                                    e.currentTarget.dataset.retried = 'true';
-                                    e.currentTarget.src = `https://http2.mlstatic.com/D_NQ_NP_${cand.id}-O.webp`;
-                                  } else {
-                                    e.currentTarget.style.display = 'none';
-                                  }
-                                }}
-                              />
-                            ) : (
-                              <Package className="h-6 w-6 text-muted-foreground/40" />
-                            )}
-                          </div>
-
-                          {/* Detalhes */}
-                          <div className="flex-1 min-w-0 space-y-1">
-                            <h4 className="text-xs font-bold text-foreground truncate">
+                    <Card key={cand.id} className="overflow-hidden border border-border/80 hover:border-primary/50 transition-all shadow-2xs bg-card">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b pb-3">
+                          <div className="space-y-1.5 flex-1">
+                            <h4 className="text-sm font-bold text-foreground leading-snug">
                               {cand.title}
                             </h4>
-
-                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                              <span className="font-mono text-primary font-bold">
-                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cand.price)}
-                              </span>
-                              {cand.brand && <span>• Marca: <strong>{cand.brand}</strong></span>}
+                            <div className="flex flex-wrap items-center gap-2">
+                              {cand.brand && (
+                                <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary border-primary/20">
+                                  Marca: {cand.brand}
+                                </Badge>
+                              )}
                               {cand.gtin && (
-                                <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                                <Badge variant="outline" className="text-[10px] font-mono bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
                                   <Barcode className="h-3 w-3 mr-1" /> EAN: {cand.gtin}
                                 </Badge>
                               )}
                             </div>
                           </div>
 
-                          {/* Ação */}
-                          <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center pt-2 sm:pt-0">
-                            <a
-                              href={cand.permalink}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="p-2 text-muted-foreground hover:text-foreground transition-colors"
-                              title="Ver anúncio original no Mercado Livre"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
-
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={() => handleSelectCandidate(cand)}
-                              disabled={!!importingId}
-                              className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs"
-                            >
-                              {isImportingThis ? (
-                                <>
-                                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                                  Importando...
-                                </>
-                              ) : (
-                                <>
-                                  <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                                  Puxar Direto
-                                </>
-                              )}
-                            </Button>
+                          <div className="text-left sm:text-right shrink-0 bg-muted/30 p-2 rounded-lg border">
+                            <span className="text-[10px] text-muted-foreground block font-medium">Preço Mercado Livre</span>
+                            <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
+                              {cand.price > 0 ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cand.price) : 'Sob Consulta'}
+                            </span>
                           </div>
+                        </div>
 
+                        {picturesList.length > 0 && (
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
+                              <span className="flex items-center gap-1.5">
+                                <ImageIcon className="h-3.5 w-3.5 text-primary" />
+                                Galeria de Fotos ({picturesList.length} imagem(ns) HD):
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                              {picturesList.map((picUrl, idx) => (
+                                <div key={idx} className="relative h-16 w-16 rounded-md overflow-hidden border bg-muted shrink-0 group">
+                                  <img
+                                    src={picUrl}
+                                    alt=""
+                                    className="h-full w-full object-cover group-hover:scale-105 transition-transform"
+                                    onError={(e) => {
+                                      e.currentTarget.src = cand.thumbnail;
+                                    }}
+                                  />
+                                  {idx === 0 && (
+                                    <span className="absolute bottom-0 inset-x-0 bg-black/70 text-white text-[8px] text-center font-bold py-0.5">
+                                      Principal
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {cand.attributes && cand.attributes.length > 0 && (
+                          <div className="space-y-1.5 pt-1">
+                            <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
+                              <Tag className="h-3.5 w-3.5 text-amber-500" />
+                              Especificações & Atributos ({cand.attributes.length}):
+                            </span>
+                            <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                              {cand.attributes.map((attr, idx) => (
+                                <span key={idx} className="text-[10px] px-2 py-0.5 rounded-md bg-muted border text-muted-foreground font-mono">
+                                  <strong className="text-foreground font-semibold">{attr.key}:</strong> {attr.value}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between pt-2 border-t">
+                          <a
+                            href={cand.permalink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 font-medium transition-colors"
+                          >
+                            Abrir no Mercado Livre <ExternalLink className="h-3 w-3" />
+                          </a>
+
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => handleSelectCandidate(cand)}
+                            disabled={!!importingId}
+                            className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 gap-1.5 shadow-sm"
+                          >
+                            {isImportingThis ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                Puxando Fotos HD & Atributos...
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="h-3.5 w-3.5" />
+                                Puxar Anúncio Completo ({picturesList.length} Fotos)
+                              </>
+                            )}
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
