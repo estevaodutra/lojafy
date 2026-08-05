@@ -24,11 +24,14 @@ serve(async (req) => {
       );
     }
 
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY') || Deno.env.get('OPENAI_API_KEY') || Deno.env.get('GEMINI_API_KEY');
     if (!lovableApiKey) {
-      console.error('LOVABLE_API_KEY não configurada no ambiente.');
+      console.error('LOVABLE_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY não configurada no ambiente.');
       return new Response(
-        JSON.stringify({ success: false, error: 'Chave de API Lovable AI não configurada.' }),
+        JSON.stringify({ 
+          success: false, 
+          error: 'Chave de API de IA (LOVABLE_API_KEY ou OPENAI_API_KEY) não configurada no ambiente Supabase.' 
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

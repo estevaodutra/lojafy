@@ -110,6 +110,39 @@ export const AiProductExtractorModal: React.FC<AiProductExtractorModalProps> = (
     setRawFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const compressImageForAi = (dataUrl: string, maxDim = 1024, quality = 0.75): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = dataUrl;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        } else {
+          resolve(dataUrl);
+        }
+      };
+      img.onerror = () => resolve(dataUrl);
+    });
+  };
+
   const handleExtractData = async () => {
     if (images.length === 0) {
       toast.error('Adicione pelo menos 1 print ou foto do produto.');
@@ -120,12 +153,24 @@ export const AiProductExtractorModal: React.FC<AiProductExtractorModalProps> = (
     setExtractedResult(null);
 
     try {
+      // 1. Otimizar e compactar imagens antes do envio para evitar estouro de limite de payload HTTP 413
+      const compressedImages = await Promise.all(
+        images.map((img) => compressImageForAi(img, 1024, 0.75))
+      );
+
       const { data, error } = await supabase.functions.invoke('ai-extract-product', {
-        body: { images },
+        body: { images: compressedImages },
       });
 
       if (error) {
-        throw new Error(error.message || 'Erro ao comunicar com a função de IA');
+        let detail = error.message;
+        try {
+          if ((error as any).context) {
+            const errBody = await (error as any).context.json();
+            if (errBody?.error) detail = errBody.error;
+          }
+        } catch (e) {}
+        throw new Error(detail || 'Erro ao comunicar com a função de IA');
       }
 
       if (!data?.success) {
