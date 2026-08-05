@@ -93,11 +93,35 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         }
       }
 
-      const { data: resData, error } = await supabase.functions.invoke('ml-public-search', {
-        body: { path }
-      });
+      let resData: any = null;
 
-      if (error) throw error;
+      // 1ª Tentativa: Via Edge Function Segura
+      try {
+        const { data, error } = await supabase.functions.invoke('ml-public-search', {
+          body: { path }
+        });
+        if (!error && data) {
+          resData = data;
+        }
+      } catch (fnErr) {
+        console.warn('[MlProductReferenceModal] Edge Function ml-public-search falhou, ativando fallback direto:', fnErr);
+      }
+
+      // 2ª Tentativa (Fallback): Via API Pública do Mercado Livre Direta (CORS Habilitado)
+      if (!resData) {
+        try {
+          const directRes = await fetch(`https://api.mercadolibre.com${path}`);
+          if (directRes.ok) {
+            resData = await directRes.json();
+          }
+        } catch (directErr) {
+          console.warn('[MlProductReferenceModal] Fallback direto da API pública falhou:', directErr);
+        }
+      }
+
+      if (!resData) {
+        throw new Error('Não foi possível obter anúncios do Mercado Livre');
+      }
 
       let itemsList: MlItemCandidate[] = [];
 
@@ -172,22 +196,41 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
 
     try {
       // 1. Buscar detalhes completos do item (/items/MLBxxx)
-      const { data: itemDetail } = await supabase.functions.invoke('ml-public-search', {
-        body: { path: `/items/${candidate.id}` }
-      });
+      let itemDetail: any = null;
+      try {
+        const { data } = await supabase.functions.invoke('ml-public-search', {
+          body: { path: `/items/${candidate.id}` }
+        });
+        if (data && data.id) itemDetail = data;
+      } catch (e) {}
+
+      if (!itemDetail) {
+        try {
+          const directDetailRes = await fetch(`https://api.mercadolibre.com/items/${candidate.id}`);
+          if (directDetailRes.ok) itemDetail = await directDetailRes.json();
+        } catch (e) {}
+      }
 
       const fullItem = itemDetail || candidate;
 
       // 2. Buscar Descrição do item (/items/MLBxxx/description)
       let descriptionText = '';
+      let descData: any = null;
       try {
-        const { data: descData } = await supabase.functions.invoke('ml-public-search', {
+        const { data } = await supabase.functions.invoke('ml-public-search', {
           body: { path: `/items/${candidate.id}/description` }
         });
-        descriptionText = descData?.plain_text || descData?.text || '';
-      } catch (e) {
-        console.warn('Descrição não encontrada:', e);
+        if (data) descData = data;
+      } catch (e) {}
+
+      if (!descData) {
+        try {
+          const directDescRes = await fetch(`https://api.mercadolibre.com/items/${candidate.id}/description`);
+          if (directDescRes.ok) descData = await directDescRes.json();
+        } catch (e) {}
       }
+
+      descriptionText = descData?.plain_text || descData?.text || '';
 
       // 3. Extrair Fotos HD
       let rawPictures: string[] = [];
