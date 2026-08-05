@@ -88,8 +88,8 @@ const productSchema = z.object({
   brand: z.string().optional().or(z.literal('')),
   sku: z.string().optional().or(z.literal('')),
   gtin_ean13: z.string().optional().or(z.literal('')),
-  stock_quantity: z.coerce.number().min(0, 'Estoque não pode ser negativo').default(0),
-  min_stock_level: z.coerce.number().min(0, 'Estoque mínimo não pode ser negativo').default(100),
+  stock_quantity: z.coerce.number().min(0, 'Estoque não pode ser negativo').default(100),
+  min_stock_level: z.coerce.number().min(0, 'Estoque mínimo não pode ser negativo').default(10),
   low_stock_alert: z.boolean().default(false),
   high_rotation: z.boolean().default(false),
   height: z.coerce.number().optional().or(z.literal('')),
@@ -150,8 +150,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
       brand: product?.brand || '',
       sku: product?.sku || '',
       gtin_ean13: product?.gtin_ean13 || '',
-      stock_quantity: product?.stock_quantity || 0,
-      min_stock_level: product?.min_stock_level ?? supplierSettings?.default_min_stock_level ?? 100,
+      stock_quantity: product?.stock_quantity ?? 100,
+      min_stock_level: product?.min_stock_level ?? 10,
       low_stock_alert: product?.low_stock_alert ?? false,
       high_rotation: product?.high_rotation ?? false,
       height: product?.height || undefined,
@@ -516,6 +516,16 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
       } catch (e) {}
     }
 
+    // Se o estoque estiver vazio ou 0, definir padrão de 100 unidades e estoque mínimo de 10
+    const currentStock = form.getValues('stock_quantity');
+    if (!currentStock || currentStock === 0) {
+      form.setValue('stock_quantity', 100);
+    }
+    const currentMinStock = form.getValues('min_stock_level');
+    if (!currentMinStock || currentMinStock === 0) {
+      form.setValue('min_stock_level', 10);
+    }
+
     setOpenAccordions(['basic', 'pricing', 'stock', 'images', 'specs', 'settings']);
     setActiveSection('basic');
   };
@@ -738,7 +748,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
       label: 'Estoque',
       isComplete: true,
       hasError: !!formErrors.stock_quantity || !!formErrors.min_stock_level,
-      summaryText: `${form.watch('stock_quantity') || 0} unidades | Est. mínimo ${form.watch('min_stock_level') || 5}`,
+      summaryText: `${form.watch('stock_quantity') ?? 100} unidades | Est. mínimo ${form.watch('min_stock_level') ?? 10}`,
     },
     images: {
       id: 'images',
