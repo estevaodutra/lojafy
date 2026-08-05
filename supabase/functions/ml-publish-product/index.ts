@@ -258,6 +258,16 @@ serve(async (req) => {
                   value_name = product.brand || 'Genérica';
                 } else if (attr.id === 'MODEL') {
                   value_name = product.model || 'Padrão';
+                } else if (attr.id === 'GTIN') {
+                  const gtinVal = product.gtin_ean13 || product.gtin || product.barcode || product.ean;
+                  const cleanGtin = gtinVal ? String(gtinVal).replace(/\D/g, '').trim() : '';
+                  if (cleanGtin && cleanGtin.length >= 8 && cleanGtin.length <= 14) {
+                    value_name = cleanGtin;
+                  } else {
+                    console.log(`[ml-publish] Category ${categoryId} requires GTIN but product GTIN is empty/invalid. Adding EMPTY_GTIN_REASON.`);
+                    attributes.push({ id: 'EMPTY_GTIN_REASON', value_name: 'Outro motivo', value_id: '9370803' });
+                    continue;
+                  }
                 } else if (Array.isArray(attr.values) && attr.values.length > 0) {
                   const productNameLower = (product.name || '').toLowerCase();
                   const matchedVal = attr.values.find((v: any) => 
@@ -288,6 +298,20 @@ serve(async (req) => {
         }
       } catch (err) {
         console.warn('[ml-publish] Failed to fetch category attributes or auto-fill:', err);
+      }
+    }
+
+    // Garantir que GTIN ou EMPTY_GTIN_REASON esteja nos atributos se a categoria exigir ou se o produto possuir GTIN
+    const gtinVal = product.gtin_ean13 || product.gtin || product.barcode || product.ean;
+    const cleanGtin = gtinVal ? String(gtinVal).replace(/\D/g, '').trim() : '';
+    const hasGtin = attributes.some((a: any) => a.id === 'GTIN');
+    const hasEmptyGtinReason = attributes.some((a: any) => a.id === 'EMPTY_GTIN_REASON');
+
+    if (!hasGtin && !hasEmptyGtinReason) {
+      if (cleanGtin && cleanGtin.length >= 8 && cleanGtin.length <= 14) {
+        attributes.push({ id: 'GTIN', value_name: cleanGtin });
+      } else {
+        attributes.push({ id: 'EMPTY_GTIN_REASON', value_name: 'Outro motivo', value_id: '9370803' });
       }
     }
 
