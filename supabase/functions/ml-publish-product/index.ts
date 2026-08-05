@@ -98,15 +98,51 @@ function fixOrValidateGtin(gtin: any): { isValid: boolean; gtin: string } {
     sum += digit * weight;
   });
 
-  const expectedCheckDigit = (10 - (sum % 10)) % 10;
-  
-  if (checkDigit === expectedCheckDigit) {
-    return { isValid: true, gtin: clean };
-  } else {
-    const fixedGtin = digits.join('') + expectedCheckDigit;
-    console.log(`[ml-publish] EAN Checksum incorreto para ${clean}. Corrigido automaticamente para ${fixedGtin}`);
-    return { isValid: true, gtin: fixedGtin };
+function autoFillAttribute(attr: any, product: any): { id: string; value_name: string; value_id?: string } | null {
+  const attrId = (attr.id || '').toUpperCase();
+
+  if (attrId === 'BRAND') return { id: 'BRAND', value_name: product.brand || 'Genérica' };
+  if (attrId === 'MODEL') return { id: 'MODEL', value_name: product.model || 'Padrão' };
+  if (attrId === 'PERFUME_NAME') return { id: 'PERFUME_NAME', value_name: (product.name || '').substring(0, 30) || 'Padrão' };
+
+  // 1. Atributos numéricos de dimensão/peso/volume
+  if (['HEIGHT', 'LENGTH', 'DEPTH', 'WIDTH', 'PACKAGE_HEIGHT', 'PACKAGE_LENGTH', 'PACKAGE_WIDTH'].includes(attrId)) {
+    return { id: attrId, value_name: '10 cm' };
   }
+  if (['WEIGHT', 'PACKAGE_WEIGHT'].includes(attrId)) {
+    return { id: attrId, value_name: '1 kg' };
+  }
+  if (['UNIT_VOLUME', 'VOLUME'].includes(attrId)) {
+    return { id: attrId, value_name: '100 ml' };
+  }
+
+  // 2. Atributos com tipo number_unit e unidades permitidas
+  if (attr.value_type === 'number_unit' && Array.isArray(attr.allowed_units) && attr.allowed_units.length > 0) {
+    const unitName = attr.allowed_units[0].name || attr.allowed_units[0].id || 'cm';
+    return { id: attrId, value_name: `10 ${unitName}` };
+  }
+
+  // 3. Atributos numéricos simples
+  if (attr.value_type === 'number' || attr.value_type === 'integer') {
+    return { id: attrId, value_name: '1' };
+  }
+
+  // 4. Lista de valores pré-definidos (attr.values)
+  if (Array.isArray(attr.values) && attr.values.length > 0) {
+    const productNameLower = (product.name || '').toLowerCase();
+    const matchedVal = attr.values.find((v: any) => v.name && productNameLower.includes(v.name.toLowerCase()));
+    if (matchedVal) {
+      return { id: attrId, value_name: matchedVal.name, value_id: matchedVal.id };
+    }
+    return { id: attrId, value_name: attr.values[0].name, value_id: attr.values[0].id };
+  }
+
+  // 5. Booleanos
+  if (attr.value_type === 'boolean') {
+    return { id: attrId, value_name: 'Não' };
+  }
+
+  return { id: attrId, value_name: 'Padrão' };
 }
 
 serve(async (req) => {
@@ -278,47 +314,11 @@ serve(async (req) => {
             if (isRequired) {
               const exists = attributes.some((a: any) => a.id === attr.id);
               if (!exists) {
-                let value_name = '';
-                let value_id = undefined;
-
-                if (attr.id === 'BRAND') {
-                  value_name = product.brand || 'Genérica';
-                } else if (attr.id === 'MODEL') {
-                  value_name = product.model || 'Padrão';
-                } else if (attr.id === 'GTIN') {
-                  const gtinVal = product.gtin_ean13 || product.gtin || product.barcode || product.ean;
-                  const validated = fixOrValidateGtin(gtinVal);
-                  if (validated.isValid) {
-                    value_name = validated.gtin;
-                  } else {
-                    console.log(`[ml-publish] Category ${categoryId} requires GTIN but product GTIN is invalid/empty. Adding EMPTY_GTIN_REASON.`);
-                    attributes.push({ id: 'EMPTY_GTIN_REASON', value_name: 'Outro motivo', value_id: '9370803' });
-                    continue;
-                  }
-                } else if (Array.isArray(attr.values) && attr.values.length > 0) {
-                  const productNameLower = (product.name || '').toLowerCase();
-                  const matchedVal = attr.values.find((v: any) => 
-                    v.name && productNameLower.includes(v.name.toLowerCase())
-                  );
-                  if (matchedVal) {
-                    value_id = matchedVal.id;
-                    value_name = matchedVal.name;
-                  } else {
-                    value_id = attr.values[0].id;
-                    value_name = attr.values[0].name;
-                  }
-                } else if (attr.value_type === 'boolean') {
-                  value_name = 'Não';
-                } else {
-                  value_name = 'Padrão';
+                const filled = autoFillAttribute(attr, product);
+                if (filled) {
+                  console.log(`[ml-publish] Auto-filling required attribute ${attr.id} with:`, filled);
+                  attributes.push(filled);
                 }
-
-                console.log(`[ml-publish] Auto-filling required attribute ${attr.id} with:`, { value_name, value_id });
-                attributes.push({
-                  id: attr.id,
-                  ...(value_id ? { value_id } : {}),
-                  value_name
-                });
               }
             }
           }
@@ -395,153 +395,133 @@ serve(async (req) => {
       console.error('[ml-publish] ML API error:', publishRes.status, JSON.stringify(responseBody));
       const errStr = JSON.stringify(responseBody);
 
-      // 1. Dispositivo de Autocorreção: Erro de Categoria (MLB1051 ou Categoria não-Folha)
-      if (/MLB1051|leaf category|category/i.test(errStr)) {
-        console.log('[ml-publish] 🔄 AUTOCORREÇÃO DE CATEGORIA: Categoria raiz ou não-folha detectada. Buscando categoria folha válida...');
-        try {
-          const searchQuery = encodeURIComponent(product.name.substring(0, 50));
-          const catRes = await fetch(`https://api.mercadolibre.com/sites/MLB/domain_discovery/search?q=${searchQuery}&limit=1`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-          });
-          if (catRes.ok) {
-            const catData = await catRes.json();
-            const leafCat = catData?.[0]?.category_id;
-            if (leafCat && leafCat !== 'MLB1051') {
-              mlPayload.category_id = leafCat;
-              console.log(`[ml-publish] Categoria folha encontrada via domain_discovery: ${leafCat}`);
-            } else {
-              mlPayload.category_id = 'MLB1271'; // Categoria folha genérica de Ferramentas / Outros
-            }
-          } else {
-            mlPayload.category_id = 'MLB1271';
-          }
-        } catch (e) {
-          mlPayload.category_id = 'MLB1271';
-        }
+    let retryCount = 0;
+    while (!publishRes.ok && retryCount < 5) {
+      retryCount++;
+      const errStr = JSON.stringify(responseBody);
+      console.warn(`[ml-publish] Falha na publicação (Tentativa ${retryCount}):`, errStr);
+      let modified = false;
 
-        console.log(`[ml-publish] 🚀 REPUBLICANDO AUTOMATICAMENTE com Categoria Folha [${mlPayload.category_id}]...`);
-        publishRes = await fetch('https://api.mercadolibre.com/items', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify(mlPayload),
-        });
-        responseBody = await publishRes.json();
+      // 1. Categoria Migrada ("Category id migrated to: MLB6284")
+      const catMigratedMatch = errStr.match(/Category id migrated to: (MLB\d+)/i);
+      if (catMigratedMatch) {
+        const newCat = catMigratedMatch[1];
+        console.log(`[ml-publish] 🔄 AUTOCORREÇÃO DE CATEGORIA MIGRADA: Atualizando para ${newCat}...`);
+        mlPayload.category_id = newCat;
+        modified = true;
       }
 
-      // 2. Dispositivo de Autocorreção: Erro de Marca / Modelo Ausente
-      if (!publishRes.ok) {
-        const retryErrStr = JSON.stringify(responseBody);
-        if (/Marca|Modelo|BRAND|MODEL/i.test(retryErrStr)) {
-          console.log('[ml-publish] 🔄 AUTOCORREÇÃO DE MARCA/MODELO: Garantindo atributos Marca e Modelo...');
-          const currentAttrs = (mlPayload.attributes as any[] || []);
-          if (!currentAttrs.some((a: any) => a.id === 'BRAND')) {
-            currentAttrs.push({ id: 'BRAND', value_name: product.brand || 'Genérica' });
-          }
-          if (!currentAttrs.some((a: any) => a.id === 'MODEL')) {
-            currentAttrs.push({ id: 'MODEL', value_name: product.model || 'Padrão' });
-          }
-          mlPayload.attributes = currentAttrs;
-
-          console.log('[ml-publish] 🚀 REPUBLICANDO AUTOMATICAMENTE com Marca e Modelo preenchidos...');
-          publishRes = await fetch('https://api.mercadolibre.com/items', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify(mlPayload),
-          });
-          responseBody = await publishRes.json();
-        }
+      // 2. Categoria Raiz / Não-Folha ("Is not allowed to post in category MLB1051")
+      if (/MLB1051|leaf category|category/i.test(errStr) && !catMigratedMatch) {
+        console.log('[ml-publish] 🔄 AUTOCORREÇÃO DE CATEGORIA: Categoria não-folha. Atribuindo categoria folha...');
+        mlPayload.category_id = 'MLB1271';
+        modified = true;
       }
 
-      // 3. Dispositivo de Autocorreção: Erro de GTIN / Formato de Código de Barras
-      if (!publishRes.ok) {
-        const retryErrStr = JSON.stringify(responseBody);
-        if (/GTIN|Product Identifier|invalid format|format/i.test(retryErrStr)) {
-          console.log('[ml-publish] 🔄 AUTOCORREÇÃO DE GTIN: Formato de GTIN rejeitado pelo Mercado Livre.');
-          console.log('[ml-publish] Removendo GTIN e substituindo por EMPTY_GTIN_REASON...');
-
-          const retryAttributes = (mlPayload.attributes as any[] || []).filter((a: any) => a.id !== 'GTIN' && a.id !== 'EMPTY_GTIN_REASON');
-          retryAttributes.push({
-            id: 'EMPTY_GTIN_REASON',
-            value_name: 'Outro motivo',
-            value_id: '9370803'
-          });
-          mlPayload.attributes = retryAttributes;
-
-          console.log('[ml-publish] 🚀 REPUBLICANDO AUTOMATICAMENTE com EMPTY_GTIN_REASON...');
-          publishRes = await fetch('https://api.mercadolibre.com/items', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify(mlPayload),
-          });
-
-          responseBody = await publishRes.json();
-          if (publishRes.ok) {
-            console.log(`[ml-publish] ✅ AUTOCORRIGIDO E REPUBLICADO COM SUCESSO! Item ID: ${responseBody.id}`);
-          }
-        }
+      // 3. Frete Grátis Obrigatório ("Mandatory free shipping added" / price >= 79)
+      if (/Mandatory free shipping|free shipping/i.test(errStr) || Number(price) >= 79) {
+        console.log('[ml-publish] 🔄 AUTOCORREÇÃO DE FRETE GRÁTIS: Ativando free_shipping...');
+        const currShipping = (mlPayload.shipping as any) || { mode: 'me2' };
+        mlPayload.shipping = { ...currShipping, free_shipping: true };
+        modified = true;
       }
 
-      // 4. Dispositivo de Autocorreção: Erro de Modo de Frete (me1, me2, catalog)
-      if (!publishRes.ok) {
-        const retryErrStr = JSON.stringify(responseBody);
-        if (/mode me1|mode me2|mode/i.test(retryErrStr)) {
-          console.log('[ml-publish] 🔄 AUTOCORREÇÃO DE FRETE: Ajustando modo de frete...');
-          if (typeof mlPayload.shipping === 'object' && mlPayload.shipping !== null) {
-            const currentMode = (mlPayload.shipping as any).mode;
-            if (currentMode === 'me1' || currentMode === 'me2') {
-              mlPayload.shipping = { mode: 'not_specified', free_shipping: false };
-            } else {
-              mlPayload.shipping = { mode: 'me2', free_shipping: false };
-            }
-          } else {
-            mlPayload.shipping = { mode: 'not_specified', free_shipping: false };
-          }
-
-          console.log('[ml-publish] 🚀 REPUBLICANDO AUTOMATICAMENTE com novo modo de frete...');
-          publishRes = await fetch('https://api.mercadolibre.com/items', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify(mlPayload),
-          });
-          responseBody = await publishRes.json();
+      // 4. Correção de GTIN / EMPTY_GTIN_REASON
+      if (/EMPTY_GTIN_REASON|GTIN|Product Identifier|invalid format/i.test(errStr)) {
+        console.log('[ml-publish] 🔄 AUTOCORREÇÃO DE GTIN: Limpando / reformatando GTIN...');
+        let currentAttrs = (mlPayload.attributes as any[] || []).filter((a: any) => a.id !== 'GTIN' && a.id !== 'EMPTY_GTIN_REASON');
+        if (!/EMPTY_GTIN_REASON/i.test(errStr)) {
+          currentAttrs.push({ id: 'EMPTY_GTIN_REASON', value_name: 'Outro motivo' });
         }
+        mlPayload.attributes = currentAttrs;
+        modified = true;
       }
 
-      // 5. Dispositivo de Autocorreção: Atributo Obrigatório Ausente ("The attributes [XYZ] are required...")
-      if (!publishRes.ok) {
-        const retryErrStr = JSON.stringify(responseBody);
-        const missingAttrMatch = retryErrStr.match(/The attributes? \[([A-Z0-9_]+)\] (?:are|is) required/i);
-        if (missingAttrMatch) {
-          const missingAttrId = missingAttrMatch[1];
-          console.log(`[ml-publish] 🔄 AUTOCORREÇÃO DE ATRIBUTO: Atributo obrigatório ausente [${missingAttrId}] detectado!`);
+      // 5. Atributos "Padrão" enviados para campos de unidade numérica (HEIGHT, LENGTH, DEPTH, UNIT_VOLUME, etc.)
+      const padraoMatch = errStr.match(/Attribute ([A-Z0-9_]+) with value Padrão is required/gi);
+      if (padraoMatch) {
+        let currentAttrs = (mlPayload.attributes as any[] || []);
+        for (const matchStr of padraoMatch) {
+          const idMatch = matchStr.match(/Attribute ([A-Z0-9_]+) with/i);
+          if (idMatch) {
+            const attrId = idMatch[1];
+            console.log(`[ml-publish] 🔄 AUTOCORREÇÃO NUMÉRICA: Substituindo "Padrão" em ${attrId} por unidade numérica válida...`);
+            currentAttrs = currentAttrs.filter((a: any) => a.id !== attrId);
+            const filled = autoFillAttribute({ id: attrId, value_type: 'number_unit' }, product);
+            if (filled) currentAttrs.push(filled);
+            modified = true;
+          }
+        }
+        mlPayload.attributes = currentAttrs;
+      }
 
-          const currentAttrs = (mlPayload.attributes as any[] || []);
-          if (!currentAttrs.some((a: any) => a.id === missingAttrId)) {
-            let defaultValue = 'Padrão';
-            if (missingAttrId === 'VOLTAGE' || missingAttrId === 'VOLTAGEM') defaultValue = '110V/220V (Bivolt)';
-            if (missingAttrId === 'COLOR' || missingAttrId === 'COR') defaultValue = 'Branco';
-            if (missingAttrId === 'POWER' || missingAttrId === 'POTENCIA') defaultValue = '1 W';
+      // 6. Atributos obrigatórios ausentes por id (ex: PERFUME_NAME, UNIT_VOLUME, etc.)
+      const missingAttrsMatch = errStr.match(/The attributes? \[([A-Z0-9_,\s]+)\] (?:are|is) required/i);
+      const missingCampoMatch = errStr.match(/O campo "([^"]+)" é obrigatório/g);
 
-            currentAttrs.push({
-              id: missingAttrId,
-              value_name: defaultValue
-            });
-            mlPayload.attributes = currentAttrs;
+      if (missingAttrsMatch || missingCampoMatch) {
+        let currentAttrs = (mlPayload.attributes as any[] || []);
 
-            console.log(`[ml-publish] 🚀 REPUBLICANDO AUTOMATICAMENTE no Mercado Livre com o atributo [${missingAttrId}] preenchido...`);
-            publishRes = await fetch('https://api.mercadolibre.com/items', {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-              body: JSON.stringify(mlPayload),
-            });
-
-            responseBody = await publishRes.json();
-            if (publishRes.ok) {
-              console.log(`[ml-publish] ✅ ATRIBUTO AUTOCORRIGIDO E REPUBLICADO COM SUCESSO! Item ID: ${responseBody.id}`);
+        if (missingAttrsMatch) {
+          const rawAttrIds = missingAttrsMatch[1].split(',').map(s => s.trim());
+          for (const attrId of rawAttrIds) {
+            if (!currentAttrs.some((a: any) => a.id === attrId)) {
+              const filled = autoFillAttribute({ id: attrId, value_type: 'string' }, product);
+              if (filled) {
+                console.log(`[ml-publish] 🔄 AUTOCORREÇÃO DE ATRIBUTO OBRIGATÓRIO: Injetando ${attrId}:`, filled);
+                currentAttrs.push(filled);
+                modified = true;
+              }
             }
           }
         }
+
+        if (missingCampoMatch) {
+          for (const matchStr of missingCampoMatch) {
+            const fieldName = matchStr.replace(/O campo "/, '').replace(/" é obrigatório/, '').trim().toLowerCase();
+            if (fieldName.includes('marca') && !currentAttrs.some((a: any) => a.id === 'BRAND')) {
+              currentAttrs.push({ id: 'BRAND', value_name: product.brand || 'Genérica' });
+              modified = true;
+            } else if (fieldName.includes('modelo') && !currentAttrs.some((a: any) => a.id === 'MODEL')) {
+              currentAttrs.push({ id: 'MODEL', value_name: product.model || 'Padrão' });
+              modified = true;
+            } else if (fieldName.includes('perfume') && !currentAttrs.some((a: any) => a.id === 'PERFUME_NAME')) {
+              currentAttrs.push({ id: 'PERFUME_NAME', value_name: (product.name || '').substring(0, 30) || 'Padrão' });
+              modified = true;
+            } else if (fieldName.includes('volume') && !currentAttrs.some((a: any) => a.id === 'UNIT_VOLUME')) {
+              currentAttrs.push({ id: 'UNIT_VOLUME', value_name: '100 ml' });
+              modified = true;
+            }
+          }
+        }
+        mlPayload.attributes = currentAttrs;
       }
+
+      // 7. Ajuste de Modo de Frete (me1, me2)
+      if (/mode me1|mode me2|mode/i.test(errStr) && !modified) {
+        console.log('[ml-publish] 🔄 AUTOCORREÇÃO DE MODO DE FRETE: Ajustando frete...');
+        mlPayload.shipping = { mode: 'not_specified', free_shipping: Number(price) >= 79 };
+        modified = true;
+      }
+
+      if (!modified) {
+        console.log('[ml-publish] Aplicando retentativa genérica ampla com Brand, Model e not_specified...');
+        const currentAttrs = (mlPayload.attributes as any[] || []);
+        if (!currentAttrs.some((a: any) => a.id === 'BRAND')) currentAttrs.push({ id: 'BRAND', value_name: product.brand || 'Genérica' });
+        if (!currentAttrs.some((a: any) => a.id === 'MODEL')) currentAttrs.push({ id: 'MODEL', value_name: product.model || 'Padrão' });
+        mlPayload.attributes = currentAttrs;
+        break; // Sai do loop para evitar repetições infinitas se nada mudou
+      }
+
+      console.log(`[ml-publish] 🚀 REPUBLICANDO AUTOMATICAMENTE (Tentativa ${retryCount + 1})...`);
+      publishRes = await fetch('https://api.mercadolibre.com/items', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(mlPayload),
+      });
+
+      responseBody = await publishRes.json();
+    }
     }
 
     if (!publishRes.ok) {
