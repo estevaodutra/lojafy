@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Plus, RefreshCw, Sparkles, Tag, Barcode, Info } from 'lucide-react';
+import { Plus, RefreshCw, Sparkles, Tag, Barcode, Info, ShoppingBag } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 interface BasicInfoSectionProps {
