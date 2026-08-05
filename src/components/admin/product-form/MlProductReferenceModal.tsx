@@ -100,22 +100,41 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         const { data, error } = await supabase.functions.invoke('ml-public-search', {
           body: { path }
         });
-        if (!error && data) {
+        if (!error && data && !data.error && (data.results || data.id)) {
           resData = data;
         }
       } catch (fnErr) {
         console.warn('[MlProductReferenceModal] Edge Function ml-public-search falhou, ativando fallback direto:', fnErr);
       }
 
-      // 2ª Tentativa (Fallback): Via API Pública do Mercado Livre Direta (CORS Habilitado)
-      if (!resData) {
+      // 2ª Tentativa (Fallback 1): Via API Pública do Mercado Livre Direta (CORS Habilitado no Navegador)
+      if (!resData || resData.error || (!resData.results && !resData.id)) {
         try {
           const directRes = await fetch(`https://api.mercadolibre.com${path}`);
           if (directRes.ok) {
-            resData = await directRes.json();
+            const directJson = await directRes.json();
+            if (directJson && !directJson.error && (directJson.results || directJson.id)) {
+              resData = directJson;
+            }
           }
         } catch (directErr) {
           console.warn('[MlProductReferenceModal] Fallback direto da API pública falhou:', directErr);
+        }
+      }
+
+      // 3ª Tentativa (Fallback 2): Via Endpoint de Produtos do Mercado Livre
+      if (!resData || resData.error || (!resData.results && !resData.id)) {
+        try {
+          const catalogPath = `/products/search?status=active&site_id=MLB&q=${encodeURIComponent(term)}&limit=10`;
+          const catalogRes = await fetch(`https://api.mercadolibre.com${catalogPath}`);
+          if (catalogRes.ok) {
+            const catalogJson = await catalogRes.json();
+            if (catalogJson && !catalogJson.error && (catalogJson.results || catalogJson.id)) {
+              resData = catalogJson;
+            }
+          }
+        } catch (catErr) {
+          console.warn('[MlProductReferenceModal] Fallback de catálogo falhou:', catErr);
         }
       }
 
