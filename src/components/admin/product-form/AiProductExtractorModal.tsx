@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Upload, Clipboard, Trash2, Loader2, CheckCircle2, AlertCircle, FileImage } from 'lucide-react';
+import { Sparkles, Upload, Clipboard, Trash2, Loader2, CheckCircle2, AlertCircle, FileImage, Key, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -110,6 +110,20 @@ export const AiProductExtractorModal: React.FC<AiProductExtractorModalProps> = (
     setRawFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const [userApiKey, setUserApiKey] = useState<string>(() => {
+    return localStorage.getItem('lojafy_openai_api_key') || '';
+  });
+  const [showKeyConfig, setShowKeyConfig] = useState(false);
+
+  const handleSaveUserKey = (val: string) => {
+    setUserApiKey(val);
+    if (val.trim()) {
+      localStorage.setItem('lojafy_openai_api_key', val.trim());
+    } else {
+      localStorage.removeItem('lojafy_openai_api_key');
+    }
+  };
+
   const compressImageForAi = (dataUrl: string, maxDim = 1024, quality = 0.75): Promise<string> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -159,7 +173,10 @@ export const AiProductExtractorModal: React.FC<AiProductExtractorModalProps> = (
       );
 
       const { data, error } = await supabase.functions.invoke('ai-extract-product', {
-        body: { images: compressedImages },
+        body: { 
+          images: compressedImages,
+          apiKey: userApiKey.trim() || undefined
+        },
       });
 
       if (error) {
@@ -216,6 +233,48 @@ export const AiProductExtractorModal: React.FC<AiProductExtractorModalProps> = (
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {/* Card permanente de Chave OpenAI / Gemini */}
+          <div className="border rounded-xl p-3 bg-amber-500/5 border-amber-500/20 space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <Key className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                Chave da OpenAI / Gemini (Chave Própria)
+              </Label>
+              {userApiKey ? (
+                <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Chave Salva
+                </Badge>
+              ) : (
+                <span className="text-[10px] text-muted-foreground">Opcional se já houver no servidor</span>
+              )}
+            </div>
+
+            <div className="relative">
+              <Input
+                type="password"
+                placeholder="Cole sua chave OpenAI aqui (ex: sk-proj-...)"
+                value={userApiKey}
+                onChange={(e) => handleSaveUserKey(e.target.value)}
+                className="h-8 text-xs font-mono pr-8 bg-background"
+              />
+              {userApiKey && (
+                <button
+                  type="button"
+                  onClick={() => handleSaveUserKey('')}
+                  className="absolute right-2 top-2 text-xs text-muted-foreground hover:text-destructive"
+                  title="Remover chave salva"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <Lock className="h-3 w-3 text-muted-foreground/70" />
+              Sua chave fica salva com segurança apenas no seu próprio computador (`localStorage`).
+            </p>
+          </div>
+
           {/* Zona de Upload / Paste */}
           <div
             onClick={() => fileInputRef.current?.click()}

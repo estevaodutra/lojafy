@@ -7,6 +7,7 @@ const corsHeaders = {
 
 interface ImageExtractPayload {
   images: string[]; // base64 data URLs or standard image URLs
+  apiKey?: string;
 }
 
 serve(async (req) => {
@@ -15,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { images } = (await req.json()) as ImageExtractPayload;
+    const { images, apiKey: customApiKey } = (await req.json()) as ImageExtractPayload;
 
     if (!images || !Array.isArray(images) || images.length === 0) {
       return new Response(
@@ -24,13 +25,13 @@ serve(async (req) => {
       );
     }
 
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY') || Deno.env.get('OPENAI_API_KEY') || Deno.env.get('GEMINI_API_KEY');
-    if (!lovableApiKey) {
-      console.error('LOVABLE_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY não configurada no ambiente.');
+    const aiApiKey = customApiKey?.trim() || Deno.env.get('LOVABLE_API_KEY') || Deno.env.get('OPENAI_API_KEY') || Deno.env.get('GEMINI_API_KEY');
+    if (!aiApiKey) {
+      console.error('Nenhuma chave de IA foi fornecida ou encontrada no ambiente.');
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Chave de API de IA (LOVABLE_API_KEY ou OPENAI_API_KEY) não configurada no ambiente Supabase.' 
+          error: 'Chave de API de IA não configurada. Insira sua chave da OpenAI no modal ou configure a variável LOVABLE_API_KEY / OPENAI_API_KEY no Supabase.' 
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -83,16 +84,23 @@ Regras:
       });
     });
 
-    console.log(`🤖 Processando ${images.length} imagem(ns) via Gemini 2.5 Flash...`);
+    const isOpenAiKey = aiApiKey.startsWith('sk-');
+    const endpoint = isOpenAiKey 
+      ? 'https://api.openai.com/v1/chat/completions' 
+      : 'https://ai.gateway.lovable.dev/v1/chat/completions';
+    
+    const model = isOpenAiKey ? 'gpt-4o-mini' : 'google/gemini-2.5-flash';
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    console.log(`🤖 Processando ${images.length} imagem(ns) via ${model} (${isOpenAiKey ? 'OpenAI' : 'Lovable AI'})...`);
+
+    const aiResponse = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
+        'Authorization': `Bearer ${aiApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessageContent }
@@ -103,9 +111,9 @@ Regras:
 
     if (!aiResponse.ok) {
       const errText = await aiResponse.text();
-      console.error('❌ Lovable AI gateway error:', aiResponse.status, errText);
+      console.error(`❌ Erro na IA (${model}):`, aiResponse.status, errText);
       return new Response(
-        JSON.stringify({ success: false, error: `Erro na IA (${aiResponse.status}): ${errText}` }),
+        JSON.stringify({ success: false, error: `Erro no servidor de IA (${aiResponse.status}): ${errText}` }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
