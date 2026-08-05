@@ -479,7 +479,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
     if (data.name) form.setValue('name', data.name);
     if (data.description) form.setValue('description', data.description);
     if (data.brand) form.setValue('brand', data.brand);
-    if (data.gtin_ean13) form.setValue('gtin_ean13', data.gtin_ean13);
+    if (data.gtin_ean13) {
+      const cleanGtin = String(data.gtin_ean13).replace(/\D/g, '').slice(0, 13);
+      if (cleanGtin) form.setValue('gtin_ean13', cleanGtin);
+    }
     if (data.price > 0) form.setValue('price', data.price);
     if (data.reference_ad_url) form.setValue('reference_ad_url', data.reference_ad_url);
 
@@ -522,12 +525,19 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
         } catch {}
       }
 
-      let finalGtin = data.gtin_ean13 || null;
+      // Sanitização estrita do GTIN/EAN-13 (máximo 13 caracteres numéricos no PostgreSQL VARCHAR(13))
+      let rawGtin = data.gtin_ean13 ? String(data.gtin_ean13).replace(/\D/g, '') : '';
+      let finalGtin = rawGtin.length >= 8 ? rawGtin.slice(0, 13) : null;
+      
       if (!finalGtin) {
         try {
           const { data: remoteGtin } = await supabase.rpc('generate_gtin_ean13');
-          if (remoteGtin) finalGtin = remoteGtin;
+          if (remoteGtin) finalGtin = String(remoteGtin).replace(/\D/g, '').slice(0, 13);
         } catch {}
+      }
+
+      if (finalGtin && finalGtin.length > 13) {
+        finalGtin = finalGtin.slice(0, 13);
       }
 
       // Sanitizar imagens mídias externas
@@ -795,7 +805,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
     if (data.brand) form.setValue('brand', data.brand);
     if (data.description) form.setValue('description', data.description);
     if (data.sku) form.setValue('sku', data.sku);
-    if (data.gtin_ean13) form.setValue('gtin_ean13', data.gtin_ean13);
+    if (data.gtin_ean13) {
+      const cleanGtin = String(data.gtin_ean13).replace(/\D/g, '').slice(0, 13);
+      if (cleanGtin) form.setValue('gtin_ean13', cleanGtin);
+    }
     if (data.cost_price && data.cost_price > 0) form.setValue('cost_price', data.cost_price);
     if (data.price && data.price > 0) form.setValue('price', data.price);
 
