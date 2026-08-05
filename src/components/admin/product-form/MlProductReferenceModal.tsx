@@ -144,11 +144,29 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         itemsList = resData.results.map((item: any) => {
           const brandAttr = item.attributes?.find((a: any) => a.id === 'BRAND')?.value_name || '';
           const gtinAttr = item.attributes?.find((a: any) => a.id === 'GTIN')?.value_name || '';
+
+          // Extração inteligente do preço (suporta catálogo e anúncios normais)
+          const rawPrice = item.price ?? item.buy_box_winner?.price ?? item.user_product_price ?? item.price_max ?? item.price_min ?? 0;
+
+          // Extração inteligente da imagem HD / Thumbnail
+          let thumb = '';
+          if (item.thumbnail_id) {
+            thumb = `https://http2.mlstatic.com/D_NQ_NP_${item.thumbnail_id}-O.webp`;
+          } else if (item.pictures && Array.isArray(item.pictures) && item.pictures.length > 0) {
+            thumb = item.pictures[0].secure_url || item.pictures[0].url || '';
+          } else if (item.thumbnail) {
+            thumb = item.thumbnail.replace(/^http:/, 'https:');
+          }
+
+          if (thumb.includes('-I.jpg')) {
+            thumb = thumb.replace('-I.jpg', '-O.jpg');
+          }
+
           return {
             id: item.id,
             title: item.title || item.name || '',
-            price: item.price || 0,
-            thumbnail: item.thumbnail ? item.thumbnail.replace(/^http:/, 'https:') : '',
+            price: Number(rawPrice) || 0,
+            thumbnail: thumb,
             permalink: item.permalink || `https://produto.mercadolivre.com.br/${item.id}`,
             brand: brandAttr,
             gtin: gtinAttr,
@@ -159,11 +177,14 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         // Objeto único de item
         const brandAttr = resData.attributes?.find((a: any) => a.id === 'BRAND')?.value_name || '';
         const gtinAttr = resData.attributes?.find((a: any) => a.id === 'GTIN')?.value_name || '';
+        const rawPrice = resData.price ?? resData.buy_box_winner?.price ?? 0;
+        const thumb = resData.pictures?.[0]?.secure_url || resData.thumbnail || '';
+
         itemsList = [{
           id: resData.id,
           title: resData.title || resData.name || '',
-          price: resData.price || 0,
-          thumbnail: resData.pictures?.[0]?.secure_url || resData.thumbnail || '',
+          price: Number(rawPrice) || 0,
+          thumbnail: thumb.replace(/^http:/, 'https:'),
           permalink: resData.permalink || `https://produto.mercadolivre.com.br/${resData.id}`,
           brand: brandAttr,
           gtin: gtinAttr,
@@ -396,15 +417,24 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
                         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                           
                           {/* Miniatura */}
-                          <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden border bg-muted/20">
-                            <img
-                              src={cand.thumbnail}
-                              alt={cand.title}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                e.currentTarget.src = 'https://lojafy-supabase.d2x.site/storage/v1/object/public/system/placeholder.png';
-                              }}
-                            />
+                          <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden border bg-muted/20 flex items-center justify-center">
+                            {cand.thumbnail ? (
+                              <img
+                                src={cand.thumbnail}
+                                alt={cand.title}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  if (cand.id && !e.currentTarget.dataset.retried) {
+                                    e.currentTarget.dataset.retried = 'true';
+                                    e.currentTarget.src = `https://http2.mlstatic.com/D_NQ_NP_${cand.id}-O.webp`;
+                                  } else {
+                                    e.currentTarget.style.display = 'none';
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <Package className="h-6 w-6 text-muted-foreground/40" />
+                            )}
                           </div>
 
                           {/* Detalhes */}
