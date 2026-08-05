@@ -77,8 +77,35 @@ async function sanitizeImageForMl(url: string): Promise<string> {
     console.log(`[ml-publish] Image sanitized successfully. New URL: ${cleanPublicUrl}`);
     return cleanPublicUrl;
   } catch (err) {
-    console.warn(`[ml-publish] Image sanitization failed for ${url}:`, err);
+    console.warn('[ml-publish] Image sanitization failed, using original:', err);
     return url;
+  }
+}
+
+function fixOrValidateGtin(gtin: any): { isValid: boolean; gtin: string } {
+  const clean = (gtin ? String(gtin) : '').replace(/\D/g, '').trim();
+  if (![8, 12, 13, 14].includes(clean.length)) {
+    return { isValid: false, gtin: '' };
+  }
+
+  const digits = clean.split('').map(Number);
+  const checkDigit = digits.pop()!;
+  
+  let sum = 0;
+  const isOddLength = digits.length % 2 !== 0;
+  digits.forEach((digit, i) => {
+    const weight = (i % 2 === (isOddLength ? 0 : 1)) ? 3 : 1;
+    sum += digit * weight;
+  });
+
+  const expectedCheckDigit = (10 - (sum % 10)) % 10;
+  
+  if (checkDigit === expectedCheckDigit) {
+    return { isValid: true, gtin: clean };
+  } else {
+    const fixedGtin = digits.join('') + expectedCheckDigit;
+    console.log(`[ml-publish] EAN Checksum incorreto para ${clean}. Corrigido automaticamente para ${fixedGtin}`);
+    return { isValid: true, gtin: fixedGtin };
   }
 }
 
@@ -260,11 +287,11 @@ serve(async (req) => {
                   value_name = product.model || 'Padrão';
                 } else if (attr.id === 'GTIN') {
                   const gtinVal = product.gtin_ean13 || product.gtin || product.barcode || product.ean;
-                  const cleanGtin = gtinVal ? String(gtinVal).replace(/\D/g, '').trim() : '';
-                  if (cleanGtin && cleanGtin.length >= 8 && cleanGtin.length <= 14) {
-                    value_name = cleanGtin;
+                  const validated = fixOrValidateGtin(gtinVal);
+                  if (validated.isValid) {
+                    value_name = validated.gtin;
                   } else {
-                    console.log(`[ml-publish] Category ${categoryId} requires GTIN but product GTIN is empty/invalid. Adding EMPTY_GTIN_REASON.`);
+                    console.log(`[ml-publish] Category ${categoryId} requires GTIN but product GTIN is invalid/empty. Adding EMPTY_GTIN_REASON.`);
                     attributes.push({ id: 'EMPTY_GTIN_REASON', value_name: 'Outro motivo', value_id: '9370803' });
                     continue;
                   }
@@ -301,17 +328,24 @@ serve(async (req) => {
       }
     }
 
-    // Garantir que GTIN ou EMPTY_GTIN_REASON esteja nos atributos se a categoria exigir ou se o produto possuir GTIN
+    // Garantir que GTIN ou EMPTY_GTIN_REASON esteja nos atributos de forma totalmente válida
     const gtinVal = product.gtin_ean13 || product.gtin || product.barcode || product.ean;
-    const cleanGtin = gtinVal ? String(gtinVal).replace(/\D/g, '').trim() : '';
+    const validatedGtin = fixOrValidateGtin(gtinVal);
     const hasGtin = attributes.some((a: any) => a.id === 'GTIN');
     const hasEmptyGtinReason = attributes.some((a: any) => a.id === 'EMPTY_GTIN_REASON');
 
     if (!hasGtin && !hasEmptyGtinReason) {
-      if (cleanGtin && cleanGtin.length >= 8 && cleanGtin.length <= 14) {
-        attributes.push({ id: 'GTIN', value_name: cleanGtin });
+      if (validatedGtin.isValid) {
+        attributes.push({ id: 'GTIN', value_name: validatedGtin.gtin });
       } else {
         attributes.push({ id: 'EMPTY_GTIN_REASON', value_name: 'Outro motivo', value_id: '9370803' });
+      }
+    } else if (hasGtin) {
+      if (!validatedGtin.isValid) {
+        attributes = attributes.filter((a: any) => a.id !== 'GTIN');
+        attributes.push({ id: 'EMPTY_GTIN_REASON', value_name: 'Outro motivo', value_id: '9370803' });
+      } else {
+        attributes = attributes.map((a: any) => a.id === 'GTIN' ? { ...a, value_name: validatedGtin.gtin } : a);
       }
     }
 
@@ -349,16 +383,48 @@ serve(async (req) => {
 
     console.log('[ml-publish] Creating item:', product.name, 'category:', mlPayload.category_id, 'price:', price);
 
-    const publishRes = await fetch('https://api.mercadolibre.com/items', {
+    let publishRes = await fetch('https://api.mercadolibre.com/items', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(mlPayload),
     });
 
-    const responseBody = await publishRes.json();
+    let responseBody = await publishRes.json();
 
     if (!publishRes.ok) {
       console.error('[ml-publish] ML API error:', publishRes.status, JSON.stringify(responseBody));
+      const errStr = JSON.stringify(responseBody);
+
+      // Dispositivo de Autocorreção e Republicação Automática
+      if (/GTIN|Product Identifier|invalid format|format/i.test(errStr)) {
+        console.log('[ml-publish] 🔄 AUTOCORREÇÃO AUTOMÁTICA ATIVADA: Formato de GTIN rejeitado pelo Mercado Livre.');
+        console.log('[ml-publish] Removendo GTIN e substituindo por EMPTY_GTIN_REASON...');
+
+        const retryAttributes = (mlPayload.attributes as any[] || []).filter(a => a.id !== 'GTIN' && a.id !== 'EMPTY_GTIN_REASON');
+        retryAttributes.push({
+          id: 'EMPTY_GTIN_REASON',
+          value_name: 'Outro motivo',
+          value_id: '9370803'
+        });
+        mlPayload.attributes = retryAttributes;
+
+        console.log('[ml-publish] 🚀 REPUBLICANDO AUTOMATICAMENTE no Mercado Livre...');
+        publishRes = await fetch('https://api.mercadolibre.com/items', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify(mlPayload),
+        });
+
+        responseBody = await publishRes.json();
+        if (publishRes.ok) {
+          console.log(`[ml-publish] ✅ AUTOCORRIGIDO E REPUBLICADO COM SUCESSO! Item ID: ${responseBody.id}`);
+        } else {
+          console.error('[ml-publish] Tentativa de republicação automática também falhou:', responseBody);
+      }
+    }
+
+    if (!publishRes.ok) {
+      console.error('[ml-publish] ML API error final:', publishRes.status, JSON.stringify(responseBody));
       const message = responseBody?.message ?? responseBody?.error ?? `ML API error ${publishRes.status}`;
       const causes: string[] = (responseBody?.cause ?? []).map((c: any) => c.message ?? JSON.stringify(c));
       const fullMessage = causes.length > 0 ? `${message} — cause: ${causes.join('; ')}` : message;
