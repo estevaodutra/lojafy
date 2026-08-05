@@ -34,7 +34,7 @@ export const ProductEditHeader: React.FC<ProductEditHeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-30 w-full border-b bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/80 shadow-xs py-3 px-4 transition-all">
-      <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="w-full flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         
         {/* Left Section: Back button + Product Mini Summary */}
         <div className="flex items-center space-x-3 min-w-0">

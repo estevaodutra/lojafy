@@ -773,7 +773,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
         />
 
         {/* Campo de Busca Rápida Interna */}
-        <div className="max-w-7xl mx-auto px-4 pt-4 pb-2">
+        <div className="w-full px-4 pt-4 pb-2">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -786,7 +786,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
         </div>
 
         {/* 3. CONTEÚDO EM ACCORDIONS RECOLHÍVEIS */}
-        <div className="max-w-7xl mx-auto px-4 py-4 space-y-4">
+        <div className="w-full px-4 py-4 space-y-4">
           <Accordion
             type="multiple"
             value={openAccordions}

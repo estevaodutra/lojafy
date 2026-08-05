@@ -24,7 +24,7 @@ export const StickySaveBar: React.FC<StickySaveBarProps> = ({
 }) => {
   return (
     <div className="sticky bottom-0 z-30 w-full border-t bg-background/95 backdrop-blur-md shadow-lg py-3 px-4 transition-all">
-      <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div className="w-full flex flex-wrap items-center justify-between gap-3">
         
         {/* Left Status Message */}
         <div className="flex items-center space-x-2">

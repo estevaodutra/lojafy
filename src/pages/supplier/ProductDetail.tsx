@@ -229,7 +229,7 @@ const SupplierProductDetail = () => {
   }
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="w-full space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={() => navigate('/supplier/produtos')}>
           <ArrowLeft className="mr-1 h-4 w-4" />
@@ -245,24 +245,19 @@ const SupplierProductDetail = () => {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Dados Completos do Produto</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ProductForm
-            product={product}
-            onSuccess={() => {
-              if (orgId) {
-                queryClient.invalidateQueries({ queryKey: supplierKeys.product(orgId, id!) });
-                queryClient.invalidateQueries({ queryKey: supplierKeys.scope(orgId) });
-              }
-              toast({ title: 'Produto atualizado com sucesso' });
-            }}
-            onCancel={() => navigate('/supplier/produtos')}
-          />
-        </CardContent>
-      </Card>
+      <div className="w-full bg-background rounded-xl border border-border/60 shadow-xs p-1 sm:p-2">
+        <ProductForm
+          product={product}
+          onSuccess={() => {
+            if (orgId) {
+              queryClient.invalidateQueries({ queryKey: supplierKeys.product(orgId, id!) });
+              queryClient.invalidateQueries({ queryKey: supplierKeys.scope(orgId) });
+            }
+            toast({ title: 'Produto atualizado com sucesso' });
+          }}
+          onCancel={() => navigate('/supplier/produtos')}
+        />
+      </div>
 
       <Separator />
 

@@ -53,7 +53,7 @@ export const ProductSectionNavigation: React.FC<ProductSectionNavigationProps> =
 }) => {
   return (
     <div className="sticky top-[57px] z-20 w-full border-b bg-background/90 backdrop-blur-sm py-2 px-4 shadow-2xs">
-      <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+      <div className="w-full flex flex-wrap items-center justify-between gap-2">
         
         {/* Anchor Buttons */}
         <div className="flex items-center space-x-1.5 overflow-x-auto py-1 scrollbar-none max-w-full">
