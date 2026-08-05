@@ -306,10 +306,24 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
 
       const fullItem = itemDetail || candidate;
 
-      let rawPictures: string[] = candidate.pictures || [];
-      if (fullItem.pictures && Array.isArray(fullItem.pictures) && fullItem.pictures.length > 0) {
-        rawPictures = fullItem.pictures.map((p: any) => p.secure_url || p.url).filter(Boolean);
+      let rawPictures: string[] = [];
+
+      if (candidate.pictures && Array.isArray(candidate.pictures) && candidate.pictures.length > 0) {
+        rawPictures.push(...candidate.pictures);
       }
+
+      if (fullItem.pictures && Array.isArray(fullItem.pictures)) {
+        fullItem.pictures.forEach((p: any) => {
+          const u = p.secure_url || p.url;
+          if (u && typeof u === 'string') {
+            const hdUrl = u.replace(/-I\.jpg$/i, '-O.jpg').replace(/-V\.jpg$/i, '-O.jpg');
+            if (!rawPictures.includes(hdUrl) && !rawPictures.includes(u)) {
+              rawPictures.push(hdUrl);
+            }
+          }
+        });
+      }
+
       if (rawPictures.length === 0 && fullItem.thumbnail) {
         rawPictures = [fullItem.thumbnail];
       }
@@ -317,12 +331,12 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         rawPictures = [candidate.thumbnail];
       }
 
-      rawPictures = rawPictures.map(url => {
+      rawPictures = Array.from(new Set(rawPictures.map(url => {
         if (typeof url === 'string') {
           return url.replace(/-I\.jpg$/i, '-O.jpg').replace(/-V\.jpg$/i, '-O.jpg');
         }
         return url;
-      });
+      }))).filter(Boolean);
 
       const specList: Array<{ key: string; value: string }> = candidate.attributes || [];
       let extractedBrand = candidate.brand || '';

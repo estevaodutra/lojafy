@@ -89,15 +89,21 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[ml-sanitize-image] Processing ${urls.length} images...`);
+    console.log(`[ml-sanitize-image] Processing ${urls.length} images in parallel...`);
+    const results = await Promise.all(
+      urls.map(async (url) => {
+        const cleanUrl = await sanitizeSingleImage(url);
+        return { original: url, sanitized: cleanUrl };
+      })
+    );
+
     const mapping: Record<string, string> = {};
     const sanitizedUrls: string[] = [];
 
-    for (const url of urls) {
-      const cleanUrl = await sanitizeSingleImage(url);
-      mapping[url] = cleanUrl;
-      sanitizedUrls.push(cleanUrl);
-    }
+    results.forEach(({ original, sanitized }) => {
+      mapping[original] = sanitized;
+      sanitizedUrls.push(sanitized);
+    });
 
     return new Response(
       JSON.stringify({
