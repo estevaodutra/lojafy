@@ -65,7 +65,7 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
   const [importingId, setImportingId] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<MlItemCandidate[]>([]);
 
-  const handleSearch = useCallback(async (queryToSearch?: string) => {
+  const handleSearch = async (queryToSearch?: string) => {
     const term = (queryToSearch !== undefined ? queryToSearch : searchQuery || '').trim();
     if (!term || term.length < 2) {
       toast({
@@ -150,8 +150,9 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery, toast]);
+  };
 
+  // Inicializa o valor de busca APENAS quando o modal é ABERTO
   useEffect(() => {
     if (isOpen) {
       const q = initialQuery || '';
@@ -160,7 +161,7 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         handleSearch(q);
       }
     }
-  }, [isOpen, initialQuery, handleSearch]);
+  }, [isOpen]);
 
   const handleSelectCandidate = async (candidate: MlItemCandidate) => {
     setImportingId(candidate.id);
