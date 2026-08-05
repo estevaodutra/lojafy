@@ -484,7 +484,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
       if (cleanGtin) form.setValue('gtin_ean13', cleanGtin);
     }
     if (data.price > 0) form.setValue('price', data.price);
-    if (data.reference_ad_url) form.setValue('reference_ad_url', data.reference_ad_url);
+    if (data.reference_ad_url) {
+      const normUrl = data.reference_ad_url.replace(/mercadolivre\.com\.br\/MLB(\d+)/i, 'mercadolivre.com.br/MLB-$1');
+      form.setValue('reference_ad_url', normUrl);
+    }
 
     if (data.images && data.images.length > 0) {
       setImages(data.images);
@@ -588,7 +591,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
         active: data.active,
         featured: data.reference_ad_url && data.reference_ad_url.trim() !== '' ? true : data.featured,
         badge: data.badge || null,
-        reference_ad_url: data.reference_ad_url || null,
+        reference_ad_url: data.reference_ad_url 
+          ? data.reference_ad_url.trim().replace(/mercadolivre\.com\.br\/MLB(\d+)/i, 'mercadolivre.com.br/MLB-$1') 
+          : null,
         specifications: specificationsObj,
         images: sanitizedImageUrls,
         updated_at: new Date().toISOString(),

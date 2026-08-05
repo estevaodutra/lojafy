@@ -162,12 +162,24 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
             thumb = thumb.replace('-I.jpg', '-O.jpg');
           }
 
+          const formatMlPermalink = (id: string, rawPermalink?: string): string => {
+            if (rawPermalink && rawPermalink.startsWith('http')) {
+              return rawPermalink.replace(/mercadolivre\.com\.br\/MLB(\d+)/i, 'mercadolivre.com.br/MLB-$1');
+            }
+            const cleanId = (id || '').trim();
+            if (/^MLB-?\d+/i.test(cleanId)) {
+              const numPart = cleanId.replace(/^MLB-?/i, '');
+              return `https://produto.mercadolivre.com.br/MLB-${numPart}`;
+            }
+            return `https://www.mercadolivre.com.br/p/${cleanId}`;
+          };
+
           return {
             id: item.id,
             title: item.title || item.name || '',
             price: Number(rawPrice) || 0,
             thumbnail: thumb,
-            permalink: item.permalink || `https://produto.mercadolivre.com.br/${item.id}`,
+            permalink: formatMlPermalink(item.id, item.permalink),
             brand: brandAttr,
             gtin: gtinAttr,
             domain_id: item.domain_id
@@ -180,12 +192,24 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         const rawPrice = resData.price ?? resData.buy_box_winner?.price ?? 0;
         const thumb = resData.pictures?.[0]?.secure_url || resData.thumbnail || '';
 
+        const formatMlPermalink = (id: string, rawPermalink?: string): string => {
+          if (rawPermalink && rawPermalink.startsWith('http')) {
+            return rawPermalink.replace(/mercadolivre\.com\.br\/MLB(\d+)/i, 'mercadolivre.com.br/MLB-$1');
+          }
+          const cleanId = (id || '').trim();
+          if (/^MLB-?\d+/i.test(cleanId)) {
+            const numPart = cleanId.replace(/^MLB-?/i, '');
+            return `https://produto.mercadolivre.com.br/MLB-${numPart}`;
+          }
+          return `https://www.mercadolivre.com.br/p/${cleanId}`;
+        };
+
         itemsList = [{
           id: resData.id,
           title: resData.title || resData.name || '',
           price: Number(rawPrice) || 0,
           thumbnail: thumb.replace(/^http:/, 'https:'),
-          permalink: resData.permalink || `https://produto.mercadolivre.com.br/${resData.id}`,
+          permalink: formatMlPermalink(resData.id, resData.permalink),
           brand: brandAttr,
           gtin: gtinAttr,
           domain_id: resData.domain_id
@@ -230,7 +254,7 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
     });
 
     try {
-      // 1. Buscar detalhes completos do item (/items/MLBxxx)
+      // 1. Buscar detalhes completos do item (/items/MLBxxx) ou catálogo (/products/MLBxxx)
       let itemDetail: any = null;
       try {
         const { data } = await supabase.functions.invoke('ml-public-search', {
@@ -239,68 +263,48 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         if (data && data.id) itemDetail = data;
       } catch (e) {}
 
-      if (!itemDetail) {
+      if (!itemDetail || !itemDetail.pictures || itemDetail.pictures.length === 0) {
         try {
           const directDetailRes = await fetch(`https://api.mercadolibre.com/items/${candidate.id}`);
           if (directDetailRes.ok) itemDetail = await directDetailRes.json();
         } catch (e) {}
       }
 
-      const fullItem = itemDetail || candidate;
-
-      // 2. Buscar Descrição do item (/items/MLBxxx/description)
-      let descriptionText = '';
-      let descData: any = null;
-      try {
-        const { data } = await supabase.functions.invoke('ml-public-search', {
-          body: { path: `/items/${candidate.id}/description` }
-        });
-        if (data) descData = data;
-      } catch (e) {}
-
-      if (!descData) {
+      // Fallback para produto de catálogo
+      if (!itemDetail || !itemDetail.pictures || itemDetail.pictures.length === 0) {
         try {
-          const directDescRes = await fetch(`https://api.mercadolibre.com/items/${candidate.id}/description`);
-          if (directDescRes.ok) descData = await directDescRes.json();
+          const { data: catData } = await supabase.functions.invoke('ml-public-search', {
+            body: { path: `/products/${candidate.id}` }
+          });
+          if (catData && catData.id) {
+            itemDetail = { ...(itemDetail || {}), ...catData };
+          }
         } catch (e) {}
       }
 
-      descriptionText = descData?.plain_text || descData?.text || '';
+      const fullItem = itemDetail || candidate;
 
-      // 3. Extrair Fotos HD
+      // 2. Extrair Fotos HD
       let rawPictures: string[] = [];
-      if (fullItem.pictures && Array.isArray(fullItem.pictures)) {
+      if (fullItem.pictures && Array.isArray(fullItem.pictures) && fullItem.pictures.length > 0) {
         rawPictures = fullItem.pictures.map((p: any) => p.secure_url || p.url).filter(Boolean);
       }
+      if (rawPictures.length === 0 && fullItem.thumbnail) {
+        rawPictures = [fullItem.thumbnail];
+      }
       if (rawPictures.length === 0 && candidate.thumbnail) {
-        rawPictures = [candidate.thumbnail.replace('-I.jpg', '-O.jpg')];
+        rawPictures = [candidate.thumbnail];
       }
 
-      // 4. Sanitizar Mídias para o Bucket product-images da VPS
-      let sanitizedUrls: string[] = [];
-      if (rawPictures.length > 0) {
-        try {
-          const { data: sanitizeRes } = await supabase.functions.invoke('ml-sanitize-image', {
-            body: { urls: rawPictures }
-          });
-          if (sanitizeRes?.sanitizedUrls && Array.isArray(sanitizeRes.sanitizedUrls)) {
-            sanitizedUrls = sanitizeRes.sanitizedUrls;
-          }
-        } catch (sanitizeErr) {
-          console.warn('Erro ao sanitizar imagens no modal:', sanitizeErr);
-          sanitizedUrls = rawPictures;
+      // Garantir mídias em alta resolução original (-O.jpg / -F.jpg)
+      rawPictures = rawPictures.map(url => {
+        if (typeof url === 'string') {
+          return url.replace(/-I\.jpg$/i, '-O.jpg').replace(/-V\.jpg$/i, '-O.jpg');
         }
-      }
+        return url;
+      });
 
-      const formattedImages: ImageFile[] = sanitizedUrls.map((url, idx) => ({
-        id: `ml-import-${idx}-${Date.now()}`,
-        preview: url,
-        url: url,
-        isMain: idx === 0,
-        isUploading: false
-      }));
-
-      // 5. Extrair Atributos e Especificações
+      // 3. Extrair Atributos e Especificações
       const specList: Array<{ key: string; value: string }> = [];
       let extractedBrand = candidate.brand || '';
       let extractedGtin = candidate.gtin || '';
@@ -311,13 +315,69 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
           const attrVal = attrItem.value_name || attrItem.value;
 
           if (attrItem.id === 'BRAND' && attrVal) extractedBrand = attrVal;
-          if (attrItem.id === 'GTIN' && attrVal && /^\d{12,14}$/.test(attrVal.trim())) extractedGtin = attrVal.trim();
+          if (attrItem.id === 'GTIN' && attrVal && /^\d{8,14}$/.test(attrVal.trim())) extractedGtin = attrVal.trim();
 
-          if (attrName && attrVal && attrVal !== 'Não' && attrVal !== 'N/A') {
-            specList.push({ key: attrName, value: attrVal });
+          if (attrName && attrVal && attrVal !== 'Não' && attrVal !== 'N/A' && attrVal !== 'Outros') {
+            if (!specList.some(s => s.key.toLowerCase() === attrName.toLowerCase())) {
+              specList.push({ key: attrName, value: String(attrVal) });
+            }
           }
         });
       }
+
+      // 4. Buscar Descrição do item (/items/MLBxxx/description ou /products/MLBxxx)
+      let descriptionText = '';
+      let descData: any = null;
+      try {
+        const { data } = await supabase.functions.invoke('ml-public-search', {
+          body: { path: `/items/${candidate.id}/description` }
+        });
+        if (data && (data.plain_text || data.text)) descData = data;
+      } catch (e) {}
+
+      if (!descData) {
+        try {
+          const directDescRes = await fetch(`https://api.mercadolibre.com/items/${candidate.id}/description`);
+          if (directDescRes.ok) descData = await directDescRes.json();
+        } catch (e) {}
+      }
+
+      descriptionText = descData?.plain_text || descData?.text || fullItem.short_description || fullItem.description || '';
+
+      // Se a descrição do Mercado Livre vier vazia, gerar descrição completa formatada com as especificações
+      if (!descriptionText || descriptionText.trim().length < 10) {
+        const titleFormatted = fullItem.title || candidate.title;
+        const specsText = specList.map(s => `• ${s.key}: ${s.value}`).join('\n');
+        descriptionText = `${titleFormatted}\n\n${extractedBrand ? `Marca: ${extractedBrand}\n` : ''}${specsText ? `\nEspecificações Técnicas:\n${specsText}\n\n` : ''}Produto de alta qualidade, pronto para envio com estoque garantido.`;
+      }
+
+      // 5. Sanitizar Mídias para o Bucket product-images da VPS
+      let sanitizedUrls: string[] = [];
+      if (rawPictures.length > 0) {
+        try {
+          const { data: sanitizeRes } = await supabase.functions.invoke('ml-sanitize-image', {
+            body: { urls: rawPictures }
+          });
+          if (sanitizeRes?.sanitizedUrls && Array.isArray(sanitizeRes.sanitizedUrls) && sanitizeRes.sanitizedUrls.length > 0) {
+            sanitizedUrls = sanitizeRes.sanitizedUrls;
+          }
+        } catch (sanitizeErr) {
+          console.warn('Erro ao sanitizar imagens no modal:', sanitizeErr);
+        }
+      }
+
+      // Se a sanitização falhou ou retornou lista vazia, usar as URLs originais
+      if (sanitizedUrls.length === 0) {
+        sanitizedUrls = rawPictures;
+      }
+
+      const formattedImages: ImageFile[] = sanitizedUrls.map((url, idx) => ({
+        id: `ml-import-${idx}-${Date.now()}`,
+        preview: url,
+        url: url,
+        isMain: idx === 0,
+        isUploading: false
+      }));
 
       // Aplicar os dados no formulário
       onApplyReference({
@@ -333,7 +393,7 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
 
       toast({
         title: "✨ Produto Importado com Sucesso!",
-        description: "Formulário preenchido com fotos HD tratadas, descrição e especificações.",
+        description: `Importadas ${formattedImages.length} fotos em HD, descrição e ${specList.length} atributos.`,
       });
 
       onClose();
