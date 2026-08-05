@@ -477,7 +477,18 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
     specifications: Array<{ key: string; value: string }>;
   }) => {
     if (data.name) form.setValue('name', data.name);
-    if (data.description) form.setValue('description', data.description);
+    if (data.description) {
+      let cleanDesc = '';
+      if (typeof data.description === 'string') {
+        cleanDesc = data.description;
+      } else if (typeof data.description === 'object' && data.description !== null) {
+        const d = data.description as any;
+        cleanDesc = d.plain_text || d.text || d.content || '';
+      }
+      if (cleanDesc && cleanDesc.trim() !== '[object Object]') {
+        form.setValue('description', cleanDesc.trim());
+      }
+    }
     if (data.brand) form.setValue('brand', data.brand);
     if (data.gtin_ean13) {
       const cleanGtin = String(data.gtin_ean13).replace(/\D/g, '').slice(0, 13);

@@ -56,6 +56,17 @@ interface MlProductReferenceModalProps {
   }) => void;
 }
 
+const extractStringDescription = (val: any): string => {
+  if (!val) return '';
+  if (typeof val === 'string' && val.trim() !== '[object Object]') return val.trim();
+  if (typeof val === 'object' && val !== null) {
+    if (typeof val.plain_text === 'string' && val.plain_text.trim()) return val.plain_text.trim();
+    if (typeof val.text === 'string' && val.text.trim()) return val.text.trim();
+    if (typeof val.content === 'string' && val.content.trim()) return val.content.trim();
+  }
+  return '';
+};
+
 export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = ({
   isOpen,
   onClose,
@@ -127,6 +138,7 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         itemsList = resData.results.map((item: any) => {
           const brandAttr = item.attributes?.find((a: any) => a.id === 'BRAND')?.value_name || '';
           const gtinAttr = item.attributes?.find((a: any) => a.id === 'GTIN')?.value_name || '';
+
           const rawPrice = item.price ?? item.buy_box_winner?.price ?? item.user_product_price ?? item.price_max ?? item.price_min ?? 0;
 
           let thumb = '';
@@ -161,6 +173,8 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
             });
           }
 
+          const candidateDesc = extractStringDescription(item.short_description) || extractStringDescription(item.description);
+
           return {
             id: item.id,
             title: item.title || item.name || '',
@@ -172,7 +186,7 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
             domain_id: item.domain_id,
             pictures: candidatePics,
             attributes: candidateAttrs,
-            description: item.short_description || item.description || ''
+            description: candidateDesc
           };
         });
       } else if (resData?.id) {
@@ -189,7 +203,8 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
           permalink: formatMlPermalink(resData.id, resData.permalink),
           brand: brandAttr,
           gtin: gtinAttr,
-          domain_id: resData.domain_id
+          domain_id: resData.domain_id,
+          description: extractStringDescription(resData.short_description) || extractStringDescription(resData.description)
         }];
       }
 
@@ -231,6 +246,8 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
               });
             }
 
+            const detailDesc = extractStringDescription(detail.short_description) || extractStringDescription(detail.description);
+
             setCandidates(prev => prev.map(c => {
               if (c.id === cand.id) {
                 return {
@@ -238,7 +255,7 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
                   pictures: pics.length > 0 ? pics : c.pictures,
                   attributes: attrs.length > 0 ? attrs : c.attributes,
                   price: Number(detail.price ?? detail.buy_box_winner?.price ?? c.price) || c.price,
-                  description: detail.short_description || detail.description || c.description
+                  description: detailDesc || c.description
                 };
               }
               return c;
@@ -366,7 +383,12 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         } catch (e) {}
       }
 
-      descriptionText = descData?.plain_text || descData?.text || fullItem.short_description || fullItem.description || descriptionText || '';
+      descriptionText = extractStringDescription(descData?.plain_text) ||
+                        extractStringDescription(descData?.text) ||
+                        extractStringDescription(descData) ||
+                        extractStringDescription(fullItem.short_description) ||
+                        extractStringDescription(fullItem.description) ||
+                        extractStringDescription(candidate.description);
 
       if (!descriptionText || descriptionText.trim().length < 10) {
         const titleFormatted = fullItem.title || candidate.title;
