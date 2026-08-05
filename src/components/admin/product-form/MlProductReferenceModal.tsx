@@ -65,17 +65,8 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
   const [importingId, setImportingId] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<MlItemCandidate[]>([]);
 
-  useEffect(() => {
-    if (isOpen) {
-      setSearchQuery(initialQuery);
-      if (initialQuery && initialQuery.trim().length >= 3) {
-        handleSearch(initialQuery);
-      }
-    }
-  }, [isOpen, initialQuery]);
-
-  const handleSearch = async (queryToSearch?: string) => {
-    const term = (queryToSearch || searchQuery).trim();
+  const handleSearch = useCallback(async (queryToSearch?: string) => {
+    const term = (queryToSearch !== undefined ? queryToSearch : searchQuery || '').trim();
     if (!term || term.length < 2) {
       toast({
         title: "Termo muito curto",
@@ -159,7 +150,17 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [searchQuery, toast]);
+
+  useEffect(() => {
+    if (isOpen) {
+      const q = initialQuery || '';
+      setSearchQuery(q);
+      if (q.trim().length >= 3) {
+        handleSearch(q);
+      }
+    }
+  }, [isOpen, initialQuery, handleSearch]);
 
   const handleSelectCandidate = async (candidate: MlItemCandidate) => {
     setImportingId(candidate.id);
