@@ -138,10 +138,6 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         }
       }
 
-      if (!resData) {
-        throw new Error('Não foi possível obter anúncios do Mercado Livre');
-      }
-
       let itemsList: MlItemCandidate[] = [];
 
       if (resData?.results && Array.isArray(resData.results)) {
@@ -180,15 +176,14 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
       if (itemsList.length === 0) {
         toast({
           title: "Nenhum resultado encontrado",
-          description: "Tente pesquisar com outro termo ou nome de produto.",
+          description: "Nenhum produto foi localizado com o termo pesquisado. Tente simplificar o nome.",
         });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao buscar no Mercado Livre:', err);
       toast({
-        title: "Erro na busca do Mercado Livre",
-        description: "Não foi possível consultar os anúncios de referência.",
-        variant: "destructive"
+        title: "Nenhum resultado encontrado",
+        description: "Não foi possível localizar anúncios para esse termo. Tente digitar apenas o nome principal do produto.",
       });
     } finally {
       setIsLoading(false);

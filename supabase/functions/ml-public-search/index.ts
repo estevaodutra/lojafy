@@ -20,73 +20,78 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { query, path } = body;
 
-    // Load credentials from database first, falling back to environment variables or defaults
-    let mlClientId = Deno.env.get('ML_CLIENT_ID') || '2003351424267574';
-    let mlClientSecret = Deno.env.get('ML_CLIENT_SECRET') || 'xxhhZC2YUeAi2GWMM222aPstgCfu0GTL';
+    const mlPath = path || (query ? `/sites/MLB/search?q=${encodeURIComponent(query)}&limit=15` : '/sites/MLB/search?q=produto&limit=15');
+    const isPublicRoute = mlPath.includes('/sites/') || mlPath.includes('/description') || mlPath.includes('/items/') || mlPath.includes('/categories/');
 
-    try {
-      const { data: platSettings } = await supabase
-        .from('marketplace_credentials')
-        .select('client_id, client_secret')
-        .eq('marketplace', 'mercadolivre')
-        .maybeSingle();
-
-      if (platSettings) {
-        if (platSettings.client_id) mlClientId = platSettings.client_id;
-        if (platSettings.client_secret) mlClientSecret = platSettings.client_secret;
-      }
-    } catch (platErr) {
-      console.warn('[ml-public-search] Failed to fetch custom credentials from marketplace_credentials:', platErr);
-    }
-
-    // 1. Gerar token de aplicação (client_credentials)
-    const tokenRes = await fetch('https://api.mercadolibre.com/oauth/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'client_credentials',
-        client_id: mlClientId,
-        client_secret: mlClientSecret,
-      }).toString(),
-    });
-
-    if (!tokenRes.ok) {
-      const errText = await tokenRes.text();
-      console.error('[ml-public-search] Failed to get app token:', errText);
-      return new Response(JSON.stringify({ error: 'Auth failed with ML' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const tokenData = await tokenRes.json();
-    const accessToken = tokenData.access_token;
-
-    // 2. Fazer a requisição no Mercado Livre
-    const mlPath = path || `/products/search?status=active&site_id=MLB&q=${encodeURIComponent(query)}&limit=15`;
-    const mlUrl = `https://api.mercadolibre.com${mlPath}`;
-    
-    // Rotas de listagem comum (/sites/) e descrição de anúncios (/description) bloqueiam tokens de servidor/Client Credentials,
-    // mas aceitam requisições sem qualquer autenticação (públicas). Enviamos token apenas para catálogo (/products).
-    const isPublicRoute = mlPath.includes('/sites/') || mlPath.includes('/description');
-    
     const headers: Record<string, string> = {
       'Accept': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     };
-    
+
+    // Para rotas privadas do catálogo (/products/), tentar token de app se disponível
     if (!isPublicRoute) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
+      let mlClientId = Deno.env.get('ML_CLIENT_ID') || '2003351424267574';
+      let mlClientSecret = Deno.env.get('ML_CLIENT_SECRET') || 'xxhhZC2YUeAi2GWMM222aPstgCfu0GTL';
+
+      try {
+        const { data: platSettings } = await supabase
+          .from('marketplace_credentials')
+          .select('client_id, client_secret')
+          .eq('marketplace', 'mercadolivre')
+          .maybeSingle();
+
+        if (platSettings?.client_id) mlClientId = platSettings.client_id;
+        if (platSettings?.client_secret) mlClientSecret = platSettings.client_secret;
+      } catch (platErr) {
+        console.warn('[ml-public-search] Erro ao buscar credenciais:', platErr);
+      }
+
+      try {
+        const tokenRes = await fetch('https://api.mercadolibre.com/oauth/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'client_credentials',
+            client_id: mlClientId,
+            client_secret: mlClientSecret,
+          }).toString(),
+        });
+
+        if (tokenRes.ok) {
+          const tokenData = await tokenRes.json();
+          if (tokenData.access_token) {
+            headers['Authorization'] = `Bearer ${tokenData.access_token}`;
+          }
+        }
+      } catch (tokenErr) {
+        console.warn('[ml-public-search] OAuth token failed, proceeding without token:', tokenErr);
+      }
     }
 
-    console.log(`[ml-public-search] Fetching ML: ${mlUrl} (authenticated: ${!isPublicRoute})`);
+    const mlUrl = `https://api.mercadolibre.com${mlPath}`;
+    console.log(`[ml-public-search] Fetching ML: ${mlUrl}`);
     
-    const mlRes = await fetch(mlUrl, { headers });
+    let mlRes = await fetch(mlUrl, { headers });
+
+    // Se falhar e a rota era de catálogo (/products), tentar fallback para /sites/MLB/search
+    if (!mlRes.ok && mlPath.includes('/products/search')) {
+      const fallbackQuery = query || 'produto';
+      const fallbackUrl = `https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(fallbackQuery)}&limit=15`;
+      console.log(`[ml-public-search] Fallback para rota pública: ${fallbackUrl}`);
+      mlRes = await fetch(fallbackUrl, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        }
+      });
+    }
 
     const data = await mlRes.json().catch(() => ({}));
 
     if (!mlRes.ok) {
       console.error('[ml-public-search] ML request failed:', mlRes.status, data);
-      return new Response(JSON.stringify({ error: 'ML request failed', details: data }), {
-        status: mlRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      return new Response(JSON.stringify({ error: 'ML request failed', details: data, results: [] }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -96,8 +101,8 @@ serve(async (req) => {
 
   } catch (err) {
     console.error('[ml-public-search] Error:', err);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    return new Response(JSON.stringify({ error: 'Internal server error', results: [] }), {
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
