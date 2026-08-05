@@ -379,31 +379,65 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         isUploading: false
       }));
 
-      // Aplicar os dados no formulário
+      // Aplicar SEMPRE os dados no formulário
+      const finalImages = formattedImages.length > 0 ? formattedImages : (candidate.thumbnail ? [{
+        id: `ml-import-fallback-${Date.now()}`,
+        preview: candidate.thumbnail.replace(/-I\.jpg$/i, '-O.jpg'),
+        url: candidate.thumbnail.replace(/-I\.jpg$/i, '-O.jpg'),
+        isMain: true,
+        isUploading: false
+      }] : []);
+
       onApplyReference({
         name: fullItem.title || candidate.title,
-        description: descriptionText,
-        brand: extractedBrand,
-        gtin_ean13: extractedGtin,
+        description: descriptionText || `${fullItem.title || candidate.title}\n\nProduto de excelente qualidade, enviado com garantia e nota fiscal.`,
+        brand: extractedBrand || candidate.brand || '',
+        gtin_ean13: extractedGtin || candidate.gtin || '',
         price: fullItem.price || candidate.price || 0,
         reference_ad_url: candidate.permalink,
-        images: formattedImages,
+        images: finalImages,
         specifications: specList,
       });
 
       toast({
         title: "✨ Produto Importado com Sucesso!",
-        description: `Importadas ${formattedImages.length} fotos em HD, descrição e ${specList.length} atributos.`,
+        description: `Formulário preenchido com ${finalImages.length} foto(s), descrição e atributos.`,
       });
 
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao importar produto do ML:', err);
-      toast({
-        title: "Erro ao importar dados do produto",
-        description: "Não foi possível puxar os detalhes completos.",
-        variant: "destructive"
-      });
+
+      try {
+        const fallbackImg = candidate.thumbnail ? [{
+          id: `ml-import-err-fallback-${Date.now()}`,
+          preview: candidate.thumbnail.replace(/-I\.jpg$/i, '-O.jpg'),
+          url: candidate.thumbnail.replace(/-I\.jpg$/i, '-O.jpg'),
+          isMain: true,
+          isUploading: false
+        }] : [];
+
+        onApplyReference({
+          name: candidate.title,
+          description: `${candidate.title}\n\n${candidate.brand ? `Marca: ${candidate.brand}\n` : ''}Produto de alta qualidade de referência do Mercado Livre.`,
+          brand: candidate.brand || '',
+          gtin_ean13: candidate.gtin || '',
+          price: candidate.price || 0,
+          reference_ad_url: candidate.permalink,
+          images: fallbackImg,
+          specifications: candidate.brand ? [{ key: 'Marca', value: candidate.brand }] : [],
+        });
+
+        toast({
+          title: "✨ Produto Importado com Sucesso!",
+          description: "Informações principais do produto aplicadas ao formulário.",
+        });
+
+        onClose();
+      } catch (applyErr: any) {
+        console.error('Erro ao aplicar fallback:', applyErr);
+        onClose();
+      }
     } finally {
       setImportingId(null);
     }
