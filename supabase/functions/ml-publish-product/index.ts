@@ -395,12 +395,12 @@ serve(async (req) => {
       console.error('[ml-publish] ML API error:', publishRes.status, JSON.stringify(responseBody));
       const errStr = JSON.stringify(responseBody);
 
-      // Dispositivo de Autocorreção e Republicação Automática
+      // 1. Dispositivo de Autocorreção: Erro de GTIN / Formato de Código de Barras
       if (/GTIN|Product Identifier|invalid format|format/i.test(errStr)) {
         console.log('[ml-publish] 🔄 AUTOCORREÇÃO AUTOMÁTICA ATIVADA: Formato de GTIN rejeitado pelo Mercado Livre.');
         console.log('[ml-publish] Removendo GTIN e substituindo por EMPTY_GTIN_REASON...');
 
-        const retryAttributes = (mlPayload.attributes as any[] || []).filter(a => a.id !== 'GTIN' && a.id !== 'EMPTY_GTIN_REASON');
+        const retryAttributes = (mlPayload.attributes as any[] || []).filter((a: any) => a.id !== 'GTIN' && a.id !== 'EMPTY_GTIN_REASON');
         retryAttributes.push({
           id: 'EMPTY_GTIN_REASON',
           value_name: 'Outro motivo',
@@ -419,7 +419,46 @@ serve(async (req) => {
         if (publishRes.ok) {
           console.log(`[ml-publish] ✅ AUTOCORRIGIDO E REPUBLICADO COM SUCESSO! Item ID: ${responseBody.id}`);
         } else {
-          console.error('[ml-publish] Tentativa de republicação automática também falhou:', responseBody);
+          console.error('[ml-publish] Tentativa de republicação por GTIN também falhou:', responseBody);
+        }
+      }
+
+      // 2. Dispositivo de Autocorreção: Atributo Obrigatório Ausente ("The attributes [XYZ] are required...")
+      if (!publishRes.ok) {
+        const retryErrStr = JSON.stringify(responseBody);
+        const missingAttrMatch = retryErrStr.match(/The attributes? \[([A-Z0-9_]+)\] (?:are|is) required/i);
+        if (missingAttrMatch) {
+          const missingAttrId = missingAttrMatch[1];
+          console.log(`[ml-publish] 🔄 AUTOCORREÇÃO DE ATRIBUTO: Atributo obrigatório ausente [${missingAttrId}] detectado!`);
+
+          const currentAttrs = (mlPayload.attributes as any[] || []);
+          if (!currentAttrs.some((a: any) => a.id === missingAttrId)) {
+            let defaultValue = 'Padrão';
+            if (missingAttrId === 'VOLTAGE' || missingAttrId === 'VOLTAGEM') defaultValue = '110V/220V (Bivolt)';
+            if (missingAttrId === 'COLOR' || missingAttrId === 'COR') defaultValue = 'Branco';
+            if (missingAttrId === 'POWER' || missingAttrId === 'POTENCIA') defaultValue = '1 W';
+
+            currentAttrs.push({
+              id: missingAttrId,
+              value_name: defaultValue
+            });
+            mlPayload.attributes = currentAttrs;
+
+            console.log(`[ml-publish] 🚀 REPUBLICANDO AUTOMATICAMENTE no Mercado Livre com o atributo [${missingAttrId}] preenchido...`);
+            publishRes = await fetch('https://api.mercadolibre.com/items', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+              body: JSON.stringify(mlPayload),
+            });
+
+            responseBody = await publishRes.json();
+            if (publishRes.ok) {
+              console.log(`[ml-publish] ✅ ATRIBUTO AUTOCORRIGIDO E REPUBLICADO COM SUCESSO! Item ID: ${responseBody.id}`);
+            } else {
+              console.error('[ml-publish] Republicação por atributo ausente falhou:', responseBody);
+            }
+          }
+        }
       }
     }
 
@@ -428,8 +467,15 @@ serve(async (req) => {
       const message = responseBody?.message ?? responseBody?.error ?? `ML API error ${publishRes.status}`;
       const causes: string[] = (responseBody?.cause ?? []).map((c: any) => c.message ?? JSON.stringify(c));
       const fullMessage = causes.length > 0 ? `${message} — cause: ${causes.join('; ')}` : message;
-      return new Response(JSON.stringify({ error: fullMessage, cause: causes, ml_response: responseBody }), {
-        status: publishRes.status >= 400 && publishRes.status < 500 ? 422 : 502,
+      
+      // Retornar HTTP 200 com success: false para que o cliente exiba a mensagem exata sem a mensagem genérica "non-2xx status code"
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: fullMessage, 
+        cause: causes, 
+        ml_response: responseBody 
+      }), {
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

@@ -157,7 +157,8 @@ export const useMercadoLivreIntegration = () => {
         let cause = '';
         try {
           if ('context' in publishError && typeof publishError.context === 'object' && publishError.context !== null) {
-            const errorBody = await (publishError.context as Response).json();
+            const ctxRes = (publishError.context as Response).clone();
+            const errorBody = await ctxRes.json();
             if (errorBody?.error) {
               errorMessage = errorBody.error;
             }
