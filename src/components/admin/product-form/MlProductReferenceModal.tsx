@@ -67,6 +67,20 @@ const extractStringDescription = (val: any): string => {
   return '';
 };
 
+const parseMlInput = (input: string): { isDirectId: boolean; id: string; isCatalog: boolean } => {
+  const str = input.trim();
+  const catalogMatch = str.match(/\/p\/(MLB-?\d+)/i);
+  if (catalogMatch) {
+    return { isDirectId: true, id: catalogMatch[1].replace('-', '').toUpperCase(), isCatalog: true };
+  }
+  const itemMatch = str.match(/(MLB-?\d+)/i);
+  if (itemMatch) {
+    const raw = itemMatch[1].replace('-', '').toUpperCase();
+    return { isDirectId: true, id: raw, isCatalog: str.includes('/p/') };
+  }
+  return { isDirectId: false, id: str, isCatalog: false };
+};
+
 export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = ({
   isOpen,
   onClose,
@@ -84,7 +98,7 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
     if (!term) {
       toast({
         title: "Informe um termo de busca",
-        description: "Digite o nome do produto ou código para buscar no Mercado Livre.",
+        description: "Digite o nome do produto ou link para buscar no Mercado Livre.",
       });
       return;
     }
@@ -92,31 +106,75 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
     setIsLoading(true);
     setCandidates([]);
 
+    const parsed = parseMlInput(term);
+
     try {
       let resData: any = null;
 
-      try {
-        const { data } = await supabase.functions.invoke('ml-public-search', {
-          body: { query: term }
-        });
-        if (data && !data.error && (data.results?.length > 0 || data.id)) {
-          resData = data;
-        }
-      } catch (edgeErr) {
-        console.warn('[MlProductReferenceModal] Edge Function ml-public-search falhou:', edgeErr);
-      }
+      if (parsed.isDirectId) {
+        // Busca por Link / ID direto do Mercado Livre
+        console.log(`[MlProductReferenceModal] Buscando por ID direto: ${parsed.id} (Catálogo: ${parsed.isCatalog})`);
+        
+        const primaryEndpoint = parsed.isCatalog ? `/products/${parsed.id}` : `/items/${parsed.id}`;
+        const fallbackEndpoint = parsed.isCatalog ? `/items/${parsed.id}` : `/products/${parsed.id}`;
 
-      if (!resData || resData.error || (!resData.results?.length && !resData.id)) {
         try {
-          const directRes = await fetch(`https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(term)}&limit=10`);
-          if (directRes.ok) {
-            const directJson = await directRes.json();
-            if (directJson && !directJson.error && (directJson.results?.length > 0 || directJson.id)) {
-              resData = directJson;
-            }
+          const { data } = await supabase.functions.invoke('ml-public-search', {
+            body: { path: primaryEndpoint }
+          });
+          if (data && !data.error && (data.id || data.title || data.name)) {
+            resData = data;
           }
-        } catch (directErr) {
-          console.warn('[MlProductReferenceModal] Fallback direto da API pública falhou:', directErr);
+        } catch (e) {}
+
+        if (!resData) {
+          try {
+            const { data } = await supabase.functions.invoke('ml-public-search', {
+              body: { path: fallbackEndpoint }
+            });
+            if (data && !data.error && (data.id || data.title || data.name)) {
+              resData = data;
+            }
+          } catch (e) {}
+        }
+
+        if (!resData) {
+          try {
+            const endpointPath = parsed.isCatalog ? `products/${parsed.id}` : `items/${parsed.id}`;
+            const directFetch = await fetch(`https://api.mercadolibre.com/${endpointPath}`);
+            if (directFetch.ok) {
+              const directJson = await directFetch.json();
+              if (directJson && !directJson.error && (directJson.id || directJson.title || directJson.name)) {
+                resData = directJson;
+              }
+            }
+          } catch (e) {}
+        }
+      } else {
+        // Busca textual normal por palavra-chave
+        try {
+          const { data } = await supabase.functions.invoke('ml-public-search', {
+            body: { query: term }
+          });
+          if (data && !data.error && (data.results?.length > 0 || data.id)) {
+            resData = data;
+          }
+        } catch (edgeErr) {
+          console.warn('[MlProductReferenceModal] Edge Function ml-public-search falhou:', edgeErr);
+        }
+
+        if (!resData || resData.error || (!resData.results?.length && !resData.id)) {
+          try {
+            const directRes = await fetch(`https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(term)}&limit=10`);
+            if (directRes.ok) {
+              const directJson = await directRes.json();
+              if (directJson && !directJson.error && (directJson.results?.length > 0 || directJson.id)) {
+                resData = directJson;
+              }
+            }
+          } catch (directErr) {
+            console.warn('[MlProductReferenceModal] Fallback direto da API pública falhou:', directErr);
+          }
         }
       }
 
@@ -192,18 +250,72 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
       } else if (resData?.id) {
         const brandAttr = resData.attributes?.find((a: any) => a.id === 'BRAND')?.value_name || '';
         const gtinAttr = resData.attributes?.find((a: any) => a.id === 'GTIN')?.value_name || '';
-        const rawPrice = resData.price ?? resData.buy_box_winner?.price ?? 0;
-        const thumb = resData.pictures?.[0]?.secure_url || resData.thumbnail || '';
+        
+        let rawPrice = resData.price ?? 
+                       resData.buy_box_winner?.price ?? 
+                       resData.user_product_price ?? 
+                       resData.price_min ?? 
+                       resData.price_max ?? 
+                       0;
+
+        // Se for um produto de catálogo com preço zerado, buscar anúncios vinculados para resolver o preço real
+        if (!rawPrice || rawPrice === 0) {
+          try {
+            const { data: catItems } = await supabase.functions.invoke('ml-public-search', {
+              body: { path: `/products/${resData.id}/items` }
+            });
+            if (catItems?.results && Array.isArray(catItems.results) && catItems.results.length > 0) {
+              const sellerPrice = catItems.results[0].price ?? catItems.results[0].buy_box_winner?.price;
+              if (sellerPrice && Number(sellerPrice) > 0) {
+                rawPrice = Number(sellerPrice);
+              }
+            }
+          } catch (e) {}
+        }
+
+        let thumb = '';
+        if (resData.thumbnail_id) {
+          thumb = `https://http2.mlstatic.com/D_NQ_NP_${resData.thumbnail_id}-O.webp`;
+        } else if (resData.pictures && Array.isArray(resData.pictures) && resData.pictures.length > 0) {
+          thumb = resData.pictures[0].secure_url || resData.pictures[0].url || '';
+        } else if (resData.thumbnail) {
+          thumb = resData.thumbnail.replace(/^http:/, 'https:');
+        }
+
+        if (thumb.includes('-I.jpg')) {
+          thumb = thumb.replace('-I.jpg', '-O.jpg');
+        }
+
+        let candidatePics: string[] = [];
+        if (resData.pictures && Array.isArray(resData.pictures) && resData.pictures.length > 0) {
+          candidatePics = resData.pictures.map((p: any) => (p.secure_url || p.url || '').replace(/-I\.jpg$/i, '-O.jpg')).filter(Boolean);
+        }
+        if (candidatePics.length === 0 && thumb) {
+          candidatePics = [thumb];
+        }
+
+        const candidateAttrs: Array<{ key: string; value: string }> = [];
+        if (resData.attributes && Array.isArray(resData.attributes)) {
+          resData.attributes.forEach((a: any) => {
+            if (a.name && a.value_name && a.value_name !== 'Não' && a.value_name !== 'N/A') {
+              if (!candidateAttrs.some(existing => existing.key.toLowerCase() === a.name.toLowerCase())) {
+                candidateAttrs.push({ key: a.name, value: String(a.value_name) });
+              }
+            }
+          });
+        }
 
         itemsList = [{
           id: resData.id,
           title: resData.title || resData.name || '',
           price: Number(rawPrice) || 0,
-          thumbnail: thumb.replace(/^http:/, 'https:'),
+          thumbnail: thumb,
           permalink: formatMlPermalink(resData.id, resData.permalink),
           brand: brandAttr,
           gtin: gtinAttr,
           domain_id: resData.domain_id,
+          pictures: candidatePics,
+          attributes: candidateAttrs,
           description: extractStringDescription(resData.short_description) || extractStringDescription(resData.description)
         }];
       }
