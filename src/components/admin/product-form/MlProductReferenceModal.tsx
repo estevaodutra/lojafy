@@ -100,7 +100,7 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         const { data, error } = await supabase.functions.invoke('ml-public-search', {
           body: { path }
         });
-        if (!error && data && !data.error && (data.results || data.id)) {
+        if (!error && data && !data.error && (data.results?.length > 0 || data.id)) {
           resData = data;
         }
       } catch (fnErr) {
@@ -108,12 +108,12 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
       }
 
       // 2ª Tentativa (Fallback 1): Via API Pública do Mercado Livre Direta (CORS Habilitado no Navegador)
-      if (!resData || resData.error || (!resData.results && !resData.id)) {
+      if (!resData || resData.error || (!resData.results?.length && !resData.id)) {
         try {
           const directRes = await fetch(`https://api.mercadolibre.com${path}`);
           if (directRes.ok) {
             const directJson = await directRes.json();
-            if (directJson && !directJson.error && (directJson.results || directJson.id)) {
+            if (directJson && !directJson.error && (directJson.results?.length > 0 || directJson.id)) {
               resData = directJson;
             }
           }
@@ -123,13 +123,13 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
       }
 
       // 3ª Tentativa (Fallback 2): Via Endpoint de Produtos do Mercado Livre
-      if (!resData || resData.error || (!resData.results && !resData.id)) {
+      if (!resData || resData.error || (!resData.results?.length && !resData.id)) {
         try {
           const catalogPath = `/products/search?status=active&site_id=MLB&q=${encodeURIComponent(term)}&limit=10`;
           const catalogRes = await fetch(`https://api.mercadolibre.com${catalogPath}`);
           if (catalogRes.ok) {
             const catalogJson = await catalogRes.json();
-            if (catalogJson && !catalogJson.error && (catalogJson.results || catalogJson.id)) {
+            if (catalogJson && !catalogJson.error && (catalogJson.results?.length > 0 || catalogJson.id)) {
               resData = catalogJson;
             }
           }
