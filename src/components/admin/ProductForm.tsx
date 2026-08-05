@@ -21,7 +21,8 @@ import {
   History,
   CheckCircle2,
   AlertTriangle,
-  ShoppingBag
+  ShoppingBag,
+  Sparkles
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -45,6 +46,7 @@ import { SettingsSection } from './product-form/SettingsSection';
 import { LinkedReferenceSection } from './product-form/LinkedReferenceSection';
 import { HistorySection } from './product-form/HistorySection';
 import { MlProductReferenceModal } from './product-form/MlProductReferenceModal';
+import { AiProductExtractorModal } from './product-form/AiProductExtractorModal';
 import { CategoryCreationModal } from './CategoryCreationModal';
 import { SubcategoryCreationModal } from './SubcategoryCreationModal';
 import { VariantsManager, ProductVariant } from './VariantsManager';
@@ -119,10 +121,11 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
   const { data: supplierOrgData } = useSupplierOrganization();
   const supplierSettings = supplierOrgData?.settings;
 
-  // Modais de Categoria e Referência Mercado Livre
+  // Modais de Categoria, Referência Mercado Livre e IA Extractor
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isSubcategoryModalOpen, setIsSubcategoryModalOpen] = useState(false);
   const [isMlSearchModalOpen, setIsMlSearchModalOpen] = useState(false);
+  const [isAiExtractorModalOpen, setIsAiExtractorModalOpen] = useState(false);
 
   // Busca interna e Navegação
   const [searchQuery, setSearchQuery] = useState('');
@@ -783,6 +786,60 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
 
   const mainImageUrl = images.find(i => i.isMain)?.url || images[0]?.preview;
 
+  // Aplicação de dados extraídos por Foto/Print (IA)
+  const handleApplyAiExtractedData = (
+    data: any,
+    imageFiles: File[]
+  ) => {
+    if (data.name) form.setValue('name', data.name);
+    if (data.brand) form.setValue('brand', data.brand);
+    if (data.description) form.setValue('description', data.description);
+    if (data.sku) form.setValue('sku', data.sku);
+    if (data.gtin_ean13) form.setValue('gtin_ean13', data.gtin_ean13);
+    if (data.cost_price && data.cost_price > 0) form.setValue('cost_price', data.cost_price);
+    if (data.price && data.price > 0) form.setValue('price', data.price);
+
+    // Se houver especificações/atributos extraídos
+    if (data.specifications && Array.isArray(data.specifications) && data.specifications.length > 0) {
+      setSpecifications(data.specifications);
+    }
+
+    // Se houver variações extraídas
+    if (data.variations && Array.isArray(data.variations) && data.variations.length > 0) {
+      const formattedVariants: ProductVariant[] = data.variations.map((v: any, index: number) => ({
+        id: `ai-variant-${Date.now()}-${index}`,
+        type: v.type || 'model',
+        name: v.name || `Opção ${index + 1}`,
+        value: v.value || v.name || `${index + 1}`,
+        costPrice: v.costPrice || data.cost_price || 0,
+        priceModifier: v.price || data.price || 0,
+        stockQuantity: v.stockQuantity || 10,
+        active: true,
+      }));
+      setVariants(formattedVariants);
+    }
+
+    // Adicionar as fotos coladas/enviadas como imagens do produto se houver
+    if (imageFiles && imageFiles.length > 0) {
+      const newImageFiles: ImageFile[] = imageFiles.map((file, i) => ({
+        id: `ai-img-${Date.now()}-${i}`,
+        file,
+        preview: URL.createObjectURL(file),
+        isMain: images.length === 0 && i === 0,
+        isUploading: false
+      }));
+      setImages(prev => [...prev, ...newImageFiles]);
+    }
+
+    if (data.name) {
+      try {
+        ensureCategory(data.name).then(catId => {
+          if (catId) form.setValue('category_id', catId);
+        }).catch(() => {});
+      } catch (e) {}
+    }
+  };
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit, onError)} className="space-y-0 pb-16 bg-muted/10 min-h-screen">
@@ -815,7 +872,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
           sectionsStatus={sectionsStatus}
         />
 
-        {/* Campo de Busca Rápida Interna e Botão de Mercado Livre */}
+        {/* Campo de Busca Rápida Interna e Botões de Importação */}
         <div className="w-full px-4 pt-4 pb-2 flex flex-wrap items-center justify-between gap-2">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -827,17 +884,31 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
             />
           </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setIsMlSearchModalOpen(true)}
-            className="h-9 text-xs px-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 border-emerald-500/30 dark:text-emerald-400 font-semibold shadow-2xs shrink-0"
-            title="Buscar produto de referência no Mercado Livre e preencher tudo automaticamente"
-          >
-            <ShoppingBag className="h-3.5 w-3.5 mr-1.5" />
-            Puxar do Mercado Livre
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAiExtractorModalOpen(true)}
+              className="h-9 text-xs px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 border-amber-500/30 dark:text-amber-400 font-semibold shadow-2xs"
+              title="Cadastrar produto enviando ou colando um print da tela do fornecedor"
+            >
+              <Sparkles className="h-3.5 w-3.5 mr-1.5 text-amber-500 animate-pulse" />
+              ⚡ Cadastrar via Foto / Print (IA)
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsMlSearchModalOpen(true)}
+              className="h-9 text-xs px-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 border-emerald-500/30 dark:text-emerald-400 font-semibold shadow-2xs"
+              title="Buscar produto de referência no Mercado Livre e preencher tudo automaticamente"
+            >
+              <ShoppingBag className="h-3.5 w-3.5 mr-1.5" />
+              Puxar do Mercado Livre
+            </Button>
+          </div>
         </div>
 
         {/* 3. CONTEÚDO EM ACCORDIONS RECOLHÍVEIS */}
@@ -881,6 +952,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
                   onGenerateGtin={handleGenerateGtin}
                   isGeneratingGtin={isGeneratingGtin}
                   onOpenMlSearch={() => setIsMlSearchModalOpen(true)}
+                  onOpenAiExtractor={() => setIsAiExtractorModalOpen(true)}
                 />
               </AccordionContent>
             </AccordionItem>
@@ -1189,6 +1261,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
           onClose={() => setIsMlSearchModalOpen(false)}
           initialQuery={form.getValues('name')}
           onApplyReference={handleApplyMlReference}
+        />
+
+        {/* Modal de Cadastramento por Foto / Print (IA Gemini) */}
+        <AiProductExtractorModal
+          isOpen={isAiExtractorModalOpen}
+          onClose={() => setIsAiExtractorModalOpen(false)}
+          onApplyExtractedData={handleApplyAiExtractedData}
         />
 
       </form>

@@ -19,6 +19,7 @@ interface BasicInfoSectionProps {
   onGenerateGtin: () => void;
   isGeneratingGtin: boolean;
   onOpenMlSearch?: () => void;
+  onOpenAiExtractor?: () => void;
 }
 
 export const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
@@ -32,6 +33,7 @@ export const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
   onGenerateGtin,
   isGeneratingGtin,
   onOpenMlSearch,
+  onOpenAiExtractor,
 }) => {
   return (
     <div className="space-y-6">
@@ -39,9 +41,23 @@ export const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
         
         {/* Coluna 1: Identificação Comercial (Esquerda - 7 cols) */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="flex items-center space-x-2 border-b pb-2">
-            <Tag className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">Identificação Comercial</h3>
+          <div className="flex items-center justify-between border-b pb-2">
+            <div className="flex items-center space-x-2">
+              <Tag className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold text-foreground">Identificação Comercial</h3>
+            </div>
+            {onOpenAiExtractor && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onOpenAiExtractor}
+                className="h-7 text-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30 font-semibold"
+              >
+                <Sparkles className="h-3.5 w-3.5 mr-1.5 text-amber-500 animate-pulse" />
+                ⚡ Cadastrar via Foto / Print (IA)
+              </Button>
+            )}
           </div>
 
           {/* Nome do Produto */}
