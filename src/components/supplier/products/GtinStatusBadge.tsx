@@ -8,10 +8,13 @@ const GTIN_STATUS_CONFIG: Record<string, { label: string; variant: 'default' | '
   confirmed: { label: 'GTIN confirmado', variant: 'default' },
 };
 
-export const GtinStatusBadge = ({ status }: { status: string | null }) => {
-  if (!status) return null;
-  const config = GTIN_STATUS_CONFIG[status];
-  if (!config) return null;
+export const GtinStatusBadge = ({ status, gtin }: { status: string | null; gtin?: string | null }) => {
+  let effectiveStatus = status;
+  if (gtin && typeof gtin === 'string' && gtin.trim().length >= 10) {
+    effectiveStatus = 'confirmed';
+  }
+  if (!effectiveStatus) return null;
+  const config = GTIN_STATUS_CONFIG[effectiveStatus] || GTIN_STATUS_CONFIG.confirmed;
   return <Badge variant={config.variant}>{config.label}</Badge>;
 };
 

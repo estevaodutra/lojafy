@@ -519,6 +519,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
         brand: data.brand || null,
         sku: data.sku ? data.sku.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() : null,
         gtin_ean13: finalGtin,
+        gtin_status: finalGtin && String(finalGtin).trim().length >= 10 ? 'confirmed' : (product?.gtin_status || 'required_missing'),
         stock_quantity: data.stock_quantity,
         min_stock_level: data.min_stock_level,
         low_stock_alert: data.low_stock_alert,
@@ -1109,6 +1110,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
         <CategoryCreationModal
           isOpen={isCategoryModalOpen}
           onClose={() => setIsCategoryModalOpen(false)}
+          trigger={null}
           onCategoryCreated={(newCatId) => {
             form.setValue('category_id', newCatId);
             queryClient.invalidateQueries({ queryKey: ['categories'] });
@@ -1119,6 +1121,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
           isOpen={isSubcategoryModalOpen}
           onClose={() => setIsSubcategoryModalOpen(false)}
           categoryId={selectedCategoryId}
+          trigger={null}
           onSubcategoryCreated={(newSubcatId) => {
             form.setValue('subcategory_id', newSubcatId);
             queryClient.invalidateQueries({ queryKey: ['subcategories', selectedCategoryId] });

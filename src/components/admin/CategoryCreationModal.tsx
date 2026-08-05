@@ -107,9 +107,11 @@ export const CategoryCreationModal: React.FC<CategoryCreationModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || defaultTrigger}
-      </DialogTrigger>
+      {trigger !== null && (
+        <DialogTrigger asChild>
+          {trigger || defaultTrigger}
+        </DialogTrigger>
+      )}
       
       <DialogContent className="sm:max-w-md">
         <DialogHeader>

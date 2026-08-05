@@ -240,7 +240,7 @@ const SupplierProductDetail = () => {
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             {product.sku && <span className="font-mono">{product.sku}</span>}
             <StageBadge stage={product.stage} />
-            <GtinStatusBadge status={product.gtin_status} />
+            <GtinStatusBadge status={product.gtin_status} gtin={product.gtin_ean13} />
           </div>
         </div>
       </div>
