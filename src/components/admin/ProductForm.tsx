@@ -1129,3 +1129,5 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
     </Form>
   );
 };
+
+export default ProductForm;
