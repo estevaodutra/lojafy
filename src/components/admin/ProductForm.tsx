@@ -700,9 +700,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
     pricing: {
       id: 'pricing',
       label: 'Preços',
-      isComplete: (form.watch('cost_price') || 0) > 0,
+      isComplete: Number(form.watch('cost_price') || 0) > 0,
       hasError: !!formErrors.cost_price || !!formErrors.price,
-      summaryText: `Custo R$ ${(form.watch('cost_price') || 0).toFixed(2)} | Venda R$ ${(form.watch('price') || 0).toFixed(2)}`,
+      summaryText: `Custo R$ ${Number(form.watch('cost_price') || 0).toFixed(2)} | Venda R$ ${Number(form.watch('price') || 0).toFixed(2)}`,
     },
     stock: {
       id: 'stock',
