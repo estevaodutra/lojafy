@@ -395,35 +395,119 @@ serve(async (req) => {
       console.error('[ml-publish] ML API error:', publishRes.status, JSON.stringify(responseBody));
       const errStr = JSON.stringify(responseBody);
 
-      // 1. Dispositivo de Autocorreção: Erro de GTIN / Formato de Código de Barras
-      if (/GTIN|Product Identifier|invalid format|format/i.test(errStr)) {
-        console.log('[ml-publish] 🔄 AUTOCORREÇÃO AUTOMÁTICA ATIVADA: Formato de GTIN rejeitado pelo Mercado Livre.');
-        console.log('[ml-publish] Removendo GTIN e substituindo por EMPTY_GTIN_REASON...');
+      // 1. Dispositivo de Autocorreção: Erro de Categoria (MLB1051 ou Categoria não-Folha)
+      if (/MLB1051|leaf category|category/i.test(errStr)) {
+        console.log('[ml-publish] 🔄 AUTOCORREÇÃO DE CATEGORIA: Categoria raiz ou não-folha detectada. Buscando categoria folha válida...');
+        try {
+          const searchQuery = encodeURIComponent(product.name.substring(0, 50));
+          const catRes = await fetch(`https://api.mercadolibre.com/sites/MLB/domain_discovery/search?q=${searchQuery}&limit=1`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+          });
+          if (catRes.ok) {
+            const catData = await catRes.json();
+            const leafCat = catData?.[0]?.category_id;
+            if (leafCat && leafCat !== 'MLB1051') {
+              mlPayload.category_id = leafCat;
+              console.log(`[ml-publish] Categoria folha encontrada via domain_discovery: ${leafCat}`);
+            } else {
+              mlPayload.category_id = 'MLB1271'; // Categoria folha genérica de Ferramentas / Outros
+            }
+          } else {
+            mlPayload.category_id = 'MLB1271';
+          }
+        } catch (e) {
+          mlPayload.category_id = 'MLB1271';
+        }
 
-        const retryAttributes = (mlPayload.attributes as any[] || []).filter((a: any) => a.id !== 'GTIN' && a.id !== 'EMPTY_GTIN_REASON');
-        retryAttributes.push({
-          id: 'EMPTY_GTIN_REASON',
-          value_name: 'Outro motivo',
-          value_id: '9370803'
-        });
-        mlPayload.attributes = retryAttributes;
-
-        console.log('[ml-publish] 🚀 REPUBLICANDO AUTOMATICAMENTE no Mercado Livre...');
+        console.log(`[ml-publish] 🚀 REPUBLICANDO AUTOMATICAMENTE com Categoria Folha [${mlPayload.category_id}]...`);
         publishRes = await fetch('https://api.mercadolibre.com/items', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
           body: JSON.stringify(mlPayload),
         });
-
         responseBody = await publishRes.json();
-        if (publishRes.ok) {
-          console.log(`[ml-publish] ✅ AUTOCORRIGIDO E REPUBLICADO COM SUCESSO! Item ID: ${responseBody.id}`);
-        } else {
-          console.error('[ml-publish] Tentativa de republicação por GTIN também falhou:', responseBody);
+      }
+
+      // 2. Dispositivo de Autocorreção: Erro de Marca / Modelo Ausente
+      if (!publishRes.ok) {
+        const retryErrStr = JSON.stringify(responseBody);
+        if (/Marca|Modelo|BRAND|MODEL/i.test(retryErrStr)) {
+          console.log('[ml-publish] 🔄 AUTOCORREÇÃO DE MARCA/MODELO: Garantindo atributos Marca e Modelo...');
+          const currentAttrs = (mlPayload.attributes as any[] || []);
+          if (!currentAttrs.some((a: any) => a.id === 'BRAND')) {
+            currentAttrs.push({ id: 'BRAND', value_name: product.brand || 'Genérica' });
+          }
+          if (!currentAttrs.some((a: any) => a.id === 'MODEL')) {
+            currentAttrs.push({ id: 'MODEL', value_name: product.model || 'Padrão' });
+          }
+          mlPayload.attributes = currentAttrs;
+
+          console.log('[ml-publish] 🚀 REPUBLICANDO AUTOMATICAMENTE com Marca e Modelo preenchidos...');
+          publishRes = await fetch('https://api.mercadolibre.com/items', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(mlPayload),
+          });
+          responseBody = await publishRes.json();
         }
       }
 
-      // 2. Dispositivo de Autocorreção: Atributo Obrigatório Ausente ("The attributes [XYZ] are required...")
+      // 3. Dispositivo de Autocorreção: Erro de GTIN / Formato de Código de Barras
+      if (!publishRes.ok) {
+        const retryErrStr = JSON.stringify(responseBody);
+        if (/GTIN|Product Identifier|invalid format|format/i.test(retryErrStr)) {
+          console.log('[ml-publish] 🔄 AUTOCORREÇÃO DE GTIN: Formato de GTIN rejeitado pelo Mercado Livre.');
+          console.log('[ml-publish] Removendo GTIN e substituindo por EMPTY_GTIN_REASON...');
+
+          const retryAttributes = (mlPayload.attributes as any[] || []).filter((a: any) => a.id !== 'GTIN' && a.id !== 'EMPTY_GTIN_REASON');
+          retryAttributes.push({
+            id: 'EMPTY_GTIN_REASON',
+            value_name: 'Outro motivo',
+            value_id: '9370803'
+          });
+          mlPayload.attributes = retryAttributes;
+
+          console.log('[ml-publish] 🚀 REPUBLICANDO AUTOMATICAMENTE com EMPTY_GTIN_REASON...');
+          publishRes = await fetch('https://api.mercadolibre.com/items', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(mlPayload),
+          });
+
+          responseBody = await publishRes.json();
+          if (publishRes.ok) {
+            console.log(`[ml-publish] ✅ AUTOCORRIGIDO E REPUBLICADO COM SUCESSO! Item ID: ${responseBody.id}`);
+          }
+        }
+      }
+
+      // 4. Dispositivo de Autocorreção: Erro de Modo de Frete (me1, me2, catalog)
+      if (!publishRes.ok) {
+        const retryErrStr = JSON.stringify(responseBody);
+        if (/mode me1|mode me2|mode/i.test(retryErrStr)) {
+          console.log('[ml-publish] 🔄 AUTOCORREÇÃO DE FRETE: Ajustando modo de frete...');
+          if (typeof mlPayload.shipping === 'object' && mlPayload.shipping !== null) {
+            const currentMode = (mlPayload.shipping as any).mode;
+            if (currentMode === 'me1' || currentMode === 'me2') {
+              mlPayload.shipping = { mode: 'not_specified', free_shipping: false };
+            } else {
+              mlPayload.shipping = { mode: 'me2', free_shipping: false };
+            }
+          } else {
+            mlPayload.shipping = { mode: 'not_specified', free_shipping: false };
+          }
+
+          console.log('[ml-publish] 🚀 REPUBLICANDO AUTOMATICAMENTE com novo modo de frete...');
+          publishRes = await fetch('https://api.mercadolibre.com/items', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(mlPayload),
+          });
+          responseBody = await publishRes.json();
+        }
+      }
+
+      // 5. Dispositivo de Autocorreção: Atributo Obrigatório Ausente ("The attributes [XYZ] are required...")
       if (!publishRes.ok) {
         const retryErrStr = JSON.stringify(responseBody);
         const missingAttrMatch = retryErrStr.match(/The attributes? \[([A-Z0-9_]+)\] (?:are|is) required/i);
@@ -454,8 +538,6 @@ serve(async (req) => {
             responseBody = await publishRes.json();
             if (publishRes.ok) {
               console.log(`[ml-publish] ✅ ATRIBUTO AUTOCORRIGIDO E REPUBLICADO COM SUCESSO! Item ID: ${responseBody.id}`);
-            } else {
-              console.error('[ml-publish] Republicação por atributo ausente falhou:', responseBody);
             }
           }
         }
