@@ -19,7 +19,8 @@ import {
   Link2, 
   History,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  ShoppingBag
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -42,6 +43,7 @@ import { SpecificationsSection } from './product-form/SpecificationsSection';
 import { SettingsSection } from './product-form/SettingsSection';
 import { LinkedReferenceSection } from './product-form/LinkedReferenceSection';
 import { HistorySection } from './product-form/HistorySection';
+import { MlProductReferenceModal } from './product-form/MlProductReferenceModal';
 import { CategoryCreationModal } from './CategoryCreationModal';
 import { SubcategoryCreationModal } from './SubcategoryCreationModal';
 import { VariantsManager, ProductVariant } from './VariantsManager';
@@ -116,9 +118,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
   const { data: supplierOrgData } = useSupplierOrganization();
   const supplierSettings = supplierOrgData?.settings;
 
-  // Modais de Categoria
+  // Modais de Categoria e Referência Mercado Livre
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isSubcategoryModalOpen, setIsSubcategoryModalOpen] = useState(false);
+  const [isMlSearchModalOpen, setIsMlSearchModalOpen] = useState(false);
 
   // Busca interna e Navegação
   const [searchQuery, setSearchQuery] = useState('');
@@ -458,6 +461,44 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
     toast({ title: "Dados originais restaurados!" });
   };
 
+  // Aplicação dos dados importados do Mercado Livre
+  const handleApplyMlReference = (data: {
+    name: string;
+    description: string;
+    brand: string;
+    gtin_ean13: string;
+    price: number;
+    reference_ad_url: string;
+    images: ImageFile[];
+    specifications: Array<{ key: string; value: string }>;
+  }) => {
+    if (data.name) form.setValue('name', data.name);
+    if (data.description) form.setValue('description', data.description);
+    if (data.brand) form.setValue('brand', data.brand);
+    if (data.gtin_ean13) form.setValue('gtin_ean13', data.gtin_ean13);
+    if (data.price > 0) form.setValue('price', data.price);
+    if (data.reference_ad_url) form.setValue('reference_ad_url', data.reference_ad_url);
+
+    if (data.images && data.images.length > 0) {
+      setImages(data.images);
+    }
+
+    if (data.specifications && data.specifications.length > 0) {
+      setSpecifications(data.specifications);
+    }
+
+    if (data.name) {
+      try {
+        ensureCategory(data.name).then(catId => {
+          if (catId) form.setValue('category_id', catId);
+        }).catch(() => {});
+      } catch (e) {}
+    }
+
+    setOpenAccordions(['basic', 'pricing', 'stock', 'images', 'specs', 'settings']);
+    setActiveSection('basic');
+  };
+
   // Submit Handler Principal
   const onSubmit = async (data: ProductFormData) => {
     setIsSubmitting(true);
@@ -773,9 +814,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
           sectionsStatus={sectionsStatus}
         />
 
-        {/* Campo de Busca Rápida Interna */}
-        <div className="w-full px-4 pt-4 pb-2">
-          <div className="relative max-w-md">
+        {/* Campo de Busca Rápida Interna e Botão de Mercado Livre */}
+        <div className="w-full px-4 pt-4 pb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar campo (ex: preço, estoque, dimensões, SKU)..."
@@ -784,6 +825,18 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
               className="h-9 text-xs pl-9 bg-background shadow-2xs border-border/60"
             />
           </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setIsMlSearchModalOpen(true)}
+            className="h-9 text-xs px-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 border-emerald-500/30 dark:text-emerald-400 font-semibold shadow-2xs shrink-0"
+            title="Buscar produto de referência no Mercado Livre e preencher tudo automaticamente"
+          >
+            <ShoppingBag className="h-3.5 w-3.5 mr-1.5" />
+            Puxar do Mercado Livre
+          </Button>
         </div>
 
         {/* 3. CONTEÚDO EM ACCORDIONS RECOLHÍVEIS */}
@@ -826,6 +879,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
                   onAutoCategorize={handleAutoCategorize}
                   onGenerateGtin={handleGenerateGtin}
                   isGeneratingGtin={isGeneratingGtin}
+                  onOpenMlSearch={() => setIsMlSearchModalOpen(true)}
                 />
               </AccordionContent>
             </AccordionItem>
@@ -1126,6 +1180,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
             form.setValue('subcategory_id', newSubcatId);
             queryClient.invalidateQueries({ queryKey: ['subcategories', selectedCategoryId] });
           }}
+        />
+
+        {/* Modal de Busca e Importação do Mercado Livre */}
+        <MlProductReferenceModal
+          isOpen={isMlSearchModalOpen}
+          onClose={() => setIsMlSearchModalOpen(false)}
+          initialQuery={form.getValues('name')}
+          onApplyReference={handleApplyMlReference}
         />
 
       </form>

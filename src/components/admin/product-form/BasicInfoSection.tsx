@@ -18,6 +18,7 @@ interface BasicInfoSectionProps {
   onAutoCategorize: () => void;
   onGenerateGtin: () => void;
   isGeneratingGtin: boolean;
+  onOpenMlSearch?: () => void;
 }
 
 export const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
@@ -30,6 +31,7 @@ export const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
   onAutoCategorize,
   onGenerateGtin,
   isGeneratingGtin,
+  onOpenMlSearch,
 }) => {
   return (
     <div className="space-y-6">
@@ -51,10 +53,25 @@ export const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
                 <FormLabel className="text-xs font-semibold">
                   Nome do Produto <span className="text-destructive">*</span>
                 </FormLabel>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap sm:flex-nowrap gap-2">
                   <FormControl>
-                    <Input placeholder="Ex: Mini Balança Digital De Alta Precisão" {...field} className="h-9 text-sm" />
+                    <Input placeholder="Ex: Mini Balança Digital De Alta Precisão" {...field} className="h-9 text-sm min-w-0 flex-1" />
                   </FormControl>
+
+                  {onOpenMlSearch && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={onOpenMlSearch}
+                      className="h-9 text-xs px-2.5 shrink-0 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 border-emerald-500/30 dark:text-emerald-400 font-semibold"
+                      title="Buscar anúncio de referência no Mercado Livre e preencher tudo com 1 clique"
+                    >
+                      <ShoppingBag className="h-3.5 w-3.5 mr-1" />
+                      Puxar do Mercado Livre
+                    </Button>
+                  )}
+
                   <Button
                     type="button"
                     variant="outline"
