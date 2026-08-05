@@ -105,12 +105,13 @@ const Features = lazy(() => import("./pages/admin/Features"));
 const Planos = lazy(() => import("./pages/admin/Planos"));
 const Marketplaces = lazy(() => import("./pages/admin/Marketplaces"));
 
+import SupplierProductCreate from "./pages/supplier/ProductCreate";
+import SupplierProductDetail from "./pages/supplier/ProductDetail";
+
 // ── Supplier panel ─────────────────────────────────────────────────────────
 const SupplierDashboard = lazy(() => import("./pages/supplier/Dashboard"));
 const SupplierProductManagement = lazy(() => import("./pages/supplier/ProductManagement"));
 const SupplierProductApproval = lazy(() => import("./pages/supplier/ProductApproval"));
-const SupplierProductCreate = lazy(() => import("./pages/supplier/ProductCreate"));
-const SupplierProductDetail = lazy(() => import("./pages/supplier/ProductDetail"));
 const SupplierOrderManagement = lazy(() => import("./pages/supplier/OrderManagement"));
 const SupplierInventory = lazy(() => import("./pages/supplier/Inventory"));
 const SupplierPicking = lazy(() => import("./pages/supplier/Picking"));
