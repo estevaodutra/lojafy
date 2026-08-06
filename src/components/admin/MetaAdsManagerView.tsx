@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { AiVariationModal } from './AiVariationModal';
 import { AdHistoryModal } from './AdHistoryModal';
+import { useSupplierOrganization } from '@/hooks/supplier/useSupplierOrganization';
 
 interface MetaAdsManagerViewProps {
   roleMode?: 'admin' | 'supplier' | 'reseller';
@@ -87,6 +88,9 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
   const [adFormPrice, setAdFormPrice] = useState('');
   const [adFormDesc, setAdFormDesc] = useState('');
 
+  const { data: orgData } = useSupplierOrganization();
+  const orgId = orgData?.organization?.id;
+
   const formatPrice = (val: number | null | undefined) => {
     if (val === null || val === undefined) return 'R$ 0,00';
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(val));
@@ -94,7 +98,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
   // 1. QUERY DE PRODUTOS
   const { data: products = [], isLoading: productsLoading, refetch: refetchProducts } = useQuery({
-    queryKey: ['meta-ads-products', roleMode, user?.id],
+    queryKey: ['meta-ads-products', roleMode, user?.id, orgId],
     queryFn: async () => {
       let query = supabase
         .from('products')
@@ -105,8 +109,12 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
         `)
         .order('created_at', { ascending: false });
 
-      if (roleMode === 'supplier' && user?.id) {
-        query = query.or(`supplier_id.eq.${user.id},user_id.eq.${user.id}`);
+      if (roleMode === 'supplier') {
+        if (orgId) {
+          query = query.or(`supplier_organization_id.eq.${orgId},supplier_id.eq.${user?.id},user_id.eq.${user?.id}`);
+        } else if (user?.id) {
+          query = query.or(`supplier_id.eq.${user.id},user_id.eq.${user.id}`);
+        }
       }
 
       const { data, error } = await query;
@@ -121,7 +129,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
   // 2. QUERY DE ANÚNCIOS
   const { data: ads = [], isLoading: adsLoading, refetch: refetchAds } = useQuery({
-    queryKey: ['meta-ads-ads', roleMode, user?.id],
+    queryKey: ['meta-ads-ads', roleMode, user?.id, orgId],
     queryFn: async () => {
       let query = supabase
         .from('ml_listing_variants')
@@ -134,6 +142,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
       if (roleMode === 'reseller' && user?.id) {
         query = query.or(`is_official_model.eq.true,user_id.eq.${user.id}`);
       } else if (roleMode === 'supplier' && user?.id) {
+        // Exibe modelos oficiais, anúncios do usuário ou vinculados aos produtos do fornecedor
         query = query.or(`is_official_model.eq.true,user_id.eq.${user.id}`);
       }
 
