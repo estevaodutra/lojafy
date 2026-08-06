@@ -100,6 +100,7 @@ const productSchema = z.object({
   featured: z.boolean().default(false),
   badge: z.string().optional().or(z.literal('')),
   reference_ad_url: z.string().optional().or(z.literal('')),
+  approval_status: z.string().optional().or(z.literal('')),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -162,6 +163,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
       featured: product?.featured ?? false,
       badge: product?.badge || '',
       reference_ad_url: product?.reference_ad_url || '',
+      approval_status: product?.approval_status || 'approved',
     },
   });
 
@@ -582,6 +584,11 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
         }
       }
 
+      // Se o produto está sendo ativado ou publicado, ajusta o approval_status para 'approved'
+      const targetApprovalStatus = (data.active || data.approval_status === 'approved' || product?.approval_status === 'approved') 
+        ? 'approved' 
+        : (data.approval_status || product?.approval_status || (isSupplier() ? 'pending_approval' : 'approved'));
+
       const productData: any = {
         name: data.name,
         description: data.description || null,
@@ -610,6 +617,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
         main_image_url: sanitizedMainImageUrl,
         image_url: sanitizedMainImageUrl,
         active: data.active,
+        approval_status: targetApprovalStatus,
+        stage: data.active ? 'stage_2_enabled' : (product?.stage || 'stage_1_basic'),
         featured: data.reference_ad_url && data.reference_ad_url.trim() !== '' ? true : data.featured,
         badge: data.badge || null,
         reference_ad_url: data.reference_ad_url 
@@ -622,7 +631,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
 
       if (isSupplier()) {
         productData.supplier_id = user?.id;
-        if (!product?.id) productData.approval_status = 'pending_approval';
       }
 
       let savedProduct;
