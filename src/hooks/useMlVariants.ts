@@ -206,20 +206,39 @@ export function useMlVariants(productId?: string) {
     onError: (e: Error) => toast({ variant: 'destructive', title: 'Erro', description: e.message }),
   });
 
-  // Sincronizar estatísticas (visitas e vendas) do ML
+  // Sincronizar estatísticas (visitas e vendas reais) do ML
   const syncStatsMutation = useMutation({
     mutationFn: async (variantId: string) => {
       const variant = variants.find(v => v.id === variantId);
       if (!variant?.ml_item_id) return;
 
+      // 1. Buscar dados atualizados de vendas e status no ML
       const res = await mlProxyCall(`/items/${variant.ml_item_id}`);
-      if (res.status >= 400) throw new Error('Erro ao buscar stats');
-
+      if (res.status >= 400) throw new Error('Erro ao buscar anúncio no Mercado Livre');
       const item = res.data;
+
+      // 2. Buscar visitas REAIS via API Oficial de Visitas do Mercado Livre (/visits/items?ids=MLB...)
+      let realVisits = 0;
+      try {
+        const visitsRes = await mlProxyCall(`/visits/items?ids=${variant.ml_item_id}`);
+        if (visitsRes?.data && visitsRes.data[variant.ml_item_id] !== undefined) {
+          realVisits = Number(visitsRes.data[variant.ml_item_id]) || 0;
+        } else {
+          // Fallback via Janela de Tempo de 30 dias se necessário
+          const twRes = await mlProxyCall(`/items/${variant.ml_item_id}/visits/time_window?last=30&unit=day`);
+          if (twRes?.data?.total_visits !== undefined) {
+            realVisits = Number(twRes.data.total_visits) || 0;
+          }
+        }
+      } catch (visitErr) {
+        console.warn('Erro ao consultar a API de visitas do Mercado Livre:', visitErr);
+        realVisits = variant.visits || 0;
+      }
+
       await supabase
         .from('ml_listing_variants')
         .update({
-          visits: item.health ?? 0,
+          visits: realVisits,
           sales: item.sold_quantity ?? 0,
           status: item.status === 'active' ? 'published' : item.status === 'paused' ? 'paused' : 'closed',
           last_synced_at: new Date().toISOString(),
@@ -227,7 +246,31 @@ export function useMlVariants(productId?: string) {
         })
         .eq('id', variantId);
     },
-    onSuccess: () => { invalidate(); toast({ title: 'Stats atualizadas!' }); },
+    onSuccess: () => { invalidate(); toast({ title: 'Estatísticas reais do ML sincronizadas!' }); },
+    onError: (e: Error) => toast({ variant: 'destructive', title: 'Erro ao sincronizar com o ML', description: e.message }),
+  });
+
+  // Sincronizar todas as estatísticas de anúncios ativos no ML
+  const syncAllStatsMutation = useMutation({
+    mutationFn: async () => {
+      const activeVariants = variants.filter(v => !!v.ml_item_id);
+      if (activeVariants.length === 0) return 0;
+
+      let count = 0;
+      for (const variant of activeVariants) {
+        try {
+          await syncStatsMutation.mutateAsync(variant.id);
+          count++;
+        } catch (e) {
+          console.warn(`Erro ao sincronizar anúncio ${variant.id}:`, e);
+        }
+      }
+      return count;
+    },
+    onSuccess: (count) => {
+      invalidate();
+      toast({ title: `Visitas e vendas reais sincronizadas para ${count} anúncio(s)!` });
+    },
     onError: (e: Error) => toast({ variant: 'destructive', title: 'Erro ao sincronizar', description: e.message }),
   });
 
@@ -259,8 +302,10 @@ export function useMlVariants(productId?: string) {
     activateVariant: (id: string) => activateMutation.mutateAsync(id),
     deleteVariant: (id: string) => deleteMutation.mutateAsync(id),
     syncStats: (id: string) => syncStatsMutation.mutateAsync(id),
+    syncAllStats: () => syncAllStatsMutation.mutateAsync(),
     publishAllDrafts: (ids: string[]) => publishAllDraftsMutation.mutateAsync(ids),
     isPublishing: publishMutation.isPending,
     isPublishingAll: publishAllDraftsMutation.isPending,
+    isSyncingStats: syncStatsMutation.isPending || syncAllStatsMutation.isPending,
   };
 }

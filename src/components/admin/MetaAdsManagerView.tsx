@@ -430,6 +430,61 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
     }
   };
 
+  const [isSyncingMl, setIsSyncingMl] = useState(false);
+
+  const handleSyncMlPerformance = async () => {
+    setIsSyncingMl(true);
+    try {
+      let syncedCount = 0;
+      for (const ad of effectiveAds) {
+        if (!ad.ml_item_id) continue;
+        
+        try {
+          // 1. Vendas e status
+          const { data: itemRes } = await supabase.functions.invoke('ml-proxy', {
+            body: { ml_path: `/items/${ad.ml_item_id}`, method: 'GET' }
+          });
+          
+          // 2. Visitas reais usando a API oficial do Mercado Livre (/visits/items?ids=MLB...)
+          const { data: visitsRes } = await supabase.functions.invoke('ml-proxy', {
+            body: { ml_path: `/visits/items?ids=${ad.ml_item_id}`, method: 'GET' }
+          });
+
+          let realVisits = 0;
+          if (visitsRes?.data && visitsRes.data[ad.ml_item_id] !== undefined) {
+            realVisits = Number(visitsRes.data[ad.ml_item_id]) || 0;
+          }
+
+          const soldQuantity = itemRes?.data?.sold_quantity ?? 0;
+          const status = itemRes?.data?.status === 'active' ? 'published' : itemRes?.data?.status === 'paused' ? 'paused' : 'closed';
+
+          if (!ad.is_synthesized && ad.id) {
+            await supabase
+              .from('ml_listing_variants')
+              .update({
+                visits: realVisits,
+                sales: soldQuantity,
+                status,
+                last_synced_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', ad.id);
+          }
+
+          syncedCount++;
+        } catch (err) {
+          console.warn(`Erro ao sincronizar anúncio ${ad.ml_item_id}:`, err);
+        }
+      }
+      refetchAds();
+      toast({ title: `Estatísticas reais do ML sincronizadas para ${syncedCount} anúncio(s)!` });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro na sincronização', description: e.message });
+    } finally {
+      setIsSyncingMl(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* ── CABEÇALHO DO META ADS MANAGER ───────────────────────────────────── */}
@@ -444,28 +499,39 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {activeTab === 'products' ? (
             <Button onClick={() => onNavigateToCreateProduct?.()} className="gap-2">
               <Plus className="h-4 w-4" />
               Novo Produto
             </Button>
           ) : (
-            <Button 
-              onClick={() => {
-                setEditingAd(null);
-                setTargetProductIdForNewAd(selectedProductIds[0] || (products[0]?.id || ''));
-                setAdFormName('Novo Anúncio Vinculado');
-                setAdFormTitle('');
-                setAdFormPrice('');
-                setAdFormDesc('');
-                setShowAdFormModal(true);
-              }} 
-              className="gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Novo Anúncio Vinculado
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={handleSyncMlPerformance}
+                disabled={isSyncingMl}
+                className="gap-2 text-emerald-700 border-emerald-300 hover:bg-emerald-50 shadow-sm"
+              >
+                <RefreshCw className={`h-4 w-4 ${isSyncingMl ? 'animate-spin' : ''}`} />
+                {isSyncingMl ? 'Sincronizando ML...' : 'Sincronizar Performance ML'}
+              </Button>
+              <Button 
+                onClick={() => {
+                  setEditingAd(null);
+                  setTargetProductIdForNewAd(selectedProductIds[0] || (products[0]?.id || ''));
+                  setAdFormName('Novo Anúncio Vinculado');
+                  setAdFormTitle('');
+                  setAdFormPrice('');
+                  setAdFormDesc('');
+                  setShowAdFormModal(true);
+                }} 
+                className="gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Novo Anúncio Vinculado
+              </Button>
+            </>
           )}
         </div>
       </div>

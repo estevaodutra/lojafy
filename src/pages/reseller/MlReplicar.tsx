@@ -280,7 +280,7 @@ export default function MlReplicar() {
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
 
-  const { variants, isLoading, publishVariant, pauseVariant, activateVariant, deleteVariant, syncStats, publishAllDrafts, isPublishing, isPublishingAll } = useMlVariants(selectedProduct?.product_id);
+  const { variants, isLoading, publishVariant, pauseVariant, activateVariant, deleteVariant, syncStats, syncAllStats, publishAllDrafts, isPublishing, isPublishingAll, isSyncingStats } = useMlVariants(selectedProduct?.product_id);
 
   const draftVariants = variants.filter(v => v.status === 'draft');
   const publishedVariants = variants.filter(v => v.status === 'published');
@@ -338,14 +338,26 @@ export default function MlReplicar() {
       {/* Variantes */}
       {selectedProduct && (
         <>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <h2 className="font-semibold">Variações</h2>
               <p className="text-xs text-muted-foreground">
                 {publishedVariants.length} publicadas · {pausedVariants.length} pausadas · {draftVariants.length} rascunhos
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              {publishedVariants.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                  disabled={isSyncingStats}
+                  onClick={() => syncAllStats()}
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isSyncingStats ? 'animate-spin' : ''}`} />
+                  {isSyncingStats ? 'Sincronizando ML...' : 'Sincronizar Performance ML'}
+                </Button>
+              )}
               {draftVariants.length > 0 && (
                 <Button
                   size="sm"
