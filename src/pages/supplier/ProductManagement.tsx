@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Download, Plus, Search, Send, Check, X, Trash2, MoreVertical, Edit, Eye, Power } from 'lucide-react';
+import { Download, Plus, Search, Send, Check, X, Trash2, MoreVertical, Edit, Eye, Power, Store } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { supplierKeys } from '@/lib/supplierQueryKeys';
@@ -9,6 +9,7 @@ import { useSupplierOrganization } from '@/hooks/supplier/useSupplierOrganizatio
 import { useSupplierPaginatedQuery } from '@/hooks/supplier/useSupplierPaginatedQuery';
 import { exportCatalogCsv, exportCatalogJson } from '@/services/supplierExportService';
 import { StageBadge } from '@/components/supplier/products/GtinStatusBadge';
+import { ProductAdsView } from '@/components/admin/ProductAdsView';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -159,7 +160,7 @@ const SupplierProductManagement = () => {
       let query = supabase
         .from('products')
         .select(
-          'id, name, sku, price, stock_quantity, stage, gtin_status, approval_status, active, main_image_url, image_url, created_at',
+          'id, name, sku, price, cost_price, suggested_price, stock_quantity, stage, gtin_status, approval_status, active, main_image_url, image_url, created_at, ml_listing_variants(id)',
           { count: 'exact' },
         )
         .eq('supplier_organization_id', orgId!)
@@ -218,19 +219,39 @@ const SupplierProductManagement = () => {
 
   const handleExport = async (format: 'csv' | 'json') => {
     try {
-      const count =
-        format === 'csv' ? await exportCatalogCsv(orgId!) : await exportCatalogJson(orgId!);
-      toast({ title: `${count} produtos exportados` });
-    } catch (error) {
-      toast({
-        title: 'Erro no export',
-        description: error instanceof Error ? error.message : String(error),
-        variant: 'destructive',
-      });
+      const { data: allProducts } = await supabase
+        .from('products')
+        .select('*')
+        .eq('supplier_organization_id', orgId!);
+      
+      if (!allProducts || allProducts.length === 0) {
+        toast({ title: "Nenhum produto para exportar", variant: "destructive" });
+        return;
+      }
+
+      if (format === 'csv') {
+        exportCatalogCsv(allProducts as any[]);
+      } else {
+        exportCatalogJson(allProducts as any[]);
+      }
+      toast({ title: `Catálogo exportado em formato ${format.toUpperCase()}` });
+    } catch (e: any) {
+      toast({ title: "Erro na exportação", description: e.message, variant: "destructive" });
     }
   };
 
   const rows = data?.rows ?? [];
+
+  if (selectedProductId) {
+    return (
+      <div className="space-y-6">
+        <ProductAdsView
+          productId={selectedProductId}
+          onBack={() => setSelectedProductId(null)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -397,100 +418,115 @@ const SupplierProductManagement = () => {
                     </TableHead>
                     <TableHead>Produto</TableHead>
                     <TableHead>SKU</TableHead>
-                    <TableHead>Preço</TableHead>
+                    <TableHead>Preço-base</TableHead>
+                    <TableHead>Preço sugerido</TableHead>
                     <TableHead>Estoque</TableHead>
-                    <TableHead>Estágio</TableHead>
+                    <TableHead className="text-center">Anúncios</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((product) => (
-                    <TableRow
-                      key={product.id}
-                      className="cursor-pointer"
-                      onClick={() => navigate(`/supplier/produtos/${product.id}`)}
-                    >
-                      <TableCell 
-                        className="cursor-pointer text-center align-middle"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectProduct(product.id, !selectedProducts.includes(product.id));
-                        }}
+                  {rows.map((product) => {
+                    const adsCount = product.ml_listing_variants?.length || 0;
+                    return (
+                      <TableRow
+                        key={product.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => setSelectedProductId(product.id)}
                       >
-                        <Checkbox
-                          checked={selectedProducts.includes(product.id)}
-                          onCheckedChange={(checked) => handleSelectProduct(product.id, !!checked)}
-                          aria-label={`Selecionar ${product.name}`}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {product.main_image_url || product.image_url ? (
-                            <img
-                              src={product.main_image_url || product.image_url || ''}
-                              alt=""
-                              className="h-9 w-9 rounded object-cover"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'https://placehold.co/100x100/e2e8f0/64748b?text=Sem+Foto';
-                              }}
-                            />
+                        <TableCell 
+                          className="cursor-pointer text-center align-middle"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectProduct(product.id, !selectedProducts.includes(product.id));
+                          }}
+                        >
+                          <Checkbox
+                            checked={selectedProducts.includes(product.id)}
+                            onCheckedChange={(checked) => handleSelectProduct(product.id, !!checked)}
+                            aria-label={`Selecionar ${product.name}`}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {product.main_image_url || product.image_url ? (
+                              <img
+                                src={product.main_image_url || product.image_url || ''}
+                                alt=""
+                                className="h-9 w-9 rounded object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = 'https://placehold.co/100x100/e2e8f0/64748b?text=Sem+Foto';
+                                }}
+                              />
+                            ) : (
+                              <div className="h-9 w-9 rounded bg-muted flex items-center justify-center text-[10px] text-muted-foreground select-none">Sem Foto</div>
+                            )}
+                            <span className="max-w-[240px] truncate font-medium">{product.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{product.sku ?? '—'}</TableCell>
+                        <TableCell className="text-muted-foreground font-medium">
+                          {(product.cost_price || product.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </TableCell>
+                        <TableCell className="font-bold text-emerald-600">
+                          {(product.suggested_price || product.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </TableCell>
+                        <TableCell className="font-bold">{product.stock_quantity ?? 0}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className="bg-primary/10 text-primary font-bold">
+                            {adsCount} anúncio{adsCount !== 1 ? 's' : ''}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {product.active ? (
+                            <Badge className="bg-green-600 hover:bg-green-600 text-white border-none">
+                              Ativado
+                            </Badge>
                           ) : (
-                            <div className="h-9 w-9 rounded bg-muted flex items-center justify-center text-[10px] text-muted-foreground select-none">Sem Foto</div>
+                            <Badge variant="secondary" className={
+                              product.approval_status === 'pending_approval' 
+                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-none'
+                                : product.approval_status === 'rejected'
+                                  ? 'bg-destructive/15 text-destructive border-none'
+                                  : product.approval_status === 'approved'
+                                    ? 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-none'
+                                    : 'bg-muted text-muted-foreground border-none'
+                            }>
+                              {product.approval_status === 'pending_approval' 
+                                ? 'Em análise' 
+                                : product.approval_status === 'rejected'
+                                  ? 'Rejeitado'
+                                  : product.approval_status === 'approved'
+                                    ? 'Desativado'
+                                    : 'Rascunho'}
+                            </Badge>
                           )}
-                          <span className="max-w-[240px] truncate font-medium">{product.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{product.sku ?? '—'}</TableCell>
-                      <TableCell>
-                        {product.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      </TableCell>
-                      <TableCell>{product.stock_quantity ?? 0}</TableCell>
-                      <TableCell>
-                        <StageBadge stage={product.stage} />
-                      </TableCell>
-                      <TableCell>
-                        {product.active ? (
-                          <Badge className="bg-green-600 hover:bg-green-600 text-white border-none">
-                            Ativado
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className={
-                            product.approval_status === 'pending_approval' 
-                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-none'
-                              : product.approval_status === 'rejected'
-                                ? 'bg-destructive/15 text-destructive border-none'
-                                : product.approval_status === 'approved'
-                                  ? 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-none'
-                                  : 'bg-muted text-muted-foreground border-none'
-                          }>
-                            {product.approval_status === 'pending_approval' 
-                              ? 'Em análise' 
-                              : product.approval_status === 'rejected'
-                                ? 'Rejeitado'
-                                : product.approval_status === 'approved'
-                                  ? 'Desativado'
-                                  : 'Rascunho'}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">Abrir menu</span>
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="bg-background border border-border shadow-md">
-                            <DropdownMenuItem 
-                              onClick={() => navigate(`/supplier/produtos/${product.id}`)}
-                              className="gap-2 cursor-pointer"
-                            >
-                              <Edit className="h-4 w-4" />
-                              Editar Produto
-                            </DropdownMenuItem>
+                        </TableCell>
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Abrir menu</span>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-background border border-border shadow-md">
+                              <DropdownMenuItem 
+                                onClick={() => setSelectedProductId(product.id)}
+                                className="gap-2 cursor-pointer text-primary font-semibold"
+                              >
+                                <Store className="h-4 w-4" />
+                                Ver Anúncios Vinculados
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => navigate(`/supplier/produtos/${product.id}`)}
+                                className="gap-2 cursor-pointer"
+                              >
+                                <Edit className="h-4 w-4" />
+                                Editar Produto
+                              </DropdownMenuItem>
 
                             {product.approval_status !== 'approved' && (
                               <>
@@ -543,7 +579,7 @@ const SupplierProductManagement = () => {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ); })}
                 </TableBody>
               </Table>
             </div>
