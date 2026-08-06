@@ -130,7 +130,7 @@ export const ProductEditHeader: React.FC<ProductEditHeaderProps> = ({
               ) : (
                 <>
                   <Rocket className="h-3.5 w-3.5" />
-                  Publicar Produto
+                  Publicar e Ativar
                 </>
               )}
             </Button>

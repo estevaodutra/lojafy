@@ -83,7 +83,7 @@ export const StickySaveBar: React.FC<StickySaveBarProps> = ({
               ) : (
                 <>
                   <Rocket className="h-3.5 w-3.5" />
-                  Publicar Produto
+                  Publicar e Ativar
                 </>
               )}
             </Button>
