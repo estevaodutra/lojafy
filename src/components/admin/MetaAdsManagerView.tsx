@@ -787,19 +787,6 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                     </SelectContent>
                   </Select>
 
-                  <Select value={adOriginFilter} onValueChange={setAdOriginFilter}>
-                    <SelectTrigger className="w-36">
-                      <SelectValue placeholder="Origem" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas Origens</SelectItem>
-                      <SelectItem value="super_admin">Superadmin</SelectItem>
-                      <SelectItem value="supplier">Fornecedor</SelectItem>
-                      <SelectItem value="reseller">Vendedor</SelectItem>
-                      <SelectItem value="ai_generated">Gerado por IA</SelectItem>
-                    </SelectContent>
-                  </Select>
-
                   <Select value={adStatusFilter} onValueChange={setAdStatusFilter}>
                     <SelectTrigger className="w-32">
                       <SelectValue placeholder="Status" />
@@ -829,7 +816,6 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                       <TableHead className="w-12 text-center">Foto</TableHead>
                       <TableHead>Nome Interno do Anúncio</TableHead>
                       <TableHead>SKU</TableHead>
-                      <TableHead>Origem</TableHead>
                       <TableHead>Marketplace</TableHead>
                       <TableHead>Título Público</TableHead>
                       <TableHead className="text-right">Preço de Venda</TableHead>
@@ -841,14 +827,14 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                   <TableBody>
                     {adsLoading ? (
                       <TableRow>
-                        <TableCell colSpan={12} className="text-center py-8">
+                        <TableCell colSpan={11} className="text-center py-8">
                           <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto" />
                           <p className="text-sm text-muted-foreground mt-2">Carregando anúncios vinculados...</p>
                         </TableCell>
                       </TableRow>
                     ) : filteredAds.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={12} className="text-center py-12 text-muted-foreground">
+                        <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
                           <div className="flex flex-col items-center justify-center space-y-3">
                             <p className="text-sm font-medium">Nenhum anúncio encontrado para o filtro atual.</p>
                             {selectedProductIds.length > 0 ? (
@@ -886,7 +872,6 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                       filteredAds.map((ad: any) => {
                         const isSelected = selectedAdIds.includes(ad.id);
                         const parentProductActive = ad.product ? ad.product.active !== false : true;
-                        const originInfo = ORIGIN_BADGES[ad.origin_type || 'official'] || ORIGIN_BADGES.official || { label: 'Modelo Oficial', className: 'bg-indigo-600 text-white' };
                         const statusInfo = STATUS_BADGES[ad.status || 'draft'] || STATUS_BADGES.draft || { label: 'Pausado', className: 'bg-amber-100 text-amber-800' };
 
                         return (
@@ -928,28 +913,19 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                               )}
                             </TableCell>
 
-                            {/* 4. Nome Interno do Anúncio */}
+                            {/* 4. Nome Interno do Anúncio (Com ícone discreto de Estrela ⭐ para Modelo Oficial) */}
                             <TableCell className="font-semibold text-foreground">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5">
                                 <span>{ad.internal_name || ad.variant_title}</span>
                                 {ad.is_official_model && (
-                                  <Badge variant="default" className="bg-amber-500 text-white text-[10px] px-1.5 py-0">
-                                    Modelo Oficial ⭐
-                                  </Badge>
+                                  <span title="Modelo Oficial ⭐" className="text-amber-500 text-sm select-none" role="img" aria-label="Modelo Oficial">⭐</span>
                                 )}
                               </div>
                             </TableCell>
 
-                            {/* 5. SKU do Produto (substituindo o Produto Vinculado) */}
+                            {/* 5. SKU do Produto */}
                             <TableCell className="font-mono text-xs text-foreground font-semibold">
                               {ad.product?.sku || '—'}
-                            </TableCell>
-
-                            {/* Origem */}
-                            <TableCell>
-                              <Badge className={originInfo.className}>
-                                {originInfo.label}
-                              </Badge>
                             </TableCell>
 
                             {/* Marketplace */}
