@@ -100,13 +100,20 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
         .from('products')
         .select(`
           *,
-          categories!category_id(name),
+          categories(id, name),
           ml_listing_variants(id, status, price, visits, sales, is_official_model)
         `)
         .order('created_at', { ascending: false });
 
+      if (roleMode === 'supplier' && user?.id) {
+        query = query.or(`supplier_id.eq.${user.id},user_id.eq.${user.id}`);
+      }
+
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error('Erro na busca de produtos:', error);
+        throw error;
+      }
       return data ?? [];
     },
     enabled: !!user?.id,
@@ -120,17 +127,21 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
         .from('ml_listing_variants')
         .select(`
           *,
-          product:products(*),
-          seller:profiles!ml_listing_variants_user_id_fkey(first_name, last_name, role)
+          product:products(*)
         `)
         .order('created_at', { ascending: false });
 
-      if (!isSuperAdmin && !isSupplier) {
-        query = query.or(`is_official_model.eq.true,user_id.eq.${user?.id}`);
+      if (roleMode === 'reseller' && user?.id) {
+        query = query.or(`is_official_model.eq.true,user_id.eq.${user.id}`);
+      } else if (roleMode === 'supplier' && user?.id) {
+        query = query.or(`is_official_model.eq.true,user_id.eq.${user.id}`);
       }
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error('Erro na busca de anúncios:', error);
+        throw error;
+      }
       return data ?? [];
     },
     enabled: !!user?.id,
