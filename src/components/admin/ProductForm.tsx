@@ -879,6 +879,22 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
     }
   };
 
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  const handlePublish = async () => {
+    setIsPublishing(true);
+    try {
+      form.setValue('active', true, { shouldDirty: true });
+      form.setValue('approval_status', 'approved', { shouldDirty: true });
+      if (!form.getValues('stage') || form.getValues('stage') === 'stage_1_basic') {
+        form.setValue('stage', 'stage_2_enabled', { shouldDirty: true });
+      }
+      await form.handleSubmit(onSubmit, onError)();
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit, onError)} className="space-y-0 pb-16 bg-muted/10 min-h-screen">
@@ -889,12 +905,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
           sku={form.watch('sku')}
           mainImageUrl={mainImageUrl}
           isSubmitting={isSubmitting}
+          isPublishing={isPublishing}
           isDirty={form.formState.isDirty}
           isExisting={!!product?.id}
           activeStatus={form.watch('active')}
           updatedAt={product?.updated_at}
           onCancel={onCancel}
           onSubmit={form.handleSubmit(onSubmit, onError)}
+          onPublish={handlePublish}
         />
 
         {/* 2. BARRA DE NAVEGAÇÃO STICKY E BUSCA */}
@@ -1264,11 +1282,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
         {/* 4. BARRA DE AÇÕES FIXA INFERIOR */}
         <StickySaveBar
           isSubmitting={isSubmitting}
+          isPublishing={isPublishing}
           isDirty={form.formState.isDirty}
           isExisting={!!product?.id}
           errorCount={Object.keys(formErrors).length}
           onCancel={onCancel}
           onSubmit={form.handleSubmit(onSubmit, onError)}
+          onPublish={handlePublish}
           onScrollToFirstError={() => onError(formErrors)}
         />
 

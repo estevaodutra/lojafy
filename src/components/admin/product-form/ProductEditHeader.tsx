@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Save, Loader2, AlertCircle, CheckCircle2, Package, Sparkles } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, AlertCircle, CheckCircle2, Package, Sparkles, Rocket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -8,12 +8,14 @@ interface ProductEditHeaderProps {
   sku?: string;
   mainImageUrl?: string;
   isSubmitting: boolean;
+  isPublishing?: boolean;
   isDirty: boolean;
   isExisting: boolean;
   activeStatus: boolean;
   updatedAt?: string;
   onCancel: () => void;
   onSubmit: () => void;
+  onPublish?: () => void;
 }
 
 export const ProductEditHeader: React.FC<ProductEditHeaderProps> = ({
@@ -21,12 +23,14 @@ export const ProductEditHeader: React.FC<ProductEditHeaderProps> = ({
   sku,
   mainImageUrl,
   isSubmitting,
+  isPublishing,
   isDirty,
   isExisting,
   activeStatus,
   updatedAt,
   onCancel,
   onSubmit,
+  onPublish,
 }) => {
   const formattedDate = updatedAt 
     ? new Date(updatedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -104,17 +108,39 @@ export const ProductEditHeader: React.FC<ProductEditHeaderProps> = ({
             variant="outline"
             size="sm"
             onClick={onCancel}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isPublishing}
             className="h-9 text-xs"
           >
             Cancelar
           </Button>
 
+          {onPublish && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={onPublish}
+              disabled={isSubmitting || isPublishing}
+              className="h-9 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm gap-1.5"
+            >
+              {isPublishing ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Publicando...
+                </>
+              ) : (
+                <>
+                  <Rocket className="h-3.5 w-3.5" />
+                  Publicar Produto
+                </>
+              )}
+            </Button>
+          )}
+
           <Button
             type="button"
             size="sm"
             onClick={onSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isPublishing}
             className="h-9 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm min-w-[130px]"
           >
             {isSubmitting ? (

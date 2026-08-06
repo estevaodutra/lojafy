@@ -1,25 +1,29 @@
 import React from 'react';
-import { Save, Loader2, AlertTriangle, CheckCircle2, X } from 'lucide-react';
+import { Save, Loader2, AlertTriangle, CheckCircle2, X, Rocket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
 interface StickySaveBarProps {
   isSubmitting: boolean;
+  isPublishing?: boolean;
   isDirty: boolean;
   isExisting: boolean;
   errorCount: number;
   onCancel: () => void;
   onSubmit: () => void;
+  onPublish?: () => void;
   onScrollToFirstError?: () => void;
 }
 
 export const StickySaveBar: React.FC<StickySaveBarProps> = ({
   isSubmitting,
+  isPublishing,
   isDirty,
   isExisting,
   errorCount,
   onCancel,
   onSubmit,
+  onPublish,
   onScrollToFirstError,
 }) => {
   return (
@@ -57,17 +61,39 @@ export const StickySaveBar: React.FC<StickySaveBarProps> = ({
             variant="outline"
             size="sm"
             onClick={onCancel}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isPublishing}
             className="h-9 text-xs"
           >
             Cancelar
           </Button>
 
+          {onPublish && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={onPublish}
+              disabled={isSubmitting || isPublishing}
+              className="h-9 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm gap-1.5"
+            >
+              {isPublishing ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Publicando...
+                </>
+              ) : (
+                <>
+                  <Rocket className="h-3.5 w-3.5" />
+                  Publicar Produto
+                </>
+              )}
+            </Button>
+          )}
+
           <Button
             type="button"
             size="sm"
             onClick={onSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isPublishing}
             className="h-9 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm min-w-[140px]"
           >
             {isSubmitting ? (
