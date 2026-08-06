@@ -31,6 +31,7 @@ interface MetaAdsManagerViewProps {
 }
 
 const ORIGIN_BADGES: Record<string, { label: string; className: string }> = {
+  official: { label: 'Modelo Oficial', className: 'bg-indigo-600 text-white font-semibold' },
   super_admin: { label: 'Superadmin', className: 'bg-purple-600 text-white' },
   supplier: { label: 'Fornecedor', className: 'bg-blue-600 text-white' },
   reseller: { label: 'Vendedor', className: 'bg-amber-100 text-amber-800 border-amber-300' },
@@ -885,8 +886,8 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                       filteredAds.map((ad: any) => {
                         const isSelected = selectedAdIds.includes(ad.id);
                         const parentProductActive = ad.product ? ad.product.active !== false : true;
-                        const originInfo = ORIGIN_BADGES[ad.origin_type || 'official'] || ORIGIN_BADGES.official;
-                        const statusInfo = STATUS_BADGES[ad.status || 'draft'] || STATUS_BADGES.draft;
+                        const originInfo = ORIGIN_BADGES[ad.origin_type || 'official'] || ORIGIN_BADGES.official || { label: 'Modelo Oficial', className: 'bg-indigo-600 text-white' };
+                        const statusInfo = STATUS_BADGES[ad.status || 'draft'] || STATUS_BADGES.draft || { label: 'Pausado', className: 'bg-amber-100 text-amber-800' };
 
                         return (
                           <TableRow key={ad.id} className={isSelected ? 'bg-muted/60' : ''}>
