@@ -825,8 +825,9 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                         />
                       </TableHead>
                       <TableHead className="w-14 text-center">Ativo</TableHead>
+                      <TableHead className="w-12 text-center">Foto</TableHead>
                       <TableHead>Nome Interno do Anúncio</TableHead>
-                      <TableHead>Produto Vinculado</TableHead>
+                      <TableHead>SKU</TableHead>
                       <TableHead>Origem</TableHead>
                       <TableHead>Marketplace</TableHead>
                       <TableHead>Título Público</TableHead>
@@ -839,14 +840,14 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                   <TableBody>
                     {adsLoading ? (
                       <TableRow>
-                        <TableCell colSpan={11} className="text-center py-8">
+                        <TableCell colSpan={12} className="text-center py-8">
                           <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto" />
                           <p className="text-sm text-muted-foreground mt-2">Carregando anúncios vinculados...</p>
                         </TableCell>
                       </TableRow>
                     ) : filteredAds.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
+                        <TableCell colSpan={12} className="text-center py-12 text-muted-foreground">
                           <div className="flex flex-col items-center justify-center space-y-3">
                             <p className="text-sm font-medium">Nenhum anúncio encontrado para o filtro atual.</p>
                             {selectedProductIds.length > 0 ? (
@@ -884,12 +885,12 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                       filteredAds.map((ad: any) => {
                         const isSelected = selectedAdIds.includes(ad.id);
                         const parentProductActive = ad.product ? ad.product.active !== false : true;
-                        const originInfo = ORIGIN_BADGES[ad.origin_type || 'reseller'] || ORIGIN_BADGES.reseller;
+                        const originInfo = ORIGIN_BADGES[ad.origin_type || 'official'] || ORIGIN_BADGES.official;
                         const statusInfo = STATUS_BADGES[ad.status || 'draft'] || STATUS_BADGES.draft;
 
                         return (
                           <TableRow key={ad.id} className={isSelected ? 'bg-muted/60' : ''}>
-                            {/* Checkbox */}
+                            {/* 1. Checkbox */}
                             <TableCell className="text-center">
                               <Checkbox
                                 checked={isSelected}
@@ -897,7 +898,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                               />
                             </TableCell>
 
-                            {/* Toggle Ativo/Pausado (Filho) */}
+                            {/* 2. Toggle Ativo/Pausado (Filho) */}
                             <TableCell className="text-center">
                               <Switch
                                 disabled={!parentProductActive}
@@ -908,7 +909,25 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                               />
                             </TableCell>
 
-                            {/* Nome Interno do Anúncio */}
+                            {/* 3. Miniatura entre Ativo e Nome Interno */}
+                            <TableCell className="text-center">
+                              {ad.product?.main_image_url || ad.product?.image_url ? (
+                                <img
+                                  src={ad.product.main_image_url || ad.product.image_url}
+                                  alt=""
+                                  className="w-9 h-9 rounded object-cover border mx-auto"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = 'https://placehold.co/100x100/e2e8f0/64748b?text=Sem+Foto';
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-9 h-9 rounded bg-muted flex items-center justify-center text-[9px] text-muted-foreground select-none mx-auto border">
+                                  Sem Foto
+                                </div>
+                              )}
+                            </TableCell>
+
+                            {/* 4. Nome Interno do Anúncio */}
                             <TableCell className="font-semibold text-foreground">
                               <div className="flex items-center gap-2">
                                 <span>{ad.internal_name || ad.variant_title}</span>
@@ -920,16 +939,9 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                               </div>
                             </TableCell>
 
-                            {/* Produto Vinculado */}
-                            <TableCell>
-                              <div className="flex items-center gap-2 text-xs">
-                                <img
-                                  src={ad.product?.main_image_url || ad.product?.image_url || '/placeholder.svg'}
-                                  alt=""
-                                  className="w-7 h-7 rounded object-cover border"
-                                />
-                                <span className="max-w-[140px] truncate font-medium">{ad.product?.name || 'Produto Base'}</span>
-                              </div>
+                            {/* 5. SKU do Produto (substituindo o Produto Vinculado) */}
+                            <TableCell className="font-mono text-xs text-foreground font-semibold">
+                              {ad.product?.sku || '—'}
                             </TableCell>
 
                             {/* Origem */}
