@@ -56,11 +56,11 @@ const Hero = () => {
 
   if (isLoading) {
     return (
-      <section className="relative bg-hero-gradient text-white overflow-hidden">
-        <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl py-20">
+      <section className="relative overflow-hidden">
+        <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl py-12">
           <div className="text-center">
-            <div className="animate-spin h-8 w-8 border-2 border-white border-t-transparent rounded-full mx-auto"></div>
-            <p className="mt-4 text-white/80">Carregando...</p>
+            <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Carregando...</p>
           </div>
         </div>
       </section>
@@ -118,8 +118,8 @@ const Hero = () => {
     }
     
     return (
-      <section className="relative bg-hero-gradient text-white overflow-hidden">
-        <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl py-20">
+      <section className="relative overflow-hidden py-8">
+        <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl py-12">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
               <h1 className="text-4xl md:text-6xl font-bold leading-tight">
@@ -127,18 +127,18 @@ const Hero = () => {
                 {banner.subtitle && (
                   <>
                     <br />
-                    <span className="text-yellow-300">{banner.subtitle}</span>
+                    <span className="text-primary">{banner.subtitle}</span>
                   </>
                 )}
               </h1>
               {banner.description && (
-                <p className="text-xl md:text-2xl text-blue-100">
+                <p className="text-xl md:text-2xl text-muted-foreground">
                   {banner.description}
                 </p>
               )}
               {banner.id === 'default' && (
-                <p className="text-lg text-blue-200">
-                  Até <strong className="text-yellow-300">70% OFF</strong> em eletrônicos, moda e casa
+                <p className="text-lg text-muted-foreground">
+                  Até <strong className="text-primary">70% OFF</strong> em eletrônicos, moda e casa
                 </p>
               )}
               <div className="flex flex-col sm:flex-row gap-4">
@@ -146,7 +146,7 @@ const Hero = () => {
                   <Link to={banner.button_link}>
                     <Button 
                       size="lg"
-                      className="bg-white text-primary hover:bg-gray-100 font-semibold text-lg px-8 py-4"
+                      className="font-semibold text-lg px-8 py-4"
                     >
                       {banner.button_text}
                     </Button>
@@ -156,7 +156,7 @@ const Hero = () => {
                   <Button 
                     variant="outline"
                     size="lg"
-                    className="border-white text-white hover:bg-white hover:text-primary font-semibold text-lg px-8 py-4"
+                    className="font-semibold text-lg px-8 py-4"
                   >
                     Ver Ofertas
                   </Button>
@@ -165,7 +165,6 @@ const Hero = () => {
             </div>
             
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-2xl"></div>
               <picture>
                 {banner.mobile_image_url && (
                   <source 
@@ -176,22 +175,18 @@ const Hero = () => {
                 <img
                   src={banner.image_url}
                   alt={banner.title}
-                  className="w-full h-auto rounded-2xl shadow-2xl"
+                  className="w-full h-auto rounded-2xl shadow-xl"
                 />
               </picture>
             </div>
           </div>
         </div>
-
-        {/* Decorative Elements */}
-        <div className="absolute top-0 right-0 w-32 h-32 md:w-72 md:h-72 bg-gradient-to-bl from-white/10 to-transparent rounded-full -translate-y-16 translate-x-16 md:-translate-y-36 md:translate-x-36"></div>
-        <div className="absolute bottom-0 left-0 w-48 h-48 md:w-96 md:h-96 bg-gradient-to-tr from-white/5 to-transparent rounded-full translate-y-24 -translate-x-24 md:translate-y-48 md:-translate-x-48"></div>
       </section>
     );
   }
 
   return (
-    <section className="relative bg-hero-gradient text-white overflow-hidden">
+    <section className="relative overflow-hidden py-2">
       <Carousel 
         className="w-full"
         plugins={[
@@ -209,7 +204,7 @@ const Hero = () => {
               
               return (
                 <CarouselItem key={banner.id}>
-                  <div className="py-4">
+                  <div className="py-2">
                     <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
                       <div className="w-full md:aspect-[8/3] rounded-lg overflow-hidden bg-muted">
                         <picture>
@@ -234,7 +229,7 @@ const Hero = () => {
             
             return (
               <CarouselItem key={banner.id}>
-                <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl py-20">
+                <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl py-12">
                   <div className="grid md:grid-cols-2 gap-12 items-center">
                     <div className="space-y-6">
                       <h1 className="text-4xl md:text-6xl font-bold leading-tight">
@@ -242,12 +237,12 @@ const Hero = () => {
                         {banner.subtitle && (
                           <>
                             <br />
-                            <span className="text-yellow-300">{banner.subtitle}</span>
+                            <span className="text-primary">{banner.subtitle}</span>
                           </>
                         )}
                       </h1>
                       {banner.description && (
-                        <p className="text-xl md:text-2xl text-blue-100">
+                        <p className="text-xl md:text-2xl text-muted-foreground">
                           {banner.description}
                         </p>
                       )}
@@ -256,7 +251,7 @@ const Hero = () => {
                           <Link to={banner.button_link}>
                             <Button 
                               size="lg"
-                              className="bg-white text-primary hover:bg-gray-100 font-semibold text-lg px-8 py-4"
+                              className="font-semibold text-lg px-8 py-4"
                             >
                               {banner.button_text}
                             </Button>
@@ -266,7 +261,7 @@ const Hero = () => {
                           <Button 
                             variant="outline"
                             size="lg"
-                            className="border-white text-white hover:bg-white hover:text-primary font-semibold text-lg px-8 py-4"
+                            className="font-semibold text-lg px-8 py-4"
                           >
                             Ver Ofertas
                           </Button>
@@ -275,7 +270,6 @@ const Hero = () => {
                     </div>
                     
                     <div className="relative">
-                      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-2xl"></div>
                       <picture>
                         {banner.mobile_image_url && (
                           <source 
@@ -286,7 +280,7 @@ const Hero = () => {
                         <img
                           src={banner.image_url}
                           alt={banner.title}
-                          className="w-full h-auto rounded-2xl shadow-2xl"
+                          className="w-full h-auto rounded-2xl shadow-xl"
                         />
                       </picture>
                     </div>
@@ -296,18 +290,7 @@ const Hero = () => {
             );
           })}
         </CarouselContent>
-        
-        {displayBanners.length > 1 && (
-          <>
-            <CarouselPrevious className="left-4 bg-white/10 border-white/20 text-white hover:bg-white/20" />
-            <CarouselNext className="right-4 bg-white/10 border-white/20 text-white hover:bg-white/20" />
-          </>
-        )}
       </Carousel>
-
-      {/* Decorative Elements */}
-      <div className="absolute top-0 right-0 w-32 h-32 md:w-72 md:h-72 bg-gradient-to-bl from-white/10 to-transparent rounded-full -translate-y-16 translate-x-16 md:-translate-y-36 md:translate-x-36"></div>
-      <div className="absolute bottom-0 left-0 w-48 h-48 md:w-96 md:h-96 bg-gradient-to-tr from-white/5 to-transparent rounded-full translate-y-24 -translate-x-24 md:translate-y-48 md:-translate-x-48"></div>
     </section>
   );
 };
