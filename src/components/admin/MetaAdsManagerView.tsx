@@ -100,49 +100,32 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
   const { data: products = [], isLoading: productsLoading, refetch: refetchProducts } = useQuery({
     queryKey: ['meta-ads-products', roleMode, user?.id, orgId],
     queryFn: async () => {
-      try {
-        let query = supabase
-          .from('products')
-          .select(`
-            *,
-            categories(id, name)
-          `)
-          .order('created_at', { ascending: false });
+      let query = supabase
+        .from('products')
+        .select(`
+          *,
+          categories!category_id (
+            id,
+            name,
+            slug
+          )
+        `)
+        .order('created_at', { ascending: false });
 
-        if (roleMode === 'supplier') {
-          if (orgId) {
-            query = query.or(`supplier_organization_id.eq.${orgId},supplier_id.eq.${user?.id},created_by.eq.${user?.id}`);
-          } else if (user?.id) {
-            query = query.or(`supplier_id.eq.${user.id},created_by.eq.${user.id}`);
-          }
-        }
-
-        const { data, error } = await query;
-        if (error) {
-          console.warn('Erro ao filtrar produtos, carregando fallback:', error);
-          const fallback = await supabase
-            .from('products')
-            .select(`*, categories(id, name)`)
-            .order('created_at', { ascending: false });
-          return fallback.data ?? [];
-        }
-        
-        // Se para o fornecedor não retornar nada com o filtro estrito, tenta buscar todos os produtos ativos do catálogo
-        if (roleMode === 'supplier' && (!data || data.length === 0)) {
-          const fallback = await supabase
-            .from('products')
-            .select(`*, categories(id, name)`)
-            .order('created_at', { ascending: false });
-          return fallback.data ?? [];
-        }
-
-        return data ?? [];
-      } catch (e) {
-        console.error('Exceção ao buscar produtos:', e);
-        return [];
+      if (roleMode === 'supplier' && orgId) {
+        query = query.eq('supplier_organization_id', orgId);
+      } else if (roleMode === 'reseller') {
+        query = query.eq('active', true);
       }
+
+      const { data, error } = await query;
+      if (error) {
+        console.error('Erro na busca de produtos:', error);
+        throw error;
+      }
+      return data ?? [];
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && (roleMode !== 'supplier' || !!orgId),
   });
 
   // 2. QUERY DE ANÚNCIOS
@@ -161,7 +144,12 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
         if (roleMode === 'reseller' && user?.id) {
           query = query.or(`is_official_model.eq.true,user_id.eq.${user.id}`);
         } else if (roleMode === 'supplier' && user?.id) {
-          query = query.or(`is_official_model.eq.true,user_id.eq.${user.id}`);
+          const prodIds = products.map((p: any) => p.id);
+          if (prodIds.length > 0) {
+            query = query.or(`is_official_model.eq.true,user_id.eq.${user.id},product_id.in.(${prodIds.join(',')})`);
+          } else {
+            query = query.or(`is_official_model.eq.true,user_id.eq.${user.id}`);
+          }
         }
 
         const { data, error } = await query;
