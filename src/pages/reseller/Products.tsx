@@ -22,13 +22,16 @@ import {
   Eye,
   Trash2,
   ExternalLink,
-  ChevronDown
+  ChevronDown,
+  Store
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { ProductAdsView } from '@/components/admin/ProductAdsView';
 
 const ResellerProducts = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const { 
     products, 
     store,
@@ -132,6 +135,17 @@ const ResellerProducts = () => {
   const totalRevenue = products
     .filter(p => p.active)
     .reduce((sum, p) => sum + (p.custom_price || 0), 0);
+
+  if (selectedProductId) {
+    return (
+      <div className="space-y-6">
+        <ProductAdsView
+          productId={selectedProductId}
+          onBack={() => setSelectedProductId(null)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -352,6 +366,16 @@ const ResellerProducts = () => {
                       </div>
                       
                       <div className="flex flex-col gap-2 min-w-[130px]">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => setSelectedProductId(product.product_id)}
+                          className="w-full text-xs font-semibold gap-1 bg-primary/10 text-primary hover:bg-primary/20"
+                        >
+                          <Store className="h-3.5 w-3.5" />
+                          Anúncios
+                        </Button>
+
                         <Button
                           size="sm"
                           variant={product.active ? "default" : "outline"}

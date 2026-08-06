@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Package, AlertTriangle, TrendingUp, Download, Upload, ArrowUp, ArrowDown, Edit, Trash2, Loader2, Star, Link2 } from 'lucide-react';
 import ProductTable from '@/components/admin/ProductTable';
 import ProductForm from '@/components/admin/ProductForm';
+import { ProductAdsView } from '@/components/admin/ProductAdsView';
 import { ProductComparisonView } from '@/components/admin/ProductComparisonView';
 import { RestoreOriginalButton } from '@/components/admin/RestoreOriginalButton';
 import { CloneFromMarketplace } from '@/components/admin/CloneFromMarketplace';
@@ -27,6 +28,7 @@ const Products = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [activeTab, setActiveTab] = useState('all');
   const [showImportModal, setShowImportModal] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   // Fetch products data
   const { data: products = [], isLoading: productsLoading, refetch: refetchProducts } = useQuery({
@@ -118,6 +120,17 @@ const Products = () => {
     link.click();
     document.body.removeChild(link);
   };
+
+  if (selectedProductId) {
+    return (
+      <div className="space-y-6">
+        <ProductAdsView
+          productId={selectedProductId}
+          onBack={() => setSelectedProductId(null)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -237,6 +250,7 @@ const Products = () => {
             onEdit={handleEditProduct}
             onDuplicate={handleDuplicateProduct}
             onRefresh={refetchProducts}
+            onSelectProduct={(id) => setSelectedProductId(id)}
           />
         </TabsContent>
 
@@ -247,6 +261,7 @@ const Products = () => {
             onEdit={handleEditProduct}
             onDuplicate={handleDuplicateProduct}
             onRefresh={refetchProducts}
+            onSelectProduct={(id) => setSelectedProductId(id)}
             emptyMessage="Nenhum produto com estoque baixo encontrado."
           />
         </TabsContent>
@@ -258,6 +273,7 @@ const Products = () => {
             onEdit={handleEditProduct}
             onDuplicate={handleDuplicateProduct}
             onRefresh={refetchProducts}
+            onSelectProduct={(id) => setSelectedProductId(id)}
             emptyMessage="Nenhum produto sem estoque encontrado."
           />
         </TabsContent>

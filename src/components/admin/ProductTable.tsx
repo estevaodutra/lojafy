@@ -60,6 +60,7 @@ interface ProductTableProps {
   onEdit: (product: any) => void;
   onDuplicate: (product: any) => void;
   onRefresh: () => void;
+  onSelectProduct?: (productId: string) => void;
   emptyMessage?: string;
 }
 
@@ -69,6 +70,7 @@ const ProductTable: React.FC<ProductTableProps> = ({
   onEdit,
   onDuplicate,
   onRefresh,
+  onSelectProduct,
   emptyMessage = "Nenhum produto encontrado."
 }) => {
   const [search, setSearch] = useState('');
@@ -606,136 +608,139 @@ const ProductTable: React.FC<ProductTableProps> = ({
                       <TableHead className="w-[100px]">Imagem</TableHead>
                       <TableHead className="w-[200px]">Produto</TableHead>
                       <TableHead className="w-[100px]">SKU</TableHead>
-                      <TableHead className="w-[120px]">Categoria</TableHead>
-                      <TableHead>Preço</TableHead>
+                      <TableHead>Preço-base</TableHead>
+                      <TableHead>Preço sugerido</TableHead>
                       <TableHead>Estoque</TableHead>
-                      <TableHead className="w-[100px]">Marketplace</TableHead>
+                      <TableHead className="text-center">Anúncios</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {currentProducts.map((product) => (
-                      <TableRow key={product.id}>
-                        <TableCell 
-                          className="cursor-pointer text-center align-middle"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectProduct(product.id, !selectedProducts.includes(product.id));
-                          }}
+                    {currentProducts.map((product) => {
+                      const adsCount = product.ml_listing_variants?.length || product.product_marketplace_data?.length || 0;
+                      return (
+                        <TableRow 
+                          key={product.id}
+                          className="hover:bg-muted/50 cursor-pointer"
+                          onClick={() => onSelectProduct?.(product.id)}
                         >
-                          <Checkbox
-                            checked={selectedProducts.includes(product.id)}
-                            onCheckedChange={(checked) => handleSelectProduct(product.id, !!checked)}
-                            aria-label={`Selecionar ${product.name}`}
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center">
-                            {product.main_image_url || product.image_url ? (
-                              <img 
-                                src={product.main_image_url || product.image_url} 
-                                alt={product.name}
-                                className="w-full h-full object-cover rounded-lg"
-                              />
-                            ) : (
-                              <span className="text-muted-foreground text-xs">Sem imagem</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium truncate max-w-[200px]" title={product.name}>
-                                {product.name}
-                              </p>
-                              {product.high_rotation && (
-                                <Badge variant="secondary" className="shrink-0">
-                                  <TrendingUp className="h-3 w-3 mr-1" />
-                                  Alta
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              {product.brand || 'Marca não informada'}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <code className="text-xs bg-muted px-2 py-1 rounded whitespace-nowrap">
-                            {product.sku || 'N/A'}
-                          </code>
-                        </TableCell>
-                        <TableCell>
-                          <span className="truncate max-w-[120px] block" title={product.categories?.name || 'Sem categoria'}>
-                            {product.categories?.name || 'Sem categoria'}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{formatPrice(product.price)}</p>
-                            {product.original_price && product.original_price > product.price && (
-                              <p className="text-xs text-muted-foreground line-through">
-                                {formatPrice(product.original_price)}
-                              </p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            <p className="text-sm font-medium">{product.stock_quantity}</p>
-                            {getStockIndicator(product)}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <TooltipProvider>
-                            <div className="flex items-center gap-1.5">
-                              {product.product_marketplace_data && product.product_marketplace_data.length > 0 ? (
-                                product.product_marketplace_data.map((mp: any) => (
-                                  <MarketplaceIcon key={mp.id} marketplace={mp.marketplace} status={mp.listing_status} />
-                                ))
+                          <TableCell 
+                            className="cursor-pointer text-center align-middle"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectProduct(product.id, !selectedProducts.includes(product.id));
+                            }}
+                          >
+                            <Checkbox
+                              checked={selectedProducts.includes(product.id)}
+                              onCheckedChange={(checked) => handleSelectProduct(product.id, !!checked)}
+                              aria-label={`Selecionar ${product.name}`}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center">
+                              {product.main_image_url || product.image_url ? (
+                                <img 
+                                  src={product.main_image_url || product.image_url} 
+                                  alt={product.name}
+                                  className="w-full h-full object-cover rounded-lg"
+                                />
                               ) : (
-                                <span className="text-muted-foreground text-sm">—</span>
+                                <span className="text-muted-foreground text-xs">Sem imagem</span>
                               )}
                             </div>
-                          </TooltipProvider>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={product.active ? "default" : "secondary"}>
-                            {product.active ? 'Ativo' : 'Inativo'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0">
-                                <span className="sr-only">Abrir menu</span>
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                              <DropdownMenuItem asChild>
-                                <Link to={`/produto/${product.id}`} className="flex items-center">
-                                  <ExternalLink className="mr-2 h-4 w-4" />
-                                  Visualizar Produto
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => onEdit(product)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => onDuplicate(product)}>
-                                <Copy className="mr-2 h-4 w-4" />
-                                Duplicar
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleToggleStatus(product)}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                {product.active ? 'Desativar' : 'Ativar'}
-                              </DropdownMenuItem>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-foreground truncate max-w-[200px]" title={product.name}>
+                                  {product.name}
+                                </p>
+                                {product.high_rotation && (
+                                  <Badge variant="secondary" className="shrink-0">
+                                    <TrendingUp className="h-3 w-3 mr-1" />
+                                    Alta
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {product.categories?.name || 'Geral'}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <code className="text-xs bg-muted px-2 py-1 rounded whitespace-nowrap">
+                              {product.sku || 'N/A'}
+                            </code>
+                          </TableCell>
+                          {/* Preço Base (Custo) */}
+                          <TableCell>
+                            <span className="font-medium text-muted-foreground">
+                              {formatPrice(product.cost_price || product.price)}
+                            </span>
+                          </TableCell>
+                          {/* Preço Sugerido */}
+                          <TableCell>
+                            <span className="font-bold text-emerald-600">
+                              {formatPrice(product.suggested_price || product.price)}
+                            </span>
+                          </TableCell>
+                          {/* Estoque */}
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              <p className="text-sm font-bold">{product.stock_quantity ?? 0}</p>
+                              {getStockIndicator(product)}
+                            </div>
+                          </TableCell>
+                          {/* Qtd Anúncios */}
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className="bg-primary/10 text-primary font-bold">
+                              {adsCount} anúncio{adsCount !== 1 ? 's' : ''}
+                            </Badge>
+                          </TableCell>
+                          {/* Status */}
+                          <TableCell>
+                            <Badge variant={product.active ? "default" : "secondary"}>
+                              {product.active ? 'Ativo' : 'Inativo'}
+                            </Badge>
+                          </TableCell>
+                          {/* Ações */}
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <span className="sr-only">Abrir menu</span>
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Ações do Produto</DropdownMenuLabel>
+                                <DropdownMenuItem onClick={() => onSelectProduct?.(product.id)}>
+                                  <Store className="mr-2 h-4 w-4 text-primary" />
+                                  Ver Anúncios Vinculados
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link to={`/produto/${product.id}`} className="flex items-center">
+                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                    Ver na Loja Pública
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => onEdit(product)}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Editar Produto
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => onDuplicate(product)}>
+                                  <Copy className="mr-2 h-4 w-4" />
+                                  Duplicar Produto
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleToggleStatus(product)}>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  {product.active ? 'Desativar' : 'Ativar'}
+                                </DropdownMenuItem>
                               <DropdownMenuSeparator />
                                 <ProductDeleteDialog
                                   product={product}
@@ -746,8 +751,9 @@ const ProductTable: React.FC<ProductTableProps> = ({
                           </DropdownMenu>
                         </TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
+                    );
+                  })}
+                </TableBody>
                 </Table>
               </div>
 
