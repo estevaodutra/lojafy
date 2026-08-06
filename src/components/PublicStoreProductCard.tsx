@@ -122,20 +122,21 @@ const PublicStoreProductCard = ({
 
             <div className="space-y-1 mt-auto">
               <div className="flex flex-col gap-1">
-                {product.original_price ? <>
+                {product.original_price ? (
+                  <>
                     <span className="text-xs sm:text-sm text-muted-foreground line-through">
                       De: {formatPrice(Number(product.price))}
                     </span>
                     <span className="text-lg sm:text-xl font-bold text-foreground">
                       Por: {formatPrice(Number(product.original_price))}
                     </span>
-                  </> : <span className="text-lg sm:text-xl font-bold text-foreground">
+                  </>
+                ) : (
+                  <span className="text-lg sm:text-xl font-bold text-foreground">
                     {formatPrice(Number(product.price))}
-                  </span>}
+                  </span>
+                )}
               </div>
-              <p className="text-xs sm:text-sm text-muted-foreground">
-                ou 10x de {formatPrice(Number(product.original_price || product.price) / 10)}
-              </p>
             </div>
           </div>
         </Link>

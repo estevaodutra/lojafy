@@ -404,9 +404,6 @@ const PublicStoreCategoryList = () => {
                             </p>
                           )}
                           <p className="text-xl font-bold text-primary">{formatPrice(product.price)}</p>
-                          <p className="text-sm text-muted-foreground">
-                            ou 12x de {formatPrice(product.price / 12)} sem juros
-                          </p>
                         </div>
                       </Link>
 

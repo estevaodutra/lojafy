@@ -457,14 +457,9 @@ const Produto = ({
               {variants.length > 0 ? (
                 // Show variant-based pricing
                 selectedVariantData ? (
-                  <>
-                    <p className="text-3xl md:text-4xl font-bold text-primary">
-                      {formatPrice(effectivePrice)}
-                    </p>
-                    <p className="text-muted-foreground">
-                      ou 12x de {formatPrice(effectivePrice / 12)} sem juros
-                    </p>
-                  </>
+                  <p className="text-3xl md:text-4xl font-bold text-primary">
+                    {formatPrice(effectivePrice)}
+                  </p>
                 ) : (
                   <p className="text-lg text-muted-foreground">
                     Selecione uma opção para ver o preço
@@ -479,15 +474,9 @@ const Produto = ({
                   <p className="text-3xl md:text-4xl font-bold text-primary">
                     Por: {formatPrice(Number(product.original_price))}
                   </p>
-                  <p className="text-muted-foreground">
-                    ou 12x de {formatPrice(Number(product.original_price) / 12)} sem juros
-                  </p>
                 </> : <>
                   <p className="text-3xl md:text-4xl font-bold text-primary">
                     {formatPrice(Number(product.price))}
-                  </p>
-                  <p className="text-muted-foreground">
-                    ou 12x de {formatPrice(Number(product.price) / 12)} sem juros
                   </p>
                 </>
               )}

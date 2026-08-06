@@ -158,9 +158,6 @@ const PublicStoreFavorites = () => {
                   <p className="text-lg font-bold text-primary">
                     {formatPrice(product.price)}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    ou 12x de {formatPrice(product.price / 12)}
-                  </p>
                 </div>
 
                 <div className="flex gap-2 pt-2">

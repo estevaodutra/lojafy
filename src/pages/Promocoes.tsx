@@ -212,9 +212,6 @@ const Promocoes = () => {
                         <p className="text-4xl font-bold text-red-500">
                           Por: {formatPrice(product.price)}
                         </p>
-                        <p className="text-sm text-muted-foreground">
-                          ou 12x de {formatPrice(product.price / 12)} sem juros
-                        </p>
                       </div>
 
                       <div className="flex gap-3">
@@ -324,9 +321,6 @@ const Promocoes = () => {
                         </p>
                         <p className="text-xl font-bold text-red-500">
                           {formatPrice(product.price)}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          ou 12x de {formatPrice(product.price / 12)} sem juros
                         </p>
                       </div>
                     </Link>

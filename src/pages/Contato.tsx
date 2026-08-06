@@ -61,7 +61,7 @@ const Contato = () => {
     answer: "Sim! Você tem até 30 dias para trocar ou devolver produtos, desde que estejam nas condições originais."
   }, {
     question: "Quais são as formas de pagamento?",
-    answer: "Aceitamos cartão de crédito, débito, PIX e boleto bancário. Parcelamento em até 12x sem juros no cartão."
+    answer: "Aceitamos cartão de crédito, débito, PIX e boleto bancário."
   }, {
     question: "Como posso cancelar um pedido?",
     answer: "Pedidos podem ser cancelados até 2 horas após a confirmação. Entre em contato conosco o mais rápido possível."
