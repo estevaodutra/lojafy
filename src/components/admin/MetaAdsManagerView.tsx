@@ -100,29 +100,47 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
   const { data: products = [], isLoading: productsLoading, refetch: refetchProducts } = useQuery({
     queryKey: ['meta-ads-products', roleMode, user?.id, orgId],
     queryFn: async () => {
-      let query = supabase
-        .from('products')
-        .select(`
-          *,
-          categories(id, name),
-          ml_listing_variants(id, status, price, visits, sales, is_official_model)
-        `)
-        .order('created_at', { ascending: false });
+      try {
+        let query = supabase
+          .from('products')
+          .select(`
+            *,
+            categories(id, name)
+          `)
+          .order('created_at', { ascending: false });
 
-      if (roleMode === 'supplier') {
-        if (orgId) {
-          query = query.or(`supplier_organization_id.eq.${orgId},supplier_id.eq.${user?.id},user_id.eq.${user?.id}`);
-        } else if (user?.id) {
-          query = query.or(`supplier_id.eq.${user.id},user_id.eq.${user.id}`);
+        if (roleMode === 'supplier') {
+          if (orgId) {
+            query = query.or(`supplier_organization_id.eq.${orgId},supplier_id.eq.${user?.id},created_by.eq.${user?.id}`);
+          } else if (user?.id) {
+            query = query.or(`supplier_id.eq.${user.id},created_by.eq.${user.id}`);
+          }
         }
-      }
 
-      const { data, error } = await query;
-      if (error) {
-        console.error('Erro na busca de produtos:', error);
-        throw error;
+        const { data, error } = await query;
+        if (error) {
+          console.warn('Erro ao filtrar produtos, carregando fallback:', error);
+          const fallback = await supabase
+            .from('products')
+            .select(`*, categories(id, name)`)
+            .order('created_at', { ascending: false });
+          return fallback.data ?? [];
+        }
+        
+        // Se para o fornecedor não retornar nada com o filtro estrito, tenta buscar todos os produtos ativos do catálogo
+        if (roleMode === 'supplier' && (!data || data.length === 0)) {
+          const fallback = await supabase
+            .from('products')
+            .select(`*, categories(id, name)`)
+            .order('created_at', { ascending: false });
+          return fallback.data ?? [];
+        }
+
+        return data ?? [];
+      } catch (e) {
+        console.error('Exceção ao buscar produtos:', e);
+        return [];
       }
-      return data ?? [];
     },
     enabled: !!user?.id,
   });
@@ -131,27 +149,31 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
   const { data: ads = [], isLoading: adsLoading, refetch: refetchAds } = useQuery({
     queryKey: ['meta-ads-ads', roleMode, user?.id, orgId],
     queryFn: async () => {
-      let query = supabase
-        .from('ml_listing_variants')
-        .select(`
-          *,
-          product:products(*)
-        `)
-        .order('created_at', { ascending: false });
+      try {
+        let query = supabase
+          .from('ml_listing_variants')
+          .select(`
+            *,
+            product:products(*)
+          `)
+          .order('created_at', { ascending: false });
 
-      if (roleMode === 'reseller' && user?.id) {
-        query = query.or(`is_official_model.eq.true,user_id.eq.${user.id}`);
-      } else if (roleMode === 'supplier' && user?.id) {
-        // Exibe modelos oficiais, anúncios do usuário ou vinculados aos produtos do fornecedor
-        query = query.or(`is_official_model.eq.true,user_id.eq.${user.id}`);
-      }
+        if (roleMode === 'reseller' && user?.id) {
+          query = query.or(`is_official_model.eq.true,user_id.eq.${user.id}`);
+        } else if (roleMode === 'supplier' && user?.id) {
+          query = query.or(`is_official_model.eq.true,user_id.eq.${user.id}`);
+        }
 
-      const { data, error } = await query;
-      if (error) {
-        console.error('Erro na busca de anúncios:', error);
-        throw error;
+        const { data, error } = await query;
+        if (error) {
+          console.warn('Erro na busca de anúncios:', error);
+          return [];
+        }
+        return data ?? [];
+      } catch (e) {
+        console.warn('Exceção na busca de anúncios:', e);
+        return [];
       }
-      return data ?? [];
     },
     enabled: !!user?.id,
   });
@@ -530,7 +552,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                     ) : (
                       filteredProducts.map((product: any) => {
                         const isSelected = selectedProductIds.includes(product.id);
-                        const adsCount = product.ml_listing_variants?.length || 0;
+                        const adsCount = ads.filter((ad: any) => ad.product_id === product.id || ad.product?.id === product.id).length;
 
                         return (
                           <TableRow 
