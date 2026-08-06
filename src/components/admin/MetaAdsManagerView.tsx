@@ -18,11 +18,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { 
   Package, Megaphone, Plus, Search, Filter, Sparkles, Store, Copy, Edit3, PauseCircle, 
   PlayCircle, Archive, Trash2, ShieldCheck, History, Eye, ExternalLink, MoreHorizontal,
-  TrendingUp, DollarSign, ShoppingBag, X, RefreshCw, Layers, CheckCircle2, ArrowRight
+  TrendingUp, DollarSign, ShoppingBag, X, RefreshCw, Layers, CheckCircle2, ArrowRight,
+  Send, Loader2, ChevronDown
 } from 'lucide-react';
 import { AiVariationModal } from './AiVariationModal';
 import { AdHistoryModal } from './AdHistoryModal';
 import { useSupplierOrganization } from '@/hooks/supplier/useSupplierOrganization';
+import { useMercadoLivreIntegration } from '@/hooks/useMercadoLivreIntegration';
 
 interface MetaAdsManagerViewProps {
   roleMode?: 'admin' | 'supplier' | 'reseller';
@@ -91,6 +93,71 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
   const { data: orgData } = useSupplierOrganization();
   const orgId = orgData?.organization?.id;
+
+  const { isProductPublished, publishProduct } = useMercadoLivreIntegration();
+  const [isBatchPublishing, setIsBatchPublishing] = useState(false);
+  const [batchPublishProgress, setBatchPublishProgress] = useState({ current: 0, total: 0 });
+
+  const handleBatchPublishMl = async (onlyUnpublished = true) => {
+    if (selectedProductIds.length === 0) {
+      toast({ title: 'Selecione pelo menos um produto para publicar.' });
+      return;
+    }
+    
+    const targetProducts = products.filter((p: any) => selectedProductIds.includes(p.id));
+    const toPublish = onlyUnpublished 
+      ? targetProducts.filter((p: any) => !isProductPublished(p.id))
+      : targetProducts;
+
+    if (toPublish.length === 0) {
+      toast({ title: 'Todos os produtos selecionados já estão publicados no Mercado Livre!' });
+      return;
+    }
+
+    setIsBatchPublishing(true);
+    setBatchPublishProgress({ current: 0, total: toPublish.length });
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < toPublish.length; i++) {
+      const prod = toPublish[i];
+      setBatchPublishProgress({ current: i + 1, total: toPublish.length });
+      try {
+        await publishProduct(prod.id);
+        successCount++;
+      } catch (err: any) {
+        console.error(`Erro ao publicar produto ${prod.name}:`, err);
+        failCount++;
+      }
+    }
+
+    setIsBatchPublishing(false);
+    refetchProducts();
+    refetchAds();
+
+    if (failCount === 0) {
+      toast({ title: `🚀 ${successCount} produto(s) publicado(s) com sucesso no Mercado Livre!` });
+    } else {
+      toast({ 
+        variant: failCount === toPublish.length ? 'destructive' : 'default',
+        title: `Publicação em lote concluída`, 
+        description: `${successCount} publicado(s) com sucesso, ${failCount} falhou.` 
+      });
+    }
+  };
+
+  const handleSinglePublishMl = async (productId: string) => {
+    try {
+      toast({ title: 'Publicando produto no Mercado Livre...' });
+      await publishProduct(productId);
+      toast({ title: '🚀 Produto publicado com sucesso no Mercado Livre!' });
+      refetchProducts();
+      refetchAds();
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Erro ao publicar no Mercado Livre', description: err.message });
+    }
+  };
 
   const formatPrice = (val: number | null | undefined) => {
     if (val === null || val === undefined) return 'R$ 0,00';
@@ -605,13 +672,53 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                   </Select>
 
                   {selectedProductIds.length > 0 && (
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setActiveTab('ads')}
-                      className="gap-2 border-primary text-primary hover:bg-primary/5"
-                    >
-                      Ver Anúncios dos Selecionados ({selectedProductIds.length}) <ArrowRight className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            disabled={isBatchPublishing}
+                            className="gap-2 bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold shadow-sm"
+                          >
+                            {isBatchPublishing ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Publicando ({batchPublishProgress.current}/{batchPublishProgress.total})...
+                              </>
+                            ) : (
+                              <>
+                                <img 
+                                  src="https://http2.mlstatic.com/static/org-img/homesnw/mercado-libre.png" 
+                                  alt="" 
+                                  className="h-4 w-auto object-contain" 
+                                />
+                                Publicar no Mercado Livre ({selectedProductIds.length})
+                                <ChevronDown className="h-4 w-4" />
+                              </>
+                            )}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-64">
+                          <DropdownMenuLabel>Ações no Mercado Livre</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleBatchPublishMl(true)}>
+                            <Send className="h-4 w-4 mr-2 text-amber-600" />
+                            Publicar produtos não integrados
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleBatchPublishMl(false)}>
+                            <Sparkles className="h-4 w-4 mr-2 text-amber-600" />
+                            Publicar todos os selecionados
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setActiveTab('ads')}
+                        className="gap-2 border-primary text-primary hover:bg-primary/5"
+                      >
+                        Ver Anúncios dos Selecionados ({selectedProductIds.length}) <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -703,12 +810,15 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                             </TableCell>
 
                             {/* Marketplace */}
-                            <TableCell>
-                              <div className="flex items-center gap-1 text-xs">
-                                <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-300">
-                                  Mercado Livre
-                                </Badge>
-                              </div>
+                            <TableCell className="text-center">
+                              {isProductPublished(product.id) ? (
+                                <img
+                                  src="https://http2.mlstatic.com/static/org-img/homesnw/mercado-libre.png"
+                                  alt="Mercado Livre"
+                                  className="h-5 w-auto object-contain mx-auto"
+                                  title="Integrado com Mercado Livre"
+                                />
+                              ) : null}
                             </TableCell>
 
                             {/* Preço-base (Custo) */}
@@ -762,6 +872,10 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuLabel>Ações do Produto</DropdownMenuLabel>
+                                  <DropdownMenuItem onClick={() => handleSinglePublishMl(product.id)}>
+                                    <Send className="h-4 w-4 mr-2 text-amber-600" /> 
+                                    {isProductPublished(product.id) ? 'Republicar no Mercado Livre' : 'Publicar no Mercado Livre'}
+                                  </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => handleViewAdsForProduct(product.id)}>
                                     <Megaphone className="h-4 w-4 mr-2 text-primary" /> Ver Anúncios Vinculados
                                   </DropdownMenuItem>
@@ -995,8 +1109,15 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                             </TableCell>
 
                             {/* Marketplace */}
-                            <TableCell className="text-xs font-medium">
-                              Mercado Livre
+                            <TableCell className="text-center">
+                              {ad.ml_item_id || ad.permalink || isProductPublished(ad.product_id || ad.product?.id) ? (
+                                <img
+                                  src="https://http2.mlstatic.com/static/org-img/homesnw/mercado-libre.png"
+                                  alt="Mercado Livre"
+                                  className="h-5 w-auto object-contain mx-auto"
+                                  title="Integrado com Mercado Livre"
+                                />
+                              ) : null}
                             </TableCell>
 
                             {/* Título Público */}
@@ -1038,6 +1159,9 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuLabel>Opções do Anúncio</DropdownMenuLabel>
+                                  <DropdownMenuItem onClick={() => handleSinglePublishMl(ad.product_id || ad.product?.id)}>
+                                    <Send className="h-4 w-4 mr-2 text-amber-600" /> Publicar Anúncio no Mercado Livre
+                                  </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => {
                                     setEditingAd(ad);
                                     setAdFormName(ad.internal_name || ad.variant_title);
