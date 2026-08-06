@@ -133,7 +133,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
     queryKey: ['meta-ads-ads', roleMode, user?.id, orgId],
     queryFn: async () => {
       try {
-        let query = supabase
+        const { data, error } = await supabase
           .from('ml_listing_variants')
           .select(`
             *,
@@ -141,23 +141,26 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
           `)
           .order('created_at', { ascending: false });
 
-        if (roleMode === 'reseller' && user?.id) {
-          query = query.or(`is_official_model.eq.true,user_id.eq.${user.id}`);
-        } else if (roleMode === 'supplier' && user?.id) {
-          const prodIds = products.map((p: any) => p.id);
-          if (prodIds.length > 0) {
-            query = query.or(`is_official_model.eq.true,user_id.eq.${user.id},product_id.in.(${prodIds.join(',')})`);
-          } else {
-            query = query.or(`is_official_model.eq.true,user_id.eq.${user.id}`);
-          }
-        }
-
-        const { data, error } = await query;
         if (error) {
-          console.warn('Erro na busca de anúncios:', error);
+          console.warn('Erro na busca de anúncios em ml_listing_variants:', error);
           return [];
         }
-        return data ?? [];
+
+        let result = data ?? [];
+
+        // Filtro em memória seguro por perfil
+        if (roleMode === 'reseller' && user?.id) {
+          result = result.filter((item: any) => item.is_official_model || item.user_id === user.id);
+        } else if (roleMode === 'supplier' && user?.id) {
+          const prodIds = new Set(products.map((p: any) => p.id));
+          result = result.filter((item: any) => 
+            item.is_official_model || 
+            item.user_id === user.id || 
+            (item.product_id && prodIds.has(item.product_id))
+          );
+        }
+
+        return result;
       } catch (e) {
         console.warn('Exceção na busca de anúncios:', e);
         return [];
@@ -797,7 +800,37 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                     ) : filteredAds.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
-                          Nenhum anúncio encontrado com os filtros selecionados.
+                          <div className="flex flex-col items-center justify-center space-y-3">
+                            <p className="text-sm font-medium">Nenhum anúncio encontrado para o filtro atual.</p>
+                            {selectedProductIds.length > 0 ? (
+                              <Button
+                                size="sm"
+                                onClick={() => setShowAiModal(true)}
+                                className="gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow"
+                              >
+                                <Sparkles className="h-4 w-4" />
+                                Gerar Anúncios com IA para os {selectedProductIds.length} produto(s) selecionado(s)
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingAd(null);
+                                  setTargetProductIdForNewAd('');
+                                  setAdFormName('');
+                                  setAdFormTitle('');
+                                  setAdFormPrice('');
+                                  setAdFormDesc('');
+                                  setShowAdFormModal(true);
+                                }}
+                                className="gap-2"
+                              >
+                                <Plus className="h-4 w-4" />
+                                Criar Novo Anúncio
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ) : (
