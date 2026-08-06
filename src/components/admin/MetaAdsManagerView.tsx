@@ -169,6 +169,36 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
     enabled: !!user?.id,
   });
 
+  // COMBINAÇÃO DE ANÚNCIOS: Cada produto gera por padrão o seu 1º Anúncio Principal (Modelo Oficial) + variações de ml_listing_variants!
+  const effectiveAds = React.useMemo(() => {
+    const combined: any[] = [...ads];
+
+    // Para cada produto cadastrado, garante que existe pelo menos o 1º Anúncio Principal (Modelo Oficial)
+    products.forEach((prod: any) => {
+      const hasBaseAd = ads.some((ad: any) => ad.product_id === prod.id && (ad.is_official_model || ad.origin_type === 'official'));
+      if (!hasBaseAd) {
+        combined.unshift({
+          id: `official-base-${prod.id}`,
+          product_id: prod.id,
+          product: prod,
+          internal_name: `${prod.name} (Anúncio Principal)`,
+          variant_title: prod.name,
+          price: prod.price || prod.cost_price || 0,
+          status: prod.active !== false ? 'published' : 'paused',
+          origin_type: 'official',
+          is_official_model: true,
+          marketplace: 'mercadolivre',
+          visits: 0,
+          sales: 0,
+          created_at: prod.created_at || new Date().toISOString(),
+          is_synthesized: true
+        });
+      }
+    });
+
+    return combined;
+  }, [products, ads]);
+
   // Alternar Status Ativo/Inativo do Produto (Nível Pai)
   const toggleProductActiveMutation = useMutation({
     mutationFn: async ({ productId, newActive }: { productId: string; newActive: boolean }) => {
@@ -193,12 +223,29 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
   // Alternar Status Ativo/Pausado do Anúncio (Nível Filho)
   const toggleAdStatusMutation = useMutation({
-    mutationFn: async ({ adId, newStatus }: { adId: string; newStatus: string }) => {
-      const { error } = await supabase
-        .from('ml_listing_variants')
-        .update({ status: newStatus })
-        .eq('id', adId);
-      if (error) throw error;
+    mutationFn: async ({ ad, newStatus }: { ad: any; newStatus: string }) => {
+      if (ad.is_synthesized) {
+        const { error } = await supabase
+          .from('ml_listing_variants')
+          .insert({
+            product_id: ad.product_id,
+            user_id: user?.id,
+            internal_name: ad.internal_name,
+            variant_title: ad.variant_title,
+            price: ad.price,
+            status: newStatus,
+            origin_type: 'official',
+            is_official_model: true,
+            marketplace: ad.marketplace || 'mercadolivre',
+          });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('ml_listing_variants')
+          .update({ status: newStatus })
+          .eq('id', ad.id);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       toast({ title: 'Status do anúncio atualizado com sucesso!' });
@@ -221,7 +268,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
   });
 
   // FILTRAGEM DA TABELA ANÚNCIOS (Com base nos produtos selecionados ou GLOBAL!)
-  const filteredAds = ads.filter((ad: any) => {
+  const filteredAds = effectiveAds.filter((ad: any) => {
     // REGRA META ADS: Se houver produtos selecionados na aba Produtos, filtra apenas anúncios desses produtos!
     if (selectedProductIds.length > 0) {
       if (!selectedProductIds.includes(ad.product_id)) return false;
@@ -237,7 +284,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
       productName.includes(adSearch.toLowerCase());
 
     const matchesMarketplace = adMarketplaceFilter === 'all' || (ad.marketplace || 'mercadolivre') === adMarketplaceFilter;
-    const matchesOrigin = adOriginFilter === 'all' || (ad.origin_type || 'reseller') === adOriginFilter;
+    const matchesOrigin = adOriginFilter === 'all' || (ad.origin_type || 'official') === adOriginFilter;
     const matchesStatus = adStatusFilter === 'all' || ad.status === adStatusFilter;
 
     return matchesSearch && matchesMarketplace && matchesOrigin && matchesStatus;
@@ -856,7 +903,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                                 disabled={!parentProductActive}
                                 checked={ad.status === 'published'}
                                 onCheckedChange={(checked) => 
-                                  toggleAdStatusMutation.mutate({ adId: ad.id, newStatus: checked ? 'published' : 'paused' })
+                                  toggleAdStatusMutation.mutate({ ad, newStatus: checked ? 'published' : 'paused' })
                                 }
                               />
                             </TableCell>
