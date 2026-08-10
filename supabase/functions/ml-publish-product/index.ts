@@ -527,6 +527,17 @@ async function handleRequest(req: Request) {
         }
       }
 
+      // 6.8 Campos inválidos reportados pela API ("The fields [title] are invalid")
+      const invalidFieldsMatch = errStr.match(/The fields \[([a-zA-Z0-9_,\s]+)\] are invalid/i);
+      if (invalidFieldsMatch) {
+        const invalidFields = invalidFieldsMatch[1].split(',').map(s => s.trim());
+        for (const field of invalidFields) {
+          console.log(`[ml-publish] 🔄 AUTOCORREÇÃO DE CAMPO INVÁLIDO: Removendo o campo proibido '${field}'...`);
+          delete mlPayload[field];
+          modified = true;
+        }
+      }
+
       // 7. Ajuste de Modo de Frete (me1, me2)
       if (/mode me1|mode me2|mode/i.test(errStr) && !modified) {
         console.log('[ml-publish] 🔄 AUTOCORREÇÃO DE MODO DE FRETE: Ajustando frete...');
