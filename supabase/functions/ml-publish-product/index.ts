@@ -98,6 +98,11 @@ function fixOrValidateGtin(gtin: any): { isValid: boolean; gtin: string } {
     sum += digit * weight;
   });
 
+  const computedCheck = (10 - (sum % 10)) % 10;
+  const isValid = computedCheck === checkDigit;
+  return { isValid, gtin: isValid ? clean + String(checkDigit) : '' };
+}
+
 function autoFillAttribute(attr: any, product: any): { id: string; value_name: string; value_id?: string } | null {
   const attrId = (attr.id || '').toUpperCase();
 
@@ -293,7 +298,7 @@ serve(async (req) => {
     }
 
     // Construir atributos do produto usando os dados que temos
-    const attributes: any[] = Array.isArray(validated.attributes) && validated.attributes.length > 0
+    let attributes: any[] = Array.isArray(validated.attributes) && validated.attributes.length > 0
       ? [...validated.attributes]
       : [];
 
@@ -391,10 +396,7 @@ serve(async (req) => {
 
     let responseBody = await publishRes.json();
 
-    if (!publishRes.ok) {
-      console.error('[ml-publish] ML API error:', publishRes.status, JSON.stringify(responseBody));
-      const errStr = JSON.stringify(responseBody);
-
+    // ── Auto-retry loop for recoverable ML API errors (up to 5 attempts) ────
     let retryCount = 0;
     while (!publishRes.ok && retryCount < 5) {
       retryCount++;
@@ -522,7 +524,7 @@ serve(async (req) => {
 
       responseBody = await publishRes.json();
     }
-    }
+
 
     if (!publishRes.ok) {
       console.error('[ml-publish] ML API error final:', publishRes.status, JSON.stringify(responseBody));

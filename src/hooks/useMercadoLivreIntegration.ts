@@ -262,6 +262,12 @@ export const useMercadoLivreIntegration = () => {
     publishProductMutation.mutate({ productId, addToStoreFirst });
   }, [publishProductMutation, toast]);
 
+  // Awaitable version for batch operations
+  const publishProductAsync = useCallback(async (productId: string): Promise<void> => {
+    setPublishingProducts(prev => new Set(prev).add(productId));
+    await publishProductMutation.mutateAsync({ productId });
+  }, [publishProductMutation]);
+
   // Mutation to unpublish product
   const unpublishProductMutation = useMutation({
     mutationFn: async ({ productId }: { productId: string }) => {
@@ -334,6 +340,7 @@ export const useMercadoLivreIntegration = () => {
     isProductUnpublishing,
     getProductPermalink,
     publishProduct,
+    publishProductAsync,
     unpublishProduct,
   };
 };

@@ -94,7 +94,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
   const { data: orgData } = useSupplierOrganization();
   const orgId = orgData?.organization?.id;
 
-  const { isProductPublished, publishProduct } = useMercadoLivreIntegration();
+  const { isProductPublished, publishProduct, publishProductAsync } = useMercadoLivreIntegration();
   const [isBatchPublishing, setIsBatchPublishing] = useState(false);
   const [batchPublishProgress, setBatchPublishProgress] = useState({ current: 0, total: 0 });
 
@@ -124,7 +124,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
       const prod = toPublish[i];
       setBatchPublishProgress({ current: i + 1, total: toPublish.length });
       try {
-        await publishProduct(prod.id);
+        await publishProductAsync(prod.id);
         successCount++;
       } catch (err: any) {
         console.error(`Erro ao publicar produto ${prod.name}:`, err);
@@ -148,9 +148,13 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
   };
 
   const handleSinglePublishMl = async (productId: string) => {
+    if (!productId) {
+      toast({ variant: 'destructive', title: 'ID do produto não encontrado.' });
+      return;
+    }
     try {
       toast({ title: 'Publicando produto no Mercado Livre...' });
-      await publishProduct(productId);
+      await publishProductAsync(productId);
       toast({ title: '🚀 Produto publicado com sucesso no Mercado Livre!' });
       refetchProducts();
       refetchAds();
