@@ -174,8 +174,20 @@ export const useMercadoLivreIntegration = () => {
       }
 
       if (!publishResponse?.success) {
-        const cause = publishResponse?.cause?.map((c: any) => c.message).join(', ');
-        throw new Error(publishResponse?.error ?? 'Erro desconhecido ao publicar no Mercado Livre' + (cause ? `: ${cause}` : ''));
+        console.error("ML Publish Response:", publishResponse);
+        const rawCause = publishResponse?.cause;
+        let causeMsg = '';
+        if (Array.isArray(rawCause)) {
+          causeMsg = rawCause.map((c: any) => {
+            const field = c.references ? c.references.join(',') : (c.department || '');
+            return field ? `${c.message} [${field}]` : c.message;
+          }).join(' | ');
+        } else if (rawCause) {
+          causeMsg = JSON.stringify(rawCause);
+        }
+        
+        const errorTitle = publishResponse?.error || 'Erro desconhecido ao publicar no Mercado Livre';
+        throw new Error(causeMsg && causeMsg !== '[]' ? `${errorTitle} - Detalhes: ${causeMsg}` : errorTitle);
       }
 
       const permalink: string | null = publishResponse.permalink ?? null;

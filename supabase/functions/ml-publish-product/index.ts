@@ -363,9 +363,19 @@ async function handleRequest(req: Request) {
       sanitizedImageUrls.push(cleanUrl);
     }
 
+    // Remover campos de resposta da API (read-only) que quebram POST /items
+    const {
+      id, site_id, permalink, seller_id, date_created, last_updated,
+      thumbnail, secure_thumbnail, status, sub_status, tags,
+      deal_ids, health, warnings, seller_address, location,
+      international_delivery_mode, listing_source,
+      ...safeValidatedFields
+    } = validated;
+
     const mlPayload: Record<string, unknown> = {
+      ...safeValidatedFields, // INJETA o payload pré-validado guardado no BD (incluindo variações, canais, garantia, etc.)
       title: product.name.substring(0, 60), // ML limita título a 60 chars
-      category_id: categoryId ?? 'MLB1051',  // fallback: Outros
+      category_id: categoryId ?? validated.category_id ?? 'MLB1051',  // fallback: Outros
       price: Math.round(Number(price) * 100) / 100,
       currency_id: 'BRL',
       available_quantity: Number(product.stock_quantity ?? 10),
