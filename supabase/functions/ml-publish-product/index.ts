@@ -459,18 +459,13 @@ serve(async (req) => {
 
       // 6. Atributos obrigatórios ausentes por id (ex: PERFUME_NAME, UNIT_VOLUME, etc.)
       const missingAttrsMatch = errStr.match(/The attributes? \[([a-zA-Z0-9_,\s]+)\] (?:are|is) required/i);
-      const missingPropsMatch = errStr.match(/The body does not contain(?:s)? some or none of the following properties \[([a-zA-Z0-9_,\s]+)\]/i);
       const missingCampoMatch = errStr.match(/O campo "([^"]+)" é obrigatório/g);
 
-      if (missingAttrsMatch || missingPropsMatch || missingCampoMatch) {
+      if (missingAttrsMatch || missingCampoMatch) {
         let currentAttrs = (mlPayload.attributes as any[] || []);
 
-        const rawIds: string[] = [];
-        if (missingAttrsMatch) rawIds.push(...missingAttrsMatch[1].split(','));
-        if (missingPropsMatch) rawIds.push(...missingPropsMatch[1].split(','));
-
-        if (rawIds.length > 0) {
-          const attrIds = rawIds.map(s => s.trim().toUpperCase());
+        if (missingAttrsMatch) {
+          const attrIds = missingAttrsMatch[1].split(',').map(s => s.trim().toUpperCase());
           for (const attrId of attrIds) {
             if (!currentAttrs.some((a: any) => a.id === attrId)) {
               const filled = autoFillAttribute({ id: attrId, value_type: 'string' }, product);
@@ -502,6 +497,23 @@ serve(async (req) => {
           }
         }
         mlPayload.attributes = currentAttrs;
+      }
+
+      // 6.5 Propriedades obrigatórias no root (ex: family_name)
+      const missingPropsMatch = errStr.match(/The body does not contain(?:s)? some or none of the following properties \[([a-zA-Z0-9_,\s]+)\]/i);
+      if (missingPropsMatch) {
+        const propIds = missingPropsMatch[1].split(',').map(s => s.trim());
+        for (const prop of propIds) {
+          if (!mlPayload[prop]) {
+            console.log(`[ml-publish] 🔄 AUTOCORREÇÃO DE PROPRIEDADE RAIZ OBRIGATÓRIA: Injetando ${prop}...`);
+            if (prop === 'family_name') {
+              mlPayload[prop] = product.name || 'Padrão';
+            } else {
+              mlPayload[prop] = 'Padrão';
+            }
+            modified = true;
+          }
+        }
       }
 
       // 7. Ajuste de Modo de Frete (me1, me2)
