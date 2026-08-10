@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+import { logApiRequest, getClientIp } from '../_shared/logApiRequest.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -150,7 +151,7 @@ function autoFillAttribute(attr: any, product: any): { id: string; value_name: s
   return { id: attrId, value_name: 'Padrão' };
 }
 
-serve(async (req) => {
+async function handleRequest(req: Request) {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
@@ -593,11 +594,60 @@ serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[ml-publish] Error:', msg);
-    return new Response(JSON.stringify({ error: msg }), {
+  } catch (error: any) {
+    console.error('[ml-publish] Error processing request:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+  }
+}
+
+serve(async (req) => {
+  const startTime = performance.now();
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+  
+  let responseBody: any = {};
+  let statusCode = 200;
+  let requestBody: any = null;
+  let errorMsg: string | null = null;
+  let userId: string | null = null;
+
+  try {
+    const clonedReq = req.clone();
+    requestBody = await clonedReq.json().catch(() => null);
+    userId = requestBody?.user_id;
+
+    const res = await handleRequest(req);
+    statusCode = res.status;
+    const clonedRes = res.clone();
+    try {
+      responseBody = await clonedRes.json();
+    } catch {
+      responseBody = { text: await clonedRes.text() };
+    }
+    return res;
+  } catch (error: any) {
+    statusCode = 500;
+    errorMsg = error.message;
+    responseBody = { error: error.message };
+    return new Response(JSON.stringify(responseBody), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+  } finally {
+    const duration = Math.round(performance.now() - startTime);
+    try {
+      await logApiRequest({
+        function_name: 'ml-publish-product',
+        method: req.method,
+        path: new URL(req.url).pathname,
+        user_id: userId || undefined,
+        ip_address: getClientIp(req),
+        request_body: requestBody,
+        status_code: statusCode,
+        response_summary: responseBody,
+        error_message: errorMsg,
+        duration_ms: duration,
+      });
+    } catch (e) {
+      console.error('Failed to write log', e);
+    }
   }
 });
