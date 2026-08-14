@@ -9,17 +9,50 @@ import heroBanner from "@/assets/hero-banner.jpg";
 
 interface Banner {
   id: string;
-  title: string;
+  title?: string;
   subtitle?: string;
   description?: string;
   image_url: string;
   mobile_image_url?: string;
   mobile_height?: number;
+  link_url?: string;
+  open_new_tab?: boolean;
   button_text?: string;
   button_link?: string;
   position: number;
   active: boolean;
 }
+
+interface BannerLinkWrapperProps {
+  linkUrl?: string;
+  openNewTab?: boolean;
+  children: React.ReactNode;
+}
+
+const BannerLinkWrapper = ({ linkUrl, openNewTab, children }: BannerLinkWrapperProps) => {
+  if (!linkUrl) return <>{children}</>;
+  
+  const isExternal = linkUrl.startsWith('http://') || linkUrl.startsWith('https://') || linkUrl.startsWith('//');
+  
+  if (openNewTab || isExternal) {
+    return (
+      <a 
+        href={linkUrl} 
+        target={openNewTab ? "_blank" : undefined} 
+        rel={openNewTab ? "noopener noreferrer" : undefined}
+        className="block cursor-pointer w-full"
+      >
+        {children}
+      </a>
+    );
+  }
+  
+  return (
+    <Link to={linkUrl} className="block cursor-pointer w-full">
+      {children}
+    </Link>
+  );
+};
 
 const Hero = () => {
   const { data: banners = [], isLoading } = useQuery({
@@ -97,21 +130,23 @@ const Hero = () => {
       return (
         <section className="relative overflow-hidden py-4">
           <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
-            <div className="w-full md:aspect-[8/3] rounded-lg overflow-hidden bg-muted">
-              <picture>
-                {banner.mobile_image_url && (
-                  <source 
-                    media="(max-width: 768px)" 
-                    srcSet={banner.mobile_image_url} 
+            <BannerLinkWrapper linkUrl={banner.link_url} openNewTab={banner.open_new_tab}>
+              <div className="w-full md:aspect-[8/3] rounded-lg overflow-hidden bg-muted hover:opacity-95 transition-opacity">
+                <picture>
+                  {banner.mobile_image_url && (
+                    <source 
+                      media="(max-width: 768px)" 
+                      srcSet={banner.mobile_image_url} 
+                    />
+                  )}
+                  <img
+                    src={banner.image_url}
+                    alt="Banner"
+                    className="w-full h-auto md:h-full md:object-cover"
                   />
-                )}
-                <img
-                  src={banner.image_url}
-                  alt="Banner"
-                  className="w-full h-auto md:h-full md:object-cover"
-                />
-              </picture>
-            </div>
+                </picture>
+              </div>
+            </BannerLinkWrapper>
           </div>
         </section>
       );
@@ -165,19 +200,21 @@ const Hero = () => {
             </div>
             
             <div className="relative">
-              <picture>
-                {banner.mobile_image_url && (
-                  <source 
-                    media="(max-width: 768px)" 
-                    srcSet={banner.mobile_image_url} 
+              <BannerLinkWrapper linkUrl={banner.link_url} openNewTab={banner.open_new_tab}>
+                <picture className="hover:opacity-95 transition-opacity block">
+                  {banner.mobile_image_url && (
+                    <source 
+                      media="(max-width: 768px)" 
+                      srcSet={banner.mobile_image_url} 
+                    />
+                  )}
+                  <img
+                    src={banner.image_url}
+                    alt={banner.title || "Banner"}
+                    className="w-full h-auto rounded-2xl shadow-xl"
                   />
-                )}
-                <img
-                  src={banner.image_url}
-                  alt={banner.title}
-                  className="w-full h-auto rounded-2xl shadow-xl"
-                />
-              </picture>
+                </picture>
+              </BannerLinkWrapper>
             </div>
           </div>
         </div>
@@ -206,21 +243,23 @@ const Hero = () => {
                 <CarouselItem key={banner.id}>
                   <div className="py-2">
                     <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
-                      <div className="w-full md:aspect-[8/3] rounded-lg overflow-hidden bg-muted">
-                        <picture>
-                          {banner.mobile_image_url && (
-                            <source 
-                              media="(max-width: 768px)" 
-                              srcSet={banner.mobile_image_url} 
+                      <BannerLinkWrapper linkUrl={banner.link_url} openNewTab={banner.open_new_tab}>
+                        <div className="w-full md:aspect-[8/3] rounded-lg overflow-hidden bg-muted hover:opacity-95 transition-opacity">
+                          <picture>
+                            {banner.mobile_image_url && (
+                              <source 
+                                media="(max-width: 768px)" 
+                                srcSet={banner.mobile_image_url} 
+                              />
+                            )}
+                            <img
+                              src={banner.image_url}
+                              alt="Banner"
+                              className="w-full h-auto md:h-full md:object-cover"
                             />
-                          )}
-                          <img
-                            src={banner.image_url}
-                            alt="Banner"
-                            className="w-full h-auto md:h-full md:object-cover"
-                          />
-                        </picture>
-                      </div>
+                          </picture>
+                        </div>
+                      </BannerLinkWrapper>
                     </div>
                   </div>
                 </CarouselItem>
@@ -270,19 +309,21 @@ const Hero = () => {
                     </div>
                     
                     <div className="relative">
-                      <picture>
-                        {banner.mobile_image_url && (
-                          <source 
-                            media="(max-width: 768px)" 
-                            srcSet={banner.mobile_image_url} 
+                      <BannerLinkWrapper linkUrl={banner.link_url} openNewTab={banner.open_new_tab}>
+                        <picture className="hover:opacity-95 transition-opacity block">
+                          {banner.mobile_image_url && (
+                            <source 
+                              media="(max-width: 768px)" 
+                              srcSet={banner.mobile_image_url} 
+                            />
+                          )}
+                          <img
+                            src={banner.image_url}
+                            alt={banner.title || "Banner"}
+                            className="w-full h-auto rounded-2xl shadow-xl"
                           />
-                        )}
-                        <img
-                          src={banner.image_url}
-                          alt={banner.title}
-                          className="w-full h-auto rounded-2xl shadow-xl"
-                        />
-                      </picture>
+                        </picture>
+                      </BannerLinkWrapper>
                     </div>
                   </div>
                 </div>
