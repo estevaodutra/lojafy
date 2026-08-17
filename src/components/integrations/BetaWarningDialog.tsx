@@ -10,13 +10,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, FlaskConical, Bug, RefreshCw } from "lucide-react";
+import { AlertTriangle, FlaskConical, Bug, RefreshCw, Link as LinkIcon } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface BetaWarningDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
   marketplaceName: string;
+  authUrl?: string;
 }
 
 export function BetaWarningDialog({
@@ -24,8 +26,10 @@ export function BetaWarningDialog({
   onOpenChange,
   onConfirm,
   marketplaceName,
+  authUrl,
 }: BetaWarningDialogProps) {
   const [accepted, setAccepted] = useState(false);
+  const { toast } = useToast();
 
   const handleConfirm = () => {
     if (accepted) {
@@ -111,12 +115,32 @@ export function BetaWarningDialog({
           </label>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>Cancelar</Button>
-          <Button onClick={handleConfirm} disabled={!accepted}>
-            <FlaskConical className="mr-2 h-4 w-4" />
-            Continuar com Beta
-          </Button>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          {authUrl && (
+            <div className="flex-1 flex justify-start">
+              <Button 
+                variant="outline" 
+                className="w-full sm:w-auto text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                onClick={() => {
+                  navigator.clipboard.writeText(authUrl);
+                  toast({
+                    title: "Link copiado!",
+                    description: "Envie este link para a pessoa que irá autorizar a integração.",
+                  });
+                }}
+              >
+                <LinkIcon className="mr-2 h-4 w-4" />
+                Copiar Link de Integração
+              </Button>
+            </div>
+          )}
+          <div className="flex gap-2 w-full sm:w-auto justify-end">
+            <Button variant="outline" onClick={handleClose}>Cancelar</Button>
+            <Button onClick={handleConfirm} disabled={!accepted}>
+              <FlaskConical className="mr-2 h-4 w-4" />
+              Continuar com Beta
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

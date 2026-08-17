@@ -301,6 +301,7 @@ const LojafyIntegra = () => {
         onOpenChange={setShowBetaWarning}
         onConfirm={handleConfirmBeta}
         marketplaceName="Mercado Livre"
+        authUrl={getMercadoLivreAuthUrl()}
       />
     </div>
   );
