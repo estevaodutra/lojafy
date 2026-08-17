@@ -115,29 +115,28 @@ export function BetaWarningDialog({
           </label>
         </div>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2">
-          {authUrl && (
-            <div className="flex-1 flex justify-start">
-              <Button 
-                variant="outline" 
-                className="w-full sm:w-auto text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
-                onClick={() => {
-                  navigator.clipboard.writeText(authUrl);
-                  toast({
-                    title: "Link copiado!",
-                    description: "Envie este link para a pessoa que irá autorizar a integração.",
-                  });
-                }}
-              >
-                <LinkIcon className="mr-2 h-4 w-4" />
-                Copiar Link de Integração
-              </Button>
-            </div>
-          )}
-          <div className="flex gap-2 w-full sm:w-auto justify-end">
-            <Button variant="outline" onClick={handleClose}>Cancelar</Button>
-            <Button onClick={handleConfirm} disabled={!accepted}>
-              <FlaskConical className="mr-2 h-4 w-4" />
+        <DialogFooter className="flex-col sm:flex-row sm:justify-between sm:space-x-0 gap-3 mt-4 w-full">
+          {authUrl ? (
+            <Button 
+              variant="outline" 
+              className="w-full sm:w-auto text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+              onClick={() => {
+                navigator.clipboard.writeText(authUrl);
+                toast({
+                  title: "Link copiado!",
+                  description: "Envie este link para a pessoa que irá autorizar a integração.",
+                });
+              }}
+            >
+              <LinkIcon className="mr-2 h-4 w-4 shrink-0" />
+              Copiar Link de Integração
+            </Button>
+          ) : <div />}
+          
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button variant="outline" className="w-full sm:w-auto" onClick={handleClose}>Cancelar</Button>
+            <Button className="w-full sm:w-auto" onClick={handleConfirm} disabled={!accepted}>
+              <FlaskConical className="mr-2 h-4 w-4 shrink-0" />
               Continuar com Beta
             </Button>
           </div>
