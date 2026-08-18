@@ -686,22 +686,39 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
           .eq('id', product.id)
           .select()
           .single();
-        if (error) throw error;
+        if (error) {
+          console.error("UPDATE ERROR:", error, "PAYLOAD:", productData);
+          toast({ 
+            title: "Erro ao atualizar produto", 
+            description: `${error.message}. Payload: ${JSON.stringify(productData)}`,
+            variant: "destructive" 
+          });
+          throw error;
+        }
         savedProduct = updated;
         toast({ title: "Produto atualizado com sucesso!" });
       } else {
+        const insertPayload = {
+          ...productData,
+          original_name: data.name,
+          original_description: data.description || null,
+          original_images: imageUrls,
+          original_saved_at: new Date().toISOString(),
+        };
         const { data: created, error } = await supabase
           .from('products')
-          .insert({
-            ...productData,
-            original_name: data.name,
-            original_description: data.description || null,
-            original_images: imageUrls,
-            original_saved_at: new Date().toISOString(),
-          })
+          .insert(insertPayload)
           .select()
           .single();
-        if (error) throw error;
+        if (error) {
+          console.error("INSERT ERROR:", error, "PAYLOAD:", insertPayload);
+          toast({ 
+            title: "Erro ao salvar produto", 
+            description: `${error.message}. Sup: ${isSupplier() ? 'yes' : 'no'}, user: ${user?.id}, status: ${insertPayload.approval_status}, active: ${insertPayload.active}`,
+            variant: "destructive" 
+          });
+          throw error;
+        }
         savedProduct = created;
         toast({ title: "Produto criado com sucesso!" });
       }
