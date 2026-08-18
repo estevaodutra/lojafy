@@ -860,10 +860,52 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                             </TableCell>
 
                             {/* Status */}
-                            <TableCell className="text-center">
-                              <Badge variant={product.active ? 'default' : 'secondary'}>
-                                {product.active ? 'Ativo' : 'Inativo'}
-                              </Badge>
+                            <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                              <Select
+                                value={product.approval_status === 'draft' ? 'draft' : (product.active ? 'active' : 'inactive')}
+                                onValueChange={async (val) => {
+                                  try {
+                                    let active = product.active;
+                                    let approval_status = product.approval_status;
+
+                                    if (val === 'active') {
+                                      active = true;
+                                      approval_status = 'approved';
+                                    } else if (val === 'inactive') {
+                                      active = false;
+                                      approval_status = 'approved'; // Usually inactive is still approved, just toggled off
+                                    } else if (val === 'draft') {
+                                      active = false;
+                                      approval_status = 'draft';
+                                    }
+
+                                    const { error } = await supabase
+                                      .from('products')
+                                      .update({ active, approval_status, updated_at: new Date().toISOString() })
+                                      .eq('id', product.id);
+
+                                    if (error) throw error;
+                                    
+                                    toast({ title: `Status alterado com sucesso!` });
+                                    refetchProducts();
+
+                                    if (val === 'active') {
+                                      handleSinglePublishMl(product.id);
+                                    }
+                                  } catch (e: any) {
+                                    toast({ variant: 'destructive', title: 'Erro ao alterar status', description: e.message });
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="w-[110px] h-8 text-xs mx-auto">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="active">Ativo</SelectItem>
+                                  <SelectItem value="inactive">Inativo</SelectItem>
+                                  <SelectItem value="draft">Rascunho</SelectItem>
+                                </SelectContent>
+                              </Select>
                             </TableCell>
 
                             {/* Ações */}
