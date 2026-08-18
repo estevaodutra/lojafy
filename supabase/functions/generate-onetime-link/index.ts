@@ -29,31 +29,30 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claims, error: claimsError } = await supabaseUser.auth.getClaims(token);
+    const { data: userData, error: userError } = await supabaseUser.auth.getUser();
     
-    if (claimsError || !claims?.claims?.sub) {
+    if (userError || !userData?.user?.id) {
       return new Response(
         JSON.stringify({ error: "Invalid token" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const callerId = claims.claims.sub;
+    const callerId = userData.user.id;
 
     // Service client for admin operations
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify caller is super_admin
-    const { data: callerRole } = await supabaseAdmin
-      .from("user_roles")
+    // Verify caller is super_admin or admin
+    const { data: callerProfile } = await supabaseAdmin
+      .from("profiles")
       .select("role")
       .eq("user_id", callerId)
       .single();
 
-    if (callerRole?.role !== "super_admin") {
+    if (callerProfile?.role !== "super_admin" && callerProfile?.role !== "admin") {
       return new Response(
-        JSON.stringify({ error: "Apenas super admins podem gerar links de acesso" }),
+        JSON.stringify({ error: "Apenas administradores podem gerar links de acesso" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
