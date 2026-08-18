@@ -506,7 +506,7 @@ const Produto = ({
             )}
 
             {/* Product Information */}
-            <div className="bg-accent/50 rounded-lg p-4 space-y-3">
+            <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 space-y-3">
               <div className="flex items-center gap-2 mb-3">
                 <Info className="h-5 w-5 text-primary" />
                 <h3 className="font-semibold">Informações do Produto</h3>
