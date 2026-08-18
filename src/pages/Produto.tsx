@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import ReactMarkdown from 'react-markdown';
 import Header from "@/components/Header";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { ImageZoomModal } from "@/components/ImageZoomModal";
-import { ChevronRight, Star, Heart, ShoppingCart, Truck, Shield, RotateCcw, Plus, Minus, Share2, ZoomIn, Package, Info, ExternalLink, Copy, Download, Loader2 } from "lucide-react";
+import { ChevronRight, ChevronLeft, Star, Heart, ShoppingCart, Truck, Shield, RotateCcw, Plus, Minus, Share2, ZoomIn, Package, Info, ExternalLink, Copy, Download, Loader2 } from "lucide-react";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCart } from "@/contexts/CartContext";
@@ -46,7 +46,15 @@ const Produto = ({
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
+  const galleryRef = useRef<HTMLDivElement>(null);
   
+  const scrollGallery = (direction: 'left' | 'right') => {
+    if (galleryRef.current) {
+      const scrollAmount = direction === 'left' ? -200 : 200;
+      galleryRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
   const { isReseller, isSupplier } = useUserRole();
 
   // Fetch product from Supabase
@@ -384,10 +392,28 @@ const Produto = ({
             </div>
             
             {/* Thumbnail Images */}
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {productImages.map((image, index) => <button key={index} onClick={() => setSelectedImage(index)} className={`flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg border-2 overflow-hidden ${selectedImage === index ? 'border-primary' : 'border-border'}`}>
-                  <img src={image} alt={`${product.name} ${index + 1}`} className="w-full h-full object-cover" />
-                </button>)}
+            <div className="relative group">
+              {productImages.length > 4 && (
+                <button
+                  onClick={() => scrollGallery('left')}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 sm:-translate-x-4 z-10 bg-background/90 hover:bg-background border shadow-md w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <ChevronLeft className="w-5 h-5 text-muted-foreground" />
+                </button>
+              )}
+              <div ref={galleryRef} className="flex gap-2 overflow-x-auto pb-2 scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                {productImages.map((image, index) => <button key={index} onClick={() => setSelectedImage(index)} className={`flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg border-2 overflow-hidden ${selectedImage === index ? 'border-primary' : 'border-border'}`}>
+                    <img src={image} alt={`${product.name} ${index + 1}`} className="w-full h-full object-cover" />
+                  </button>)}
+              </div>
+              {productImages.length > 4 && (
+                <button
+                  onClick={() => scrollGallery('right')}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 sm:translate-x-4 z-10 bg-background/90 hover:bg-background border shadow-md w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                </button>
+              )}
             </div>
             
             {productImages.length > 0 && (isReseller() || isSupplier()) && (
