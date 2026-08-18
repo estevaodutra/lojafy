@@ -395,6 +395,30 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
 
   const priceBreakdown = getPriceBreakdown();
 
+  const ensureExactCategory = async (categoryName: string): Promise<string | null> => {
+    try {
+      const lowerName = categoryName.toLowerCase();
+      const existing = categories.find((cat: any) => cat.name.toLowerCase() === lowerName);
+      if (existing) return existing.id;
+
+      const { data: newCat, error } = await supabase
+        .from('categories')
+        .insert({ 
+           name: categoryName, 
+           slug: lowerName.replace(/\s+/g, '-').replace(/[^\w-]/g, '')
+        })
+        .select('id').single();
+      
+      if (!error && newCat) {
+        queryClient.invalidateQueries({ queryKey: ['categories'] });
+        return newCat.id;
+      }
+    } catch (e) {
+      console.warn("Falha ao criar categoria exata:", e);
+    }
+    return null;
+  };
+
   // Categorização Automática
   const ensureCategory = async (productName: string): Promise<string> => {
     // 1. Tenta buscar a categoria oficial no Mercado Livre
@@ -405,23 +429,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
         const mlCategoryName = mlData?.[0]?.category_name;
         
         if (mlCategoryName) {
-          const lowerMlName = mlCategoryName.toLowerCase();
-          const existing = categories.find((cat: any) => cat.name.toLowerCase() === lowerMlName);
-          if (existing) return existing.id;
-          
-          // Se a categoria existe no ML mas não no banco local, cria ela automaticamente
-          const { data: newCat, error } = await supabase
-            .from('categories')
-            .insert({ 
-               name: mlCategoryName, 
-               slug: lowerMlName.replace(/\s+/g, '-').replace(/[^\w-]/g, '')
-            })
-            .select('id').single();
-          
-          if (!error && newCat) {
-            queryClient.invalidateQueries({ queryKey: ['categories'] });
-            return newCat.id;
-          }
+          const catId = await ensureExactCategory(mlCategoryName);
+          if (catId) return catId;
         }
       }
     } catch (e) {
@@ -511,6 +520,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
     images: ImageFile[];
     specifications: Array<{ key: string; value: string }>;
     dimensions?: { height?: number; width?: number; length?: number; weight?: number };
+    category_name?: string;
+    variations?: any[];
   }) => {
     if (data.name) form.setValue('name', data.name);
     if (data.description) {
@@ -555,10 +566,48 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
 
     if (data.name) {
       try {
-        ensureCategory(data.name).then(catId => {
+        const catName = data.category_name || data.name;
+        ensureExactCategory(catName).then(catId => {
           if (catId) form.setValue('category_id', catId);
+          else if (!data.category_name) {
+            ensureCategory(catName).then(fallbackCatId => {
+               if (fallbackCatId) form.setValue('category_id', fallbackCatId);
+            }).catch(() => {});
+          }
         }).catch(() => {});
       } catch (e) {}
+    }
+
+    if (data.variations && data.variations.length > 0 && typeof setVariants === 'function') {
+      try {
+        const mappedVariants: any[] = data.variations.map((v: any, index: number) => {
+          const combos = v.attribute_combinations || [];
+          let varName = combos.map((c: any) => c.value_name).join(' / ') || `Variação ${index + 1}`;
+          let varType = 'model';
+          if (combos.some((c: any) => c.name.toLowerCase().includes('cor') || c.id === 'COLOR')) varType = 'color';
+          else if (combos.some((c: any) => c.name.toLowerCase().includes('tamanho') || c.id === 'SIZE')) varType = 'size';
+
+          let pic = undefined;
+          if (v.picture_ids && v.picture_ids.length > 0) {
+            pic = `https://http2.mlstatic.com/D_NQ_NP_${v.picture_ids[0]}-O.webp`;
+          }
+
+          return {
+            id: `ml-var-${v.id || index}-${Date.now()}`,
+            name: varName,
+            type: varType,
+            value: varName,
+            priceModifier: 0,
+            image: pic,
+            inStock: v.available_quantity > 0
+          };
+        });
+        if (mappedVariants.length > 0) {
+          setVariants(mappedVariants);
+        }
+      } catch (e) {
+        console.warn('Erro ao mapear variações do ML', e);
+      }
     }
 
     // Se o estoque estiver vazio ou 0, definir padrão de 100 unidades e estoque mínimo de 10
@@ -571,7 +620,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
       form.setValue('min_stock_level', 10);
     }
 
-    setOpenAccordions(['basic', 'pricing', 'stock', 'images', 'specs', 'settings']);
+    setOpenAccordions(['basic', 'pricing', 'stock', 'images', 'specs', 'variants', 'settings']);
     setActiveSection('basic');
   };
 

@@ -38,6 +38,15 @@ interface MlItemCandidate {
   pictures?: string[];
   attributes?: Array<{ key: string; value: string }>;
   description?: string;
+  category_id?: string;
+  category_name?: string;
+  variations?: Array<{
+    id: number;
+    price: number;
+    attribute_combinations: Array<{ id: string; name: string; value_name: string }>;
+    available_quantity: number;
+    picture_ids?: string[];
+  }>;
 }
 
 interface MlProductReferenceModalProps {
@@ -53,6 +62,8 @@ interface MlProductReferenceModalProps {
     reference_ad_url: string;
     images: ImageFile[];
     specifications: Array<{ key: string; value: string }>;
+    category_name?: string;
+    variations?: any[];
   }) => void;
 }
 
@@ -359,6 +370,23 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
             }
 
             const detailDesc = extractStringDescription(detail.short_description) || extractStringDescription(detail.description);
+            const detailCategoryId = detail.category_id || undefined;
+            const detailVariations = detail.variations && Array.isArray(detail.variations) && detail.variations.length > 0 ? detail.variations : undefined;
+            
+            let detailCategoryName: string | undefined = undefined;
+            if (detailCategoryId) {
+              try {
+                const { data: catData } = await supabase.functions.invoke('ml-public-search', {
+                  body: { path: `/categories/${detailCategoryId}` }
+                });
+                // Pega o path_from_root principal (index 0) ou o nome
+                if (catData && catData.path_from_root && catData.path_from_root.length > 0) {
+                  detailCategoryName = catData.path_from_root[0].name;
+                } else if (catData && catData.name) {
+                  detailCategoryName = catData.name;
+                }
+              } catch (e) {}
+            }
 
             setCandidates(prev => prev.map(c => {
               if (c.id === cand.id) {
@@ -367,7 +395,10 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
                   pictures: pics.length > 0 ? pics : c.pictures,
                   attributes: attrs.length > 0 ? attrs : c.attributes,
                   price: Number(detail.price ?? detail.buy_box_winner?.price ?? c.price) || c.price,
-                  description: detailDesc || c.description
+                  description: detailDesc || c.description,
+                  category_id: detailCategoryId,
+                  category_name: detailCategoryName,
+                  variations: detailVariations
                 };
               }
               return c;
@@ -551,6 +582,18 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         isUploading: false
       }));
 
+      // Pega do candidate ou tenta do fullItem
+      let catName = candidate.category_name;
+      if (!catName && fullItem.category_id) {
+         try {
+           const { data: catData } = await supabase.functions.invoke('ml-public-search', { body: { path: `/categories/${fullItem.category_id}` } });
+           if (catData?.path_from_root?.[0]?.name) catName = catData.path_from_root[0].name;
+           else if (catData?.name) catName = catData.name;
+         } catch(e) {}
+      }
+      
+      const vars = candidate.variations || (fullItem.variations?.length > 0 ? fullItem.variations : undefined);
+
       // Aplicar TUDO no formulário imediatamente sem bloqueios
       onApplyReference({
         name: fullItem.title || candidate.title,
@@ -562,11 +605,13 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         images: formattedImages,
         specifications: specList,
         dimensions: Object.keys(extractedDimensions).length > 0 ? extractedDimensions : undefined,
+        category_name: catName,
+        variations: vars,
       });
 
       toast({
         title: "✨ Produto Importado com Sucesso!",
-        description: `Importadas ${formattedImages.length} fotos em HD, ${specList.length} especificações e descrição completa.`,
+        description: `Importadas ${formattedImages.length} fotos em HD, ${specList.length} especificações, ${vars ? vars.length + ' variações' : 'descrição'}.`,
       });
 
       onClose();
@@ -592,6 +637,8 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
           reference_ad_url: candidate.permalink,
           images: fallbackImgs,
           specifications: candidate.attributes || (candidate.brand ? [{ key: 'Marca', value: candidate.brand }] : []),
+          category_name: candidate.category_name,
+          variations: candidate.variations,
         });
 
         toast({
@@ -743,6 +790,21 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
                                 </span>
                               ))}
                             </div>
+                          </div>
+                        )}
+
+                        {(cand.category_name || (cand.variations && cand.variations.length > 0)) && (
+                          <div className="flex flex-wrap items-center gap-3 pt-2">
+                            {cand.category_name && (
+                              <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/30">
+                                Categoria Principal: {cand.category_name}
+                              </Badge>
+                            )}
+                            {cand.variations && cand.variations.length > 0 && (
+                              <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-600 border-purple-500/30">
+                                {cand.variations.length} Variações Encontradas
+                              </Badge>
+                            )}
                           </div>
                         )}
 
