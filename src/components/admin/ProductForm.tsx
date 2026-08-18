@@ -397,9 +397,42 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
 
   // Categorização Automática
   const ensureCategory = async (productName: string): Promise<string> => {
+    // 1. Tenta buscar a categoria oficial no Mercado Livre
+    try {
+      const mlRes = await fetch(`https://api.mercadolibre.com/sites/MLB/domain_discovery/search?q=${encodeURIComponent(productName.substring(0, 50))}&limit=1`);
+      if (mlRes.ok) {
+        const mlData = await mlRes.json();
+        const mlCategoryName = mlData?.[0]?.category_name;
+        
+        if (mlCategoryName) {
+          const lowerMlName = mlCategoryName.toLowerCase();
+          const existing = categories.find((cat: any) => cat.name.toLowerCase() === lowerMlName);
+          if (existing) return existing.id;
+          
+          // Se a categoria existe no ML mas não no banco local, cria ela automaticamente
+          const { data: newCat, error } = await supabase
+            .from('categories')
+            .insert({ 
+               name: mlCategoryName, 
+               slug: lowerMlName.replace(/\s+/g, '-').replace(/[^\w-]/g, '')
+            })
+            .select('id').single();
+          
+          if (!error && newCat) {
+            queryClient.invalidateQueries({ queryKey: ['categories'] });
+            return newCat.id;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Falha ao buscar categoria no Mercado Livre:", e);
+    }
+
+    // 2. Fallback: Busca aproximada local
     const lowerName = productName.toLowerCase();
     const existing = categories.find((cat: any) => lowerName.includes(cat.name.toLowerCase()));
     if (existing) return existing.id;
+    
     throw new Error('Não foi possível determinar a categoria.');
   };
 
