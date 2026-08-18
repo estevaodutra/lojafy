@@ -20,8 +20,8 @@ jobs:
 
       - name: Copy functions to VPS via Rsync
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" rsync -avz -e "ssh -p 22022 -o StrictHostKeyChecking=no" supabase/functions/ root@108.174.148.227:/root/supabase-lojafy/volumes/functions/
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" rsync -avz -e "ssh -p 22022 -o StrictHostKeyChecking=no" supabase/functions/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/root/supabase-lojafy/volumes/functions/
 
       - name: Restart functions container
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -p 22022 -o StrictHostKeyChecking=no root@108.174.148.227 "cd /root/supabase-lojafy && (docker compose restart functions || docker-compose restart functions)"
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -p 22022 -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd /root/supabase-lojafy && (docker compose restart functions || docker-compose restart functions)"
