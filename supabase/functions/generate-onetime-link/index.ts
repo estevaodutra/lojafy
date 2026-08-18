@@ -67,9 +67,9 @@ Deno.serve(async (req) => {
     }
 
     // Verify target user exists
-    const { data: targetUser, error: userError } = await supabaseAdmin.auth.admin.getUserById(user_id);
+    const { data: targetUser, error: targetUserError } = await supabaseAdmin.auth.admin.getUserById(user_id);
     
-    if (userError || !targetUser?.user) {
+    if (targetUserError || !targetUser?.user) {
       return new Response(
         JSON.stringify({ error: "Usuário não encontrado" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
