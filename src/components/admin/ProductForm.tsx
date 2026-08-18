@@ -617,10 +617,22 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
         }
       }
 
-      // Se o produto está sendo ativado ou publicado, ajusta o approval_status para 'approved'
-      const targetApprovalStatus = (data.active || data.approval_status === 'approved' || product?.approval_status === 'approved') 
-        ? 'approved' 
-        : (data.approval_status || product?.approval_status || (isSupplier() ? 'pending_approval' : 'approved'));
+      // Ajuste das permissões do Fornecedor para evitar erro de RLS na criação/edição
+      let targetApprovalStatus = data.approval_status || product?.approval_status || 'approved';
+      let targetActive = data.active;
+      
+      if (isSupplier()) {
+        if (!product?.id || targetApprovalStatus !== 'approved') {
+          targetApprovalStatus = 'pending_approval';
+        }
+        if (targetApprovalStatus !== 'approved') {
+          targetActive = false; // Fornecedor não pode ativar se não estiver aprovado
+        }
+      } else {
+        if (data.active || data.approval_status === 'approved' || product?.approval_status === 'approved') {
+          targetApprovalStatus = 'approved';
+        }
+      }
 
       const productData: any = {
         name: data.name,
@@ -649,9 +661,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
         weight: dimensions.weight || null,
         main_image_url: sanitizedMainImageUrl,
         image_url: sanitizedMainImageUrl,
-        active: data.active,
+        active: targetActive,
         approval_status: targetApprovalStatus,
-        stage: data.active ? 'stage_2_enabled' : (product?.stage || 'stage_1_basic'),
+        stage: targetActive ? 'stage_2_enabled' : (product?.stage || 'stage_1_basic'),
         featured: data.reference_ad_url && data.reference_ad_url.trim() !== '' ? true : data.featured,
         badge: data.badge || null,
         reference_ad_url: data.reference_ad_url 
