@@ -738,7 +738,6 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                           onCheckedChange={toggleSelectAllProducts}
                         />
                       </TableHead>
-                      <TableHead className="w-14 text-center">Ativo</TableHead>
                       <TableHead>Produto</TableHead>
                       <TableHead>SKU</TableHead>
                       <TableHead>Marketplace</TableHead>
@@ -780,16 +779,6 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                               <Checkbox
                                 checked={isSelected}
                                 onCheckedChange={() => toggleSelectProduct(product.id)}
-                              />
-                            </TableCell>
-
-                            {/* Toggle Ativo/Inativo (Pai) */}
-                            <TableCell className="text-center">
-                              <Switch
-                                checked={!!product.active}
-                                onCheckedChange={(checked) => 
-                                  toggleProductActiveMutation.mutate({ productId: product.id, newActive: checked })
-                                }
                               />
                             </TableCell>
 
@@ -889,7 +878,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                                     toast({ title: `Status alterado com sucesso!` });
                                     refetchProducts();
 
-                                    if (val === 'active') {
+                                    if (val === 'active' && roleMode !== 'supplier') {
                                       handleSinglePublishMl(product.id);
                                     }
                                   } catch (e: any) {
