@@ -470,12 +470,46 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
       const specList: Array<{ key: string; value: string }> = candidate.attributes || [];
       let extractedBrand = candidate.brand || '';
       let extractedGtin = candidate.gtin || '';
+      let extractedDimensions: { height?: number; width?: number; length?: number; weight?: number } = {};
+
+      const parseDim = (val: string, type: 'cm' | 'kg') => {
+        if (!val) return undefined;
+        const numMatch = val.match(/([\d.,]+)/);
+        if (!numMatch) return undefined;
+        let num = parseFloat(numMatch[1].replace(',', '.'));
+        const lowerVal = val.toLowerCase();
+        if (type === 'kg') {
+           if (lowerVal.includes(' g') || lowerVal.endsWith('g')) num = num / 1000;
+        } else if (type === 'cm') {
+           if (lowerVal.includes(' mm') || lowerVal.endsWith('mm')) num = num / 10;
+           if (lowerVal.match(/\b(m)\b/)) num = num * 100;
+        }
+        return num;
+      };
 
       if (fullItem.attributes && Array.isArray(fullItem.attributes)) {
         fullItem.attributes.forEach((attrItem: any) => {
           const attrVal = attrItem.value_name || attrItem.value;
-          if (attrItem.id === 'BRAND' && attrVal) extractedBrand = attrVal;
-          if (attrItem.id === 'GTIN' && attrVal && /^\d{8,14}$/.test(attrVal.trim())) extractedGtin = attrVal.trim();
+          if (!attrVal) return;
+          if (attrItem.id === 'BRAND') extractedBrand = attrVal;
+          if (attrItem.id === 'GTIN' && /^\d{8,14}$/.test(attrVal.trim())) extractedGtin = attrVal.trim();
+          
+          if (['PACKAGE_HEIGHT', 'HEIGHT', 'ITEM_HEIGHT'].includes(attrItem.id)) {
+            const parsed = parseDim(attrVal, 'cm');
+            if (parsed) extractedDimensions.height = parsed;
+          }
+          if (['PACKAGE_WIDTH', 'WIDTH', 'ITEM_WIDTH'].includes(attrItem.id)) {
+            const parsed = parseDim(attrVal, 'cm');
+            if (parsed) extractedDimensions.width = parsed;
+          }
+          if (['PACKAGE_LENGTH', 'LENGTH', 'ITEM_LENGTH'].includes(attrItem.id)) {
+            const parsed = parseDim(attrVal, 'cm');
+            if (parsed) extractedDimensions.length = parsed;
+          }
+          if (['PACKAGE_WEIGHT', 'WEIGHT', 'ITEM_WEIGHT'].includes(attrItem.id)) {
+            const parsed = parseDim(attrVal, 'kg');
+            if (parsed) extractedDimensions.weight = parsed;
+          }
         });
       }
 
@@ -527,6 +561,7 @@ export const MlProductReferenceModal: React.FC<MlProductReferenceModalProps> = (
         reference_ad_url: candidate.permalink,
         images: formattedImages,
         specifications: specList,
+        dimensions: Object.keys(extractedDimensions).length > 0 ? extractedDimensions : undefined,
       });
 
       toast({

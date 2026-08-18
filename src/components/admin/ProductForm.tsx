@@ -510,6 +510,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
     reference_ad_url: string;
     images: ImageFile[];
     specifications: Array<{ key: string; value: string }>;
+    dimensions?: { height?: number; width?: number; length?: number; weight?: number };
   }) => {
     if (data.name) form.setValue('name', data.name);
     if (data.description) {
@@ -537,6 +538,15 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
 
     if (data.images && data.images.length > 0) {
       setImages(data.images);
+    }
+
+    if (data.dimensions) {
+      handleDimensionsChange({
+        height: data.dimensions.height || dimensions.height,
+        width: data.dimensions.width || dimensions.width,
+        length: data.dimensions.length || dimensions.length,
+        weight: data.dimensions.weight || dimensions.weight
+      });
     }
 
     if (data.specifications && data.specifications.length > 0) {
