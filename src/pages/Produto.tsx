@@ -425,10 +425,10 @@ const Produto = ({
                 </h1>
                 {(isReseller() || isSupplier()) && (
                   <Button
-                    variant="ghost"
+                    variant="secondary"
                     size="icon"
                     onClick={handleCopyTitle}
-                    className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-foreground"
+                    className="h-8 w-8 flex-shrink-0 bg-gray-100 hover:bg-gray-200 text-muted-foreground hover:text-foreground dark:bg-gray-800 dark:hover:bg-gray-700"
                     title="Copiar título"
                   >
                     <Copy className="h-4 w-4" />
@@ -582,14 +582,14 @@ const Produto = ({
                   <h3 className="font-medium text-sm text-muted-foreground">Descrição</h3>
                   {(isReseller() || isSupplier()) && (
                     <Button
-                      variant="ghost"
+                      variant="secondary"
                       size="sm"
                       onClick={handleCopyDescription}
-                      className="h-7 px-2 text-muted-foreground hover:text-foreground gap-1"
+                      className="h-8 px-3 bg-gray-100 hover:bg-gray-200 text-muted-foreground hover:text-foreground dark:bg-gray-800 dark:hover:bg-gray-700 gap-2"
                       title="Copiar descrição"
                     >
-                      <Copy className="h-3.5 w-3.5" />
-                      <span className="text-xs">Copiar</span>
+                      <Copy className="h-4 w-4" />
+                      <span className="text-sm font-medium">Copiar</span>
                     </Button>
                   )}
                 </div>
