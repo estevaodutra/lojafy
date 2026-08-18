@@ -46,7 +46,9 @@ const Produto = ({
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
-  const { isReseller } = useUserRole();
+  const storeSlug = propStoreSlug || (typeof window !== 'undefined' ? window.location.pathname.startsWith('/loja/') ? window.location.pathname.split('/')[2] : undefined : undefined);
+  
+  const { isReseller, isSupplier } = useUserRole();
 
   // Fetch product from Supabase
   const {
@@ -389,7 +391,7 @@ const Produto = ({
                 </button>)}
             </div>
             
-            {productImages.length > 0 && isReseller() && (
+            {productImages.length > 0 && (isReseller() || isSupplier()) && (
               <Button
                 variant="outline"
                 size="sm"
@@ -422,7 +424,7 @@ const Produto = ({
                       ⚠️
                     </span>}
                 </h1>
-                {isReseller() && (
+                {(isReseller() || isSupplier()) && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -524,7 +526,7 @@ const Produto = ({
                   <span className="ml-2">{product.stock_quantity || 0} unidades</span>
                 </div>
                 {(product.height || product.width || product.length || product.weight) && <div className="col-span-2">
-                    <span className="font-medium text-muted-foreground">Dimensões:</span>
+                    <span className="font-medium text-muted-foreground">Dimensões e Peso:</span>
                     <div className="mt-1 text-xs space-y-1">
                       {(product.height || product.width || product.length) && <div>
                           {Number(product.height || 0).toFixed(1)}cm × {Number(product.width || 0).toFixed(1)}cm × {Number(product.length || 0).toFixed(1)}cm
@@ -532,6 +534,29 @@ const Produto = ({
                       {product.weight && <div>Peso: {Number(product.weight).toFixed(2)}kg</div>}
                     </div>
                   </div>}
+
+                {/* Specificações Técnicas / Atributos */}
+                {product.specifications && (
+                  <div className="col-span-2 mt-2">
+                    <span className="font-medium text-muted-foreground">Atributos:</span>
+                    <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      {Array.isArray(product.specifications) 
+                        ? product.specifications.map((spec: any, i: number) => (
+                            <div key={i} className="flex flex-col">
+                              <span className="font-medium text-muted-foreground">{spec.key}:</span>
+                              <span>{spec.value}</span>
+                            </div>
+                          ))
+                        : Object.entries(product.specifications as Record<string, any>).map(([k, v], i) => (
+                            <div key={i} className="flex flex-col">
+                              <span className="font-medium text-muted-foreground">{k}:</span>
+                              <span>{String(v)}</span>
+                            </div>
+                          ))
+                      }
+                    </div>
+                  </div>
+                )}
                 
                 {/* High Rotation Warning */}
                 {product.high_rotation && !storeSlug && <div className="col-span-2 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg p-3">
@@ -556,7 +581,7 @@ const Produto = ({
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-medium text-sm text-muted-foreground">Descrição</h3>
-                  {isReseller() && (
+                  {(isReseller() || isSupplier()) && (
                     <Button
                       variant="ghost"
                       size="sm"
