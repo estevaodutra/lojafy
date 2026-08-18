@@ -46,7 +46,6 @@ const Produto = ({
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
-  const storeSlug = propStoreSlug || (typeof window !== 'undefined' ? window.location.pathname.startsWith('/loja/') ? window.location.pathname.split('/')[2] : undefined : undefined);
   
   const { isReseller, isSupplier } = useUserRole();
 
