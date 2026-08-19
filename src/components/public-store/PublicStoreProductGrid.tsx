@@ -21,7 +21,7 @@ const PublicStoreProductGrid = ({ resellerId, storeSlug }: PublicStoreProductGri
             <Skeleton className="h-8 w-64 mx-auto mb-4" />
             <Skeleton className="h-4 w-96 mx-auto" />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
             {Array.from({ length: 4 }).map((_, i) => (
               <Skeleton key={i} className="h-80 w-full" />
             ))}
@@ -69,7 +69,7 @@ const PublicStoreProductGrid = ({ resellerId, storeSlug }: PublicStoreProductGri
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
           {featuredProducts
             .filter(rp => rp.product && rp.product.id && rp.product.name && rp.product.active === true)
             .map((resellerProduct: PublicStoreProductData) => {
