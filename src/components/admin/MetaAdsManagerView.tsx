@@ -203,6 +203,40 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
   const { data: products = [], isLoading: productsLoading, refetch: refetchProducts } = useQuery({
     queryKey: ['meta-ads-products', roleMode, user?.id, orgId],
     queryFn: async () => {
+      if (roleMode === 'reseller' && user?.id) {
+        const { data, error } = await supabase
+          .from('reseller_products')
+          .select(`
+            id,
+            reseller_id,
+            product_id,
+            active,
+            custom_price,
+            custom_description,
+            product:products!inner (
+              *,
+              categories!category_id (
+                id,
+                name,
+                slug
+              )
+            )
+          `)
+          .eq('reseller_id', user.id);
+
+        if (error) {
+          console.error('Erro na busca de produtos revendedor:', error);
+          throw error;
+        }
+
+        return (data || []).map((rp: any) => ({
+          ...rp.product,
+          _reseller_product_id: rp.id,
+          active: rp.active,
+          price: rp.custom_price || rp.product.price,
+        })).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      }
+
       let query = supabase
         .from('products')
         .select(`
@@ -217,8 +251,6 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
       if (roleMode === 'supplier' && orgId) {
         query = query.eq('supplier_organization_id', orgId);
-      } else if (roleMode === 'reseller') {
-        query = query.eq('active', true);
       }
 
       const { data, error } = await query;
@@ -305,11 +337,22 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
   // Alternar Status Ativo/Inativo do Produto (Nível Pai)
   const toggleProductActiveMutation = useMutation({
     mutationFn: async ({ productId, newActive }: { productId: string; newActive: boolean }) => {
-      const { error } = await supabase
-        .from('products')
-        .update({ active: newActive, updated_at: new Date().toISOString() })
-        .eq('id', productId);
-      if (error) throw error;
+      if (roleMode === 'reseller') {
+        const product = products.find((p: any) => p.id === productId);
+        if (product && product._reseller_product_id) {
+          const { error } = await supabase
+            .from('reseller_products')
+            .update({ active: newActive, updated_at: new Date().toISOString() })
+            .eq('id', product._reseller_product_id);
+          if (error) throw error;
+        }
+      } else {
+        const { error } = await supabase
+          .from('products')
+          .update({ active: newActive, updated_at: new Date().toISOString() })
+          .eq('id', productId);
+        if (error) throw error;
+      }
     },
     onSuccess: (_, variables) => {
       toast({ 
@@ -931,12 +974,22 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                                       approval_status = 'draft';
                                     }
 
-                                    const { error } = await supabase
-                                      .from('products')
-                                      .update({ active, approval_status, updated_at: new Date().toISOString() })
-                                      .eq('id', product.id);
+                                    let updateError;
+                                    if (roleMode === 'reseller') {
+                                      const { error } = await supabase
+                                        .from('reseller_products')
+                                        .update({ active, updated_at: new Date().toISOString() })
+                                        .eq('id', product._reseller_product_id);
+                                      updateError = error;
+                                    } else {
+                                      const { error } = await supabase
+                                        .from('products')
+                                        .update({ active, approval_status, updated_at: new Date().toISOString() })
+                                        .eq('id', product.id);
+                                      updateError = error;
+                                    }
 
-                                    if (error) throw error;
+                                    if (updateError) throw updateError;
                                     
                                     toast({ title: `Status alterado com sucesso!` });
                                     refetchProducts();
