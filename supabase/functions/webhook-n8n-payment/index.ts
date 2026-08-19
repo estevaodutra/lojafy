@@ -377,9 +377,16 @@ serve(async (req) => {
           .maybeSingle();
 
         if (shippingFile?.file_path) {
-          const { data: signedUrlData } = await supabase.storage
+          let { data: signedUrlData, error: signedUrlError } = await supabase.storage
             .from('shipping-files')
             .createSignedUrl(shippingFile.file_path, 604800);
+            
+          if (signedUrlError || !signedUrlData?.signedUrl) {
+            const fallback = await supabase.storage
+              .from('shipping-labels')
+              .createSignedUrl(shippingFile.file_path, 604800);
+            signedUrlData = fallback.data;
+          }
           
           shippingLabel = {
             file_name: shippingFile.file_name,

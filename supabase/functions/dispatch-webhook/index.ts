@@ -112,10 +112,16 @@ async function fetchLastPaidOrder(supabase: any): Promise<Record<string, any> | 
 
   let shippingLabel = null;
   if (shippingFile?.file_path) {
-    // Generate signed URL (valid for 1 hour)
-    const { data: signedUrlData } = await supabase.storage
+    let { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from('shipping-files')
       .createSignedUrl(shippingFile.file_path, 604800); // 7 dias
+      
+    if (signedUrlError || !signedUrlData?.signedUrl) {
+      const fallback = await supabase.storage
+        .from('shipping-labels')
+        .createSignedUrl(shippingFile.file_path, 604800);
+      signedUrlData = fallback.data;
+    }
     
     shippingLabel = {
       file_name: shippingFile.file_name,
@@ -200,9 +206,17 @@ async function fetchOrderById(supabase: any, orderId: string): Promise<Record<st
 
   let shippingLabel = null;
   if (shippingFile?.file_path) {
-    const { data: signedUrlData } = await supabase.storage
+    let { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from('shipping-files')
       .createSignedUrl(shippingFile.file_path, 604800);
+      
+    if (signedUrlError || !signedUrlData?.signedUrl) {
+      const fallback = await supabase.storage
+        .from('shipping-labels')
+        .createSignedUrl(shippingFile.file_path, 604800);
+      signedUrlData = fallback.data;
+    }
+    
     shippingLabel = {
       file_name: shippingFile.file_name,
       file_size: shippingFile.file_size,
