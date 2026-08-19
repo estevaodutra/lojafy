@@ -18,6 +18,7 @@ import {
   Building2,
   Truck,
   MapPin,
+  Layers,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -54,6 +55,7 @@ const operationItems: MenuItem[] = [
 const catalogItems: MenuItem[] = [
   { title: 'Meus Produtos', url: '/supplier/produtos', icon: Package },
   { title: 'Produtos para Aprovação', url: '/supplier/produtos/aprovacao', icon: CheckCircle },
+  { title: 'Categorias', url: '/supplier/categorias', icon: Layers },
   { title: 'Estoque', url: '/supplier/estoque', icon: Warehouse },
   { title: 'Movimentações', url: '/supplier/movimentacoes', icon: History },
   { title: 'Importação', url: '/supplier/importacao', icon: Upload },
