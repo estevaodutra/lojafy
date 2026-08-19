@@ -26,7 +26,7 @@ const PublicStoreCategory = () => {
         <PublicStoreHeader store={store} />
         <div className="container mx-auto px-4 py-16">
           <Skeleton className="h-8 w-64 mb-8" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
             {Array.from({ length: 12 }).map((_, i) => (
               <Skeleton key={i} className="h-80 w-full" />
             ))}
@@ -76,7 +76,7 @@ const PublicStoreCategory = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
           {category.products
             .filter((rp: any) => rp.product && rp.product.active === true)
             .map((resellerProduct: any) => {

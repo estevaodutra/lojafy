@@ -36,7 +36,7 @@ const ProductGrid = () => {
               Os produtos mais procurados com os melhores preços
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
               <Card key={i} className="animate-pulse">
                 <CardContent className="p-0">
@@ -103,7 +103,7 @@ const ProductGrid = () => {
               <p className="text-muted-foreground">Nenhum produto em destaque encontrado.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
               {products.filter(p => p.active === true).map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
