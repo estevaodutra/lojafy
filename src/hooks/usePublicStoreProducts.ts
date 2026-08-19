@@ -113,7 +113,7 @@ export const usePublicStoreCategories = (resellerId?: string) => {
       const { data: resellerProducts, error: productsError } = await supabase
         .from('reseller_products')
         .select(`
-          product:products!inner(category_id, active, categories(id, name, slug, icon, color, image_url))
+          product:products!inner(category_id, active, categories!category_id(id, name, slug, icon, color, image_url))
         `)
         .eq('reseller_id', resellerId)
         .eq('active', true)
@@ -191,7 +191,7 @@ export const usePublicStoreCategoryProducts = (resellerId?: string, categorySlug
           *,
           products!inner(
             *,
-            categories(id, slug, name)
+            categories!category_id(id, slug, name)
           )
         `)
         .eq('reseller_id', resellerId)

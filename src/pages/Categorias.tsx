@@ -75,10 +75,10 @@ const Categorias = () => {
         .from('store_products')
         .select(slug ? `
           *,
-          categories!inner(slug, name)
+          categories!category_id!inner(slug, name)
         ` : `
           *,
-          categories(slug, name)
+          categories!category_id(slug, name)
         `)
         .eq('active', true);
 
