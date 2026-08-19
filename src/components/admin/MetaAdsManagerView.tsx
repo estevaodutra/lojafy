@@ -168,6 +168,34 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(val));
   };
 
+  // ── MUTAÇÕES ───────────────────────────────────────────────────────────
+  const bulkUpdateCategory = useMutation({
+    mutationFn: async (categoryId: string) => {
+      if (selectedProductIds.length === 0) return;
+      const { error } = await supabase.from('products').update({ category_id: categoryId }).in('id', selectedProductIds);
+      if (error) throw error;
+      return selectedProductIds.length;
+    },
+    onSuccess: (count) => {
+      toast({ title: 'Sucesso!', description: `${count} produtos atualizados.` });
+      refetchProducts();
+      setSelectedProductIds([]);
+    },
+    onError: (err: any) => {
+      toast({ title: 'Erro ao atualizar', description: err.message, variant: 'destructive' });
+    }
+  });
+
+  // ── BUSCA DE DADOS: Produtos ───────────────────────────────────────────
+  const { data: categories = [] } = useQuery({
+    queryKey: ['meta-ads-categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('categories').select('id, name').order('name');
+      if (error) throw error;
+      return data;
+    }
+  });
+
   // 1. QUERY DE PRODUTOS
   const { data: products = [], isLoading: productsLoading, refetch: refetchProducts } = useQuery({
     queryKey: ['meta-ads-products', roleMode, user?.id, orgId],
@@ -677,6 +705,28 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
                   {selectedProductIds.length > 0 && (
                     <div className="flex items-center gap-2 flex-wrap">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="gap-2">
+                            <Layers className="h-4 w-4" />
+                            Atribuir Categoria
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56 max-h-64 overflow-y-auto">
+                          <DropdownMenuLabel>Selecione a Categoria</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          {categories.length === 0 && (
+                            <div className="p-2 text-sm text-muted-foreground text-center">Nenhuma categoria criada</div>
+                          )}
+                          {categories.map((cat: any) => (
+                            <DropdownMenuItem key={cat.id} onClick={() => bulkUpdateCategory.mutate(cat.id)}>
+                              {cat.name}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button 
