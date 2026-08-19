@@ -107,6 +107,7 @@ async function fetchLastPaidOrder(supabase: any): Promise<Record<string, any> | 
     .from('order_shipping_files')
     .select('file_name, file_path, file_size, uploaded_at')
     .eq('order_id', order.id)
+    .order('uploaded_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -201,6 +202,7 @@ async function fetchOrderById(supabase: any, orderId: string): Promise<Record<st
     .from('order_shipping_files')
     .select('file_name, file_path, file_size, uploaded_at')
     .eq('order_id', order.id)
+    .order('uploaded_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 

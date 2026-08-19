@@ -373,6 +373,7 @@ serve(async (req) => {
           .from('order_shipping_files')
           .select('file_name, file_path, file_size, uploaded_at')
           .eq('order_id', fullOrder?.id)
+          .order('uploaded_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
