@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User, FileText, Download, Upload, TrendingUp, MessageSquarePlus, Send, Loader2, RefreshCw } from 'lucide-react';
+import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User, FileText, Download, Upload, TrendingUp, MessageSquarePlus, Send, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -314,6 +314,37 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       console.error('Erro ao buscar arquivos de envio:', error);
     }
   };
+  const deleteShippingFile = async (fileId: string, filePath: string) => {
+    if (!isAdmin) return;
+    if (!confirm('Tem certeza que deseja excluir esta etiqueta de envio?')) return;
+    
+    try {
+      const { error: dbError } = await supabase
+        .from('order_shipping_files')
+        .delete()
+        .eq('id', fileId);
+        
+      if (dbError) throw dbError;
+      
+      // Attempt to remove from storage (best effort)
+      await supabase.storage.from('shipping-files').remove([filePath]);
+      await supabase.storage.from('shipping-labels').remove([filePath]);
+      
+      setShippingFiles(prev => prev.filter(f => f.id !== fileId));
+      toast({
+        title: "Sucesso",
+        description: "Etiqueta excluída com sucesso."
+      });
+    } catch (error) {
+      console.error('Erro ao excluir etiqueta:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir a etiqueta.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const downloadShippingFile = async (filePath: string, fileName: string) => {
     try {
       let { data, error } = await supabase.storage.from('shipping-files').download(filePath);
@@ -463,6 +494,35 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       setIsRefundUploading(false);
     }
   };
+  const deleteRefundDocument = async (fileId: string, filePath: string) => {
+    if (!isAdmin) return;
+    if (!confirm('Tem certeza que deseja excluir este comprovante?')) return;
+    
+    try {
+      const { error: dbError } = await supabase
+        .from('order_refund_documents')
+        .delete()
+        .eq('id', fileId);
+        
+      if (dbError) throw dbError;
+      
+      await supabase.storage.from('refund-documents').remove([filePath]);
+      
+      setRefundDocuments(prev => prev.filter(f => f.id !== fileId));
+      toast({
+        title: "Sucesso",
+        description: "Comprovante excluído com sucesso."
+      });
+    } catch (error) {
+      console.error('Erro ao excluir comprovante:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir o comprovante.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const downloadRefundDocument = async (filePath: string, fileName: string) => {
     try {
       const {
@@ -1156,10 +1216,17 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                               </p>
                             </div>
                           </div>
-                          <Button variant="outline" size="sm" onClick={() => downloadShippingFile(file.file_path, file.file_name)}>
-                            <Download className="h-4 w-4 mr-2" />
-                            Baixar
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" onClick={() => downloadShippingFile(file.file_path, file.file_name)}>
+                              <Download className="h-4 w-4 mr-2" />
+                              Baixar
+                            </Button>
+                            {isAdmin && (
+                              <Button variant="outline" size="sm" onClick={() => deleteShippingFile(file.id, file.file_path)} className="text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
                         </div>) : !isAdmin ? <p className="text-sm text-muted-foreground text-center py-4">
                         Nenhuma etiqueta disponível para este pedido.
                       </p> : <p className="text-sm text-muted-foreground text-center py-4">
@@ -1228,10 +1295,17 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                               </p>
                             </div>
                           </div>
-                          <Button variant="outline" size="sm" onClick={() => downloadRefundDocument(doc.file_path, doc.file_name)} className="border-amber-300 hover:bg-amber-100">
-                            <Download className="h-4 w-4 mr-2" />
-                            Baixar PDF
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" onClick={() => downloadRefundDocument(doc.file_path, doc.file_name)} className="border-amber-300 hover:bg-amber-100">
+                              <Download className="h-4 w-4 mr-2" />
+                              Baixar PDF
+                            </Button>
+                            {isAdmin && (
+                              <Button variant="outline" size="sm" onClick={() => deleteRefundDocument(doc.id, doc.file_path)} className="text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
                         </div>) : !isAdmin ? <p className="text-sm text-muted-foreground text-center py-4">
                         Nenhum comprovante disponível.
                       </p> : <p className="text-sm text-muted-foreground text-center py-4">
