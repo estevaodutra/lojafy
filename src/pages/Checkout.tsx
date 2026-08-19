@@ -495,7 +495,7 @@ const Checkout = ({
             order_id: response.order_id,
             file_name: fileName,
             file_path: shippingLabelData.filePath,
-            file_size: shippingFile?.size || 0
+            file_size: shippingLabelData.fileSize || 0
           });
           
           if (dbError) console.error('Error saving shipping label to db:', dbError);

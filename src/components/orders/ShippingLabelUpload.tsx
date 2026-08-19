@@ -17,6 +17,7 @@ export interface ShippingLabelData {
   extractionMethod: string;
   manuallyEdited: boolean;
   filePath: string;
+  fileSize?: number;
 }
 
 interface ShippingLabelUploadProps {
@@ -70,7 +71,8 @@ export function ShippingLabelUpload({ onLabelProcessed, maxSizeMB = 10 }: Shippi
         confidence: data.confidence || 0,
         extractionMethod: data.extractionMethod || 'manual',
         manuallyEdited: false,
-        filePath
+        filePath,
+        fileSize: selectedFile.size
       };
 
       setResult({ ...data, rawPath: filePath });

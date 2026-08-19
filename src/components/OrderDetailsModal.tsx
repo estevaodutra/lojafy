@@ -316,22 +316,26 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   };
   const downloadShippingFile = async (filePath: string, fileName: string) => {
     try {
-      const {
-        data,
-        error
-      } = await supabase.storage.from('shipping-files').download(filePath);
+      let { data, error } = await supabase.storage.from('shipping-files').download(filePath);
+      
       if (error) {
-        console.error('Error downloading file:', error);
-        toast({
-          title: "Erro",
-          description: "Não foi possível baixar o arquivo.",
-          variant: "destructive"
-        });
-        return;
+        // Fallback to shipping-labels bucket used by the newer checkout flow
+        const { data: fallbackData, error: fallbackError } = await supabase.storage.from('shipping-labels').download(filePath);
+        
+        if (fallbackError) {
+          console.error('Error downloading file from both buckets:', error, fallbackError);
+          toast({
+            title: "Erro",
+            description: "Não foi possível baixar o arquivo.",
+            variant: "destructive"
+          });
+          return;
+        }
+        data = fallbackData;
       }
 
       // Create blob URL and trigger download
-      const blob = new Blob([data]);
+      const blob = new Blob([data!]);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
