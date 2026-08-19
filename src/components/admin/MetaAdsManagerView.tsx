@@ -70,6 +70,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
   // Filtros e Paginação da Aba Produtos
   const [productSearch, setProductSearch] = useState('');
   const [productStatusFilter, setProductStatusFilter] = useState('all');
+  const [productCategoryFilter, setProductCategoryFilter] = useState('all');
   const [productPage, setProductPage] = useState(1);
   const [productItemsPerPage, setProductItemsPerPage] = useState(25);
 
@@ -366,7 +367,9 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
       (productStatusFilter === 'active' && product.active) ||
       (productStatusFilter === 'inactive' && !product.active);
 
-    return matchesSearch && matchesStatus;
+    const matchesCategory = productCategoryFilter === 'all' || product.category_id === productCategoryFilter;
+
+    return matchesSearch && matchesStatus && matchesCategory;
   });
 
   // PAGINAÇÃO DA TABELA PRODUTOS
@@ -699,7 +702,19 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <Select value={productStatusFilter} onValueChange={setProductStatusFilter}>
+                  <Select value={productCategoryFilter} onValueChange={(val) => { setProductCategoryFilter(val); setProductPage(1); }}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as Categorias</SelectItem>
+                      {categories.map((cat: any) => (
+                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={productStatusFilter} onValueChange={(val) => { setProductStatusFilter(val); setProductPage(1); }}>
                     <SelectTrigger className="w-36">
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
