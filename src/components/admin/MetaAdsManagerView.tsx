@@ -67,9 +67,11 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [selectedAdIds, setSelectedAdIds] = useState<string[]>([]);
 
-  // Filtros da Aba Produtos
+  // Filtros e Paginação da Aba Produtos
   const [productSearch, setProductSearch] = useState('');
   const [productStatusFilter, setProductStatusFilter] = useState('all');
+  const [productPage, setProductPage] = useState(1);
+  const [productItemsPerPage, setProductItemsPerPage] = useState(25);
 
   // Filtros da Aba Anúncios
   const [adSearch, setAdSearch] = useState('');
@@ -366,6 +368,11 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
     return matchesSearch && matchesStatus;
   });
+
+  // PAGINAÇÃO DA TABELA PRODUTOS
+  const productTotalPages = Math.ceil(filteredProducts.length / productItemsPerPage);
+  const productStartIndex = (productPage - 1) * productItemsPerPage;
+  const paginatedProducts = filteredProducts.slice(productStartIndex, productStartIndex + productItemsPerPage);
 
   // FILTRAGEM DA TABELA ANÚNCIOS (Com base nos produtos selecionados ou GLOBAL!)
   const filteredAds = effectiveAds.filter((ad: any) => {
@@ -815,7 +822,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredProducts.map((product: any) => {
+                      paginatedProducts.map((product: any) => {
                         const isSelected = selectedProductIds.includes(product.id);
                         const adsCount = ads.filter((ad: any) => ad.product_id === product.id || ad.product?.id === product.id).length;
 
@@ -841,49 +848,40 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                                   className="w-10 h-10 rounded-md object-cover border bg-muted"
                                 />
                                 <div>
-                                  <h4 className="font-semibold text-sm text-foreground line-clamp-1">{product.name}</h4>
+                                  <p className="font-semibold text-sm max-w-[200px] truncate" title={product.name}>
+                                    {product.name}
+                                  </p>
                                   <span className="text-xs text-muted-foreground">{product.categories?.name || 'Geral'}</span>
                                 </div>
                               </div>
                             </TableCell>
 
                             {/* SKU */}
-                            <TableCell className="font-mono text-xs text-muted-foreground">
-                              {product.sku || 'N/A'}
-                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{product.sku || '-'}</TableCell>
 
                             {/* Marketplace */}
-                            <TableCell className="text-center">
-                              {isProductPublished(product.id) ? (
-                                <img
-                                  src="https://http2.mlstatic.com/static/org-img/homesnw/mercado-libre.png"
-                                  alt="Mercado Livre"
-                                  className="h-5 w-auto object-contain mx-auto"
-                                  title="Integrado com Mercado Livre"
-                                />
-                              ) : null}
+                            <TableCell>
+                              <img src="https://http2.mlstatic.com/static/org-img/homesnw/mercado-libre.png" alt="ML" className="h-4 object-contain" />
                             </TableCell>
 
                             {/* Preço-base (Custo) */}
-                            <TableCell className="text-right font-medium text-muted-foreground">
+                            <TableCell className="text-right font-medium text-xs">
                               {formatPrice(product.cost_price || product.price)}
                             </TableCell>
 
                             {/* Preço Sugerido */}
-                            <TableCell className="text-right font-semibold text-emerald-600">
+                            <TableCell className="text-right font-semibold text-xs text-emerald-600">
                               {formatPrice(product.suggested_price || product.price)}
                             </TableCell>
 
                             {/* Seu Preço */}
-                            <TableCell className="text-right font-bold text-foreground">
+                            <TableCell className="text-right font-bold text-sm">
                               {formatPrice(product.price)}
                             </TableCell>
 
                             {/* Estoque */}
-                            <TableCell className="text-center font-bold">
-                              <span className={Number(product.stock_quantity || 0) <= 10 ? 'text-red-500' : 'text-foreground'}>
-                                {product.stock_quantity ?? 0}
-                              </span>
+                            <TableCell className="text-center font-medium">
+                              {product.stock_quantity ?? 0}
                             </TableCell>
 
                             {/* Anúncios Vinculados */}
@@ -912,7 +910,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                                       approval_status = 'approved';
                                     } else if (val === 'inactive') {
                                       active = false;
-                                      approval_status = 'approved'; // Usually inactive is still approved, just toggled off
+                                      approval_status = 'approved'; 
                                     } else if (val === 'draft') {
                                       active = false;
                                       approval_status = 'draft';
@@ -941,7 +939,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="active">Ativo</SelectItem>
-                                  <SelectItem value="inactive">Inativo</SelectItem>
+                                  <SelectItem value="inactive">Inativos</SelectItem>
                                   <SelectItem value="draft">Rascunho</SelectItem>
                                 </SelectContent>
                               </Select>
@@ -977,6 +975,54 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                   </TableBody>
                 </Table>
               </div>
+
+              {/* FOOTER DE PAGINAÇÃO */}
+              {!productsLoading && filteredProducts.length > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Itens por página:</span>
+                    <Select 
+                      value={productItemsPerPage.toString()} 
+                      onValueChange={(val) => { 
+                        setProductItemsPerPage(Number(val)); 
+                        setProductPage(1); 
+                      }}
+                    >
+                      <SelectTrigger className="w-[80px]">
+                        <SelectValue placeholder="25" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-muted-foreground">
+                      Página {productPage} de {productTotalPages || 1}
+                    </span>
+                    <div className="flex gap-1">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setProductPage(prev => Math.max(1, prev - 1))} 
+                        disabled={productPage === 1}
+                      >
+                        Anterior
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setProductPage(prev => Math.min(productTotalPages, prev + 1))} 
+                        disabled={productPage === productTotalPages || productTotalPages === 0}
+                      >
+                        Próxima
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
