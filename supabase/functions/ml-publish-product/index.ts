@@ -518,12 +518,25 @@ async function handleRequest(req: Request) {
           if (!mlPayload[prop]) {
             console.log(`[ml-publish] 🔄 AUTOCORREÇÃO DE PROPRIEDADE RAIZ OBRIGATÓRIA: Injetando ${prop}...`);
             if (prop === 'family_name') {
-              mlPayload[prop] = product.name || 'Padrão';
+              mlPayload[prop] = (product.name || 'Padrão').substring(0, 60);
             } else {
               mlPayload[prop] = 'Padrão';
             }
             modified = true;
           }
+        }
+      }
+
+      // 6.6 Correção de limite máximo de caracteres (ex: family_name > 60 chars)
+      if (/length is over of 60 character/i.test(errStr) || /maximum length/i.test(errStr)) {
+        console.log(`[ml-publish] 🔄 AUTOCORREÇÃO DE LIMITE DE CARACTERES: Truncando para 60 chars...`);
+        if (typeof mlPayload.family_name === 'string' && mlPayload.family_name.length > 60) {
+          mlPayload.family_name = mlPayload.family_name.substring(0, 60);
+          modified = true;
+        }
+        if (typeof mlPayload.title === 'string' && mlPayload.title.length > 60) {
+          mlPayload.title = mlPayload.title.substring(0, 60);
+          modified = true;
         }
       }
 
