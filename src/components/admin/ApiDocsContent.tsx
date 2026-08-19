@@ -6,7 +6,6 @@ import { ApiKeyManager } from '@/components/admin/ApiKeyManager';
 import { EndpointCard } from '@/components/admin/EndpointCard';
 import { CodeBlock } from '@/components/admin/CodeBlock';
 import { WebhooksSection } from '@/components/admin/WebhooksSection';
-import { ApiLogsSection } from '@/components/admin/ApiLogsSection';
 import { Shield, Zap, Globe, FileText, BookOpen, Terminal } from 'lucide-react';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://lojafy.6ksfuf.easypanel.host';
@@ -309,6 +308,26 @@ export const ApiDocsContent: React.FC<ApiDocsContentProps> = ({
           </p>
         </div>
 
+        {/* Interactive management */}
+        <div>
+          <h3 className="text-xl font-semibold mb-4">⚙️ Gerenciamento de Webhooks</h3>
+          <WebhooksSection />
+        </div>
+
+        <Separator />
+
+        {/* Events documentation */}
+        <div>
+          <h3 className="text-xl font-semibold mb-4">📡 Eventos Disponíveis</h3>
+          <div className="grid gap-6">
+            {endpoints.length > 0 ? (
+              endpoints.map((endpoint, index) => (
+                <EndpointCard key={`evt-${index}`} endpoint={endpoint} />
+              ))
+            ) : null}
+          </div>
+        </div>
+
         {/* Validation info */}
         <Card>
           <CardHeader>
@@ -350,60 +369,6 @@ const isValid = crypto.timingSafeEqual(
             />
           </CardContent>
         </Card>
-
-        {/* Events documentation */}
-        <div>
-          <h3 className="text-xl font-semibold mb-4">📡 Eventos Disponíveis</h3>
-          <div className="grid gap-6">
-            {endpoints.length > 0 ? (
-              endpoints.map((endpoint, index) => (
-                <EndpointCard key={`evt-${index}`} endpoint={endpoint} />
-              ))
-            ) : null}
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* Interactive management */}
-        <div>
-          <h3 className="text-xl font-semibold mb-4">⚙️ Gerenciamento de Webhooks</h3>
-          <WebhooksSection />
-        </div>
-      </div>
-    );
-  }
-
-  if (selectedSection === 'logs') {
-    return (
-      <div className="space-y-8">
-        <div>
-          <h2 className="text-2xl font-bold mb-2">Logs</h2>
-          <p className="text-muted-foreground">
-            Sistema de monitoramento centralizado com retenção automática de 7 dias. 
-            Registra todas as chamadas de API e disparos de webhook para debugging e auditoria.
-          </p>
-        </div>
-
-        {/* Logs schema documentation */}
-        <div>
-          <h3 className="text-xl font-semibold mb-4">📋 Estrutura dos Logs</h3>
-          <div className="grid gap-6">
-            {endpoints.length > 0 ? (
-              endpoints.map((endpoint, index) => (
-                <EndpointCard key={`log-${index}`} endpoint={endpoint} />
-              ))
-            ) : null}
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* Interactive logs viewer */}
-        <div>
-          <h3 className="text-xl font-semibold mb-4">🔍 Visualizador de Logs</h3>
-          <ApiLogsSection />
-        </div>
       </div>
     );
   }

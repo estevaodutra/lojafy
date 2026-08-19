@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { ApiDocsSidebar } from '@/components/admin/ApiDocsSidebar';
 import { ApiDocsContent } from '@/components/admin/ApiDocsContent';
 import { ApiDocsPagination } from '@/components/admin/ApiDocsPagination';
-import { apiEndpointsData, webhookEventsData, webhookEndpointsData, logsEndpointsData } from '@/data/apiEndpointsData';
+import { apiEndpointsData, webhookEventsData, webhookEndpointsData } from '@/data/apiEndpointsData';
 
 const ITEMS_PER_PAGE = 5;
 
@@ -14,12 +14,9 @@ const ApiDocumentation: React.FC = () => {
 
   // Get endpoints for the selected section
   const currentEndpoints = useMemo(() => {
-    // Special sections: webhooks shows events + endpoints, logs shows log schemas
+    // Special sections: webhooks shows events + endpoints
     if (selectedSection === 'webhooks') {
       return [...webhookEventsData, ...webhookEndpointsData];
-    }
-    if (selectedSection === 'logs') {
-      return logsEndpointsData;
     }
 
     const category = apiEndpointsData.find(cat => cat.id === selectedSection);
