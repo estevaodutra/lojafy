@@ -216,7 +216,7 @@ const Promocoes = () => {
 
                       <div className="flex gap-3">
                         <Link to={`/produto/${product.id}`} className="flex-1">
-                          <Button size="lg" className="w-full">
+                          <Button size="lg" className="w-full bg-[#3fc356] hover:bg-[#34a548] text-white">
                             Comprar Agora
                           </Button>
                         </Link>
@@ -326,7 +326,7 @@ const Promocoes = () => {
                     </Link>
 
                     <Link to={`/produto/${product.id}`}>
-                      <Button className="w-full mt-4">
+                      <Button className="w-full mt-4 bg-[#3fc356] hover:bg-[#34a548] text-white">
                         Comprar
                       </Button>
                     </Link>

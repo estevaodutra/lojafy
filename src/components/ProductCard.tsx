@@ -141,7 +141,7 @@ const ProductCard = ({
 
         <div className="p-3 sm:p-4 pt-0">
           <Link to={`/produto/${product.id}`}>
-            <Button className="w-full btn-cart h-10 text-sm bg-[3fc356] bg-[#3fc356]">
+            <Button className="w-full btn-cart h-10 text-sm bg-[#3fc356] hover:bg-[#34a548] text-white">
               Comprar
             </Button>
           </Link>

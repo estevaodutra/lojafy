@@ -700,7 +700,7 @@ const Produto = ({
                 size="lg" 
                 onClick={handleBuyNow} 
                 disabled={(product.stock_quantity || 0) <= 0 || (variants.length > 0 && !selectedVariant)} 
-                className="w-full btn-buy-now h-11 md:h-12 text-slate-50 text-base bg-[3dba54] bg-[#3fc356]"
+                className="w-full btn-buy-now h-11 md:h-12 text-base font-semibold bg-[#3fc356] hover:bg-[#34a548] text-white"
               >
                 <span className="text-base font-semibold">
                   {variants.length > 0 && !selectedVariant ? 'Selecione uma opção' : 'Comprar Agora'}

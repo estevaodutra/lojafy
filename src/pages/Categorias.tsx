@@ -437,7 +437,7 @@ const Categorias = () => {
                       </Link>
 
                       <Link to={`/produto/${product.id}`}>
-                        <Button className="w-full mt-4">
+                        <Button className="w-full mt-4 bg-[#3fc356] hover:bg-[#34a548] text-white">
                           Comprar
                         </Button>
                       </Link>

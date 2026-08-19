@@ -141,13 +141,13 @@ const PublicStoreProductCard = ({
           </div>
         </Link>
 
-        <div className="p-3 sm:p-4 pt-0">
-          <Link to={`/loja/${storeSlug}/produto/${product.id}`}>
-            <Button className="w-full btn-cart h-10 text-sm bg-[#3fc356]">
-              Comprar
-            </Button>
-          </Link>
-        </div>
+          <div className="p-3 sm:p-4 pt-0">
+            <Link to={`/loja/${storeSlug}/produto/${product.id}`}>
+              <Button className="w-full btn-cart h-10 text-sm bg-[#3fc356] hover:bg-[#34a548] text-white">
+                Comprar
+              </Button>
+            </Link>
+          </div>
       </CardContent>
     </Card>;
 };
