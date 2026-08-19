@@ -23,6 +23,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AutoCategorizeButton } from '@/components/admin/AutoCategorizeButton';
 
 const Products = () => {
   const [showProductForm, setShowProductForm] = useState(false);
@@ -138,11 +139,16 @@ const Products = () => {
   }
 
   return (
-    <MetaAdsManagerView
-      roleMode="admin"
-      onNavigateToCreateProduct={handleCreateProduct}
-      onEditProduct={handleEditProduct}
-    />
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <AutoCategorizeButton />
+      </div>
+      <MetaAdsManagerView
+        roleMode="admin"
+        onNavigateToCreateProduct={handleCreateProduct}
+        onEditProduct={handleEditProduct}
+      />
+    </div>
   );
 };
 
