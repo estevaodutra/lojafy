@@ -17,6 +17,15 @@ interface VariationOutput {
   image?: string | null;
 }
 
+export interface SupplierInfo {
+  id: string;
+  trade_name: string | null;
+  legal_name: string | null;
+  email: string | null;
+  phone: string | null;
+  document: string | null;
+}
+
 interface EnrichedItem {
   product_id: string;
   product_url: string;
@@ -27,6 +36,7 @@ interface EnrichedItem {
   quantity: number;
   unit_price: number;
   variation: VariationOutput | null;
+  supplier?: SupplierInfo | null;
 }
 
 function normalize(s: string): string {
@@ -116,16 +126,32 @@ export async function buildOrderItemsPayload(
   );
 
   let productsMap = new Map<string, any>();
+  let suppliersMap = new Map<string, any>();
+
   if (productIds.length > 0) {
     const { data: products, error } = await supabase
       .from('products')
-      .select('id, name, sku, image_url, main_image_url, cost_price, has_variations, variations')
+      .select('id, name, sku, image_url, main_image_url, cost_price, has_variations, variations, supplier_organization_id')
       .in('id', productIds);
 
     if (error) {
       console.error('[build-order-items-payload] erro buscando produtos:', error.message);
     } else if (products) {
       for (const p of products) productsMap.set(p.id, p);
+
+      const orgIds = [...new Set(products.map((p: any) => p.supplier_organization_id).filter(Boolean))];
+      if (orgIds.length > 0) {
+        const { data: orgs, error: orgsError } = await supabase
+          .from('supplier_organizations')
+          .select('id, trade_name, legal_name, email, phone, document')
+          .in('id', orgIds);
+
+        if (orgsError) {
+          console.error('[build-order-items-payload] erro buscando suppliers:', orgsError.message);
+        } else if (orgs) {
+          for (const org of orgs) suppliersMap.set(org.id, org);
+        }
+      }
     }
   }
 
@@ -148,6 +174,21 @@ export async function buildOrderItemsPayload(
       variation?.cost_price ??
       null;
 
+    const orgId = product?.supplier_organization_id;
+    const org = orgId ? suppliersMap.get(orgId) : null;
+
+    let supplier: SupplierInfo | null = null;
+    if (org) {
+      supplier = {
+        id: org.id,
+        trade_name: org.trade_name,
+        legal_name: org.legal_name,
+        email: org.email,
+        phone: org.phone,
+        document: org.document
+      };
+    }
+
     return {
       product_id: item.product_id,
       product_url: `${baseUrl}/produto/${item.product_id}`,
@@ -158,6 +199,7 @@ export async function buildOrderItemsPayload(
       quantity: item.quantity,
       unit_price: item.unit_price,
       variation,
+      supplier,
     };
   });
 }
