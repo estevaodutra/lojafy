@@ -31,7 +31,26 @@ export const useWebhookSettings = () => {
 
       if (error) throw error;
       
-      setSettings((data as unknown as WebhookSetting[]) || []);
+      let fetchedSettings = (data as unknown as WebhookSetting[]) || [];
+      
+      // Auto-populate local state for missing events
+      const defaultEvents = ['order.paid', 'user.created', 'user.inactive.7days', 'user.inactive.15days', 'user.inactive.30days'];
+      const missingEvents = defaultEvents.filter(ev => !fetchedSettings.find(s => s.event_type === ev));
+      
+      const mockedSettings = missingEvents.map(ev => ({
+        id: `mock-${ev}`,
+        event_type: ev,
+        webhook_url: '',
+        active: false,
+        secret_token: fetchedSettings[0]?.secret_token || null, // Reuse token if available
+        last_triggered_at: null,
+        last_status_code: null,
+        last_error_message: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+
+      setSettings([...fetchedSettings, ...mockedSettings].sort((a, b) => a.event_type.localeCompare(b.event_type)));
     } catch (error: any) {
       console.error('Erro ao buscar configurações de webhook:', error);
       toast({
@@ -52,16 +71,36 @@ export const useWebhookSettings = () => {
     try {
       setUpdating(eventType);
       
-      const { error } = await supabase
-        .from('webhook_settings')
-        .update({ webhook_url: url || null })
-        .eq('event_type', eventType);
+      // Check if it exists
+      const { data: existing } = await supabase.from('webhook_settings').select('id').eq('event_type', eventType).maybeSingle();
+      
+      let error;
+      if (existing) {
+        const res = await supabase
+          .from('webhook_settings')
+          .update({ webhook_url: url || null })
+          .eq('event_type', eventType);
+        error = res.error;
+      } else {
+        // Create new
+        const randomBytes = new Uint8Array(24);
+        crypto.getRandomValues(randomBytes);
+        const newSecret = 'whsec_' + Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+        
+        const res = await supabase
+          .from('webhook_settings')
+          .insert({ 
+            event_type: eventType, 
+            webhook_url: url || null,
+            active: false,
+            secret_token: settings[0]?.secret_token || newSecret
+          });
+        error = res.error;
+      }
 
       if (error) throw error;
 
-      setSettings(prev => 
-        prev.map(s => s.event_type === eventType ? { ...s, webhook_url: url || null } : s)
-      );
+      await fetchSettings();
 
       toast({
         title: 'URL atualizada',
@@ -98,16 +137,34 @@ export const useWebhookSettings = () => {
         return;
       }
 
-      const { error } = await supabase
-        .from('webhook_settings')
-        .update({ active: newActive })
-        .eq('event_type', eventType);
+      const { data: existing } = await supabase.from('webhook_settings').select('id').eq('event_type', eventType).maybeSingle();
+      
+      let error;
+      if (existing) {
+        const res = await supabase
+          .from('webhook_settings')
+          .update({ active: newActive })
+          .eq('event_type', eventType);
+        error = res.error;
+      } else {
+        const randomBytes = new Uint8Array(24);
+        crypto.getRandomValues(randomBytes);
+        const newSecret = 'whsec_' + Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+        
+        const res = await supabase
+          .from('webhook_settings')
+          .insert({ 
+            event_type: eventType, 
+            active: newActive,
+            webhook_url: current.webhook_url,
+            secret_token: settings[0]?.secret_token || newSecret
+          });
+        error = res.error;
+      }
 
       if (error) throw error;
 
-      setSettings(prev => 
-        prev.map(s => s.event_type === eventType ? { ...s, active: newActive } : s)
-      );
+      await fetchSettings();
 
       toast({
         title: newActive ? 'Webhook ativado' : 'Webhook desativado',
@@ -179,23 +236,25 @@ export const useWebhookSettings = () => {
 
   const regenerateSecret = async (eventType: string) => {
     try {
-      setUpdating(eventType);
+      setUpdating('secret');
 
       // Gerar novo secret token
       const randomBytes = new Uint8Array(24);
       crypto.getRandomValues(randomBytes);
       const newSecret = 'whsec_' + Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
 
-      const { error } = await supabase
-        .from('webhook_settings')
-        .update({ secret_token: newSecret })
-        .eq('event_type', eventType);
+      const { data: existing } = await supabase.from('webhook_settings').select('id');
+      
+      if (existing && existing.length > 0) {
+        const { error } = await supabase
+          .from('webhook_settings')
+          .update({ secret_token: newSecret })
+          .not('id', 'is', null);
+  
+        if (error) throw error;
+      }
 
-      if (error) throw error;
-
-      setSettings(prev => 
-        prev.map(s => s.event_type === eventType ? { ...s, secret_token: newSecret } : s)
-      );
+      setSettings(prev => prev.map(s => ({ ...s, secret_token: newSecret })));
 
       toast({
         title: 'Token regenerado',
