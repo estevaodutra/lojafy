@@ -222,9 +222,9 @@ const PublicStoreProducts = () => {
           </aside>
 
           {/* Main Content */}
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             {/* Header with title and controls */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <div>
                 <h1 className="text-3xl font-bold">Todos os Produtos</h1>
                 <p className="text-muted-foreground">
