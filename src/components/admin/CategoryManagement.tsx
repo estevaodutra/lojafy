@@ -23,11 +23,14 @@ const CategoryManagement = () => {
         .from('categories')
         .select(`
           *,
-          products:products(count)
+          products!category_id(count)
         `)
         .order('name');
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching categories:", error);
+        throw error;
+      }
       return data.map(cat => ({
         ...cat,
         product_count: cat.products?.[0]?.count || 0

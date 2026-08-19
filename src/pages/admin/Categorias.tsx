@@ -72,11 +72,14 @@ const Categorias = () => {
         .from('categories')
         .select(`
           *,
-          product_count:products(count)
+          product_count:products!category_id(count)
         `)
         .eq('active', true);
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching available categories:", error);
+        throw error;
+      }
       
       // Transform the data to include product_count as a number
       return data?.map(category => ({
