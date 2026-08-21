@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import Header from "@/components/Header";
+import Hero from "@/components/Hero";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -207,6 +208,7 @@ const Categorias = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
+      <Hero />
       
       <main className="container mx-auto px-4 py-8">
         {/* Breadcrumb */}
