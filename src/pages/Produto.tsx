@@ -55,7 +55,8 @@ const Produto = ({
     }
   };
 
-  const { isReseller, isSupplier } = useUserRole();
+  const { isReseller, isSupplier, isSuperAdmin, role } = useUserRole();
+  const canCopyOrDownload = isReseller() || isSupplier() || isSuperAdmin() || role === 'admin';
 
   // Fetch product from Supabase
   const {
@@ -416,7 +417,7 @@ const Produto = ({
               )}
             </div>
             
-            {productImages.length > 0 && (isReseller() || isSupplier()) && (
+            {productImages.length > 0 && canCopyOrDownload && (
               <Button
                 variant="outline"
                 size="sm"
@@ -449,7 +450,7 @@ const Produto = ({
                       ⚠️
                     </span>}
                 </h1>
-                {(isReseller() || isSupplier()) && (
+                {canCopyOrDownload && (
                   <Button
                     variant="secondary"
                     size="icon"
@@ -606,7 +607,7 @@ const Produto = ({
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-medium text-sm text-muted-foreground">Descrição</h3>
-                  {(isReseller() || isSupplier()) && (
+                  {canCopyOrDownload && (
                     <Button
                       variant="secondary"
                       size="sm"
