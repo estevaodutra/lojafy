@@ -75,11 +75,15 @@ serve(async (req) => {
     }
 
     // Registrar histórico
-    await supabase.from('order_status_history').insert({
-      order_id,
-      status: 'recebido',
-      notes: 'Pagamento confirmado com saldo da carteira',
-    }).catch(() => {});
+    try {
+      await supabase.from('order_status_history').insert({
+        order_id,
+        status: 'recebido',
+        notes: 'Pagamento confirmado com saldo da carteira',
+      });
+    } catch (historyError) {
+      console.error('[complete-wallet-payment] Failed to insert status history:', historyError);
+    }
 
     // Disparar split de pagamento de forma assíncrona
     try {
