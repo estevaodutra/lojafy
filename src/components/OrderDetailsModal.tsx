@@ -316,39 +316,48 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         return;
       }
 
-      // Storage list fallback for both shipping-files and shipping-labels buckets
+      // Storage list fallback for both shipping-files and shipping-labels buckets (subfolder & root level)
       const fallbackFiles: ShippingFile[] = [];
+      const buckets = ['shipping-labels', 'shipping-files'];
 
-      try {
-        const { data: sFiles } = await supabase.storage.from('shipping-files').list(orderId);
-        if (sFiles && sFiles.length > 0) {
-          sFiles.filter(f => f.name && f.name !== '.emptyFolderPlaceholder').forEach(f => {
-            fallbackFiles.push({
-              id: f.id || f.name,
-              file_name: f.name,
-              file_path: `${orderId}/${f.name}`,
-              file_size: f.metadata?.size || 0,
-              uploaded_at: f.created_at || new Date().toISOString(),
+      for (const bucket of buckets) {
+        try {
+          // List in folder named orderId
+          const { data: subFiles } = await supabase.storage.from(bucket).list(orderId);
+          if (subFiles && subFiles.length > 0) {
+            subFiles.filter(f => f.name && f.name !== '.emptyFolderPlaceholder').forEach(f => {
+              if (!fallbackFiles.some(existing => existing.file_name === f.name)) {
+                fallbackFiles.push({
+                  id: f.id || f.name,
+                  file_name: f.name,
+                  file_path: `${orderId}/${f.name}`,
+                  file_size: f.metadata?.size || 0,
+                  uploaded_at: f.created_at || new Date().toISOString(),
+                });
+              }
             });
-          });
-        }
+          }
 
-        const { data: lFiles } = await supabase.storage.from('shipping-labels').list(orderId);
-        if (lFiles && lFiles.length > 0) {
-          lFiles.filter(f => f.name && f.name !== '.emptyFolderPlaceholder').forEach(f => {
-            if (!fallbackFiles.some(existing => existing.file_name === f.name)) {
-              fallbackFiles.push({
-                id: f.id || f.name,
-                file_name: f.name,
-                file_path: `${orderId}/${f.name}`,
-                file_size: f.metadata?.size || 0,
-                uploaded_at: f.created_at || new Date().toISOString(),
-              });
-            }
-          });
+          // List at root folder level
+          const { data: rootFiles } = await supabase.storage.from(bucket).list('');
+          if (rootFiles && rootFiles.length > 0) {
+            rootFiles.filter(f => f.name && f.name !== '.emptyFolderPlaceholder').forEach(f => {
+              if (!fallbackFiles.some(existing => existing.file_name === f.name)) {
+                if (f.name.includes(orderId) || f.name.endsWith('.pdf') || f.name.endsWith('.png') || f.name.endsWith('.jpeg') || f.name.endsWith('.jpg')) {
+                  fallbackFiles.push({
+                    id: f.id || f.name,
+                    file_name: f.name,
+                    file_path: f.name,
+                    file_size: f.metadata?.size || 0,
+                    uploaded_at: f.created_at || new Date().toISOString(),
+                  });
+                }
+              }
+            });
+          }
+        } catch (err) {
+          console.error(`Error listing storage bucket ${bucket}:`, err);
         }
-      } catch (storageErr) {
-        console.error('Error fetching storage fallback for shipping files:', storageErr);
       }
 
       setShippingFiles(data && data.length > 0 ? data : fallbackFiles);
@@ -388,17 +397,40 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   };
 
   const getShippingFileBlob = async (filePath: string, fileName: string) => {
-    let { data, error } = await supabase.storage.from('shipping-files').download(filePath);
-    if (error) {
-      const { data: fallbackData, error: fallbackError } = await supabase.storage.from('shipping-labels').download(filePath);
-      if (fallbackError) {
-        throw new Error('Não foi possível carregar o arquivo dos buckets de armazenamento.');
+    // Try shipping-labels first since it has public authenticated RLS policy
+    let { data, error } = await supabase.storage.from('shipping-labels').download(filePath);
+    if (error && filePath.includes('/')) {
+      const pureFileName = filePath.split('/').pop() || fileName;
+      const { data: d2, error: e2 } = await supabase.storage.from('shipping-labels').download(pureFileName);
+      if (!e2 && d2) {
+        data = d2;
+        error = null;
       }
-      data = fallbackData;
     }
+
+    if (error || !data) {
+      // Fallback to shipping-files bucket
+      const { data: fData, error: fError } = await supabase.storage.from('shipping-files').download(filePath);
+      if (fError && filePath.includes('/')) {
+        const pureFileName = filePath.split('/').pop() || fileName;
+        const { data: d3, error: e3 } = await supabase.storage.from('shipping-files').download(pureFileName);
+        if (!e3 && d3) {
+          data = d3;
+          error = null;
+        }
+      } else if (!fError && fData) {
+        data = fData;
+        error = null;
+      }
+    }
+
+    if (!data) {
+      throw new Error('Não foi possível carregar o arquivo dos buckets de armazenamento.');
+    }
+
     const ext = fileName.split('.').pop()?.toLowerCase();
-    const mimeType = data?.type || (ext === 'png' ? 'image/png' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'application/pdf');
-    return new Blob([data!], { type: mimeType });
+    const mimeType = data.type || (ext === 'png' ? 'image/png' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'application/pdf');
+    return new Blob([data], { type: mimeType });
   };
 
   const viewShippingFile = async (filePath: string, fileName: string) => {
