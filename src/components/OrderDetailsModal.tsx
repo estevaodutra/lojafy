@@ -264,13 +264,72 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       if (error) throw error;
       setOrder(data);
 
-      // Fetch customer profile
+      // Fetch customer profile (with multi-layer fallback for suppliers)
+      let resolvedCustomer: any = null;
       if (data?.user_id) {
-        const {
-          data: profileData
-        } = await supabase.from('profiles').select('first_name, last_name, cpf, phone').eq('user_id', data.user_id).single();
-        setCustomer(profileData);
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('first_name, last_name, cpf, phone')
+          .eq('user_id', data.user_id)
+          .maybeSingle();
+        resolvedCustomer = profileData;
       }
+
+      // Fallback 1: Extract from shipping_address or billing_address
+      if (!resolvedCustomer || (!resolvedCustomer.first_name && !resolvedCustomer.last_name)) {
+        const parseAddr = (addr: any) => {
+          if (!addr) return null;
+          if (typeof addr === 'string') {
+            try { return JSON.parse(addr); } catch (e) { return null; }
+          }
+          if (typeof addr === 'object') return addr;
+          return null;
+        };
+
+        const sa = parseAddr(data.shipping_address) || parseAddr(data.billing_address);
+        if (sa) {
+          let firstName = sa.first_name || '';
+          let lastName = sa.last_name || '';
+          if (!firstName && !lastName) {
+            const fullName = sa.name || sa.full_name || sa.recipient_name || sa.customer_name || sa.contact_name || sa.receiver_name;
+            if (fullName && typeof fullName === 'string' && fullName.trim()) {
+              const parts = fullName.trim().split(' ');
+              firstName = parts[0];
+              lastName = parts.slice(1).join(' ');
+            }
+          }
+          if (firstName || lastName) {
+            resolvedCustomer = {
+              first_name: firstName,
+              last_name: lastName,
+              cpf: sa.cpf || sa.document || sa.tax_id || resolvedCustomer?.cpf || null,
+              phone: sa.phone || sa.telephone || sa.mobile || resolvedCustomer?.phone || null,
+            };
+          }
+        }
+      }
+
+      // Fallback 2: Edge Function invoke (uses Service Role Key to fetch profile bypassing RLS)
+      if ((!resolvedCustomer || (!resolvedCustomer.first_name && !resolvedCustomer.last_name)) && orderId) {
+        try {
+          const { data: webhookRes } = await supabase.functions.invoke('dispatch-order-webhook', {
+            body: { order_id: orderId }
+          });
+          if (webhookRes?.customer?.name) {
+            const parts = String(webhookRes.customer.name).trim().split(' ');
+            resolvedCustomer = {
+              first_name: parts[0] || 'Cliente',
+              last_name: parts.slice(1).join(' ') || '',
+              phone: webhookRes.customer.phone || null,
+              cpf: resolvedCustomer?.cpf || null,
+            };
+          }
+        } catch (e) {
+          console.error('Error fetching customer via edge function:', e);
+        }
+      }
+
+      setCustomer(resolvedCustomer);
 
       // Custos vêm congelados de order_items.supplier_unit_cost (fallback: snapshot da compra)
       const costsMap: Record<string, number> = {};
