@@ -1286,15 +1286,15 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                 </CardContent>
               </Card>}
 
-            {/* Refund Documents - Only show if order is refunded or if admin */}
-            {(order.status === 'reembolsado' || isAdmin) && <Card>
+            {/* Refund Documents */}
+            {(order.status === 'reembolsado' || refundDocuments.length > 0 || isAdmin || isSupplier) && <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-amber-600" />
                       Comprovantes de Reembolso (PDF)
                     </div>
-                    {isAdmin && <div className="flex items-center gap-2">
+                    {canManageShippingFiles && <div className="flex items-center gap-2">
                         <Input type="file" accept=".pdf" onChange={e => {
                   const file = e.target.files?.[0];
                   if (file && file.type === 'application/pdf') {
@@ -1315,7 +1315,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {refundUploadFile && isAdmin && <div className="mb-4 p-3 border border-amber-200 rounded-lg bg-amber-50">
+                  {refundUploadFile && canManageShippingFiles && <div className="mb-4 p-3 border border-amber-200 rounded-lg bg-amber-50">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 text-amber-600" />
@@ -1350,13 +1350,13 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                               <Download className="h-4 w-4 mr-2" />
                               Baixar PDF
                             </Button>
-                            {isAdmin && (
+                            {canManageShippingFiles && (
                               <Button variant="outline" size="sm" onClick={() => deleteRefundDocument(doc.id, doc.file_path)} className="text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200">
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
                           </div>
-                        </div>) : !isAdmin ? <p className="text-sm text-muted-foreground text-center py-4">
+                        </div>) : !canManageShippingFiles ? <p className="text-sm text-muted-foreground text-center py-4">
                         Nenhum comprovante disponível.
                       </p> : <p className="text-sm text-muted-foreground text-center py-4">
                         Nenhum comprovante enviado. Use o botão acima para fazer upload de PDFs.
