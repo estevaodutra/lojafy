@@ -319,22 +319,18 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
       const fallbackFiles: ShippingFile[] = [];
 
-      // 2. Invoke dispatch-webhook (uses Service Role Key internally to query order_shipping_files bypassing RLS)
+      // 2. Invoke dispatch-order-webhook (uses SUPABASE_SERVICE_ROLE_KEY internally to query order_shipping_files bypassing DB RLS)
       try {
-        const { data: webhookRes } = await supabase.functions.invoke('dispatch-webhook', {
-          body: {
-            event_type: 'order.paid',
-            ignore_deduplication: true,
-            payload: { order_id: orderId }
-          }
+        const { data: webhookRes } = await supabase.functions.invoke('dispatch-order-webhook', {
+          body: { order_id: orderId }
         });
 
-        const label = webhookRes?.data?.shipping_label || webhookRes?.payload?.shipping_label || webhookRes?.shipping_label;
-        if (label && label.file_name) {
+        if (webhookRes?.shipping_label?.file_name) {
+          const label = webhookRes.shipping_label;
           fallbackFiles.push({
             id: label.file_name,
             file_name: label.file_name,
-            file_path: label.file_name,
+            file_path: label.download_url || label.file_name,
             file_size: label.file_size || 50500,
             uploaded_at: label.uploaded_at || new Date().toISOString(),
           });
@@ -342,7 +338,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           return;
         }
       } catch (err) {
-        console.error('Error fetching shipping label via dispatch-webhook:', err);
+        console.error('Error fetching shipping label via dispatch-order-webhook:', err);
       }
 
       // 3. Check shipment_label_extractions table
@@ -431,19 +427,29 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   };
 
   const getShippingFileBlob = async (filePath: string, fileName: string) => {
-    // 1. Try signed URL from dispatch-webhook Edge Function (Service Role Key)
+    // 0. If filePath is a full HTTP(S) URL (pre-signed by Service Role Key)
+    if (filePath && (filePath.startsWith('http://') || filePath.startsWith('https://'))) {
+      try {
+        const response = await fetch(filePath);
+        if (response.ok) {
+          const arrayBuffer = await response.arrayBuffer();
+          const ext = fileName.split('.').pop()?.toLowerCase();
+          const mimeType = ext === 'png' ? 'image/png' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'application/pdf';
+          return new Blob([arrayBuffer], { type: mimeType });
+        }
+      } catch (e) {
+        console.error('Error fetching file from signed URL:', e);
+      }
+    }
+
+    // 1. Try signed URL from dispatch-order-webhook Edge Function (Service Role Key)
     if (orderId) {
       try {
-        const { data: webhookRes } = await supabase.functions.invoke('dispatch-webhook', {
-          body: {
-            event_type: 'order.paid',
-            ignore_deduplication: true,
-            payload: { order_id: orderId }
-          }
+        const { data: webhookRes } = await supabase.functions.invoke('dispatch-order-webhook', {
+          body: { order_id: orderId }
         });
-        const label = webhookRes?.data?.shipping_label || webhookRes?.payload?.shipping_label || webhookRes?.shipping_label;
-        if (label?.download_url) {
-          const res = await fetch(label.download_url);
+        if (webhookRes?.shipping_label?.download_url) {
+          const res = await fetch(webhookRes.shipping_label.download_url);
           if (res.ok) {
             const arrayBuffer = await res.arrayBuffer();
             const ext = fileName.split('.').pop()?.toLowerCase();
@@ -452,7 +458,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           }
         }
       } catch (e) {
-        console.error('Error fetching signed URL via dispatch-webhook:', e);
+        console.error('Error fetching signed URL via dispatch-order-webhook:', e);
       }
     }
 
