@@ -158,6 +158,15 @@ const SupplierOrderManagement = () => {
       }
       const profilesMap = new Map(profilesData.map(p => [p.user_id, p]));
 
+      const parseAddress = (addr: any) => {
+        if (!addr) return null;
+        if (typeof addr === 'string') {
+          try { return JSON.parse(addr); } catch (e) { return null; }
+        }
+        if (typeof addr === 'object') return addr;
+        return null;
+      };
+
       const mappedRows: SupplierOrderRow[] = fulfillmentsData.map(item => {
         const orderObj = item.orders as any;
         const profile = orderObj ? profilesMap.get(orderObj.user_id) : null;
@@ -165,31 +174,37 @@ const SupplierOrderManagement = () => {
         let firstName = profile?.first_name || '';
         let lastName = profile?.last_name || '';
 
-        if (!firstName && !lastName && orderObj?.shipping_address && typeof orderObj.shipping_address === 'object') {
-          const sa = orderObj.shipping_address;
-          if (sa.first_name || sa.last_name) {
-            firstName = sa.first_name || '';
-            lastName = sa.last_name || '';
-          } else if (sa.name) {
-            const parts = String(sa.name).trim().split(' ');
-            firstName = parts[0] || 'Cliente';
-            lastName = parts.slice(1).join(' ') || '';
-          } else if (sa.recipient_name) {
-            const parts = String(sa.recipient_name).trim().split(' ');
-            firstName = parts[0] || 'Cliente';
-            lastName = parts.slice(1).join(' ') || '';
+        if (!firstName && !lastName && orderObj?.shipping_address) {
+          const sa = parseAddress(orderObj.shipping_address);
+          if (sa) {
+            if (sa.first_name || sa.last_name) {
+              firstName = sa.first_name || '';
+              lastName = sa.last_name || '';
+            } else {
+              const fullName = sa.name || sa.full_name || sa.recipient_name || sa.customer_name || sa.contact_name;
+              if (fullName && typeof fullName === 'string' && fullName.trim()) {
+                const parts = fullName.trim().split(' ');
+                firstName = parts[0];
+                lastName = parts.slice(1).join(' ');
+              }
+            }
           }
         }
 
-        if (!firstName && !lastName && orderObj?.billing_address && typeof orderObj.billing_address === 'object') {
-          const ba = orderObj.billing_address;
-          if (ba.first_name || ba.last_name) {
-            firstName = ba.first_name || '';
-            lastName = ba.last_name || '';
-          } else if (ba.name) {
-            const parts = String(ba.name).trim().split(' ');
-            firstName = parts[0] || 'Cliente';
-            lastName = parts.slice(1).join(' ') || '';
+        if (!firstName && !lastName && orderObj?.billing_address) {
+          const ba = parseAddress(orderObj.billing_address);
+          if (ba) {
+            if (ba.first_name || ba.last_name) {
+              firstName = ba.first_name || '';
+              lastName = ba.last_name || '';
+            } else {
+              const fullName = ba.name || ba.full_name || ba.recipient_name || ba.customer_name || ba.contact_name;
+              if (fullName && typeof fullName === 'string' && fullName.trim()) {
+                const parts = fullName.trim().split(' ');
+                firstName = parts[0];
+                lastName = parts.slice(1).join(' ');
+              }
+            }
           }
         }
 

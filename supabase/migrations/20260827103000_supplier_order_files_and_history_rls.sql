@@ -111,3 +111,18 @@ WITH CHECK (
     )
   )
 );
+
+-- 6. RLS Policy for profiles table to allow suppliers to view customer names for their orders
+DROP POLICY IF EXISTS "Suppliers can view customer profiles for their orders" ON public.profiles;
+CREATE POLICY "Suppliers can view customer profiles for their orders"
+ON public.profiles
+FOR SELECT
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.orders o
+    WHERE o.user_id = profiles.user_id
+      AND public.has_supplier_access_to_order(auth.uid(), o.id)
+  )
+);
+
