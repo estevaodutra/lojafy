@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User, FileText, Download, Upload, TrendingUp, MessageSquarePlus, Send, Loader2, RefreshCw, Trash2 } from 'lucide-react';
+import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User, FileText, Download, Upload, TrendingUp, MessageSquarePlus, Send, Loader2, RefreshCw, Trash2, Printer, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -117,6 +117,8 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     profile
   } = useAuth();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
+  const isSupplier = profile?.role === 'supplier';
+  const canManageShippingFiles = isAdmin || isSupplier;
   useEffect(() => {
     if (orderId && isOpen) {
       fetchOrderDetails();
@@ -315,7 +317,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     }
   };
   const deleteShippingFile = async (fileId: string, filePath: string) => {
-    if (!isAdmin) return;
+    if (!isAdmin && !isSupplier) return;
     if (!confirm('Tem certeza que deseja excluir esta etiqueta de envio?')) return;
     
     try {
@@ -345,28 +347,68 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     }
   };
 
+  const getShippingFileBlob = async (filePath: string, fileName: string) => {
+    let { data, error } = await supabase.storage.from('shipping-files').download(filePath);
+    if (error) {
+      const { data: fallbackData, error: fallbackError } = await supabase.storage.from('shipping-labels').download(filePath);
+      if (fallbackError) {
+        throw new Error('Não foi possível carregar o arquivo dos buckets de armazenamento.');
+      }
+      data = fallbackData;
+    }
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    const mimeType = data?.type || (ext === 'png' ? 'image/png' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'application/pdf');
+    return new Blob([data!], { type: mimeType });
+  };
+
+  const viewShippingFile = async (filePath: string, fileName: string) => {
+    try {
+      const blob = await getShippingFileBlob(filePath, fileName);
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (error: any) {
+      console.error('Error viewing file:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao visualizar o arquivo.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const printShippingFile = async (filePath: string, fileName: string) => {
+    try {
+      const blob = await getShippingFileBlob(filePath, fileName);
+      const blobUrl = window.URL.createObjectURL(blob);
+      const printWindow = window.open(blobUrl, '_blank');
+      if (printWindow) {
+        printWindow.focus();
+        setTimeout(() => {
+          try {
+            printWindow.print();
+          } catch (e) {
+            console.error('Error triggering print:', e);
+          }
+        }, 600);
+      } else {
+        toast({
+          title: "Aviso",
+          description: "Pop-up bloqueado. Permita janelas pop-up no navegador para abrir a janela de impressão automaticamente.",
+        });
+      }
+    } catch (error: any) {
+      console.error('Error printing shipping file:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao tentar imprimir etiqueta.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const downloadShippingFile = async (filePath: string, fileName: string) => {
     try {
-      let { data, error } = await supabase.storage.from('shipping-files').download(filePath);
-      
-      if (error) {
-        // Fallback to shipping-labels bucket used by the newer checkout flow
-        const { data: fallbackData, error: fallbackError } = await supabase.storage.from('shipping-labels').download(filePath);
-        
-        if (fallbackError) {
-          console.error('Error downloading file from both buckets:', error, fallbackError);
-          toast({
-            title: "Erro",
-            description: "Não foi possível baixar o arquivo.",
-            variant: "destructive"
-          });
-          return;
-        }
-        data = fallbackData;
-      }
-
-      // Create blob URL and trigger download
-      const blob = new Blob([data!]);
+      const blob = await getShippingFileBlob(filePath, fileName);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -404,12 +446,12 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     }
   };
   const handleFileUpload = async (file: File) => {
-    if (!orderId || !isAdmin) return;
+    if (!orderId || (!isAdmin && !isSupplier)) return;
     setIsUploading(true);
     try {
       // Generate unique filename
       const fileExtension = file.name.split('.').pop();
-      const fileName = `admin_upload_${Date.now()}.${fileExtension}`;
+      const fileName = `upload_${Date.now()}.${fileExtension}`;
       const filePath = `${orderId}/${fileName}`;
 
       // Upload file to Supabase Storage
@@ -1166,14 +1208,14 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             })()}
 
             {/* Shipping Files */}
-            {(shippingFiles.length > 0 || isAdmin) && <Card>
+            {(shippingFiles.length > 0 || canManageShippingFiles) && <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4" />
                       Etiquetas de Envio
                     </div>
-                    {isAdmin && <div className="flex items-center gap-2">
+                    {canManageShippingFiles && <div className="flex items-center gap-2">
                         <Input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => {
                   const file = e.target.files?.[0];
                   if (file) setUploadFile(file);
@@ -1186,7 +1228,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {uploadFile && isAdmin && <div className="mb-4 p-3 border border-border rounded-lg bg-muted/50">
+                  {uploadFile && canManageShippingFiles && <div className="mb-4 p-3 border border-border rounded-lg bg-muted/50">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4" />
@@ -1204,7 +1246,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     </div>}
                   
                   <div className="space-y-3">
-                    {shippingFiles.length > 0 ? shippingFiles.map(file => <div key={file.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                    {shippingFiles.length > 0 ? shippingFiles.map(file => <div key={file.id} className="flex flex-wrap items-center justify-between gap-2 p-3 border border-border rounded-lg">
                           <div className="flex items-center gap-3">
                             <div className="flex items-center justify-center w-10 h-10 bg-primary/10 rounded-lg">
                               <FileText className="h-5 w-5 text-primary" />
@@ -1216,18 +1258,26 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button variant="outline" size="sm" onClick={() => viewShippingFile(file.file_path, file.file_name)}>
+                              <Eye className="h-4 w-4 mr-1" />
+                              Visualizar
+                            </Button>
                             <Button variant="outline" size="sm" onClick={() => downloadShippingFile(file.file_path, file.file_name)}>
-                              <Download className="h-4 w-4 mr-2" />
+                              <Download className="h-4 w-4 mr-1" />
                               Baixar
                             </Button>
-                            {isAdmin && (
+                            <Button size="sm" onClick={() => printShippingFile(file.file_path, file.file_name)} className="bg-blue-600 hover:bg-blue-700 text-white">
+                              <Printer className="h-4 w-4 mr-1" />
+                              Imprimir
+                            </Button>
+                            {canManageShippingFiles && (
                               <Button variant="outline" size="sm" onClick={() => deleteShippingFile(file.id, file.file_path)} className="text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200">
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
                           </div>
-                        </div>) : !isAdmin ? <p className="text-sm text-muted-foreground text-center py-4">
+                        </div>) : !canManageShippingFiles ? <p className="text-sm text-muted-foreground text-center py-4">
                         Nenhuma etiqueta disponível para este pedido.
                       </p> : <p className="text-sm text-muted-foreground text-center py-4">
                         Nenhuma etiqueta enviada ainda. Use o botão acima para fazer upload.

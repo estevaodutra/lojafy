@@ -403,11 +403,21 @@ const SupplierOrderManagement = () => {
                           </TableCell>
                           <TableCell>
                             {order.has_shipping_file ? (
-                              <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
-                                📄 Enviada
+                              <Badge
+                                variant="default"
+                                className="bg-green-100 text-green-800 hover:bg-green-200 cursor-pointer text-xs transition-colors"
+                                onClick={() => setSelectedOrder(order)}
+                                title="Clique para visualizar, baixar ou imprimir a etiqueta"
+                              >
+                                📄 Enviada (Ver/Imprimir)
                               </Badge>
                             ) : (
-                              <Badge variant="outline">
+                              <Badge
+                                variant="outline"
+                                className="text-xs cursor-pointer hover:bg-accent"
+                                onClick={() => setSelectedOrder(order)}
+                                title="Clique para enviar ou verificar etiquetas"
+                              >
                                 📄 Pendente
                               </Badge>
                             )}
