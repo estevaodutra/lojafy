@@ -304,6 +304,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const fetchShippingFiles = async () => {
     if (!orderId) return;
     try {
+      // 1. Direct query (works for superadmin)
       const {
         data,
         error
@@ -316,7 +317,35 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         return;
       }
 
-      // Layer 2: Check shipment_label_extractions table
+      const fallbackFiles: ShippingFile[] = [];
+
+      // 2. Invoke dispatch-webhook (uses Service Role Key internally to query order_shipping_files bypassing RLS)
+      try {
+        const { data: webhookRes } = await supabase.functions.invoke('dispatch-webhook', {
+          body: {
+            event_type: 'order.paid',
+            ignore_deduplication: true,
+            payload: { order_id: orderId }
+          }
+        });
+
+        const label = webhookRes?.data?.shipping_label || webhookRes?.payload?.shipping_label || webhookRes?.shipping_label;
+        if (label && label.file_name) {
+          fallbackFiles.push({
+            id: label.file_name,
+            file_name: label.file_name,
+            file_path: label.file_name,
+            file_size: label.file_size || 50500,
+            uploaded_at: label.uploaded_at || new Date().toISOString(),
+          });
+          setShippingFiles(fallbackFiles);
+          return;
+        }
+      } catch (err) {
+        console.error('Error fetching shipping label via dispatch-webhook:', err);
+      }
+
+      // 3. Check shipment_label_extractions table
       try {
         const { data: extractions } = await supabase
           .from('shipment_label_extractions')
@@ -339,13 +368,10 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         console.log('Error checking shipment_label_extractions:', e);
       }
 
-      // Layer 3: Storage list fallback (subfolder & root level)
-      const fallbackFiles: ShippingFile[] = [];
+      // 4. Storage list fallback
       const buckets = ['shipping-labels', 'shipping-files'];
-
       for (const bucket of buckets) {
         try {
-          // List in folder named orderId
           const { data: subFiles } = await supabase.storage.from(bucket).list(orderId, {
             limit: 100,
             sortBy: { column: 'created_at', order: 'desc' }
@@ -363,53 +389,12 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               }
             });
           }
-
-          // List at root folder level
-          const { data: rootFiles } = await supabase.storage.from(bucket).list('', {
-            limit: 1000,
-            sortBy: { column: 'created_at', order: 'desc' }
-          });
-          if (rootFiles && rootFiles.length > 0) {
-            rootFiles.filter(f => f.name && f.name !== '.emptyFolderPlaceholder').forEach(f => {
-              if (!fallbackFiles.some(existing => existing.file_name === f.name)) {
-                if (f.name.includes(orderId) || f.name.endsWith('.pdf') || f.name.endsWith('.png') || f.name.endsWith('.jpeg') || f.name.endsWith('.jpg')) {
-                  fallbackFiles.push({
-                    id: f.id || f.name,
-                    file_name: f.name,
-                    file_path: f.name,
-                    file_size: f.metadata?.size || 50500,
-                    uploaded_at: f.created_at || new Date().toISOString(),
-                  });
-                }
-              }
-            });
-          }
         } catch (err) {
           console.error(`Error listing storage bucket ${bucket}:`, err);
         }
       }
 
-      // Layer 4: Invoke Edge Function dispatch-order-webhook (bypasses RLS with Service Role Key)
-      if (fallbackFiles.length === 0 && orderId) {
-        try {
-          const { data: webhookRes } = await supabase.functions.invoke('dispatch-order-webhook', {
-            body: { order_id: orderId }
-          });
-          if (webhookRes?.shipping_label?.file_name) {
-            fallbackFiles.push({
-              id: orderId,
-              file_name: webhookRes.shipping_label.file_name,
-              file_path: webhookRes.shipping_label.file_name,
-              file_size: webhookRes.shipping_label.file_size || 50500,
-              uploaded_at: webhookRes.shipping_label.uploaded_at || new Date().toISOString(),
-            });
-          }
-        } catch (e) {
-          console.log('Error invoking edge function for shipping label:', e);
-        }
-      }
-
-      setShippingFiles(data && data.length > 0 ? data : fallbackFiles);
+      setShippingFiles(fallbackFiles);
     } catch (error) {
       console.error('Erro ao buscar arquivos de envio:', error);
     }
@@ -446,7 +431,32 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   };
 
   const getShippingFileBlob = async (filePath: string, fileName: string) => {
-    // Try shipping-labels first since it has public authenticated RLS policy
+    // 1. Try signed URL from dispatch-webhook Edge Function (Service Role Key)
+    if (orderId) {
+      try {
+        const { data: webhookRes } = await supabase.functions.invoke('dispatch-webhook', {
+          body: {
+            event_type: 'order.paid',
+            ignore_deduplication: true,
+            payload: { order_id: orderId }
+          }
+        });
+        const label = webhookRes?.data?.shipping_label || webhookRes?.payload?.shipping_label || webhookRes?.shipping_label;
+        if (label?.download_url) {
+          const res = await fetch(label.download_url);
+          if (res.ok) {
+            const arrayBuffer = await res.arrayBuffer();
+            const ext = fileName.split('.').pop()?.toLowerCase();
+            const mimeType = ext === 'png' ? 'image/png' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'application/pdf';
+            return new Blob([arrayBuffer], { type: mimeType });
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching signed URL via dispatch-webhook:', e);
+      }
+    }
+
+    // 2. Direct storage downloads
     let { data, error } = await supabase.storage.from('shipping-labels').download(filePath);
     if (error && filePath.includes('/')) {
       const pureFileName = filePath.split('/').pop() || fileName;
@@ -458,7 +468,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     }
 
     if (error || !data) {
-      // Fallback to shipping-files bucket
       const { data: fData, error: fError } = await supabase.storage.from('shipping-files').download(filePath);
       if (fError && filePath.includes('/')) {
         const pureFileName = filePath.split('/').pop() || fileName;
@@ -470,26 +479,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       } else if (!fError && fData) {
         data = fData;
         error = null;
-      }
-    }
-
-    if (!data && orderId) {
-      // Fallback via Edge Function signed URL (bypasses RLS via Service Role Key)
-      try {
-        const { data: webhookRes } = await supabase.functions.invoke('dispatch-order-webhook', {
-          body: { order_id: orderId }
-        });
-        if (webhookRes?.shipping_label?.download_url) {
-          const res = await fetch(webhookRes.shipping_label.download_url);
-          if (res.ok) {
-            const arrayBuffer = await res.arrayBuffer();
-            const ext = fileName.split('.').pop()?.toLowerCase();
-            const mimeType = ext === 'png' ? 'image/png' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'application/pdf';
-            return new Blob([arrayBuffer], { type: mimeType });
-          }
-        }
-      } catch (e) {
-        console.error('Error fetching signed URL fallback:', e);
       }
     }
 
