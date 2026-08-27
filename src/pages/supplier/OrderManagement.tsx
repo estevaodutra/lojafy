@@ -100,7 +100,7 @@ const SupplierOrderManagement = () => {
           sla_picking_deadline,
           sla_shipping_deadline,
           created_at,
-          orders!inner (
+          orders (
             id,
             order_number,
             status,
