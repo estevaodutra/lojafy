@@ -87,6 +87,7 @@ const SupplierOrderManagement = () => {
     if (!orgId) return;
     try {
       setLoading(true);
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
 
       // 1. Fetch fulfillments cleanly
       const { data: fulfillmentsData, error: fError } = await supabase
@@ -175,9 +176,9 @@ const SupplierOrderManagement = () => {
           console.error('Error fetching profiles:', err);
         }
 
-        if (profilesData.length === 0 && user?.id) {
+        if (profilesData.length === 0 && currentUser?.id) {
           try {
-            const { data: rpcData } = await supabase.rpc('get_order_customer_names', { _user_id: user.id });
+            const { data: rpcData } = await supabase.rpc('get_order_customer_names', { _user_id: currentUser.id });
             if (rpcData && rpcData.length > 0) {
               profilesData = rpcData;
             }
