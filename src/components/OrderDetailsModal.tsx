@@ -310,8 +310,48 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       } = await supabase.from('order_shipping_files').select('*').eq('order_id', orderId).order('uploaded_at', {
         ascending: false
       });
-      if (error) throw error;
-      setShippingFiles(data || []);
+
+      if (!error && data && data.length > 0) {
+        setShippingFiles(data);
+        return;
+      }
+
+      // Storage list fallback for both shipping-files and shipping-labels buckets
+      const fallbackFiles: ShippingFile[] = [];
+
+      try {
+        const { data: sFiles } = await supabase.storage.from('shipping-files').list(orderId);
+        if (sFiles && sFiles.length > 0) {
+          sFiles.filter(f => f.name && f.name !== '.emptyFolderPlaceholder').forEach(f => {
+            fallbackFiles.push({
+              id: f.id || f.name,
+              file_name: f.name,
+              file_path: `${orderId}/${f.name}`,
+              file_size: f.metadata?.size || 0,
+              uploaded_at: f.created_at || new Date().toISOString(),
+            });
+          });
+        }
+
+        const { data: lFiles } = await supabase.storage.from('shipping-labels').list(orderId);
+        if (lFiles && lFiles.length > 0) {
+          lFiles.filter(f => f.name && f.name !== '.emptyFolderPlaceholder').forEach(f => {
+            if (!fallbackFiles.some(existing => existing.file_name === f.name)) {
+              fallbackFiles.push({
+                id: f.id || f.name,
+                file_name: f.name,
+                file_path: `${orderId}/${f.name}`,
+                file_size: f.metadata?.size || 0,
+                uploaded_at: f.created_at || new Date().toISOString(),
+              });
+            }
+          });
+        }
+      } catch (storageErr) {
+        console.error('Error fetching storage fallback for shipping files:', storageErr);
+      }
+
+      setShippingFiles(data && data.length > 0 ? data : fallbackFiles);
     } catch (error) {
       console.error('Erro ao buscar arquivos de envio:', error);
     }
@@ -1025,10 +1065,10 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             {/* Order Summary with Financial Breakdown */}
             <Card>
               <CardHeader>
-                <CardTitle>{isAdmin ? 'Resumo Financeiro do Pedido' : 'Resumo do Pedido'}</CardTitle>
+                <CardTitle>{(isAdmin || isSupplier) ? 'Resumo Financeiro do Pedido' : 'Resumo do Pedido'}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {isAdmin ? (
+                {(isAdmin || isSupplier) ? (
                   (() => {
                     const financials = calculateOrderFinancials(order);
 
