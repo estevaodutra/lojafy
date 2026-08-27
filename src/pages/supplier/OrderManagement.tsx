@@ -108,6 +108,9 @@ const SupplierOrderManagement = () => {
             total_amount,
             user_id,
             created_at,
+            has_shipping_file,
+            shipping_address,
+            billing_address,
             webhook_paid_status,
             webhook_paid_error,
             webhook_paid_dispatched_at
@@ -156,8 +159,48 @@ const SupplierOrderManagement = () => {
       const profilesMap = new Map(profilesData.map(p => [p.user_id, p]));
 
       const mappedRows: SupplierOrderRow[] = fulfillmentsData.map(item => {
-        const orderObj = item.orders;
+        const orderObj = item.orders as any;
         const profile = orderObj ? profilesMap.get(orderObj.user_id) : null;
+
+        let firstName = profile?.first_name || '';
+        let lastName = profile?.last_name || '';
+
+        if (!firstName && !lastName && orderObj?.shipping_address && typeof orderObj.shipping_address === 'object') {
+          const sa = orderObj.shipping_address;
+          if (sa.first_name || sa.last_name) {
+            firstName = sa.first_name || '';
+            lastName = sa.last_name || '';
+          } else if (sa.name) {
+            const parts = String(sa.name).trim().split(' ');
+            firstName = parts[0] || 'Cliente';
+            lastName = parts.slice(1).join(' ') || '';
+          } else if (sa.recipient_name) {
+            const parts = String(sa.recipient_name).trim().split(' ');
+            firstName = parts[0] || 'Cliente';
+            lastName = parts.slice(1).join(' ') || '';
+          }
+        }
+
+        if (!firstName && !lastName && orderObj?.billing_address && typeof orderObj.billing_address === 'object') {
+          const ba = orderObj.billing_address;
+          if (ba.first_name || ba.last_name) {
+            firstName = ba.first_name || '';
+            lastName = ba.last_name || '';
+          } else if (ba.name) {
+            const parts = String(ba.name).trim().split(' ');
+            firstName = parts[0] || 'Cliente';
+            lastName = parts.slice(1).join(' ') || '';
+          }
+        }
+
+        const hasShippingFile = Boolean(
+          orderObj?.has_shipping_file ||
+          ordersWithShippingFiles.has(item.order_id) ||
+          item.label_status === 'generated' ||
+          item.label_status === 'printed' ||
+          item.status === 'label_ready'
+        );
+
         return {
           id: orderObj?.id || item.id,
           fulfillment_id: item.id,
@@ -169,14 +212,14 @@ const SupplierOrderManagement = () => {
           total_amount: Number(orderObj?.total_amount || 0),
           created_at: orderObj?.created_at || item.created_at,
           user_id: orderObj?.user_id || '',
-          has_shipping_file: ordersWithShippingFiles.has(item.order_id),
+          has_shipping_file: hasShippingFile,
           webhook_paid_status: orderObj?.webhook_paid_status,
           webhook_paid_dispatched_at: orderObj?.webhook_paid_dispatched_at,
           webhook_paid_error: orderObj?.webhook_paid_error,
           sla_shipping_deadline: item.sla_shipping_deadline,
           profiles: {
-            first_name: profile?.first_name || '',
-            last_name: profile?.last_name || '',
+            first_name: firstName || 'Cliente',
+            last_name: lastName || '',
           },
         };
       });
