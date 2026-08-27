@@ -452,7 +452,7 @@ const SupplierOrderManagement = () => {
                                 onClick={() => setSelectedOrder(order)}
                                 title="Clique para visualizar, baixar ou imprimir a etiqueta"
                               >
-                                📄 Enviada (Ver/Imprimir)
+                                📄 Enviada
                               </Badge>
                             ) : (
                               <Badge
