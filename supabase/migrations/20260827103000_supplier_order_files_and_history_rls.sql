@@ -1,4 +1,4 @@
-﻿-- Migration: Enable suppliers to view & manage shipping files, status history and refund documents
+-- Migration: Enable suppliers to view & manage shipping files, status history and refund documents
 
 -- 1. Helper function to verify supplier access to an order (supporting both fulfillments org members & direct product supplier_id)
 CREATE OR REPLACE FUNCTION public.has_supplier_access_to_order(_user_id uuid, _order_id uuid)
@@ -7,13 +7,14 @@ LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = public
-AS \$\$
+AS $$
   SELECT EXISTS (
     SELECT 1
     FROM public.supplier_fulfillments sf
-    JOIN public.supplier_organization_members som ON som.organization_id = sf.supplier_organization_id
+    JOIN public.supplier_members sm ON sm.organization_id = sf.supplier_organization_id
     WHERE sf.order_id = _order_id
-      AND som.user_id = _user_id
+      AND sm.user_id = _user_id
+      AND sm.active = true
   ) OR EXISTS (
     SELECT 1
     FROM public.order_items oi
@@ -21,7 +22,7 @@ AS \$\$
     WHERE oi.order_id = _order_id
       AND p.supplier_id = _user_id
   );
-\$\$;
+$$;
 
 -- 2. RLS Policies for order_shipping_files
 DROP POLICY IF EXISTS "Suppliers can view shipping files of their orders" ON public.order_shipping_files;
