@@ -304,7 +304,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const fetchShippingFiles = async () => {
     if (!orderId) return;
     try {
-      // 1. Direct query (works for superadmin)
+      // 1. Direct DB query (returns files when RLS policy grants supplier access)
       const {
         data,
         error
@@ -319,29 +319,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
       const fallbackFiles: ShippingFile[] = [];
 
-      // 2. Invoke dispatch-order-webhook (uses SUPABASE_SERVICE_ROLE_KEY internally to query order_shipping_files bypassing DB RLS)
-      try {
-        const { data: webhookRes } = await supabase.functions.invoke('dispatch-order-webhook', {
-          body: { order_id: orderId }
-        });
-
-        if (webhookRes?.shipping_label?.file_name) {
-          const label = webhookRes.shipping_label;
-          fallbackFiles.push({
-            id: label.file_name,
-            file_name: label.file_name,
-            file_path: label.download_url || label.file_name,
-            file_size: label.file_size || 50500,
-            uploaded_at: label.uploaded_at || new Date().toISOString(),
-          });
-          setShippingFiles(fallbackFiles);
-          return;
-        }
-      } catch (err) {
-        console.error('Error fetching shipping label via dispatch-order-webhook:', err);
-      }
-
-      // 3. Check shipment_label_extractions table
+      // 2. Fallback to shipment_label_extractions table
       try {
         const { data: extractions } = await supabase
           .from('shipment_label_extractions')
@@ -364,7 +342,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         console.log('Error checking shipment_label_extractions:', e);
       }
 
-      // 4. Storage list fallback
+      // 3. Storage list fallback
       const buckets = ['shipping-labels', 'shipping-files'];
       for (const bucket of buckets) {
         try {
@@ -427,7 +405,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   };
 
   const getShippingFileBlob = async (filePath: string, fileName: string) => {
-    // 0. If filePath is a full HTTP(S) URL (pre-signed by Service Role Key)
+    // 0. If filePath is a full HTTP(S) URL
     if (filePath && (filePath.startsWith('http://') || filePath.startsWith('https://'))) {
       try {
         const response = await fetch(filePath);
@@ -442,27 +420,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       }
     }
 
-    // 1. Try signed URL from dispatch-order-webhook Edge Function (Service Role Key)
-    if (orderId) {
-      try {
-        const { data: webhookRes } = await supabase.functions.invoke('dispatch-order-webhook', {
-          body: { order_id: orderId }
-        });
-        if (webhookRes?.shipping_label?.download_url) {
-          const res = await fetch(webhookRes.shipping_label.download_url);
-          if (res.ok) {
-            const arrayBuffer = await res.arrayBuffer();
-            const ext = fileName.split('.').pop()?.toLowerCase();
-            const mimeType = ext === 'png' ? 'image/png' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'application/pdf';
-            return new Blob([arrayBuffer], { type: mimeType });
-          }
-        }
-      } catch (e) {
-        console.error('Error fetching signed URL via dispatch-order-webhook:', e);
-      }
-    }
-
-    // 2. Direct storage downloads
+    // 1. Direct storage download from shipping-labels
     let { data, error } = await supabase.storage.from('shipping-labels').download(filePath);
     if (error && filePath.includes('/')) {
       const pureFileName = filePath.split('/').pop() || fileName;
@@ -473,6 +431,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       }
     }
 
+    // 2. Direct storage download from shipping-files
     if (error || !data) {
       const { data: fData, error: fError } = await supabase.storage.from('shipping-files').download(filePath);
       if (fError && filePath.includes('/')) {
