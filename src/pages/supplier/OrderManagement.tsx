@@ -155,6 +155,17 @@ const SupplierOrderManagement = () => {
         } catch (err) {
           console.error('Error fetching profiles:', err);
         }
+
+        if (profilesData.length === 0 && user?.id) {
+          try {
+            const { data: rpcData } = await supabase.rpc('get_order_customer_names', { _user_id: user.id });
+            if (rpcData && rpcData.length > 0) {
+              profilesData = rpcData;
+            }
+          } catch (rpcErr) {
+            console.error('Error calling get_order_customer_names RPC:', rpcErr);
+          }
+        }
       }
       const profilesMap = new Map(profilesData.map(p => [p.user_id, p]));
 
