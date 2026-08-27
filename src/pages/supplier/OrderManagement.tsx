@@ -88,6 +88,7 @@ const SupplierOrderManagement = () => {
     try {
       setLoading(true);
 
+      // 1. Fetch fulfillments cleanly
       const { data: fulfillmentsData, error: fError } = await supabase
         .from('supplier_fulfillments')
         .select(`
@@ -100,6 +101,7 @@ const SupplierOrderManagement = () => {
           sla_picking_deadline,
           sla_shipping_deadline,
           created_at,
+          supplier_organization_id,
           orders (
             id,
             order_number,
@@ -127,7 +129,24 @@ const SupplierOrderManagement = () => {
         return;
       }
 
-      const orderIds = fulfillmentsData.map(f => f.order_id).filter(Boolean);
+      const orderIds = [...new Set(fulfillmentsData.map(f => f.order_id).filter(Boolean))];
+
+      // 2. Fetch orders separately if joined orders is null due to RLS
+      let ordersData: any[] = [];
+      if (orderIds.length > 0) {
+        try {
+          const { data: oData, error: oError } = await supabase
+            .from('orders')
+            .select('id, order_number, status, payment_status, total_amount, user_id, created_at, has_shipping_file, shipping_address, billing_address, webhook_paid_status, webhook_paid_error, webhook_paid_dispatched_at')
+            .in('id', orderIds);
+          if (!oError && oData) {
+            ordersData = oData;
+          }
+        } catch (e) {
+          console.error('Error fetching orders directly:', e);
+        }
+      }
+      const ordersMap = new Map(ordersData.map(o => [o.id, o]));
 
       let shippingFilesData: Array<{ order_id: string }> = [];
       if (orderIds.length > 0) {
@@ -143,7 +162,7 @@ const SupplierOrderManagement = () => {
       }
       const ordersWithShippingFiles = new Set(shippingFilesData.map(f => f.order_id));
 
-      const userIds = [...new Set(fulfillmentsData.map(f => f.orders?.user_id).filter(Boolean))];
+      const userIds = [...new Set(fulfillmentsData.map(f => (f.orders?.user_id || ordersMap.get(f.order_id)?.user_id)).filter(Boolean))];
       let profilesData: Array<{ user_id: string; first_name: string | null; last_name: string | null }> = [];
       if (userIds.length > 0) {
         try {
@@ -179,8 +198,8 @@ const SupplierOrderManagement = () => {
       };
 
       const mappedRows: SupplierOrderRow[] = fulfillmentsData.map(item => {
-        const orderObj = item.orders as any;
-        const profile = orderObj ? profilesMap.get(orderObj.user_id) : null;
+        const orderObj = (item.orders as any) || ordersMap.get(item.order_id) || {};
+        const profile = orderObj?.user_id ? profilesMap.get(orderObj.user_id) : null;
 
         let firstName = profile?.first_name || '';
         let lastName = profile?.last_name || '';
@@ -251,11 +270,11 @@ const SupplierOrderManagement = () => {
       });
 
       setOrders(mappedRows);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching supplier orders:', error);
       toast({
         title: "Erro",
-        description: "Erro ao carregar pedidos",
+        description: error?.message || "Erro ao carregar pedidos",
         variant: "destructive",
       });
     } finally {
