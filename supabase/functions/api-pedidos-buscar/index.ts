@@ -197,10 +197,25 @@ Deno.serve(async (req) => {
       order.total_amount
     );
 
+    const statusEnvioLabel = {
+      pendente: 'Pedido Gerado > Aguardando Pagamento',
+      pago: 'Pedido Pago Aguardada Recebimento da Expedição',
+      recebido: 'Pedido Recebido > Aguardando Envio',
+      embalado: 'Embalado > Aguardando Envio',
+      enviado: 'Pedido Enviado',
+      finalizado: 'Finalizado',
+      cancelado: 'Cancelado',
+      etiqueta_incorreta: 'Erro | Etiqueta Incorreta',
+    }[order.status as string] || order.status;
+
     const responseData = {
       id: order.id,
       order_number: order.order_number,
       status: order.status,
+      shipping_status: order.status,
+      shipping_status_label: statusEnvioLabel,
+      status_envio: order.status,
+      status_envio_label: statusEnvioLabel,
       payment_status: order.payment_status,
       payment_method: order.payment_method,
       payment_id: order.payment_id,

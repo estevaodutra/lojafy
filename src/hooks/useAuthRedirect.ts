@@ -45,10 +45,16 @@ export const useAuthRedirect = () => {
 
     console.log('🚀 Redirecting user with role:', role);
 
-    // Redirect all users to home after login
+    // Redirect user after login
     setTimeout(() => {
       if (currentPath === '/auth') {
-        navigate('/', { replace: true });
+        const returnUrl = sessionStorage.getItem('returnUrl') || searchParams.get('redirect');
+        if (returnUrl) {
+          sessionStorage.removeItem('returnUrl');
+          navigate(returnUrl, { replace: true });
+        } else {
+          navigate('/', { replace: true });
+        }
       }
     }, 100);
   }, [role, isAuthenticated, navigate, location.pathname, location.search]);

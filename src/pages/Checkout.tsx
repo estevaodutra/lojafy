@@ -20,7 +20,7 @@ import PixPayment from "@/components/PixPayment";
 import { ModernPixPayment } from '@/components/ModernPixPayment';
 import { PixPaymentModal } from '@/components/PixPaymentModal';
 import { createModernPixPayment, PixPaymentRequest } from '@/lib/mercadoPago';
-import { ShoppingCart, CreditCard, Truck, Shield, AlertTriangle } from "lucide-react";
+import { ShoppingCart, CreditCard, Truck, Shield, AlertTriangle, ArrowRight, ArrowLeft, CheckCircle2, Lock, Wallet, ChevronRight } from "lucide-react";
 import pixIcon from "@/assets/pix-icon.png";
 import { ShippingMethodSelector } from "@/components/ShippingMethodSelector";
 import { HighRotationAlert } from '@/components/HighRotationAlert';
@@ -117,6 +117,33 @@ const Checkout = ({
       navigate("/carrinho");
     }
   }, [cartItems, navigate, toast]);
+
+  // Restore pending step if returning from auth login
+  useEffect(() => {
+    const pendingStep = sessionStorage.getItem('checkout_pending_step');
+    if (pendingStep) {
+      sessionStorage.removeItem('checkout_pending_step');
+      const stepNum = parseInt(pendingStep, 10);
+      if (stepNum >= 1 && stepNum <= 3) {
+        setCurrentStep(stepNum);
+      }
+    }
+  }, []);
+
+  const handleAdvanceStep = (targetStep: number) => {
+    if (targetStep >= 3 && !user) {
+      toast({
+        title: "Login necessário",
+        description: "Faça login para continuar com o pagamento.",
+      });
+      const currentUrl = window.location.pathname + window.location.search;
+      sessionStorage.setItem('returnUrl', currentUrl);
+      sessionStorage.setItem('checkout_pending_step', targetStep.toString());
+      navigate('/auth?redirect=' + encodeURIComponent(currentUrl));
+      return;
+    }
+    setCurrentStep(targetStep);
+  };
   const [formData, setFormData] = useState<CheckoutForm>({
     email: "",
     firstName: "",
@@ -557,6 +584,17 @@ const Checkout = ({
     }
   };
   const createModernPix = async () => {
+    if (!user) {
+      toast({
+        title: "Login necessário",
+        description: "Você precisa fazer login para continuar com o pagamento.",
+      });
+      const currentUrl = window.location.pathname + window.location.search;
+      sessionStorage.setItem('returnUrl', currentUrl);
+      sessionStorage.setItem('checkout_pending_step', '3');
+      navigate('/auth?redirect=' + encodeURIComponent(currentUrl));
+      return;
+    }
     if (!formData.firstName || !formData.email || !formData.cpf) {
       toast({
         title: "Dados incompletos",
@@ -601,6 +639,17 @@ const Checkout = ({
     createModernPix();
   };
   const handlePayWithWallet = async () => {
+    if (!user) {
+      toast({
+        title: "Login necessário",
+        description: "Você precisa fazer login para pagar com o saldo da carteira.",
+      });
+      const currentUrl = window.location.pathname + window.location.search;
+      sessionStorage.setItem('returnUrl', currentUrl);
+      sessionStorage.setItem('checkout_pending_step', '3');
+      navigate('/auth?redirect=' + encodeURIComponent(currentUrl));
+      return;
+    }
     if (walletSaldo < total) {
       toast({
         title: "Saldo insuficiente",
@@ -793,396 +842,476 @@ const Checkout = ({
     title: "PIX",
     icon: Shield
   }];
-  return <div className="min-h-screen bg-background">
+  return (
+    <div className="min-h-screen bg-background relative flex flex-col">
       {showHeader && <Header />}
       
-      <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-4">Finalizar Compra</h1>
+      <main className="container mx-auto px-4 py-6 sm:py-8 flex-1 pb-32 sm:pb-36">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-4 tracking-tight">Finalizar Compra</h1>
           
-          {/* Progress Steps */}
-          <div className="flex items-center justify-between mb-8">
-            {steps.map((step, index) => <div key={step.number} className="flex items-center">
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full ${currentStep >= step.number ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                  <step.icon className="w-5 h-5" />
+          {/* Desktop Stepper */}
+          <div className="hidden md:flex items-center justify-between mb-8 bg-card border rounded-xl p-4 shadow-sm">
+            {steps.slice(0, 3).map((step, index) => (
+              <div key={step.number} className="flex items-center flex-1 last:flex-none">
+                <div className="flex items-center gap-3">
+                  <div className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all ${
+                    currentStep === step.number 
+                      ? 'bg-primary text-primary-foreground ring-4 ring-primary/20 shadow-sm' 
+                      : currentStep > step.number 
+                        ? 'bg-emerald-600 text-white' 
+                        : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {currentStep > step.number ? (
+                      <CheckCircle2 className="w-5 h-5" />
+                    ) : (
+                      <step.icon className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs text-muted-foreground font-medium">Etapa {step.number}</span>
+                    <span className={`text-sm font-semibold ${currentStep >= step.number ? 'text-foreground' : 'text-muted-foreground'}`}>
+                      {step.title}
+                    </span>
+                  </div>
                 </div>
-                <span className={`ml-2 text-sm font-medium ${currentStep >= step.number ? 'text-primary' : 'text-muted-foreground'}`}>
-                  {step.title}
-                </span>
-                {index < steps.length - 1 && <div className={`w-20 h-0.5 mx-4 ${currentStep > step.number ? 'bg-primary' : 'bg-muted'}`} />}
-              </div>)}
+                {index < 2 && (
+                  <div className="flex-1 mx-4 h-0.5 bg-border overflow-hidden">
+                    <div 
+                      className="h-full bg-primary transition-all duration-300"
+                      style={{ width: currentStep > step.number ? '100%' : '0%' }}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Mobile Stepper */}
+          <div className="md:hidden mb-6 bg-card border rounded-xl p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-primary uppercase tracking-wider">
+                Etapa {currentStep} de 3
+              </span>
+              <span className="text-sm font-bold text-foreground">
+                {steps.find(s => s.number === currentStep)?.title}
+              </span>
+            </div>
+            <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
+              <div 
+                className="bg-primary h-full transition-all duration-300 ease-out" 
+                style={{ width: `${(Math.min(currentStep, 3) / 3) * 100}%` }}
+              />
+            </div>
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Checkout Form */}
+        <div className="grid lg:grid-cols-3 gap-6 lg:gap-8 items-start">
+          {/* Checkout Form Main Column */}
           <div className="lg:col-span-2 space-y-6">
             
             {/* Profile completion warning for logged-in users */}
-            {user && (!profile?.phone || !profile?.cpf) && <Card className="border-amber-200 bg-amber-50">
-                <CardContent className="pt-6">
+            {user && (!profile?.phone || !profile?.cpf) && (
+              <Card className="border-amber-200 bg-amber-50/80 shadow-sm rounded-xl">
+                <CardContent className="pt-5 pb-5">
                   <div className="flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+                    <div className="p-2 bg-amber-100 rounded-lg text-amber-600">
+                      <AlertTriangle className="w-5 h-5" />
+                    </div>
                     <div className="flex-1">
-                      <h3 className="font-semibold text-amber-800">Complete seu perfil</h3>
-                      <p className="text-sm text-amber-700 mt-1">
+                      <h3 className="font-semibold text-amber-900">Complete seu perfil</h3>
+                      <p className="text-sm text-amber-800 mt-1">
                         Para uma experiência mais rápida, complete as informações do seu perfil. 
                         Os dados serão salvos automaticamente após a compra.
                       </p>
-                      {!profile?.phone && !profile?.cpf && <p className="text-xs text-amber-600 mt-2">
+                      {!profile?.phone && !profile?.cpf && (
+                        <p className="text-xs text-amber-700 mt-2 font-medium">
                           Preencha telefone e CPF para que sejam salvos no seu perfil.
-                        </p>}
-                      {!profile?.phone && profile?.cpf && <p className="text-xs text-amber-600 mt-2">
-                          Preencha seu telefone para que seja salvo no seu perfil.
-                        </p>}
-                      {profile?.phone && !profile?.cpf && <p className="text-xs text-amber-600 mt-2">
-                          Preencha seu CPF para que seja salvo no seu perfil.
-                        </p>}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>}
-            
-            {/* Show PIX Payment if available */}
-            {modernPixData ? <div className="flex justify-center">
-                <ModernPixPayment qrCode={modernPixData.qr_code} qrCodeBase64={modernPixData.qr_code_base64} amount={total} paymentId={modernPixData.payment_id} onPaymentConfirmed={handlePixPaymentConfirmed} />
-              </div> : pixPaymentData ? <div className="flex justify-center">
-                <PixPayment paymentData={pixPaymentData} onPaymentConfirmed={handlePixPaymentConfirmed} />
-              </div> : <>
-                {/* Regular checkout steps */}
-            {currentStep === 1 && <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <ShoppingCart className="w-5 h-5" />
-                    Dados Pessoais
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label htmlFor="email">E-mail</Label>
-                    <Input id="email" type="email" value={formData.email} onChange={e => handleInputChange("email", e.target.value)} placeholder="seu@email.com" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="firstName">Nome</Label>
-                      <Input id="firstName" value={formData.firstName} onChange={e => handleInputChange("firstName", e.target.value)} placeholder="Seu nome" />
-                    </div>
-                    <div>
-                      <Label htmlFor="lastName">Sobrenome</Label>
-                      <Input id="lastName" value={formData.lastName} onChange={e => handleInputChange("lastName", e.target.value)} placeholder="Seu sobrenome" />
-                    </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="phone">Telefone</Label>
-                    <Input id="phone" value={formData.phone} onChange={e => handleInputChange("phone", e.target.value)} placeholder="+55 (11) 99999-9999" maxLength={19} />
-                  </div>
-                  <div>
-                    <Label htmlFor="cpf">CPF</Label>
-                    <Input id="cpf" value={formData.cpf} onChange={e => handleInputChange("cpf", e.target.value)} placeholder="000.000.000-00" maxLength={14} />
-                  </div>
-                </CardContent>
-              </Card>}
-
-            {currentStep === 2 && <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Truck className="w-5 h-5" />
-                    Endereço de Entrega
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Shipping Method Selector */}
-                  <ShippingMethodSelector 
-                    orderValue={subtotal} 
-                    zipCode={formData.zipCode} 
-                    weight={1} // Calculate this based on products if needed
-                    selectedMethodId={selectedShippingMethod?.id} 
-                    onMethodChange={handleShippingMethodChange} 
-                    onFileUploaded={handleShippingFileUpload} 
-                    onLabelProcessed={handleLabelProcessed}
-                  />
-                  
-                  {isLabelMethod() && (
-                    <div className="space-y-4 pt-4 border-t">
-                      <div className="space-y-2">
-                        <Label htmlFor="trackingCode" className="font-semibold text-sm">
-                          Código de Rastreio da Etiqueta *
-                        </Label>
-                        <Input
-                          id="trackingCode"
-                          value={trackingCode}
-                          onChange={e => setTrackingCode(e.target.value.toUpperCase())}
-                          placeholder="Informe o código de rastreio da etiqueta"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Código de rastreio que consta na etiqueta para rastreabilidade em caso de devolução.
                         </p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="confirmTrackingCode" className="font-semibold text-sm">
-                          Confirmar Código de Rastreio *
-                        </Label>
-                        <Input
-                          id="confirmTrackingCode"
-                          value={confirmTrackingCode}
-                          onChange={e => setConfirmTrackingCode(e.target.value.toUpperCase())}
-                          placeholder="Confirme o código de rastreio"
-                        />
-                      </div>
-
-                      {trackingCode && confirmTrackingCode && trackingCode !== confirmTrackingCode && (
-                        <p className="text-sm font-medium text-destructive">
-                          ⚠️ Os códigos de rastreio informados não são idênticos.
+                      )}
+                      {!profile?.phone && profile?.cpf && (
+                        <p className="text-xs text-amber-700 mt-2 font-medium">
+                          Preencha seu telefone para que seja salvo no seu perfil.
+                        </p>
+                      )}
+                      {profile?.phone && !profile?.cpf && (
+                        <p className="text-xs text-amber-700 mt-2 font-medium">
+                          Preencha seu CPF para que seja salvo no seu perfil.
                         </p>
                       )}
                     </div>
-                  )}
-
-                  {/* Address fields - only show if not using label method */}
-                  {!isLabelMethod() && <div className="space-y-4 pt-4 border-t">
-                      <div className="flex items-center gap-2">
-                        <Truck className="w-4 h-4" />
-                        <Label className="text-base font-semibold">Endereço de Entrega</Label>
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="zipCode">CEP</Label>
-                        <Input id="zipCode" value={formData.zipCode} onChange={e => handleInputChange("zipCode", e.target.value)} placeholder="00000-000" maxLength={9} disabled={isLoadingCep} />
-                        {isLoadingCep && <p className="text-sm text-muted-foreground mt-1">
-                            Buscando endereço...
-                          </p>}
-                      </div>
-                      <div>
-                        <Label htmlFor="address">Logradouro</Label>
-                        <Input id="address" value={formData.address} onChange={e => handleInputChange("address", e.target.value)} placeholder="Nome da rua" />
-                      </div>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="col-span-1">
-                          <Label htmlFor="number">Número</Label>
-                          <Input id="number" value={formData.number} onChange={e => handleInputChange("number", e.target.value)} placeholder="123" />
-                        </div>
-                        <div className="col-span-2">
-                          <Label htmlFor="complement">Complemento</Label>
-                          <Input id="complement" value={formData.complement} onChange={e => handleInputChange("complement", e.target.value)} placeholder="Apto, casa, etc. (opcional)" />
-                        </div>
-                      </div>
-                      <div>
-                        <Label htmlFor="neighborhood">Bairro</Label>
-                        <Input id="neighborhood" value={formData.neighborhood} onChange={e => handleInputChange("neighborhood", e.target.value)} placeholder="Nome do bairro" />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="city">Cidade</Label>
-                          <Input id="city" value={formData.city} onChange={e => handleInputChange("city", e.target.value)} placeholder="Sua cidade" />
-                        </div>
-                        <div>
-                          <Label htmlFor="state">Estado</Label>
-                          <Select value={formData.state} onValueChange={value => handleInputChange("state", value)}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="AC">Acre</SelectItem>
-                              <SelectItem value="AL">Alagoas</SelectItem>
-                              <SelectItem value="AP">Amapá</SelectItem>
-                              <SelectItem value="AM">Amazonas</SelectItem>
-                              <SelectItem value="BA">Bahia</SelectItem>
-                              <SelectItem value="CE">Ceará</SelectItem>
-                              <SelectItem value="DF">Distrito Federal</SelectItem>
-                              <SelectItem value="ES">Espírito Santo</SelectItem>
-                              <SelectItem value="GO">Goiás</SelectItem>
-                              <SelectItem value="MA">Maranhão</SelectItem>
-                              <SelectItem value="MT">Mato Grosso</SelectItem>
-                              <SelectItem value="MS">Mato Grosso do Sul</SelectItem>
-                              <SelectItem value="MG">Minas Gerais</SelectItem>
-                              <SelectItem value="PA">Pará</SelectItem>
-                              <SelectItem value="PB">Paraíba</SelectItem>
-                              <SelectItem value="PR">Paraná</SelectItem>
-                              <SelectItem value="PE">Pernambuco</SelectItem>
-                              <SelectItem value="PI">Piauí</SelectItem>
-                              <SelectItem value="RJ">Rio de Janeiro</SelectItem>
-                              <SelectItem value="RN">Rio Grande do Norte</SelectItem>
-                              <SelectItem value="RS">Rio Grande do Sul</SelectItem>
-                              <SelectItem value="RO">Rondônia</SelectItem>
-                              <SelectItem value="RR">Roraima</SelectItem>
-                              <SelectItem value="SC">Santa Catarina</SelectItem>
-                              <SelectItem value="SP">São Paulo</SelectItem>
-                              <SelectItem value="SE">Sergipe</SelectItem>
-                              <SelectItem value="TO">Tocantins</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </div>}
-                  
-                  {/* Label method info message */}
-                  {isLabelMethod() && <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-start gap-2">
-                        <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
-                        <div>
-                          <h4 className="font-semibold text-blue-800">Envio com Etiqueta</h4>
-                          <p className="text-sm text-blue-700 mt-1">
-                            Com esta modalidade de envio, não é necessário informar o endereço de entrega. 
-                            {selectedShippingMethod?.requires_file && !shippingFile && <span className="block mt-1 font-medium">
-                                Por favor, faça o upload da etiqueta de envio para continuar.
-                              </span>}
-                          </p>
-                        </div>
-                      </div>
-                    </div>}
+                  </div>
                 </CardContent>
-              </Card>}
-
-            {currentStep === 3 && <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CreditCard className="w-5 h-5" />
-                    Forma de Pagamento
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Wallet payment option */}
-                  {user && walletSaldo > 0 && (
-                    <div 
-                      className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${paymentMethod === 'wallet' ? 'border-primary bg-primary/5' : 'border-muted hover:border-primary/50'}`}
-                      onClick={() => setPaymentMethod('wallet')}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center text-xl">
-                          💰
+              </Card>
+            )}
+            
+            {/* Show PIX Payment if available */}
+            {modernPixData ? (
+              <div className="flex justify-center">
+                <ModernPixPayment qrCode={modernPixData.qr_code} qrCodeBase64={modernPixData.qr_code_base64} amount={total} paymentId={modernPixData.payment_id} onPaymentConfirmed={handlePixPaymentConfirmed} />
+              </div>
+            ) : pixPaymentData ? (
+              <div className="flex justify-center">
+                <PixPayment paymentData={pixPaymentData} onPaymentConfirmed={handlePixPaymentConfirmed} />
+              </div>
+            ) : (
+              <>
+                {/* Regular checkout steps */}
+                {currentStep === 1 && (
+                  <Card className="shadow-sm rounded-xl border">
+                    <CardHeader className="pb-4">
+                      <CardTitle className="flex items-center gap-2 text-lg font-bold">
+                        <div className="p-2 bg-primary/10 text-primary rounded-lg">
+                          <ShoppingCart className="w-5 h-5" />
                         </div>
-                        <div className="flex-1">
-                          <h4 className="font-semibold">Saldo da Carteira</h4>
-                          <p className="text-sm text-muted-foreground">
-                            Disponível: {formatPrice(walletSaldo)}
-                          </p>
-                          {walletSaldo >= total ? (
-                            <p className="text-xs text-emerald-600 font-medium mt-0.5">✅ Saldo suficiente para este pedido</p>
-                          ) : (
-                            <p className="text-xs text-amber-600 font-medium mt-0.5">⚠️ Saldo insuficiente. Faltam {formatPrice(total - walletSaldo)}</p>
+                        Dados Pessoais
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <Label htmlFor="email" className="font-semibold text-sm">E-mail *</Label>
+                        <Input id="email" type="email" value={formData.email} onChange={e => handleInputChange("email", e.target.value)} placeholder="seu@email.com" className="mt-1" />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="firstName" className="font-semibold text-sm">Nome *</Label>
+                          <Input id="firstName" value={formData.firstName} onChange={e => handleInputChange("firstName", e.target.value)} placeholder="Seu nome" className="mt-1" />
+                        </div>
+                        <div>
+                          <Label htmlFor="lastName" className="font-semibold text-sm">Sobrenome</Label>
+                          <Input id="lastName" value={formData.lastName} onChange={e => handleInputChange("lastName", e.target.value)} placeholder="Seu sobrenome" className="mt-1" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="phone" className="font-semibold text-sm">Telefone</Label>
+                          <Input id="phone" value={formData.phone} onChange={e => handleInputChange("phone", e.target.value)} placeholder="+55 (11) 99999-9999" maxLength={19} className="mt-1" />
+                        </div>
+                        <div>
+                          <Label htmlFor="cpf" className="font-semibold text-sm">CPF *</Label>
+                          <Input id="cpf" value={formData.cpf} onChange={e => handleInputChange("cpf", e.target.value)} placeholder="000.000.000-00" maxLength={14} className="mt-1" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {currentStep === 2 && (
+                  <Card className="shadow-sm rounded-xl border">
+                    <CardHeader className="pb-4">
+                      <CardTitle className="flex items-center gap-2 text-lg font-bold">
+                        <div className="p-2 bg-primary/10 text-primary rounded-lg">
+                          <Truck className="w-5 h-5" />
+                        </div>
+                        Endereço de Entrega
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <ShippingMethodSelector 
+                        orderValue={subtotal} 
+                        zipCode={formData.zipCode} 
+                        weight={1} 
+                        selectedMethodId={selectedShippingMethod?.id} 
+                        onMethodChange={handleShippingMethodChange} 
+                        onFileUploaded={handleShippingFileUpload} 
+                        onLabelProcessed={handleLabelProcessed}
+                      />
+                      
+                      {isLabelMethod() && (
+                        <div className="space-y-4 pt-4 border-t">
+                          <div className="space-y-2">
+                            <Label htmlFor="trackingCode" className="font-semibold text-sm">
+                              Código de Rastreio da Etiqueta *
+                            </Label>
+                            <Input
+                              id="trackingCode"
+                              value={trackingCode}
+                              onChange={e => setTrackingCode(e.target.value.toUpperCase())}
+                              placeholder="Informe o código de rastreio da etiqueta"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Código de rastreio que consta na etiqueta para rastreabilidade em caso de devolução.
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="confirmTrackingCode" className="font-semibold text-sm">
+                              Confirmar Código de Rastreio *
+                            </Label>
+                            <Input
+                              id="confirmTrackingCode"
+                              value={confirmTrackingCode}
+                              onChange={e => setConfirmTrackingCode(e.target.value.toUpperCase())}
+                              placeholder="Confirme o código de rastreio"
+                            />
+                          </div>
+
+                          {trackingCode && confirmTrackingCode && trackingCode !== confirmTrackingCode && (
+                            <p className="text-sm font-medium text-destructive">
+                              ⚠️ Os códigos de rastreio informados não são idênticos.
+                            </p>
                           )}
                         </div>
-                        <input type="radio" checked={paymentMethod === 'wallet'} onChange={() => setPaymentMethod('wallet')} className="w-4 h-4" />
-                      </div>
-                    </div>
-                  )}
+                      )}
 
-                  {/* PIX option */}
-                  <div 
-                    className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${paymentMethod === 'pix' ? 'border-primary bg-primary/5' : 'border-muted hover:border-primary/50'}`}
-                    onClick={() => setPaymentMethod('pix')}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-xl">
-                        💠
-                      </div>
-                      <div>
-                        <h4 className="font-semibold">PIX</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Pagamento instantâneo e seguro
-                        </p>
-                      </div>
-                      <input type="radio" checked={paymentMethod === 'pix'} onChange={() => setPaymentMethod('pix')} className="w-4 h-4 ml-auto" />
-                    </div>
-                  </div>
+                      {!isLabelMethod() && (
+                        <div className="space-y-4 pt-4 border-t">
+                          <div className="flex items-center gap-2">
+                            <Truck className="w-4 h-4 text-primary" />
+                            <Label className="text-base font-semibold">Endereço de Entrega</Label>
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor="zipCode">CEP</Label>
+                            <Input id="zipCode" value={formData.zipCode} onChange={e => handleInputChange("zipCode", e.target.value)} placeholder="00000-000" maxLength={9} disabled={isLoadingCep} />
+                            {isLoadingCep && (
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Buscando endereço...
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <Label htmlFor="address">Logradouro</Label>
+                            <Input id="address" value={formData.address} onChange={e => handleInputChange("address", e.target.value)} placeholder="Nome da rua" />
+                          </div>
+                          <div className="grid grid-cols-3 gap-4">
+                            <div className="col-span-1">
+                              <Label htmlFor="number">Número</Label>
+                              <Input id="number" value={formData.number} onChange={e => handleInputChange("number", e.target.value)} placeholder="123" />
+                            </div>
+                            <div className="col-span-2">
+                              <Label htmlFor="complement">Complemento</Label>
+                              <Input id="complement" value={formData.complement} onChange={e => handleInputChange("complement", e.target.value)} placeholder="Apto, casa, etc. (opcional)" />
+                            </div>
+                          </div>
+                          <div>
+                            <Label htmlFor="neighborhood">Bairro</Label>
+                            <Input id="neighborhood" value={formData.neighborhood} onChange={e => handleInputChange("neighborhood", e.target.value)} placeholder="Nome do bairro" />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="city">Cidade</Label>
+                              <Input id="city" value={formData.city} onChange={e => handleInputChange("city", e.target.value)} placeholder="Sua cidade" />
+                            </div>
+                            <div>
+                              <Label htmlFor="state">Estado</Label>
+                              <Select value={formData.state} onValueChange={value => handleInputChange("state", value)}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="AC">Acre</SelectItem>
+                                  <SelectItem value="AL">Alagoas</SelectItem>
+                                  <SelectItem value="AP">Amapá</SelectItem>
+                                  <SelectItem value="AM">Amazonas</SelectItem>
+                                  <SelectItem value="BA">Bahia</SelectItem>
+                                  <SelectItem value="CE">Ceará</SelectItem>
+                                  <SelectItem value="DF">Distrito Federal</SelectItem>
+                                  <SelectItem value="ES">Espírito Santo</SelectItem>
+                                  <SelectItem value="GO">Goiás</SelectItem>
+                                  <SelectItem value="MA">Maranhão</SelectItem>
+                                  <SelectItem value="MT">Mato Grosso</SelectItem>
+                                  <SelectItem value="MS">Mato Grosso do Sul</SelectItem>
+                                  <SelectItem value="MG">Minas Gerais</SelectItem>
+                                  <SelectItem value="PA">Pará</SelectItem>
+                                  <SelectItem value="PB">Paraíba</SelectItem>
+                                  <SelectItem value="PR">Paraná</SelectItem>
+                                  <SelectItem value="PE">Pernambuco</SelectItem>
+                                  <SelectItem value="PI">Piauí</SelectItem>
+                                  <SelectItem value="RJ">Rio de Janeiro</SelectItem>
+                                  <SelectItem value="RN">Rio Grande do Norte</SelectItem>
+                                  <SelectItem value="RS">Rio Grande do Sul</SelectItem>
+                                  <SelectItem value="RO">Rondônia</SelectItem>
+                                  <SelectItem value="RR">Roraima</SelectItem>
+                                  <SelectItem value="SC">Santa Catarina</SelectItem>
+                                  <SelectItem value="SP">São Paulo</SelectItem>
+                                  <SelectItem value="SE">Sergipe</SelectItem>
+                                  <SelectItem value="TO">Tocantins</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {isLabelMethod() && (
+                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
+                            <div>
+                              <h4 className="font-semibold text-blue-800">Envio com Etiqueta</h4>
+                              <p className="text-sm text-blue-700 mt-1">
+                                Com esta modalidade de envio, não é necessário informar o endereço de entrega. 
+                                {selectedShippingMethod?.requires_file && !shippingFile && (
+                                  <span className="block mt-1 font-medium">
+                                    Por favor, faça o upload da etiqueta de envio para continuar.
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
 
-                  <BannerPrevisaoEnvio />
-                  
-                  {paymentMethod === 'pix' ? (
-                    <>
-                      <p className="text-sm text-muted-foreground">
-                        Clique no botão abaixo para gerar o QR Code PIX para pagamento.
-                      </p>
-                      <Button onClick={handleGeneratePix} disabled={isProcessingPayment || !canAdvanceToNextStep()} size="lg" className="w-full bg-[#3fc356]">
-                        {isProcessingPayment ? "Gerando PIX..." : "Concluir Pagamento via PIX"}
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-sm text-muted-foreground">
-                        O valor de {formatPrice(total)} será debitado do seu saldo da carteira.
-                      </p>
-                      <Button 
-                        onClick={handlePayWithWallet} 
-                        disabled={isPayingWithWallet || walletSaldo < total || !canAdvanceToNextStep()} 
-                        size="lg" 
-                        className="w-full bg-emerald-600 hover:bg-emerald-700"
+                {currentStep === 3 && (
+                  <Card className="shadow-sm rounded-xl border">
+                    <CardHeader className="pb-4">
+                      <CardTitle className="flex items-center gap-2 text-lg font-bold">
+                        <div className="p-2 bg-primary/10 text-primary rounded-lg">
+                          <CreditCard className="w-5 h-5" />
+                        </div>
+                        Forma de Pagamento
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {user && walletSaldo > 0 && (
+                        <div 
+                          className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${paymentMethod === 'wallet' ? 'border-emerald-600 bg-emerald-50/50 shadow-sm' : 'border-muted hover:border-primary/50'}`}
+                          onClick={() => setPaymentMethod('wallet')}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center text-xl shrink-0">
+                              💰
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-semibold">Saldo da Carteira</h4>
+                              <p className="text-sm text-muted-foreground">
+                                Disponível: {formatPrice(walletSaldo)}
+                              </p>
+                              {walletSaldo >= total ? (
+                                <p className="text-xs text-emerald-600 font-medium mt-0.5">✅ Saldo suficiente para este pedido</p>
+                              ) : (
+                                <p className="text-xs text-amber-600 font-medium mt-0.5">⚠️ Saldo insuficiente. Faltam {formatPrice(total - walletSaldo)}</p>
+                              )}
+                            </div>
+                            <input type="radio" checked={paymentMethod === 'wallet'} onChange={() => setPaymentMethod('wallet')} className="w-4 h-4 text-emerald-600" />
+                          </div>
+                        </div>
+                      )}
+
+                      <div 
+                        className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${paymentMethod === 'pix' ? 'border-primary bg-primary/5 shadow-sm' : 'border-muted hover:border-primary/50'}`}
+                        onClick={() => setPaymentMethod('pix')}
                       >
-                        {isPayingWithWallet ? "Processando..." : `Pagar com Saldo (${formatPrice(walletSaldo)})`}
-                      </Button>
-                    </>
-                  )}
-                </CardContent>
-              </Card>}
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-primary/10 text-primary rounded-lg flex items-center justify-center text-xl shrink-0">
+                            💠
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-semibold">PIX</h4>
+                            <p className="text-sm text-muted-foreground">
+                              Pagamento instantâneo e seguro
+                            </p>
+                          </div>
+                          <input type="radio" checked={paymentMethod === 'pix'} onChange={() => setPaymentMethod('pix')} className="w-4 h-4" />
+                        </div>
+                      </div>
 
-            {currentStep === 4 && <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="w-5 h-5" />
-                    Confirmação do Pedido
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground mb-4">
-                    Revise seus dados e finalize a compra. Você receberá um e-mail de confirmação.
-                  </p>
-                  <div className="space-y-2 text-sm">
-                    <p><strong>Nome:</strong> {formData.firstName} {formData.lastName}</p>
-                    <p><strong>E-mail:</strong> {formData.email}</p>
-                    <p><strong>Telefone:</strong> {formData.phone}</p>
-                    {!isLabelMethod() ? <p><strong>Endereço:</strong> {formData.address}, {formData.number} {formData.complement && `- ${formData.complement}`}, {formData.neighborhood}, {formData.city} - {formData.state}</p> : <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-                        <p><strong>Entrega:</strong> Envio com Etiqueta</p>
-                        {shippingFile && <p className="text-xs text-blue-600 mt-1">
-                            Etiqueta anexada: {shippingFile.name}
-                          </p>}
-                      </div>}
-                    <p><strong>Pagamento:</strong> PIX</p>
-                  </div>
-                </CardContent>
-              </Card>}
+                      <BannerPrevisaoEnvio />
+                    </CardContent>
+                  </Card>
+                )}
 
-                {/* Navigation Buttons */}
-                <div className="flex justify-between">
-                  <Button variant="outline" onClick={() => setCurrentStep(Math.max(1, currentStep - 1))} disabled={currentStep === 1 || isProcessingPayment}>
+                {currentStep === 4 && (
+                  <Card className="shadow-sm rounded-xl border">
+                    <CardHeader className="pb-4">
+                      <CardTitle className="flex items-center gap-2 text-lg font-bold">
+                        <div className="p-2 bg-primary/10 text-primary rounded-lg">
+                          <Shield className="w-5 h-5" />
+                        </div>
+                        Confirmação do Pedido
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-muted-foreground mb-4">
+                        Revise seus dados e finalize a compra. Você receberá um e-mail de confirmação.
+                      </p>
+                      <div className="space-y-2 text-sm">
+                        <p><strong>Nome:</strong> {formData.firstName} {formData.lastName}</p>
+                        <p><strong>E-mail:</strong> {formData.email}</p>
+                        <p><strong>Telefone:</strong> {formData.phone}</p>
+                        {!isLabelMethod() ? (
+                          <p><strong>Endereço:</strong> {formData.address}, {formData.number} {formData.complement && `- ${formData.complement}`}, {formData.neighborhood}, {formData.city} - {formData.state}</p>
+                        ) : (
+                          <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                            <p><strong>Entrega:</strong> Envio com Etiqueta</p>
+                            {shippingFile && (
+                              <p className="text-xs text-blue-600 mt-1">
+                                Etiqueta anexada: {shippingFile.name}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        <p><strong>Pagamento:</strong> {paymentMethod === 'pix' ? 'PIX' : 'Saldo da Carteira'}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Inline Card Navigation Buttons */}
+                <div className="flex items-center justify-between pt-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => handleAdvanceStep(Math.max(1, currentStep - 1))} 
+                    disabled={currentStep === 1 || isProcessingPayment || isPayingWithWallet}
+                    className="gap-2"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
                     Voltar
                   </Button>
                   
-                  {currentStep < 3 && <Button onClick={() => setCurrentStep(currentStep + 1)} disabled={!canAdvanceToNextStep()} className="bg-[#3fc356]">
+                  {currentStep < 3 && (
+                    <Button 
+                      onClick={() => handleAdvanceStep(currentStep + 1)} 
+                      disabled={!canAdvanceToNextStep()} 
+                      className="bg-[#3fc356] hover:bg-[#35a849] gap-2 text-white font-semibold shadow-sm"
+                    >
                       Continuar
-                    </Button>}
+                      <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
-              </>}
+              </>
+            )}
           </div>
 
-          {/* Order Summary */}
+          {/* Order Summary Sidebar */}
           <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Resumo do Pedido</CardTitle>
+            <Card className="shadow-sm rounded-xl border">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-bold">Resumo do Pedido</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {cartItems.map(item => <div key={item.productId} className="flex gap-3">
-                    <img src={item.productImage} alt={item.productName} className="w-16 h-16 object-cover rounded" />
-                    <div className="flex-1">
-                      <h4 className="font-medium text-sm">{item.productName}</h4>
-                      {item.variants && <div className="flex gap-1 mt-1">
-                          {Object.entries(item.variants).map(([key, value]) => <Badge key={key} variant="secondary" className="text-xs">
+                {cartItems.map(item => (
+                  <div key={item.productId} className="flex gap-3">
+                    <img src={item.productImage} alt={item.productName} className="w-16 h-16 object-cover rounded-lg border shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-sm truncate">{item.productName}</h4>
+                      {item.variants && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {Object.entries(item.variants).map(([key, value]) => (
+                            <Badge key={key} variant="secondary" className="text-[10px] px-1.5 py-0">
                               {value}
-                            </Badge>)}
-                        </div>}
-                      <p className="text-sm text-muted-foreground">Qtd: {item.quantity}</p>
-                      <p className="font-medium">{formatPrice(item.price)}</p>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">Qtd: {item.quantity}</p>
+                      <p className="font-semibold text-sm mt-0.5">{formatPrice(item.price)}</p>
                     </div>
-                  </div>)}
+                  </div>
+                ))}
                 
                 <Separator />
                 
                 {/* Coupon */}
                 <div className="space-y-2">
                   <div className="flex gap-2">
-                    <Input placeholder="Código do cupom" value={couponCode} onChange={e => setCouponCode(e.target.value)} />
-                    <Button variant="outline" onClick={applyCoupon}>
+                    <Input placeholder="Código do cupom" value={couponCode} onChange={e => setCouponCode(e.target.value)} className="text-sm" />
+                    <Button variant="outline" onClick={applyCoupon} className="shrink-0">
                       Aplicar
                     </Button>
                   </div>
@@ -1191,34 +1320,122 @@ const Checkout = ({
                 <Separator />
                 
                 {/* Totals */}
-                <div className="space-y-2">
-                  <div className="flex justify-between">
+                <div className="space-y-2.5 text-sm">
+                  <div className="flex justify-between text-muted-foreground">
                     <span>Subtotal</span>
-                    <span>{formatPrice(subtotal)}</span>
+                    <span className="font-medium text-foreground">{formatPrice(subtotal)}</span>
                   </div>
-                  {discount > 0 && <div className="flex justify-between text-green-600">
+                  {discount > 0 && (
+                    <div className="flex justify-between text-emerald-600 font-medium">
                       <span>Desconto</span>
                       <span>-{formatPrice(discount)}</span>
-                    </div>}
-                  <div className="flex justify-between">
+                    </div>
+                  )}
+                  <div className="flex justify-between text-muted-foreground">
                     <span>Frete</span>
-                    <span>
-                      {selectedShippingMethod ? shippingCost === 0 ? "GRÁTIS" : formatPrice(shippingCost) : "A calcular"}
+                    <span className="font-medium text-foreground">
+                      {selectedShippingMethod ? (shippingCost === 0 ? <span className="text-emerald-600 font-semibold">GRÁTIS</span> : formatPrice(shippingCost)) : "A calcular"}
                     </span>
                   </div>
                   <Separator />
-                  <div className="flex justify-between font-bold text-lg">
+                  <div className="flex justify-between font-bold text-lg pt-1">
                     <span>Total</span>
-                    <span>{formatPrice(total)}</span>
+                    <span className="text-primary">{formatPrice(total)}</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
         </div>
-       </main>
+      </main>
       
       {showFooter && <Footer />}
+
+      {/* Floating Action Footer Bar (Always Fixed at Bottom) */}
+      {!modernPixData && !pixPaymentData && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-t border-border shadow-[0_-4px_20px_rgba(0,0,0,0.12)] p-3 sm:p-4">
+          <div className="container mx-auto max-w-6xl flex items-center justify-between gap-3 sm:gap-4">
+            {/* Left: Total Summary */}
+            <div className="flex flex-col min-w-0">
+              <span className="text-[10px] sm:text-xs text-muted-foreground font-semibold uppercase tracking-wider">Total a pagar</span>
+              <div className="flex items-baseline gap-1.5 sm:gap-2">
+                <span className="text-lg sm:text-2xl font-extrabold text-foreground tracking-tight">{formatPrice(total)}</span>
+                {shippingCost === 0 && selectedShippingMethod && (
+                  <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 text-[10px] sm:text-xs font-semibold px-1.5 py-0">
+                    Frete Grátis
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            {/* Right: Floating Actions */}
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+              {currentStep > 1 && (
+                <Button
+                  variant="outline"
+                  size="default"
+                  onClick={() => handleAdvanceStep(Math.max(1, currentStep - 1))}
+                  disabled={isProcessingPayment || isPayingWithWallet}
+                  className="px-3 sm:px-4 text-xs sm:text-sm font-medium h-10 sm:h-11 border-muted-foreground/30"
+                >
+                  <ArrowLeft className="w-4 h-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Voltar</span>
+                </Button>
+              )}
+
+              {currentStep < 3 ? (
+                <Button
+                  onClick={() => handleAdvanceStep(currentStep + 1)}
+                  disabled={!canAdvanceToNextStep()}
+                  size="default"
+                  className="bg-[#3fc356] hover:bg-[#35a849] text-white font-bold px-4 sm:px-6 h-10 sm:h-11 shadow-md transition-all text-xs sm:text-sm rounded-lg"
+                >
+                  <span>Continuar</span>
+                  <ArrowRight className="w-4 h-4 ml-1.5" />
+                </Button>
+              ) : paymentMethod === 'pix' ? (
+                <Button
+                  onClick={handleGeneratePix}
+                  disabled={isProcessingPayment || !canAdvanceToNextStep()}
+                  size="default"
+                  className="bg-[#3fc356] hover:bg-[#35a849] text-white font-bold px-4 sm:px-6 h-10 sm:h-11 shadow-md transition-all text-xs sm:text-sm rounded-lg"
+                >
+                  {isProcessingPayment ? (
+                    <span className="flex items-center gap-2">
+                      <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                      Gerando PIX...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5">
+                      <Lock className="w-4 h-4" />
+                      Concluir Pagamento via PIX
+                    </span>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  onClick={handlePayWithWallet}
+                  disabled={isPayingWithWallet || walletSaldo < total || !canAdvanceToNextStep()}
+                  size="default"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 sm:px-6 h-10 sm:h-11 shadow-md transition-all text-xs sm:text-sm rounded-lg"
+                >
+                  {isPayingWithWallet ? (
+                    <span className="flex items-center gap-2">
+                      <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                      Processando...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5">
+                      <Wallet className="w-4 h-4" />
+                      Pagar com Saldo
+                    </span>
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* PIX Payment Modal */}
       {pixModalData && <PixPaymentModal isOpen={showPixModal} onClose={() => setShowPixModal(false)} qrCodeBase64={pixModalData.qrCodeBase64} qrCodeCopyPaste={pixModalData.qrCodeCopyPaste} paymentId={pixModalData.paymentId} amount={pixModalData.amount} onPaymentConfirmed={handlePixPaymentConfirmed} />}
@@ -1229,6 +1446,7 @@ const Checkout = ({
         onClose={() => setShowHighRotationAlert(false)} 
         allowContinue={false}
       />
-    </div>;
+    </div>
+  );
 };
 export default Checkout;

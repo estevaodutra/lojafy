@@ -51,7 +51,7 @@ const Auth = () => {
     const result = await signIn(loginEmail, loginPassword);
     
     if (!result.error) {
-      const returnUrl = sessionStorage.getItem('returnUrl');
+      const returnUrl = sessionStorage.getItem('returnUrl') || new URLSearchParams(window.location.search).get('redirect');
       if (returnUrl) {
         sessionStorage.removeItem('returnUrl');
         window.location.href = returnUrl;
