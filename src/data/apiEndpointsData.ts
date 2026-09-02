@@ -493,7 +493,75 @@ const ordersEndpoints: EndpointData[] = [
       { code: 403, title: 'Sem permissão', description: 'API Key sem permissão pedidos.read', example: { success: false, error: 'Esta API Key não possui permissão de leitura de pedidos' } },
       { code: 404, title: 'Pedido não encontrado', description: 'Nenhum pedido corresponde ao identificador informado', example: { success: false, error: 'Pedido não encontrado' } }
     ]
-  }
+  },
+  {
+    title: 'Consultar Webhook de Pedido Pago',
+    method: 'GET',
+    url: '/functions/v1/api-webhook-buscar-pedido',
+    description: 'Endpoint específico para busca ativa e polling de pedidos pagos. Retorna exatamente a mesma estrutura de payload transmitida no evento de webhook order.paid.',
+    headers: [
+      { name: 'X-API-Key', description: 'Chave de API com permissão pedidos.read', example: 'sk_...', required: true }
+    ],
+    queryParams: [
+      { name: 'order_number', description: 'Número do pedido para busca única', example: '482' },
+      { name: 'id', description: 'ID (UUID) do pedido para busca única', example: '12ee31a9-707e-43aa-a56e-7ea6e980fe93' },
+      { name: 'external_reference', description: 'Referência externa (Mercado Pago)', example: '482' },
+      { name: 'payment_id', description: 'ID do pagamento', example: 'PAY01M1HDNZRBN3XKZQ2N0FVWF97C' },
+      { name: 'period', description: 'Período para listagem ativa: today, yesterday, 7days, 14days, 30days (padrão: 30days)', example: '7days' },
+      { name: 'limit', description: 'Limite de registros por busca (máx: 100)', example: '50' }
+    ],
+    responseExample: {
+      success: true,
+      event: 'order.paid',
+      data: {
+        order_id: '12ee31a9-707e-43aa-a56e-7ea6e980fe93',
+        order_number: 482,
+        total_amount: 8.9,
+        payment_status: 'paid',
+        payment_method: 'pix',
+        status: 'pago',
+        shipping_status: 'pago',
+        shipping_status_label: 'Pedido Pago > Aguardando Recebimento da Expedição',
+        created_at: '2026-09-02T16:01:55Z',
+        customer: {
+          user_id: 'user-uuid',
+          email: 'cliente@exemplo.com',
+          name: 'João Silva',
+          phone: '(11) 98765-4321',
+          cpf: '123.456.789-00'
+        },
+        reseller: {
+          user_id: null,
+          store_name: null
+        },
+        items: [
+          {
+            product_id: 'prod-uuid',
+            product_url: 'https://...',
+            name: 'Produto Exemplo',
+            sku: 'SKU-001',
+            image_url: 'https://...',
+            cost_price: 5.0,
+            quantity: 1,
+            unit_price: 8.9,
+            variation: null
+          }
+        ],
+        shipping_address: { street: 'Rua Exemplo', number: '100', city: 'São Paulo', state: 'SP' },
+        shipping_label: {
+          file_name: 'etiqueta_482.pdf',
+          file_size: 102400,
+          uploaded_at: '2026-09-02T16:03:00Z',
+          download_url: 'https://...'
+        }
+      }
+    },
+    errorExamples: [
+      { code: 401, title: 'API Key inválida', description: 'Chave não fornecida ou inativa', example: { success: false, error: 'API Key inválida ou inativa' } },
+      { code: 403, title: 'Sem permissão', description: 'API Key sem permissão pedidos.read', example: { success: false, error: 'Esta API Key não possui permissão de leitura de pedidos' } },
+      { code: 404, title: 'Pedido não encontrado', description: 'Nenhum pedido pago encontrado com o identificador informado', example: { success: false, error: 'Pedido não encontrado' } }
+    ]
+  },
 ];
 
 // Ranking/Demo Endpoints

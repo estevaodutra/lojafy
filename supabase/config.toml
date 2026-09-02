@@ -51,6 +51,9 @@ verify_jwt = false
 [functions.api-pedidos-atualizar-status]
 verify_jwt = false
 
+[functions.api-webhook-buscar-pedido]
+verify_jwt = false
+
 [functions.create-pix-payment]
 verify_jwt = false
 
