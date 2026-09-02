@@ -144,6 +144,60 @@ function calculateFinancialSummary(
   };
 }
 
+function parseShippingStatusFilter(statusParam: string | null): string[] {
+  if (!statusParam) return [];
+  
+  const tokens = statusParam.split(',').map(s => s.trim()).filter(Boolean);
+  const resolvedStatuses = new Set<string>();
+
+  const KNOWN_STATUSES = [
+    'pendente',
+    'pago',
+    'recebido',
+    'embalado',
+    'enviado',
+    'finalizado',
+    'cancelado',
+    'etiqueta_incorreta'
+  ];
+
+  for (const token of tokens) {
+    const lower = token.toLowerCase();
+
+    if (KNOWN_STATUSES.includes(lower)) {
+      resolvedStatuses.add(lower);
+      continue;
+    }
+
+    if (
+      lower.includes('pago') || 
+      lower.includes('recebimento') || 
+      lower.includes('expedição') || 
+      lower.includes('expedicao')
+    ) {
+      resolvedStatuses.add('pago');
+    } else if (lower.includes('pendente') || lower.includes('pagamento')) {
+      resolvedStatuses.add('pendente');
+    } else if (lower.includes('recebido')) {
+      resolvedStatuses.add('recebido');
+    } else if (lower.includes('embalado')) {
+      resolvedStatuses.add('embalado');
+    } else if (lower.includes('enviado')) {
+      resolvedStatuses.add('enviado');
+    } else if (lower.includes('finalizado')) {
+      resolvedStatuses.add('finalizado');
+    } else if (lower.includes('cancelado')) {
+      resolvedStatuses.add('cancelado');
+    } else if (lower.includes('etiqueta') || lower.includes('incorreta')) {
+      resolvedStatuses.add('etiqueta_incorreta');
+    } else {
+      resolvedStatuses.add(token);
+    }
+  }
+
+  return Array.from(resolvedStatuses);
+}
+
 function getPeriodFilter(period: string) {
   const now = new Date();
   let startDate: Date;
@@ -240,15 +294,20 @@ Deno.serve(async (req) => {
     const dateParam = url.searchParams.get('date');
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
     const page = Math.max(parseInt(url.searchParams.get('page') || '1'), 1);
-    const status = url.searchParams.get('status');
+    const shippingStatusParam = url.searchParams.get('shipping_status') || 
+                               url.searchParams.get('status_envio') || 
+                               url.searchParams.get('status');
     const paymentStatus = url.searchParams.get('payment_status');
+
+    const parsedShippingStatuses = parseShippingStatusFilter(shippingStatusParam);
 
     console.log('[api-pedidos-listar] Request received', {
       period,
       dateParam,
       limit,
       page,
-      status,
+      shippingStatusParam,
+      parsedShippingStatuses,
       paymentStatus,
       apiKeyUserId: apiKeyData.user_id
     });
@@ -334,8 +393,10 @@ Deno.serve(async (req) => {
       query = query.gte('created_at', startDate.toISOString());
     }
 
-    if (status) {
-      query = query.eq('status', status);
+    if (parsedShippingStatuses.length === 1) {
+      query = query.eq('status', parsedShippingStatuses[0]);
+    } else if (parsedShippingStatuses.length > 1) {
+      query = query.in('status', parsedShippingStatuses);
     }
 
     if (paymentStatus) {
@@ -419,7 +480,7 @@ Deno.serve(async (req) => {
 
       const statusEnvioLabel = {
         pendente: 'Pedido Gerado > Aguardando Pagamento',
-        pago: 'Pedido Pago Aguardada Recebimento da Expedição',
+        pago: 'Pedido Pago > Aguardando Recebimento da Expedição',
         recebido: 'Pedido Recebido > Aguardando Envio',
         embalado: 'Embalado > Aguardando Envio',
         enviado: 'Pedido Enviado',
@@ -490,7 +551,8 @@ Deno.serve(async (req) => {
         period: dateParam ? null : period,
         date: dateParam || null,
         filters: {
-          status: status || null,
+          shipping_status: shippingStatusParam || null,
+          status: shippingStatusParam || null,
           payment_status: paymentStatus || null
         }
       }),

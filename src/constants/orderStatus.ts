@@ -29,7 +29,7 @@ export interface OrderStatusConfig {
 
 export const ORDER_STATUS_CONFIG: Record<OrderStatus, OrderStatusConfig> = {
   pendente: { label: "Pedido Gerado > Aguardando Pagamento", icon: Clock, color: "bg-gray-100 text-gray-800", variant: "secondary" },
-  pago: { label: "Pedido Pago Aguardada Recebimento da Expedição", icon: BadgeCheck, color: "bg-emerald-100 text-emerald-800", variant: "default" },
+  pago: { label: "Pedido Pago > Aguardando Recebimento da Expedição", icon: BadgeCheck, color: "bg-emerald-100 text-emerald-800", variant: "default" },
   recebido: { label: "Pedido Recebido > Aguardando Envio", icon: Inbox, color: "bg-blue-100 text-blue-800", variant: "default" },
   embalado: { label: "Embalado > Aguardando Envio", icon: Package, color: "bg-orange-100 text-orange-800", variant: "default" },
   enviado: { label: "Pedido Enviado", icon: Send, color: "bg-purple-100 text-purple-800", variant: "secondary" },

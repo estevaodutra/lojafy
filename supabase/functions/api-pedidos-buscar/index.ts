@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
 
     const statusEnvioLabel = {
       pendente: 'Pedido Gerado > Aguardando Pagamento',
-      pago: 'Pedido Pago Aguardada Recebimento da Expedição',
+      pago: 'Pedido Pago > Aguardando Recebimento da Expedição',
       recebido: 'Pedido Recebido > Aguardando Envio',
       embalado: 'Embalado > Aguardando Envio',
       enviado: 'Pedido Enviado',
