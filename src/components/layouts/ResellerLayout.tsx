@@ -173,7 +173,7 @@ const ResellerSidebar = () => {
   };
 
   return (
-    <Sidebar className="border-r">
+    <Sidebar collapsible="icon" className="border-r">
       <SidebarContent>
         <div className="p-4 flex items-center justify-between border-b">
           <h2 className="text-lg font-semibold">Revendedor</h2>

@@ -36,7 +36,7 @@ const AdminSidebar = () => {
   };
 
   return (
-    <Sidebar className="w-64">
+    <Sidebar collapsible="icon" className="w-64 border-r">
       <SidebarContent>
         <SidebarHeader className="p-4 border-b flex justify-center">
           <img 

@@ -100,13 +100,15 @@ const CustomerSidebar = () => {
 const CustomerLayout: React.FC = () => {
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full overflow-x-hidden min-w-0">
         <CustomerSidebar />
-        <main className="flex-1 p-6">
-          <div className="mb-6">
-            <SidebarTrigger className="md:hidden" />
+        <main className="flex-1 min-w-0 flex flex-col overflow-x-hidden">
+          <header className="h-12 flex items-center border-b px-4 shrink-0 bg-background md:hidden">
+            <SidebarTrigger />
+          </header>
+          <div className="p-4 md:p-6 flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
+            <Outlet />
           </div>
-          <Outlet />
         </main>
       </div>
     </SidebarProvider>

@@ -162,7 +162,7 @@ const SuperAdminSidebar = () => {
   };
 
   return (
-    <Sidebar className="border-r">
+    <Sidebar collapsible="icon" className="border-r">
       <SidebarContent>
         <div className="p-4">
           <h2 className="text-lg font-semibold">Super Admin</h2>
