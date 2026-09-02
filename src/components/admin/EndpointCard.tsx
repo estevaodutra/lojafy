@@ -122,17 +122,17 @@ export const EndpointCard: React.FC<EndpointCardProps> = ({ endpoint }) => {
               <h4 className="font-medium mb-3">Headers Obrigatórios</h4>
               <div className="space-y-2">
                 {endpoint.headers.map((header) => (
-                  <div key={header.name} className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm border-l-2 border-primary/20 pl-3">
-                    <div className="flex items-center gap-2">
-                      <code className="font-mono text-primary">{header.name}</code>
+                  <div key={header.name} className="flex flex-col md:flex-row md:items-center justify-between gap-2 p-2.5 rounded-lg bg-muted/40 border text-sm min-w-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                      <code className="font-mono text-primary font-semibold shrink-0">{header.name}</code>
                       {header.required && (
-                        <Badge variant="destructive" className="text-xs py-0 px-1">
+                        <Badge variant="destructive" className="text-xs py-0 px-1 shrink-0">
                           obrigatório
                         </Badge>
                       )}
+                      <span className="text-muted-foreground text-xs md:text-sm break-words">{header.description}</span>
                     </div>
-                    <div className="text-muted-foreground">{header.description}</div>
-                    <div className="font-mono text-xs bg-muted px-2 py-1 rounded">
+                    <div className="font-mono text-xs bg-muted px-2 py-1 rounded shrink-0 self-start md:self-auto break-all max-w-full">
                       {header.example}
                     </div>
                   </div>
@@ -149,17 +149,17 @@ export const EndpointCard: React.FC<EndpointCardProps> = ({ endpoint }) => {
             <h4 className="font-medium mb-3">Parâmetros de Query</h4>
             <div className="space-y-2">
               {endpoint.queryParams.map((param) => (
-                <div key={param.name} className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <code className="font-mono text-primary">{param.name}</code>
+                <div key={param.name} className="flex flex-col md:flex-row md:items-center justify-between gap-2 p-2.5 rounded-lg bg-muted/40 border text-sm min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                    <code className="font-mono text-primary font-semibold shrink-0">{param.name}</code>
                     {param.required && (
-                      <Badge variant="destructive" className="text-xs py-0 px-1">
+                      <Badge variant="destructive" className="text-xs py-0 px-1 shrink-0">
                         obrigatório
                       </Badge>
                     )}
+                    <span className="text-muted-foreground text-xs md:text-sm break-words">{param.description}</span>
                   </div>
-                  <div className="text-muted-foreground">{param.description}</div>
-                  <div className="font-mono text-xs bg-muted px-2 py-1 rounded">
+                  <div className="font-mono text-xs bg-muted px-2 py-1 rounded shrink-0 self-start md:self-auto break-all max-w-full">
                     {param.example}
                   </div>
                 </div>

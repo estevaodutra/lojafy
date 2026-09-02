@@ -62,7 +62,7 @@ export const ApiDocsSidebar: React.FC<ApiDocsSidebarProps> = ({
   onCategoryToggle,
 }) => {
   return (
-    <div className="bg-card border rounded-lg sticky top-6">
+    <div className="bg-card border rounded-lg sticky top-6 overflow-hidden min-w-0">
       <ScrollArea className="h-[calc(100vh-280px)]">
         <div className="p-4 space-y-1">
           {/* Static Items */}

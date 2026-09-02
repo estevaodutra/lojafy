@@ -142,10 +142,10 @@ export const SupplierLayout: React.FC = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full overflow-x-hidden min-w-0">
         <SupplierSidebar />
-        <main className="flex-1 min-w-0">
-          <header className="h-12 flex items-center gap-3 border-b px-4">
+        <main className="flex-1 min-w-0 flex flex-col overflow-x-hidden">
+          <header className="h-12 flex items-center gap-3 border-b px-4 shrink-0 bg-background">
             <SidebarTrigger />
             {orgData?.organization && (
               <span className="text-sm font-medium text-muted-foreground truncate">
@@ -156,7 +156,7 @@ export const SupplierLayout: React.FC = () => {
               <AlertsStrip />
             </div>
           </header>
-          <div className="p-6">
+          <div className="p-4 md:p-6 flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
             <Outlet />
           </div>
         </main>

@@ -304,13 +304,13 @@ export const ResellerLayout: React.FC = () => {
   return (
     <SidebarProvider>
       <WelcomeResellerModal />
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full overflow-x-hidden min-w-0">
         <ResellerSidebar />
-        <main className="flex-1">
-          <header className="h-12 flex items-center border-b px-4">
+        <main className="flex-1 min-w-0 flex flex-col overflow-x-hidden">
+          <header className="h-12 flex items-center border-b px-4 shrink-0 bg-background">
             <SidebarTrigger />
           </header>
-          <div className="p-6">
+          <div className="p-4 md:p-6 flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
             <Outlet />
           </div>
         </main>

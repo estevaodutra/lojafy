@@ -135,13 +135,13 @@ const AdminLayout: React.FC = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full overflow-x-hidden min-w-0">
         <AdminSidebar />
-        <main className="flex-1">
-          <header className="flex items-center justify-end p-6 border-b bg-background">
+        <main className="flex-1 min-w-0 flex flex-col overflow-x-hidden">
+          <header className="flex items-center justify-end p-4 border-b bg-background shrink-0">
             <SidebarTrigger className="md:hidden" />
           </header>
-          <div className="p-6">
+          <div className="p-4 md:p-6 flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
             <Outlet />
           </div>
         </main>
