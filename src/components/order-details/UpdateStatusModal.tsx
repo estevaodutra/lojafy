@@ -59,6 +59,16 @@ export const UpdateStatusModal = ({
         notes,
       });
 
+      if (['pago', 'recebido'].includes(newStatus)) {
+        try {
+          await supabase.functions.invoke('dispatch-webhook', {
+            body: { event_type: 'order.paid', payload: { order_id: orderId } }
+          });
+        } catch (whErr) {
+          console.error('Erro ao disparar webhook order.paid:', whErr);
+        }
+      }
+
       toast.success(`Status atualizado para "${getStatusLabel(newStatus)}"`);
       onOpenChange(false);
       onSuccess();

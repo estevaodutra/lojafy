@@ -193,6 +193,21 @@ Deno.serve(async (req) => {
 
     console.log(`Order ${order_number} status updated: ${previousStatus} -> ${status}`);
 
+    // Disparar webhook order.paid se o status for pago ou recebido
+    if (['pago', 'recebido'].includes(status) || updateData.payment_status === 'paid') {
+      try {
+        await supabase.functions.invoke('dispatch-webhook', {
+          body: {
+            event_type: 'order.paid',
+            payload: { order_id: order.id }
+          }
+        });
+        console.log(`✅ Webhook order.paid disparado via api-pedidos-atualizar-status para pedido ${order_number}`);
+      } catch (whErr: any) {
+        console.error('Erro ao disparar webhook order.paid:', whErr);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

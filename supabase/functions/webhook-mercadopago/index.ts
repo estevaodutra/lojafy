@@ -1,4 +1,4 @@
-﻿import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
@@ -272,26 +272,39 @@ serve(async (req) => {
     if (paymentData.status === 'approved') {
       console.log(`✅ Payment approved for order ${orderData.order_number}`);
 
-      // Split assíncrono — não bloqueia resposta ao MP
-      supabase.functions.invoke('process-payment-split', {
-        body: { order_id: orderData.id },
-      }).catch((e: Error) => console.error('[mp-webhook] Split failed:', e));
+      // Disparar evento order.paid para webhooks registrados (n8n, etc.) com await
+      try {
+        await supabase.functions.invoke('dispatch-webhook', {
+          body: { event_type: 'order.paid', payload: { order_id: orderData.id } },
+        });
+        console.log(`✅ Webhook order.paid disparado com sucesso para pedido ${orderData.order_number}`);
+      } catch (e: any) {
+        console.error('[mp-webhook] Webhook dispatch failed:', e);
+      }
 
-      // Disparar evento order.paid para webhooks registrados (n8n, etc.)
-      supabase.functions.invoke('dispatch-webhook', {
-        body: { event_type: 'order.paid', payload: { order_id: orderData.id } },
-      }).catch((e: Error) => console.error('[mp-webhook] Webhook dispatch failed:', e));
+      // Split de pagamento
+      try {
+        await supabase.functions.invoke('process-payment-split', {
+          body: { order_id: orderData.id },
+        });
+      } catch (e: any) {
+        console.error('[mp-webhook] Split failed:', e);
+      }
 
       // Notificar comprador
       if (orderData.user_id) {
-        supabase.from('notifications').insert({
-          user_id: orderData.user_id,
-          title: '✅ Pagamento confirmado!',
-          message: `Seu pedido ${orderData.order_number} foi pago e está sendo processado.`,
-          type: 'order_paid',
-          action_url: '/minha-conta/pedidos',
-          action_label: 'Ver Pedido',
-        }).catch((e: Error) => console.error('[mp-webhook] Notification failed:', e));
+        try {
+          await supabase.from('notifications').insert({
+            user_id: orderData.user_id,
+            title: '✅ Pagamento confirmado!',
+            message: `Seu pedido ${orderData.order_number} foi pago e está sendo processado.`,
+            type: 'order_paid',
+            action_url: '/minha-conta/pedidos',
+            action_label: 'Ver Pedido',
+          });
+        } catch (e: any) {
+          console.error('[mp-webhook] Notification failed:', e);
+        }
       }
     }
 
