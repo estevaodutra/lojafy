@@ -166,6 +166,11 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
                       className="h-9 text-xs font-mono font-bold text-foreground"
                     />
                   </FormControl>
+                  {watchedUseAutoPricing && (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Calculado via Precificação Automática. Desative a chave acima para digitar um valor manual.
+                    </p>
+                  )}
                   <FormMessage className="text-[11px]" />
                 </FormItem>
               )}

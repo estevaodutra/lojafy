@@ -698,13 +698,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
       const productData: any = {
         name: data.name,
         description: data.description || null,
-        cost_price: data.cost_price || null,
-        price: data.price,
-        original_price: data.original_price || null,
+        cost_price: data.cost_price !== undefined && data.cost_price !== '' && data.cost_price !== null ? Number(data.cost_price) : null,
+        price: Number(data.price || 0),
+        original_price: data.original_price !== undefined && data.original_price !== '' && data.original_price !== null ? Number(data.original_price) : null,
+        suggested_price: data.use_auto_pricing ? Number(data.price || 0) : (data.original_price ? Number(data.original_price) : Number(data.price || 0)),
         use_auto_pricing: data.use_auto_pricing,
         use_default_profit_margin: data.use_default_profit_margin,
-        custom_profit_margin_percentage: data.custom_profit_margin_percentage || null,
-        calculated_price: data.use_auto_pricing ? data.price : null,
+        custom_profit_margin_percentage: data.custom_profit_margin_percentage !== undefined && data.custom_profit_margin_percentage !== '' && data.custom_profit_margin_percentage !== null ? Number(data.custom_profit_margin_percentage) : null,
+        calculated_price: data.use_auto_pricing ? Number(data.price || 0) : null,
         estimated_net_profit: priceBreakdown ? priceBreakdown.estimatedNetProfit : null,
         category_id: finalCategoryId || null,
         subcategory_id: data.subcategory_id === 'none' ? null : data.subcategory_id,
@@ -784,6 +785,21 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
         toast({ title: "Produto criado com sucesso!" });
       }
 
+      // Sincronizar preço no anúncio padrão / variantes de anúncio se existir
+      if (savedProduct?.id) {
+        try {
+          await supabase
+            .from('ml_listing_variants')
+            .update({
+              price: Number(data.price || 0),
+              updated_at: new Date().toISOString()
+            })
+            .eq('product_id', savedProduct.id);
+        } catch (adErr) {
+          console.warn('Aviso ao sincronizar preço em anúncios vinculados:', adErr);
+        }
+      }
+
       // Salvar Variações
       if (variants.length > 0 && savedProduct?.id) {
         const variantData = variants.map(v => ({
@@ -805,8 +821,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
         await supabase.from('product_variants').insert(variantData);
       }
 
+      // Invalidar todos os caches de produtos do React Query
+      queryClient.invalidateQueries({ queryKey: ['meta-ads-products'] });
       queryClient.invalidateQueries({ queryKey: ['admin-products'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['supplier-products'] });
+      queryClient.invalidateQueries({ queryKey: ['reseller-products'] });
+      queryClient.invalidateQueries({ queryKey: ['meta-ads-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
       onSuccess();
     } catch (error: any) {
       console.error('Erro ao salvar produto:', error);
