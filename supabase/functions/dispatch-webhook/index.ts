@@ -462,50 +462,32 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Deduplicacao robusta: checar webhook_paid_status na tabela orders (cobre qualquer intervalo de tempo)
+    // Deduplicacao atomica contra Race Conditions e disparos simultaneos
     if (event_type === 'order.paid' && !is_test && !ignore_deduplication && payload?.order_id) {
-      const { data: orderCheck } = await supabase
+      // Tentar atualizar o webhook_paid_status para 'sending' apenas se ainda NAO for 'sent' nem 'sending'
+      const { data: lockOrder, error: lockError } = await supabase
         .from('orders')
-        .select('id, webhook_paid_status, order_number')
+        .update({ 
+          webhook_paid_status: 'sending',
+          webhook_paid_dispatched_at: new Date().toISOString()
+        })
         .eq('id', payload.order_id)
-        .maybeSingle();
+        .or('webhook_paid_status.is.null,webhook_paid_status.eq.failed')
+        .select('id, order_number, webhook_paid_status');
 
-      if (orderCheck?.webhook_paid_status === 'sent') {
-        console.log(`[dispatch-webhook] Deduplicacao: order.paid para ${payload.order_id} (pedido ${orderCheck.order_number}) ja foi enviado com sucesso, ignorando`);
+      if (lockError || !lockOrder || lockOrder.length === 0) {
+        console.log(`[dispatch-webhook] Deduplicacao (Atomic Lock): order.paid para ${payload.order_id} ja foi enviado ou esta sendo enviado por outra requisicao simultanea, ignorando.`);
         return new Response(
           JSON.stringify({ 
             success: true, 
             deduplicated: true,
-            message: 'Webhook ja disparado com sucesso para este pedido' 
+            message: 'Webhook ja disparado ou em processamento por outra requisicao concorrente' 
           }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Fallback: verificar logs recentes (ultimos 60s) para evitar race conditions
-      const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
-      const { data: recentDispatches } = await supabase
-        .from('webhook_dispatch_logs')
-        .select('id, payload')
-        .eq('event_type', 'order.paid')
-        .gte('dispatched_at', oneMinuteAgo)
-        .limit(20);
-      
-      const duplicateFound = recentDispatches?.find(
-        (log: any) => log.payload?.data?.order_id === payload.order_id
-      );
-      
-      if (duplicateFound) {
-        console.log(`[dispatch-webhook] Deduplicacao (60s): order.paid para ${payload.order_id} ja disparado recentemente, ignorando`);
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            deduplicated: true,
-            message: 'Webhook ja disparado recentemente para este pedido' 
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      console.log(`[dispatch-webhook] Lock de envio adquirido com sucesso para pedido ${lockOrder[0]?.order_number || payload.order_id}`);
     }
 
         // Montar payload final
