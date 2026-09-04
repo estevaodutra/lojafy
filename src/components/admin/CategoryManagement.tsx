@@ -9,6 +9,7 @@ import CategoryTable from './CategoryTable';
 import CategoryForm from './CategoryForm';
 import SubcategoryTable from './SubcategoryTable';
 import { CategoryCreationModal } from './CategoryCreationModal';
+import { AutoCategorizeButton } from './AutoCategorizeButton';
 
 const CategoryManagement = () => {
   const [showCategoryForm, setShowCategoryForm] = useState(false);
@@ -99,7 +100,8 @@ const CategoryManagement = () => {
             Organize produtos em categorias e subcategorias
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <AutoCategorizeButton label="Organizar & Limpar Categorias" />
           <CategoryCreationModal
             onCategoryCreated={() => refetchCategories()}
             trigger={
