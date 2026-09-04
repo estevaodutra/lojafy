@@ -107,11 +107,13 @@ type ProductFormData = z.infer<typeof productSchema>;
 
 interface ProductFormProps {
   product?: any;
+  initialData?: any;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, onCancel }) => {
+export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, initialData, onSuccess, onCancel }) => {
+  const product = propProduct || initialData;
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -749,10 +751,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
           console.error("UPDATE ERROR:", error, "PAYLOAD:", productData);
           toast({ 
             title: "Erro ao atualizar produto", 
-            description: `${error.message}. Payload: ${JSON.stringify(productData)}`,
+            description: error.message || "Não foi possível atualizar o produto.",
             variant: "destructive" 
           });
-          throw error;
+          return;
         }
         savedProduct = updated;
         toast({ title: "Produto atualizado com sucesso!" });
@@ -773,10 +775,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess, on
           console.error("INSERT ERROR:", error, "PAYLOAD:", insertPayload);
           toast({ 
             title: "Erro ao salvar produto", 
-            description: `${error.message}. Sup: ${isSupplier() ? 'yes' : 'no'}, user: ${user?.id}, status: ${insertPayload.approval_status}, active: ${insertPayload.active}`,
+            description: error.message || "Não foi possível cadastrar o produto.",
             variant: "destructive" 
           });
-          throw error;
+          return;
         }
         savedProduct = created;
         toast({ title: "Produto criado com sucesso!" });

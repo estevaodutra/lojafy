@@ -130,6 +130,7 @@ const Products = () => {
           ← Voltar para o Gerenciador Meta Ads
         </Button>
         <ProductForm
+          product={editingProduct}
           initialData={editingProduct}
           onSuccess={handleFormSuccess}
           onCancel={() => setShowProductForm(false)}
