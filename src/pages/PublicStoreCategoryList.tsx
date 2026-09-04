@@ -208,9 +208,9 @@ const PublicStoreCategoryList = () => {
                   <h4 className="font-medium text-sm">Categorias</h4>
                   <div className="space-y-2">
                     <Link
-                      to={`/loja/${store.store_slug}/categorias`}
+                      to={store?.store_slug ? `/loja/${store.store_slug}/categorias` : `/categorias`}
                       className={`block text-sm p-2 rounded hover:bg-accent ${
-                        !categorySlug ? "bg-accent" : ""
+                        !categorySlug ? "bg-accent font-medium text-primary" : ""
                       }`}
                     >
                       Todas ({products.length})
@@ -220,12 +220,12 @@ const PublicStoreCategoryList = () => {
                       : categories.map((category) => (
                           <Link
                             key={category.id}
-                            to={`/loja/${store.store_slug}/categorias/${category.slug}`}
+                            to={store?.store_slug ? `/loja/${store.store_slug}/categorias/${category.slug}` : `/categorias/${category.slug}`}
                             className={`block text-sm p-2 rounded hover:bg-accent ${
-                              selectedCategory?.id === category.id ? "bg-accent" : ""
+                              selectedCategory?.id === category.id || categorySlug === category.slug ? "bg-accent font-medium text-primary" : ""
                             }`}
                           >
-                            {category.name} ({category.products?.length || 0})
+                            {category.name} {category.products?.length ? `(${category.products.length})` : ''}
                           </Link>
                         ))}
                   </div>

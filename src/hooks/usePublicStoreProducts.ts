@@ -107,75 +107,46 @@ export const usePublicStoreCategories = (resellerId?: string) => {
   return useQuery({
     queryKey: ['public-store-categories', resellerId],
     queryFn: async () => {
-      if (!resellerId) throw new Error('Reseller ID required');
-      
-      // First get unique categories from reseller products
-      const { data: resellerProducts, error: productsError } = await supabase
-        .from('reseller_products')
-        .select(`
-          product:products!inner(category_id, active, categories!category_id(id, name, slug, icon, color, image_url))
-        `)
-        .eq('reseller_id', resellerId)
-        .eq('active', true)
-        .eq('product.active', true);
-
-      if (productsError) throw productsError;
-
-      // Extract unique categories
-      const categoriesMap = new Map();
-      resellerProducts.forEach(item => {
-        const category = item.product?.categories;
-        if (category && !categoriesMap.has(category.id)) {
-          categoriesMap.set(category.id, category);
-        }
-      });
-
-      const categories = Array.from(categoriesMap.values());
-
-      // Get products for each category
-      const categoriesWithProducts = await Promise.all(
-        categories.map(async (category) => {
-          const { data: categoryProducts, error } = await supabase
+      if (resellerId) {
+        try {
+          const { data: resellerProducts, error: productsError } = await supabase
             .from('reseller_products')
             .select(`
-              *,
-              product:products!inner(
-                id,
-                name,
-                price,
-                image_url,
-                main_image_url,
-                images,
-                rating,
-                badge,
-                category_id,
-                active
-              )
+              product:products!inner(category_id, active, categories!category_id(id, name, slug, icon, color, image_url))
             `)
             .eq('reseller_id', resellerId)
             .eq('active', true)
-            .eq('product.active', true)
-            .eq('product.category_id', category.id)
-            .order('position', { ascending: true })
-            .limit(8);
+            .eq('product.active', true);
 
-          if (error) throw error;
+          if (!productsError && resellerProducts && resellerProducts.length > 0) {
+            const categoriesMap = new Map();
+            resellerProducts.forEach(item => {
+              const category = item.product?.categories;
+              if (category && !categoriesMap.has(category.id)) {
+                categoriesMap.set(category.id, { ...category, products: [] });
+              }
+            });
+            const resellerCats = Array.from(categoriesMap.values());
+            if (resellerCats.length > 0) {
+              return resellerCats;
+            }
+          }
+        } catch (e) {
+          console.warn('[usePublicStoreCategories] Reseller categories error, falling back:', e);
+        }
+      }
 
-          return {
-            ...category,
-            products: categoryProducts || []
-          };
-        })
-      );
+      // Fallback or main store: fetch all active categories
+      const { data: allCategories, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('active', true)
+        .order('name');
 
-      // For reseller stores, show categories with at least 1 product
-      // For main store, show categories with at least 5 products  
-      return categoriesWithProducts.filter(cat => {
-        const minProducts = resellerId ? 1 : 5;
-        return cat.products.length >= minProducts;
-      });
+      if (error) throw error;
+      return allCategories || [];
     },
-    enabled: !!resellerId,
+    enabled: true,
   });
 };
 

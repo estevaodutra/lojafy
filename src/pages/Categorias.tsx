@@ -51,19 +51,30 @@ const Categorias = () => {
     queryFn: async () => {
       const { data: categoriesData, error: categoriesError } = await supabase
         .from('categories')
-        .select(`
-          *,
-          products!left(id, active)
-        `)
+        .select('*')
         .eq('active', true)
         .order('name');
       
       if (categoriesError) throw categoriesError;
+
+      // Count active products per category
+      const { data: storeProductsData } = await supabase
+        .from('store_products')
+        .select('category_id')
+        .eq('active', true);
+
+      const countMap: Record<string, number> = {};
+      if (storeProductsData) {
+        storeProductsData.forEach((p: any) => {
+          if (p.category_id) {
+            countMap[p.category_id] = (countMap[p.category_id] || 0) + 1;
+          }
+        });
+      }
       
-      // Calculate product count manually
-      return categoriesData.map(category => ({
+      return (categoriesData || []).map(category => ({
         ...category,
-        real_product_count: category.products?.filter((p: any) => p.active).length || 0
+        real_product_count: countMap[category.id] || 0
       }));
     },
   });
@@ -238,22 +249,28 @@ const Categorias = () => {
                 <div className="space-y-3 mb-6">
                   <h4 className="font-medium text-sm">Categorias</h4>
                   <div className="space-y-2">
+                    <Link
+                      to="/categorias"
+                      className={`block text-sm p-2 rounded hover:bg-accent ${
+                        !slug ? 'bg-accent font-medium text-primary' : ''
+                      }`}
+                    >
+                      Todas ({products.length})
+                    </Link>
                     {categoriesLoading ? (
                       Array.from({ length: 4 }).map((_, i) => (
                         <Skeleton key={i} className="h-8 w-full" />
                       ))
                     ) : (
-                      categories
-                        .filter(category => (category.real_product_count || 0) > 0)
-                        .map((category) => (
+                      categories.map((category) => (
                         <Link
                           key={category.id}
                           to={`/categorias/${category.slug}`}
                           className={`block text-sm p-2 rounded hover:bg-accent ${
-                            selectedCategory?.id === category.id ? 'bg-accent' : ''
+                            selectedCategory?.id === category.id ? 'bg-accent font-medium text-primary' : ''
                           }`}
                         >
-                          {category.name} ({category.real_product_count})
+                          {category.name} {category.real_product_count > 0 ? `(${category.real_product_count})` : ''}
                         </Link>
                       ))
                     )}
