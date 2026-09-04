@@ -604,29 +604,72 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
     }
   };
 
-  // Handler acionado pelo menu do Produto para duplicar anúncio
-  const handleProductDuplicateAdClick = (product: any) => {
-    const productAds = ads.filter((ad: any) => ad.product_id === product.id || ad.product?.id === product.id);
-    
-    if (productAds.length === 0) {
-      // Nenhum anúncio cadastrado manualmente: duplica o anúncio base sintetizado do produto
-      const baseAd = {
-        product_id: product.id,
-        product: product,
-        internal_name: `${product.name} (Anúncio Principal)`,
-        variant_title: product.name,
-        price: product.price || product.cost_price || 0,
-        is_synthesized: true,
-        marketplace: 'mercadolivre',
-      };
-      handleDuplicateAd(baseAd);
-    } else if (productAds.length === 1) {
-      // Exatamente 1 anúncio: duplica ele diretamente
-      handleDuplicateAd(productAds[0]);
-    } else {
-      // Múltiplos anúncios: abre o modal para o usuário escolher qual anúncio duplicar
-      setProductForAdDuplication(product);
-      setShowAdSelectionModal(true);
+  // Duplicar Entidade Produto
+  const handleDuplicateProduct = async (product: any) => {
+    try {
+      const cleanName = (product.name || 'Produto').replace(/\s*(Copy|\(Cópia\))+$/gi, '').trim();
+      const newName = `${cleanName} Copy`;
+      const newSku = `PROD-${Math.floor(100000 + Math.random() * 900000)}`;
+
+      const { data: newProd, error } = await supabase
+        .from('products')
+        .insert({
+          name: newName,
+          sku: newSku,
+          category_id: product.category_id || null,
+          subcategory_id: product.subcategory_id || null,
+          brand: product.brand || null,
+          description: product.description || null,
+          cost_price: product.cost_price || null,
+          price: product.price || 0,
+          original_price: product.original_price || null,
+          suggested_price: product.suggested_price || null,
+          stock_quantity: 0,
+          min_stock_level: product.min_stock_level || 10,
+          height: product.height || null,
+          width: product.width || null,
+          length: product.length || null,
+          weight: product.weight || null,
+          main_image_url: product.main_image_url || product.image_url || null,
+          image_url: product.image_url || null,
+          additional_images: product.additional_images || null,
+          active: false,
+          approval_status: 'draft',
+          supplier_organization_id: product.supplier_organization_id || null,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({ title: 'Produto duplicado com sucesso!', description: `Novo produto "${newProd.name}" criado como rascunho.` });
+      refetchProducts();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro ao duplicar produto', description: e.message });
+    }
+  };
+
+  // Excluir / Desativar Entidade Produto
+  const [productToDelete, setProductToDelete] = useState<any>(null);
+  const [isDeletingProduct, setIsDeletingProduct] = useState(false);
+
+  const handleConfirmDeleteProduct = async () => {
+    if (!productToDelete) return;
+    setIsDeletingProduct(true);
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ active: false, approval_status: 'archived', updated_at: new Date().toISOString() })
+        .eq('id', productToDelete.id);
+
+      if (error) throw error;
+      toast({ title: 'Produto excluído/arquivado com sucesso!' });
+      setProductToDelete(null);
+      refetchProducts();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Erro ao excluir produto', description: e.message });
+    } finally {
+      setIsDeletingProduct(false);
     }
   };
 
@@ -1098,18 +1141,18 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuLabel>Ações do Produto</DropdownMenuLabel>
-                                  <DropdownMenuItem onClick={() => handleSinglePublishMl(product.id)}>
-                                    <Send className="h-4 w-4 mr-2 text-amber-600" /> 
-                                    {isProductPublished(product.id) ? 'Republicar no Mercado Livre' : 'Publicar no Mercado Livre'}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleViewAdsForProduct(product.id)}>
-                                    <Megaphone className="h-4 w-4 mr-2 text-primary" /> Gerenciar anúncios
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleProductDuplicateAdClick(product)}>
-                                    <Copy className="h-4 w-4 mr-2 text-indigo-600" /> Duplicar anúncio
-                                  </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => onEditProduct?.(product)}>
-                                    <Edit3 className="h-4 w-4 mr-2" /> Editar Produto
+                                    <Edit3 className="h-4 w-4 mr-2" /> Editar produto
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleDuplicateProduct(product)}>
+                                    <Copy className="h-4 w-4 mr-2 text-indigo-600" /> Duplicar produto
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    onClick={() => setProductToDelete(product)}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" /> Excluir produto
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -1564,6 +1607,26 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
         onOpenChange={setShowHistoryModal}
         adId={historyTargetId}
       />
+
+      {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DE PRODUTO */}
+      <Dialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive font-bold flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" /> Excluir produto?
+            </DialogTitle>
+            <DialogDescription>
+              Esta ação desativará e arquivará o produto "{productToDelete?.name}". Anúncios vinculados não ficarão ativos operacionalmente.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setProductToDelete(null)}>Cancelar</Button>
+            <Button variant="destructive" disabled={isDeletingProduct} onClick={handleConfirmDeleteProduct}>
+              {isDeletingProduct ? 'Excluindo...' : 'Excluir produto'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* MODAL DE SELEÇÃO DE ANÚNCIO PARA DUPLICAÇÃO */}
       <Dialog open={showAdSelectionModal} onOpenChange={setShowAdSelectionModal}>

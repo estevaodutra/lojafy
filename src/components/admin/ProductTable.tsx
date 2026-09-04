@@ -715,39 +715,23 @@ const ProductTable: React.FC<ProductTableProps> = ({
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Ações do Produto</DropdownMenuLabel>
-                                <DropdownMenuItem onClick={() => onSelectProduct?.(product.id)}>
-                                  <Store className="mr-2 h-4 w-4 text-primary" />
-                                  Gerenciar anúncios
-                                </DropdownMenuItem>
-                                <DropdownMenuItem asChild>
-                                  <Link to={`/produto/${product.id}`} className="flex items-center">
-                                    <ExternalLink className="mr-2 h-4 w-4" />
-                                    Ver na Loja Pública
-                                  </Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => onEdit(product)}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Editar Produto
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => onDuplicate(product)}>
-                                  <Copy className="mr-2 h-4 w-4" />
-                                  Duplicar Produto
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => handleToggleStatus(product)}>
-                                  <Eye className="mr-2 h-4 w-4" />
-                                  {product.active ? 'Desativar' : 'Ativar'}
-                                </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                                <ProductDeleteDialog
-                                  product={product}
-                                  onDelete={handleDeleteProduct}
-                                  onDeactivate={handleToggleStatus}
-                                />
-                            </DropdownMenuContent>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel>Ações do Produto</DropdownMenuLabel>
+                                  <DropdownMenuItem onClick={() => onEdit(product)}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Editar produto
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => onDuplicate(product)}>
+                                    <Copy className="mr-2 h-4 w-4 text-indigo-600" />
+                                    Duplicar produto
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <ProductDeleteDialog
+                                    product={product}
+                                    onDelete={handleDeleteProduct}
+                                    onDeactivate={handleToggleStatus}
+                                  />
+                                </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
                       </TableRow>
