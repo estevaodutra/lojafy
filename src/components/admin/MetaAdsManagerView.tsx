@@ -19,7 +19,7 @@ import {
   Package, Megaphone, Plus, Search, Filter, Sparkles, Store, Copy, Edit3, PauseCircle, 
   PlayCircle, Archive, Trash2, ShieldCheck, History, Eye, ExternalLink, MoreHorizontal,
   TrendingUp, DollarSign, ShoppingBag, X, RefreshCw, Layers, CheckCircle2, ArrowRight,
-  Send, Loader2, ChevronDown
+  Send, Loader2, ChevronDown, AlertTriangle
 } from 'lucide-react';
 import { AiVariationModal } from './AiVariationModal';
 import { AdHistoryModal } from './AdHistoryModal';
