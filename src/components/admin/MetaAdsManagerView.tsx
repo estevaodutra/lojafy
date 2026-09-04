@@ -94,6 +94,10 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
   const [adFormPrice, setAdFormPrice] = useState('');
   const [adFormDesc, setAdFormDesc] = useState('');
 
+  // Modal de Seleção de Anúncio para Duplicação (Ação na linha do produto)
+  const [showAdSelectionModal, setShowAdSelectionModal] = useState(false);
+  const [productForAdDuplication, setProductForAdDuplication] = useState<any>(null);
+
   const { data: orgData } = useSupplierOrganization();
   const orgId = orgData?.organization?.id;
 
@@ -600,6 +604,32 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
     }
   };
 
+  // Handler acionado pelo menu do Produto para duplicar anúncio
+  const handleProductDuplicateAdClick = (product: any) => {
+    const productAds = ads.filter((ad: any) => ad.product_id === product.id || ad.product?.id === product.id);
+    
+    if (productAds.length === 0) {
+      // Nenhum anúncio cadastrado manualmente: duplica o anúncio base sintetizado do produto
+      const baseAd = {
+        product_id: product.id,
+        product: product,
+        internal_name: `${product.name} (Anúncio Principal)`,
+        variant_title: product.name,
+        price: product.price || product.cost_price || 0,
+        is_synthesized: true,
+        marketplace: 'mercadolivre',
+      };
+      handleDuplicateAd(baseAd);
+    } else if (productAds.length === 1) {
+      // Exatamente 1 anúncio: duplica ele diretamente
+      handleDuplicateAd(productAds[0]);
+    } else {
+      // Múltiplos anúncios: abre o modal para o usuário escolher qual anúncio duplicar
+      setProductForAdDuplication(product);
+      setShowAdSelectionModal(true);
+    }
+  };
+
   // Transformar em Modelo Oficial
   const handleTransformToOfficial = async (ad: any) => {
     try {
@@ -1075,6 +1105,9 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                                   <DropdownMenuItem onClick={() => handleViewAdsForProduct(product.id)}>
                                     <Megaphone className="h-4 w-4 mr-2 text-primary" /> Gerenciar anúncios
                                   </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleProductDuplicateAdClick(product)}>
+                                    <Copy className="h-4 w-4 mr-2 text-indigo-600" /> Duplicar anúncio
+                                  </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => onEditProduct?.(product)}>
                                     <Edit3 className="h-4 w-4 mr-2" /> Editar Produto
                                   </DropdownMenuItem>
@@ -1531,6 +1564,53 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
         onOpenChange={setShowHistoryModal}
         adId={historyTargetId}
       />
+
+      {/* MODAL DE SELEÇÃO DE ANÚNCIO PARA DUPLICAÇÃO */}
+      <Dialog open={showAdSelectionModal} onOpenChange={setShowAdSelectionModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-foreground font-bold">
+              <Copy className="h-5 w-5 text-indigo-600" />
+              Selecionar Anúncio para Duplicar
+            </DialogTitle>
+            <DialogDescription>
+              Este produto possui múltiplos anúncios vinculados. Escolha qual anúncio deseja utilizar como origem para a cópia:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2 max-h-96 overflow-y-auto">
+            {productForAdDuplication && ads
+              .filter((ad: any) => ad.product_id === productForAdDuplication.id || ad.product?.id === productForAdDuplication.id)
+              .map((ad: any) => (
+                <div key={ad.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/40 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={productForAdDuplication.main_image_url || productForAdDuplication.image_url || '/placeholder.svg'}
+                      alt=""
+                      className="w-10 h-10 rounded object-cover border bg-muted"
+                    />
+                    <div>
+                      <p className="font-semibold text-sm text-foreground">{ad.internal_name || ad.variant_title}</p>
+                      <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                        <Badge variant="outline" className="text-[10px] py-0">{ad.marketplace || 'Mercado Livre'}</Badge>
+                        <span>{formatPrice(ad.price)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setShowAdSelectionModal(false);
+                      handleDuplicateAd(ad);
+                    }}
+                    className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white"
+                  >
+                    <Copy className="h-3.5 w-3.5" /> Duplicar
+                  </Button>
+                </div>
+              ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
