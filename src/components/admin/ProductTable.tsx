@@ -719,7 +719,7 @@ const ProductTable: React.FC<ProductTableProps> = ({
                                 <DropdownMenuLabel>Ações do Produto</DropdownMenuLabel>
                                 <DropdownMenuItem onClick={() => onSelectProduct?.(product.id)}>
                                   <Store className="mr-2 h-4 w-4 text-primary" />
-                                  Ver Anúncios Vinculados
+                                  Gerenciar anúncios
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild>
                                   <Link to={`/produto/${product.id}`} className="flex items-center">

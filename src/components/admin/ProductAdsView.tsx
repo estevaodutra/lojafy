@@ -203,31 +203,70 @@ export const ProductAdsView: React.FC<ProductAdsViewProps> = ({ productId, onBac
     }
   };
 
+  // Auxiliares de formatação para duplicação de anúncios
+  const formatCopyTitle = (title?: string) => {
+    if (!title) return 'Anúncio Copy';
+    const cleanTitle = title.replace(/\s*(Copy|\(Cópia\))+$/gi, '').trim();
+    return `${cleanTitle} Copy`;
+  };
+
+  const generateAdSku = (baseSku?: string) => {
+    const prefix = baseSku ? baseSku.trim() : 'PROD';
+    const randomHex = Math.floor(Math.random() * 0xffffff).toString(16).toUpperCase().padStart(6, '0');
+    return `${prefix}-COPY-${randomHex}`;
+  };
+
+  const generateAdGtin = () => {
+    const random10Digits = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+    return `789${random10Digits}`;
+  };
+
   // Duplicar Anúncio
   const handleDuplicateAd = async (ad: any) => {
     try {
+      const targetProductId = productId || ad.product_id;
+      const newTitle = formatCopyTitle(ad.variant_title || ad.internal_name);
+      const newInternalName = formatCopyTitle(ad.internal_name || ad.variant_title);
+      const newSku = generateAdSku(ad.sku || product?.sku);
+      const newGtin = generateAdGtin();
+
       const { error } = await supabase
         .from('ml_listing_variants')
         .insert({
-          product_id: productId,
+          product_id: targetProductId,
           user_id: user!.id,
-          internal_name: `${ad.internal_name || ad.variant_title} (Cópia)`,
-          variant_title: ad.variant_title,
-          variant_description: ad.variant_description,
-          price: ad.price,
+          internal_name: newInternalName,
+          variant_title: newTitle,
+          variant_description: ad.variant_description || null,
+          price: ad.price || 0,
+          promotional_price: ad.promotional_price || null,
+          video_url: ad.video_url || null,
+          category_id: ad.category_id || null,
+          sku: newSku,
+          gtin: newGtin,
           status: 'draft',
           origin_type: 'duplicated',
           origin_user_id: user!.id,
-          source_ad_id: ad.id,
+          source_ad_id: ad.id && !ad.is_synthesized ? ad.id : null,
           marketplace: ad.marketplace || 'mercadolivre',
-          is_official_model: false
+          is_official_model: false,
+          ml_item_id: null,
+          permalink: null,
+          visits: 0,
+          sales: 0,
+          gross_revenue: 0,
+          net_profit: 0,
+          conversion_rate: 0,
+          cancellations: 0,
+          refunds: 0,
+          last_synced_at: null,
         });
 
       if (error) throw error;
-      toast({ title: 'Anúncio duplicado com sucesso!' });
+      toast({ title: 'Anúncio duplicado com sucesso!', description: 'A cópia foi criada como Rascunho com novos SKU e GTIN.' });
       refetchAds();
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Erro ao duplicar', description: e.message });
+      toast({ variant: 'destructive', title: 'Erro ao duplicar anúncio', description: e.message });
     }
   };
 
