@@ -50,6 +50,154 @@ const STATUS_BADGES: Record<string, { label: string; className: string }> = {
   archived: { label: 'Arquivado', className: 'bg-slate-200 text-slate-700 border-slate-300' },
 };
 
+interface InlinePriceCellProps {
+  productId: string;
+  field: 'cost_price' | 'price';
+  initialValue: number | null | undefined;
+  roleMode?: string;
+  resellerProductId?: string;
+  onSuccess: () => void;
+}
+
+const InlinePriceCell: React.FC<InlinePriceCellProps> = ({
+  productId,
+  field,
+  initialValue,
+  roleMode,
+  resellerProductId,
+  onSuccess,
+}) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [val, setVal] = useState(initialValue !== null && initialValue !== undefined ? String(initialValue) : '');
+  const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  React.useEffect(() => {
+    setVal(initialValue !== null && initialValue !== undefined ? String(initialValue) : '');
+  }, [initialValue]);
+
+  const handleSave = async () => {
+    setIsEditing(false);
+    const cleanStr = val.replace(',', '.').trim();
+    if (cleanStr === '') return;
+
+    const numVal = parseFloat(cleanStr);
+    if (isNaN(numVal) || numVal < 0) {
+      setVal(initialValue !== null && initialValue !== undefined ? String(initialValue) : '');
+      return;
+    }
+
+    if (numVal === Number(initialValue)) return;
+
+    setIsSaving(true);
+    try {
+      if (roleMode === 'reseller' && resellerProductId && field === 'price') {
+        const { error } = await supabase
+          .from('reseller_products')
+          .update({ custom_price: numVal, updated_at: new Date().toISOString() })
+          .eq('id', resellerProductId);
+
+        if (error) throw error;
+      } else {
+        const updatePayload: any = {
+          [field]: numVal,
+          updated_at: new Date().toISOString()
+        };
+
+        const { error } = await supabase
+          .from('products')
+          .update(updatePayload)
+          .eq('id', productId);
+
+        if (error) throw error;
+
+        if (field === 'price') {
+          try {
+            await supabase
+              .from('ml_listing_variants')
+              .update({ price: numVal, updated_at: new Date().toISOString() })
+              .eq('product_id', productId);
+          } catch (adErr) {
+            console.warn('Erro ao atualizar anúncio vinculado:', adErr);
+          }
+        }
+      }
+
+      toast({
+        title: field === 'cost_price' ? 'Preço de custo atualizado!' : 'Preço de venda atualizado!',
+        description: `Novo valor: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(numVal)}`
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['meta-ads-products'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-products'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['supplier-products'] });
+      queryClient.invalidateQueries({ queryKey: ['reseller-products'] });
+      onSuccess();
+    } catch (err: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao atualizar preço',
+        description: err.message
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSave();
+    } else if (e.key === 'Escape') {
+      setVal(initialValue !== null && initialValue !== undefined ? String(initialValue) : '');
+      setIsEditing(false);
+    }
+  };
+
+  const formattedDisplay = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(initialValue) || 0);
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+        <span className="text-[11px] font-semibold text-muted-foreground">R$</span>
+        <Input
+          type="number"
+          step="0.01"
+          autoFocus
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={handleKeyDown}
+          className="h-7 w-20 text-xs font-mono font-bold text-right px-1 py-0 shadow-2xs border-primary"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        setIsEditing(true);
+      }}
+      className="group flex items-center justify-end gap-1.5 cursor-pointer hover:bg-muted/70 px-1.5 py-1 rounded transition-colors"
+      title="Clique no lápis ou no valor para editar rapidamente"
+    >
+      {isSaving ? (
+        <Loader2 className="h-3 w-3 animate-spin text-primary" />
+      ) : (
+        <>
+          <span className={`font-mono text-xs ${field === 'price' ? 'font-bold text-foreground' : 'font-medium text-foreground'}`}>
+            {formattedDisplay}
+          </span>
+          <Edit3 className="h-3.5 w-3.5 text-muted-foreground/60 opacity-60 group-hover:opacity-100 group-hover:text-primary transition-opacity" />
+        </>
+      )}
+    </div>
+  );
+};
+
 export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
   roleMode = 'admin',
   onNavigateToCreateProduct,
@@ -974,9 +1122,8 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                       <TableHead>Produto</TableHead>
                       <TableHead>SKU</TableHead>
                       <TableHead>Marketplace</TableHead>
-                      <TableHead className="text-right">Preço-base</TableHead>
-                      <TableHead className="text-right">Preço Sugerido</TableHead>
-                      <TableHead className="text-right">Seu Preço</TableHead>
+                      <TableHead className="text-right">Preço de Custo</TableHead>
+                      <TableHead className="text-right">Preço de Venda</TableHead>
                       <TableHead className="text-center">Estoque</TableHead>
                       <TableHead className="text-center">Anúncios</TableHead>
                       <TableHead className="text-center">Status</TableHead>
@@ -986,14 +1133,14 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                   <TableBody>
                     {productsLoading ? (
                       <TableRow>
-                        <TableCell colSpan={12} className="text-center py-8">
+                        <TableCell colSpan={10} className="text-center py-8">
                           <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto" />
                           <p className="text-sm text-muted-foreground mt-2">Carregando catálogo de produtos...</p>
                         </TableCell>
                       </TableRow>
                     ) : filteredProducts.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={12} className="text-center py-12 text-muted-foreground">
+                        <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
                           Nenhum produto encontrado.
                         </TableCell>
                       </TableRow>
@@ -1040,19 +1187,28 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                               <img src="https://http2.mlstatic.com/static/org-img/homesnw/mercado-libre.png" alt="ML" className="h-4 object-contain" />
                             </TableCell>
 
-                            {/* Preço-base (Custo) */}
-                            <TableCell className="text-right font-medium text-xs">
-                              {formatPrice(product.cost_price || product.price)}
+                            {/* Preço de Custo */}
+                            <TableCell className="text-right">
+                              <InlinePriceCell
+                                productId={product.id}
+                                field="cost_price"
+                                initialValue={product.cost_price}
+                                roleMode={roleMode}
+                                resellerProductId={product._reseller_product_id}
+                                onSuccess={refetchProducts}
+                              />
                             </TableCell>
 
-                            {/* Preço Sugerido */}
-                            <TableCell className="text-right font-semibold text-xs text-emerald-600">
-                              {formatPrice(product.suggested_price || product.price)}
-                            </TableCell>
-
-                            {/* Seu Preço */}
-                            <TableCell className="text-right font-bold text-sm">
-                              {formatPrice(product.price)}
+                            {/* Preço de Venda */}
+                            <TableCell className="text-right">
+                              <InlinePriceCell
+                                productId={product.id}
+                                field="price"
+                                initialValue={product.price}
+                                roleMode={roleMode}
+                                resellerProductId={product._reseller_product_id}
+                                onSuccess={refetchProducts}
+                              />
                             </TableCell>
 
                             {/* Estoque */}
