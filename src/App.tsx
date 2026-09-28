@@ -104,6 +104,8 @@ const SystemLogs = lazy(() => import("./pages/admin/SystemLogs"));
 const Features = lazy(() => import("./pages/admin/Features"));
 const Planos = lazy(() => import("./pages/admin/Planos"));
 const Marketplaces = lazy(() => import("./pages/admin/Marketplaces"));
+const AdminApps = lazy(() => import("./pages/admin/Apps"));
+const AdminWebhooks = lazy(() => import("./pages/admin/Webhooks"));
 
 import SupplierProductCreate from "./pages/supplier/ProductCreate";
 import SupplierProductDetail from "./pages/supplier/ProductDetail";
@@ -397,6 +399,8 @@ const App = () => {
                   <Route path="suporte" element={<SupportManagement />} />
                   <Route path="api-docs" element={<ApiDocumentation />} />
                   <Route path="logs" element={<SystemLogs />} />
+                  <Route path="apps" element={<AdminApps />} />
+                  <Route path="apps/webhooks" element={<AdminWebhooks />} />
                 </Route>
 
                 {/* Supplier Panel Routes */}

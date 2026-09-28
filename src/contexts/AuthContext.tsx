@@ -171,6 +171,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         last_name: lastName 
       });
 
+      // Dispatch platform webhook user.created (non-blocking)
+      supabase.functions.invoke('dispatch-webhook', {
+        body: {
+          event_type: 'user.created',
+          payload: {
+            user_id: data.user?.id,
+            email: email,
+            name: `${firstName || ''} ${lastName || ''}`.trim() || 'Usuário',
+            phone: phone || null,
+            role: 'customer',
+            origin: {
+              type: 'frontend',
+              store_id: null,
+              store_name: null,
+            },
+            created_at: data.user?.created_at || new Date().toISOString(),
+          }
+        }
+      }).catch((whErr) => {
+        console.error('Erro ao disparar webhook user.created via frontend:', whErr);
+      });
+
       // Note: The toast will be replaced by a modal in the Auth component
       
       return { error: null };

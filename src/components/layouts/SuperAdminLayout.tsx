@@ -27,7 +27,8 @@ import {
   ShoppingBag,
   Wallet,
   Clock,
-  ScrollText
+  ScrollText,
+  LayoutGrid
 } from 'lucide-react';
 import {
   Sidebar,
@@ -133,6 +134,11 @@ const superAdminMenuItems = [
     url: '/super-admin/logs',
     icon: ScrollText,
   },
+  {
+    title: 'Apps',
+    url: '/super-admin/apps',
+    icon: LayoutGrid,
+  },
 ];
 
 const supportMenuItems = [
@@ -214,7 +220,7 @@ const SuperAdminSidebar = () => {
                     ) : (
                       <SidebarMenuButton 
                         asChild
-                        className={'url' in item && currentPath === item.url ? 'bg-sidebar-accent' : ''}
+                        className={'url' in item && (currentPath === item.url || (item.url !== '/super-admin' && currentPath.startsWith(item.url + '/'))) ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground' : ''}
                       >
                         <button onClick={() => navigate(('url' in item ? item.url : '') as string)}>
                           <item.icon className="mr-2 h-4 w-4" />

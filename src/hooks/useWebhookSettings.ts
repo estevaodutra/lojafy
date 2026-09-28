@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { WEBHOOK_EVENTS_CATALOG } from '@/data/webhookEventsCatalog';
 
 export interface WebhookSetting {
   id: string;
@@ -34,7 +35,7 @@ export const useWebhookSettings = () => {
       let fetchedSettings = (data as unknown as WebhookSetting[]) || [];
       
       // Auto-populate local state for missing events
-      const defaultEvents = ['order.paid', 'user.created', 'user.inactive.7days', 'user.inactive.15days', 'user.inactive.30days'];
+      const defaultEvents = WEBHOOK_EVENTS_CATALOG.map(item => item.eventType);
       const missingEvents = defaultEvents.filter(ev => !fetchedSettings.find(s => s.event_type === ev));
       
       const mockedSettings = missingEvents.map(ev => ({
@@ -208,17 +209,32 @@ export const useWebhookSettings = () => {
 
       if (error) throw error;
 
+      let resultData = data;
+      // If edge function returned that real test data is not supported, fallback to sending sample payload
+      if (!resultData?.success && resultData?.error?.includes('não suporta dados reais de teste')) {
+        const catalogItem = WEBHOOK_EVENTS_CATALOG.find(e => e.eventType === eventType);
+        const fallbackRes = await supabase.functions.invoke('dispatch-webhook', {
+          body: {
+            event_type: eventType,
+            payload: catalogItem?.samplePayload?.data || {},
+            is_test: true,
+            use_real_data: false,
+          },
+        });
+        resultData = fallbackRes.data;
+      }
+
       await fetchSettings(); // Refresh to get latest status
 
-      if (data?.success) {
+      if (resultData?.success) {
         toast({
           title: 'Teste enviado!',
-          description: `Resposta: ${data.status_code} (dados reais)`,
+          description: `Resposta: ${resultData.status_code || 200} OK`,
         });
       } else {
         toast({
           title: 'Falha no teste',
-          description: data?.error || 'Erro ao enviar webhook',
+          description: resultData?.error || 'Erro ao enviar webhook',
           variant: 'destructive',
         });
       }
