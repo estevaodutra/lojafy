@@ -386,8 +386,15 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const body = await req.json();
-    const { event_type, payload: providedPayload, is_test = false, use_real_data = false, ignore_deduplication = false } = body;
+    const { 
+      event_type, 
+      payload: providedPayload, 
+      is_test = false, 
+      use_real_data = false, 
+      ignore_deduplication = false,
+      webhook_url: overrideUrl,
+      secret_token: overrideToken
+    } = body;
 
     if (!event_type) {
       return new Response(
@@ -396,15 +403,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`[dispatch-webhook] Disparando evento: ${event_type}, is_test: ${is_test}, use_real_data: ${use_real_data}`);
+    console.log(`[dispatch-webhook] Disparando evento: ${event_type}, is_test: ${is_test}, use_real_data: ${use_real_data}, overrideUrl: ${overrideUrl || 'none'}`);
 
-        // Auto-enrich order.paid payload sempre em producao para garantir dados consistentes e reais do cliente
+    // Auto-enrich order.paid payload sempre em producao para garantir dados consistentes e reais do cliente
     let payload = providedPayload;
     if (event_type === 'order.paid' && !is_test && !ignore_deduplication && payload?.order_id) {
       console.log(`[dispatch-webhook] Enriquecendo payload para order ${payload.order_id}`);
       const enriched = await fetchOrderById(supabase, payload.order_id);
       if (enriched) {
-        // Dados reais do banco (com service role) sobrescrevem quaisquer fallbacks dos callers
         payload = { ...payload, ...enriched }; 
       }
     }
@@ -429,38 +435,63 @@ Deno.serve(async (req) => {
       console.log(`[dispatch-webhook] Dados reais encontrados para ${event_type}`);
     }
 
-    // Buscar configuração do webhook
-    const { data: webhookConfig, error: configError } = await supabase
-      .from('webhook_settings')
-      .select('*')
-      .eq('event_type', event_type)
-      .single();
+    // Identificar URL de destino: overrideUrl direto ou busca em registered_webhooks / webhook_settings
+    let targetUrl = overrideUrl;
+    let targetToken = overrideToken || '';
 
-    if (configError || !webhookConfig) {
-      console.error(`[dispatch-webhook] Configuração não encontrada para: ${event_type}`);
+    if (!targetUrl) {
+      // 1. Tentar ler do registro de webhooks cadastrados
+      const { data: registryConfig } = await supabase
+        .from('webhook_settings')
+        .select('*')
+        .eq('event_type', 'registered_webhooks')
+        .maybeSingle();
+
+      if (registryConfig?.last_error_message) {
+        try {
+          const list = JSON.parse(registryConfig.last_error_message);
+          if (Array.isArray(list)) {
+            const matches = list.filter((w: any) =>
+              (w.active || is_test) && w.url && Array.isArray(w.events) && w.events.includes(event_type)
+            );
+            if (matches.length > 0) {
+              targetUrl = matches[0].url;
+              targetToken = matches[0].token || registryConfig.secret_token;
+            }
+          }
+        } catch (e) {
+          console.error('[dispatch-webhook] Erro ao parsear registered_webhooks:', e);
+        }
+      }
+
+      // 2. Fallback para configuração legada por tipo de evento
+      if (!targetUrl) {
+        const { data: legacyConfig } = await supabase
+          .from('webhook_settings')
+          .select('*')
+          .eq('event_type', event_type)
+          .maybeSingle();
+
+        if (legacyConfig && (legacyConfig.active || is_test) && legacyConfig.webhook_url) {
+          targetUrl = legacyConfig.webhook_url;
+          targetToken = legacyConfig.secret_token;
+        }
+      }
+    }
+
+    if (!targetUrl) {
+      console.log(`[dispatch-webhook] Nenhum webhook ativo encontrado para o evento: ${event_type}`);
       return new Response(
-        JSON.stringify({ success: false, error: 'Configuração de webhook não encontrada' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: `Nenhum webhook ativo configurado para ${event_type}` }),
+        { status: is_test ? 400 : 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Verificar se está ativo
-    if (!webhookConfig.active && !is_test) {
-      console.log(`[dispatch-webhook] Webhook ${event_type} está inativo, ignorando`);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Webhook desativado' }),
-        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Verificar se tem URL configurada
-    if (!webhookConfig.webhook_url) {
-      console.log(`[dispatch-webhook] Webhook ${event_type} sem URL configurada`);
-      return new Response(
-        JSON.stringify({ success: false, error: 'URL do webhook não configurada' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const webhookConfig = {
+      webhook_url: targetUrl,
+      secret_token: targetToken,
+      active: true,
+    };
 
     // Deduplicacao atomica contra Race Conditions e disparos simultaneos
     if (event_type === 'order.paid' && !is_test && !ignore_deduplication && payload?.order_id) {
