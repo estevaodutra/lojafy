@@ -32,7 +32,6 @@ const staticItems = [
   { id: 'intro', label: 'Introdução', icon: FileText },
   { id: 'auth', label: 'Autenticação', icon: Key },
   { id: 'keys', label: 'Chaves de API', icon: Settings },
-  { id: 'webhooks', label: 'Webhooks', icon: Zap },
 ];
 
 const categoryIcons: Record<string, React.ElementType> = {
