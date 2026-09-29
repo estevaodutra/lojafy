@@ -1,12 +1,13 @@
 import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ApiKeyManager } from '@/components/admin/ApiKeyManager';
 import { EndpointCard } from '@/components/admin/EndpointCard';
 import { CodeBlock } from '@/components/admin/CodeBlock';
-import { WebhooksSection } from '@/components/admin/WebhooksSection';
-import { Shield, Zap, Globe, FileText, BookOpen, Terminal } from 'lucide-react';
+import { Shield, Zap, Globe, FileText, BookOpen, Terminal, Webhook, ArrowRight } from 'lucide-react';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://lojafy.6ksfuf.easypanel.host';
 
@@ -274,6 +275,8 @@ export const ApiDocsContent: React.FC<ApiDocsContentProps> = ({
   scrollToIndex,
   onScrollComplete,
 }) => {
+  const navigate = useNavigate();
+
   useEffect(() => {
     if (scrollToIndex !== null && scrollToIndex !== undefined) {
       const timer = setTimeout(() => {
@@ -308,11 +311,27 @@ export const ApiDocsContent: React.FC<ApiDocsContentProps> = ({
           </p>
         </div>
 
-        {/* Interactive management */}
-        <div>
-          <h3 className="text-xl font-semibold mb-4">⚙️ Gerenciamento de Webhooks</h3>
-          <WebhooksSection />
-        </div>
+        {/* Centralized management callout */}
+        <Card className="border-primary/40 bg-primary/5 shadow-sm">
+          <CardContent className="p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <h3 className="text-base font-semibold flex items-center gap-2 text-foreground">
+                <Webhook className="h-5 w-5 text-primary" />
+                Gerenciamento Centralizado em Apps &gt; Webhooks
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Todos os webhooks agora são gerenciados de forma centralizada em <strong>Apps &gt; Webhooks</strong>, com separação de eventos por grupos (Usuários, Pedidos, Estoque, etc.), múltiplos destinos para o mesmo evento e visualização de payload.
+              </p>
+            </div>
+            <Button 
+              onClick={() => navigate('/super-admin/apps/webhooks')} 
+              className="gap-2 shrink-0 bg-[#5B47FB] hover:bg-[#4C39EC] text-white"
+            >
+              <span>Abrir Gerenciador de Webhooks</span>
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </CardContent>
+        </Card>
 
         <Separator />
 

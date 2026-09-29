@@ -1,24 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
   Plus, 
   Send, 
   Copy, 
-  Check, 
   RefreshCw, 
   Edit2, 
   Trash2, 
   Eye, 
   FileJson, 
-  ExternalLink, 
   HelpCircle, 
-  CheckCircle2, 
-  XCircle, 
   Clock, 
   Webhook as WebhookIcon, 
-  ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  Users,
+  Package,
+  Boxes,
+  Truck,
+  ShoppingCart,
+  DollarSign,
+  FileText,
+  GraduationCap,
+  MessageSquare,
+  Search,
+  CheckCheck
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -35,10 +41,31 @@ import {
   DialogFooter 
 } from '@/components/ui/dialog';
 import { useRegisteredWebhooks, RegisteredWebhook } from '@/hooks/useRegisteredWebhooks';
-import { WEBHOOK_EVENTS_CATALOG, WebhookEventMeta } from '@/data/webhookEventsCatalog';
+import { 
+  WEBHOOK_GROUPS, 
+  WEBHOOK_EVENTS_CATALOG, 
+  WebhookEventMeta, 
+  WebhookGroupId 
+} from '@/data/webhookEventsCatalog';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+
+// Helper to render group icon
+const renderGroupIcon = (groupId: WebhookGroupId, className: string = 'h-4 w-4') => {
+  switch (groupId) {
+    case 'user': return <Users className={className} />;
+    case 'order': return <Package className={className} />;
+    case 'stock': return <Boxes className={className} />;
+    case 'logistics': return <Truck className={className} />;
+    case 'cart': return <ShoppingCart className={className} />;
+    case 'finance': return <DollarSign className={className} />;
+    case 'subscription': return <FileText className={className} />;
+    case 'academy': return <GraduationCap className={className} />;
+    case 'support': return <MessageSquare className={className} />;
+    default: return <WebhookIcon className={className} />;
+  }
+};
 
 export const Webhooks: React.FC = () => {
   const navigate = useNavigate();
@@ -54,6 +81,10 @@ export const Webhooks: React.FC = () => {
     testWebhook,
   } = useRegisteredWebhooks();
 
+  // Filter Webhooks on main page
+  const [filterGroup, setFilterGroup] = useState<string>('all');
+  const [searchWebhooks, setSearchWebhooks] = useState('');
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingWebhook, setEditingWebhook] = useState<RegisteredWebhook | null>(null);
@@ -64,6 +95,8 @@ export const Webhooks: React.FC = () => {
   const [formToken, setFormToken] = useState('');
   const [formEvents, setFormEvents] = useState<string[]>(['user.created']);
   const [testingFormUrl, setTestingFormUrl] = useState(false);
+  const [modalFilterGroup, setModalFilterGroup] = useState<string>('all');
+  const [modalSearchEvent, setModalSearchEvent] = useState('');
 
   // Payload Preview Modal State
   const [previewPayload, setPreviewPayload] = useState<WebhookEventMeta | null>(null);
@@ -91,6 +124,8 @@ export const Webhooks: React.FC = () => {
     setFormUrl('');
     setFormToken(generateRandomToken());
     setFormEvents(['user.created']);
+    setModalFilterGroup('all');
+    setModalSearchEvent('');
     setIsModalOpen(true);
   };
 
@@ -101,6 +136,8 @@ export const Webhooks: React.FC = () => {
     setFormUrl(webhook.url);
     setFormToken(webhook.token || generateRandomToken());
     setFormEvents(webhook.events || []);
+    setModalFilterGroup('all');
+    setModalSearchEvent('');
     setIsModalOpen(true);
   };
 
@@ -110,6 +147,24 @@ export const Webhooks: React.FC = () => {
       setFormEvents([]);
     } else {
       setFormEvents(WEBHOOK_EVENTS_CATALOG.map(e => e.eventType));
+    }
+  };
+
+  // Toggle all events of a specific group
+  const handleToggleGroupEvents = (groupId: WebhookGroupId) => {
+    const groupEventKeys = WEBHOOK_EVENTS_CATALOG
+      .filter(e => e.group === groupId)
+      .map(e => e.eventType);
+
+    const allGroupSelected = groupEventKeys.every(k => formEvents.includes(k));
+
+    if (allGroupSelected) {
+      // Remove all group events
+      setFormEvents(formEvents.filter(k => !groupEventKeys.includes(k)));
+    } else {
+      // Add missing group events
+      const next = new Set([...formEvents, ...groupEventKeys]);
+      setFormEvents(Array.from(next));
     }
   };
 
@@ -210,6 +265,34 @@ export const Webhooks: React.FC = () => {
     });
   };
 
+  // Filtered groups in modal
+  const modalVisibleGroups = useMemo(() => {
+    return WEBHOOK_GROUPS.filter(g => {
+      if (modalFilterGroup !== 'all' && g.id !== modalFilterGroup) return false;
+      return true;
+    });
+  }, [modalFilterGroup]);
+
+  // Filtered webhooks on main page
+  const filteredWebhooks = useMemo(() => {
+    return webhooks.filter(wh => {
+      const matchesSearch = !searchWebhooks || 
+        wh.name.toLowerCase().includes(searchWebhooks.toLowerCase()) ||
+        wh.url.toLowerCase().includes(searchWebhooks.toLowerCase());
+
+      if (!matchesSearch) return false;
+
+      if (filterGroup === 'all') return true;
+
+      // Check if this webhook has any event in filterGroup
+      const groupEvents = WEBHOOK_EVENTS_CATALOG
+        .filter(e => e.group === filterGroup)
+        .map(e => e.eventType);
+
+      return wh.events.some(ev => groupEvents.includes(ev));
+    });
+  }, [webhooks, searchWebhooks, filterGroup]);
+
   return (
     <div className="p-6 md:p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-300">
       {/* Top Breadcrumb & Header */}
@@ -232,7 +315,7 @@ export const Webhooks: React.FC = () => {
               <span>Webhooks</span>
             </h1>
             <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-              Crie webhooks para receber notificações em tempo real e conecte múltiplos serviços com os mesmos eventos.
+              Gerencie seus webhooks organizados por grupos (Usuários, Pedidos, Estoque, etc.) com suporte a múltiplos destinos para o mesmo evento.
             </p>
           </div>
 
@@ -246,37 +329,98 @@ export const Webhooks: React.FC = () => {
         </div>
       </div>
 
+      {/* Filter Bar (Groups & Search) */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+        {/* Category Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-none">
+          <button
+            onClick={() => setFilterGroup('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+              filterGroup === 'all'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Todos ({webhooks.length})
+          </button>
+
+          {WEBHOOK_GROUPS.map(grp => {
+            const grpEvents = WEBHOOK_EVENTS_CATALOG.filter(e => e.group === grp.id).map(e => e.eventType);
+            const count = webhooks.filter(w => w.events.some(ev => grpEvents.includes(ev))).length;
+
+            return (
+              <button
+                key={grp.id}
+                onClick={() => setFilterGroup(grp.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                  filterGroup === grp.id
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {renderGroupIcon(grp.id, 'h-3.5 w-3.5')}
+                <span>{grp.name}</span>
+                {count > 0 && (
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                    filterGroup === grp.id ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted-foreground/20 text-muted-foreground'
+                  }`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Search */}
+        <div className="relative w-full md:w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome ou URL..."
+            value={searchWebhooks}
+            onChange={(e) => setSearchWebhooks(e.target.value)}
+            className="pl-8 h-9 text-xs"
+          />
+        </div>
+      </div>
+
       {/* Webhooks List */}
       <div className="space-y-4">
         {loading ? (
           <div className="text-center py-16">
             <RefreshCw className="h-6 w-6 animate-spin mx-auto text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">Carregando webhooks...</p>
+            <p className="text-sm text-muted-foreground">Carregando webhooks configurados...</p>
           </div>
-        ) : webhooks.length === 0 ? (
+        ) : filteredWebhooks.length === 0 ? (
           /* Empty State */
           <div className="text-center py-16 border border-dashed rounded-2xl bg-card/60 p-8 space-y-4">
             <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
               <WebhookIcon className="h-7 w-7" />
             </div>
             <div className="max-w-md mx-auto space-y-1">
-              <h3 className="font-semibold text-lg text-foreground">Nenhum webhook cadastrado</h3>
+              <h3 className="font-semibold text-lg text-foreground">
+                {webhooks.length === 0 ? 'Nenhum webhook cadastrado' : 'Nenhum webhook encontrado para este filtro'}
+              </h3>
               <p className="text-sm text-muted-foreground">
-                Crie um novo webhook para começar a transmitir os eventos da Lojafy (como Usuário Criado e Pedido Pago) para automações no n8n, CRM ou planilhas.
+                {webhooks.length === 0 
+                  ? 'Crie seu primeiro webhook para receber notificações dos eventos selecionados (Usuários, Pedidos, Estoque, etc.).'
+                  : 'Tente alterar os filtros de grupo ou o termo da busca acima.'}
               </p>
             </div>
-            <Button 
-              onClick={handleOpenCreateModal}
-              className="bg-[#5B47FB] hover:bg-[#4C39EC] text-white gap-2 text-sm mt-2"
-            >
-              <Plus className="h-4 w-4" />
-              Criar meu primeiro webhook
-            </Button>
+            {webhooks.length === 0 && (
+              <Button 
+                onClick={handleOpenCreateModal}
+                className="bg-[#5B47FB] hover:bg-[#4C39EC] text-white gap-2 text-sm mt-2"
+              >
+                <Plus className="h-4 w-4" />
+                Criar meu primeiro webhook
+              </Button>
+            )}
           </div>
         ) : (
           /* Cards List */
           <div className="grid grid-cols-1 gap-4">
-            {webhooks.map((wh) => (
+            {filteredWebhooks.map((wh) => (
               <Card 
                 key={wh.id}
                 className="border border-border/80 shadow-sm hover:shadow transition-all bg-card"
@@ -341,20 +485,23 @@ export const Webhooks: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Events Badges */}
+                  {/* Events Badges with Group Classification */}
                   <div className="space-y-1.5">
                     <span className="text-xs text-muted-foreground font-medium">Eventos que acionam este webhook:</span>
                     <div className="flex flex-wrap gap-1.5">
                       {wh.events.map(evKey => {
                         const meta = WEBHOOK_EVENTS_CATALOG.find(e => e.eventType === evKey);
+                        const group = WEBHOOK_GROUPS.find(g => g.id === meta?.group);
+
                         return (
                           <Badge 
                             key={evKey}
                             variant="secondary"
-                            className="text-xs font-normal py-0.5 gap-1.5 cursor-pointer hover:bg-secondary/80"
+                            className="text-xs font-normal py-0.5 gap-1.5 cursor-pointer hover:bg-secondary/80 border border-border/60"
                             onClick={() => meta && setPreviewPayload(meta)}
                             title="Clique para visualizar o payload deste evento"
                           >
+                            {meta?.group && renderGroupIcon(meta.group, 'h-3 w-3 text-muted-foreground')}
                             <span>{meta?.title || evKey}</span>
                             <Eye className="h-3 w-3 text-muted-foreground" />
                           </Badge>
@@ -430,9 +577,9 @@ export const Webhooks: React.FC = () => {
         )}
       </div>
 
-      {/* Modal: Criar / Editar Webhook (matching user screenshot) */}
+      {/* Modal: Criar / Editar Webhook with Group Classification */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto p-6 space-y-4">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-4">
           <DialogHeader className="pb-2 border-b">
             <DialogTitle className="text-xl font-bold text-slate-900 dark:text-white">
               {editingWebhook ? 'Editar webhook' : 'Criar webhook'}
@@ -446,7 +593,7 @@ export const Webhooks: React.FC = () => {
                 Nome
               </label>
               <Input
-                placeholder="Ex: Integração n8n, CRM de Leads..."
+                placeholder="Ex: Notificações de Vendas - n8n, CRM de Leads..."
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 className="h-10 text-sm"
@@ -523,65 +670,149 @@ export const Webhooks: React.FC = () => {
               <span>Aprenda mais sobre os webhooks e como autenticar requisições usando o token secreto.</span>
             </div>
 
-            {/* Field: Evento com Selecionar Todos */}
-            <div className="space-y-2 pt-2 border-t">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-foreground">
-                  Evento
-                </label>
+            {/* Field: Eventos Separados por Grupo */}
+            <div className="space-y-3 pt-3 border-t">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-bold text-foreground uppercase tracking-wider">
+                    Eventos da Plataforma
+                  </label>
+                  <Badge variant="outline" className="text-[11px] font-mono">
+                    {formEvents.length} selecionados
+                  </Badge>
+                </div>
+
                 <button
                   type="button"
                   onClick={handleToggleSelectAllEvents}
-                  className="text-xs text-[#4F46E5] hover:underline font-medium"
+                  className="text-xs text-[#4F46E5] hover:underline font-semibold self-start sm:self-auto"
                 >
                   {formEvents.length === WEBHOOK_EVENTS_CATALOG.length 
-                    ? '(Desmarcar todos)' 
-                    : '(Selecionar todos)'}
+                    ? '(Desmarcar todos os eventos)' 
+                    : '(Selecionar todos os eventos)'}
                 </button>
               </div>
 
-              {/* Checkboxes List */}
-              <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
-                {WEBHOOK_EVENTS_CATALOG.map((ev) => {
-                  const isChecked = formEvents.includes(ev.eventType);
+              {/* Group Quick Filter Pills inside Modal */}
+              <div className="flex items-center gap-1 overflow-x-auto pb-1.5 scrollbar-none">
+                <button
+                  type="button"
+                  onClick={() => setModalFilterGroup('all')}
+                  className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                    modalFilterGroup === 'all'
+                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                      : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                  }`}
+                >
+                  Todos os Grupos
+                </button>
+                {WEBHOOK_GROUPS.map(g => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => setModalFilterGroup(g.id)}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium whitespace-nowrap transition-colors ${
+                      modalFilterGroup === g.id
+                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                        : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                    }`}
+                  >
+                    {renderGroupIcon(g.id, 'h-3 w-3')}
+                    <span>{g.name.replace('Eventos de ', '')}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Grouped Events Accordion / Section List */}
+              <div className="space-y-4 max-h-72 overflow-y-auto pr-1">
+                {modalVisibleGroups.map((grp) => {
+                  const groupEvents = WEBHOOK_EVENTS_CATALOG.filter(e => e.group === grp.id);
+                  const selectedInGroup = groupEvents.filter(e => formEvents.includes(e.eventType)).length;
+                  const isAllInGroupSelected = groupEvents.length > 0 && selectedInGroup === groupEvents.length;
 
                   return (
                     <div 
-                      key={ev.eventType} 
-                      className={`flex items-center justify-between p-2 rounded-lg border transition-colors ${
-                        isChecked ? 'bg-primary/5 border-primary/30' : 'border-border/60 hover:bg-muted/40'
-                      }`}
+                      key={grp.id}
+                      className="border border-border/80 rounded-xl overflow-hidden bg-card shadow-xs"
                     >
-                      <label 
-                        htmlFor={`check-${ev.eventType}`} 
-                        className="flex items-center gap-2.5 cursor-pointer text-xs font-medium text-foreground flex-1"
-                      >
-                        <Checkbox
-                          id={`check-${ev.eventType}`}
-                          checked={isChecked}
-                          onCheckedChange={() => handleToggleEvent(ev.eventType)}
-                        />
-                        <span>{ev.title}</span>
-                        {ev.eventType === 'user.created' && (
-                          <Badge className="bg-emerald-600 text-white text-[9px] h-4 px-1.5 py-0 font-medium">
-                            user.created
-                          </Badge>
-                        )}
-                      </label>
+                      {/* Group Header */}
+                      <div className="bg-muted/40 px-3.5 py-2.5 flex items-center justify-between border-b border-border/60">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1 rounded-md bg-primary/10 text-primary">
+                            {renderGroupIcon(grp.id, 'h-3.5 w-3.5')}
+                          </div>
+                          <div>
+                            <span className="text-xs font-bold text-foreground">
+                              {grp.name}
+                            </span>
+                            <span className="text-[11px] text-muted-foreground ml-2">
+                              ({selectedInGroup}/{groupEvents.length})
+                            </span>
+                          </div>
+                        </div>
 
-                      {/* Botão Visualizar Payload */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPreviewPayload(ev);
-                        }}
-                        className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded hover:bg-muted"
-                        title="Visualizar payload do documento que vai ser enviado"
-                      >
-                        <Eye className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-[11px]">Ver payload</span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleGroupEvents(grp.id)}
+                          className="text-[11px] text-[#4F46E5] hover:underline font-medium"
+                        >
+                          {isAllInGroupSelected ? 'Desmarcar grupo' : 'Selecionar grupo'}
+                        </button>
+                      </div>
+
+                      {/* Group Items */}
+                      <div className="p-2 space-y-1.5 divide-y divide-border/30">
+                        {groupEvents.map((ev) => {
+                          const isChecked = formEvents.includes(ev.eventType);
+
+                          return (
+                            <div 
+                              key={ev.eventType} 
+                              className={`flex items-center justify-between p-2 rounded-lg transition-colors ${
+                                isChecked ? 'bg-primary/[0.04]' : 'hover:bg-muted/30'
+                              }`}
+                            >
+                              <label 
+                                htmlFor={`check-${ev.eventType}`} 
+                                className="flex items-center gap-2.5 cursor-pointer text-xs font-medium text-foreground flex-1"
+                              >
+                                <Checkbox
+                                  id={`check-${ev.eventType}`}
+                                  checked={isChecked}
+                                  onCheckedChange={() => handleToggleEvent(ev.eventType)}
+                                />
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center gap-2">
+                                    <span>{ev.title}</span>
+                                    {ev.eventType === 'user.created' && (
+                                      <Badge className="bg-emerald-600 text-white text-[9px] h-4 px-1.5 py-0 font-medium">
+                                        user.created
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-muted-foreground font-normal line-clamp-1">
+                                    {ev.description}
+                                  </p>
+                                </div>
+                              </label>
+
+                              {/* Botão Visualizar Payload */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPreviewPayload(ev);
+                                }}
+                                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded hover:bg-muted shrink-0 ml-2"
+                                title="Visualizar payload do documento que vai ser enviado"
+                              >
+                                <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span className="text-[11px]">Ver payload</span>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 })}
@@ -626,7 +857,7 @@ export const Webhooks: React.FC = () => {
                 </DialogTitle>
               </div>
               <DialogDescription className="font-mono text-xs">
-                Evento: <code>{previewPayload.eventType}</code>
+                Evento: <code>{previewPayload.eventType}</code> ({previewPayload.group})
               </DialogDescription>
             </DialogHeader>
 

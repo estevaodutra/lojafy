@@ -31,18 +31,18 @@ export const useRegisteredWebhooks = () => {
     try {
       setLoading(true);
 
-      // 1. Try to fetch registry row from webhook_settings
-      const { data, error } = await supabase
+      // 1. Fetch all webhook_settings rows from database
+      const { data: allRows, error: allRowsError } = await supabase
         .from('webhook_settings')
-        .select('*')
-        .eq('event_type', DB_REGISTRY_EVENT)
-        .maybeSingle();
+        .select('*');
 
       let loaded: RegisteredWebhook[] = [];
 
-      if (!error && data?.last_error_message) {
+      // 2. Check if registered_webhooks registry row exists
+      const registryRow = allRows?.find(r => r.event_type === DB_REGISTRY_EVENT);
+      if (registryRow?.last_error_message) {
         try {
-          const parsed = JSON.parse(data.last_error_message);
+          const parsed = JSON.parse(registryRow.last_error_message);
           if (Array.isArray(parsed)) {
             loaded = parsed;
           }
@@ -51,7 +51,7 @@ export const useRegisteredWebhooks = () => {
         }
       }
 
-      // If DB empty, fallback to localStorage
+      // If loaded is empty, fallback to localStorage
       if (loaded.length === 0) {
         const local = localStorage.getItem(STORAGE_KEY);
         if (local) {
@@ -59,8 +59,6 @@ export const useRegisteredWebhooks = () => {
             const parsedLocal = JSON.parse(local);
             if (Array.isArray(parsedLocal) && parsedLocal.length > 0) {
               loaded = parsedLocal;
-              // Sync back to DB if super_admin
-              await syncToDatabase(loaded);
             }
           } catch (e) {
             console.warn('Erro ao ler localStorage:', e);
@@ -68,8 +66,48 @@ export const useRegisteredWebhooks = () => {
         }
       }
 
+      // 3. MIGRAÇÃO AUTOMÁTICA DOS WEBHOOKS JÁ CONFIGURADOS NO API DOCS
+      // Qualquer linha com webhook_url preenchida (ex: order.paid, user.created) que ainda não esteja na lista
+      let hasMigrated = false;
+      if (allRows && allRows.length > 0) {
+        for (const row of allRows) {
+          if (row.event_type === DB_REGISTRY_EVENT) continue;
+          if (row.webhook_url && row.webhook_url.trim().length > 0) {
+            const alreadyExists = loaded.some(w => 
+              w.id === row.id || 
+              (w.url.trim() === row.webhook_url.trim() && w.events.includes(row.event_type))
+            );
+
+            if (!alreadyExists) {
+              const meta = WEBHOOK_EVENTS_CATALOG.find(e => e.eventType === row.event_type);
+              const eventTitle = meta?.title || row.event_type;
+              const migratedWebhook: RegisteredWebhook = {
+                id: row.id || 'migrated_' + row.event_type,
+                name: `Webhook ${eventTitle}`,
+                url: row.webhook_url.trim(),
+                token: row.secret_token || 'whsec_' + Math.random().toString(36).substring(2, 12),
+                events: [row.event_type],
+                active: row.active ?? true,
+                created_at: row.created_at || new Date().toISOString(),
+                updated_at: row.updated_at || new Date().toISOString(),
+                last_triggered_at: row.last_triggered_at || null,
+                last_status_code: row.last_status_code || null,
+                last_error_message: row.last_error_message || null,
+              };
+
+              loaded.push(migratedWebhook);
+              hasMigrated = true;
+            }
+          }
+        }
+      }
+
       setWebhooks(loaded);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(loaded));
+
+      if (hasMigrated) {
+        await syncToDatabase(loaded);
+      }
     } catch (err) {
       console.error('Erro ao buscar webhooks:', err);
       // Fallback to local storage
