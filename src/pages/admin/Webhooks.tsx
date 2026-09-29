@@ -40,6 +40,13 @@ import {
   DialogTitle, 
   DialogFooter 
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useRegisteredWebhooks, RegisteredWebhook } from '@/hooks/useRegisteredWebhooks';
 import { 
   WEBHOOK_GROUPS, 
@@ -329,59 +336,80 @@ export const Webhooks: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter Bar (Groups & Search) */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-        {/* Category Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-none">
-          <button
+      {/* Filter Bar (Groups Dropdown Menu & Search) */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 max-w-xl">
+          {/* Menu Suspenso de Grupos */}
+          <div className="w-full sm:w-64 shrink-0">
+            <Select 
+              value={filterGroup} 
+              onValueChange={(val) => setFilterGroup(val as WebhookGroupId | 'all')}
+            >
+              <SelectTrigger className="h-9 text-xs bg-card">
+                <div className="flex items-center gap-2 truncate">
+                  {filterGroup === 'all' ? (
+                    <WebhookIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  ) : (
+                    <span className="shrink-0">{renderGroupIcon(filterGroup, 'h-3.5 w-3.5')}</span>
+                  )}
+                  <SelectValue placeholder="Filtrar por grupo" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs">
+                  <div className="flex items-center justify-between w-full gap-4">
+                    <span className="font-medium">Todos os Grupos</span>
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                      {webhooks.length}
+                    </Badge>
+                  </div>
+                </SelectItem>
+                {WEBHOOK_GROUPS.map(grp => {
+                  const grpEvents = WEBHOOK_EVENTS_CATALOG.filter(e => e.group === grp.id).map(e => e.eventType);
+                  const count = webhooks.filter(w => w.events.some(ev => grpEvents.includes(ev))).length;
+
+                  return (
+                    <SelectItem key={grp.id} value={grp.id} className="text-xs">
+                      <div className="flex items-center justify-between w-full gap-4">
+                        <div className="flex items-center gap-2">
+                          {renderGroupIcon(grp.id, 'h-3.5 w-3.5 text-muted-foreground')}
+                          <span>{grp.name}</span>
+                        </div>
+                        {count > 0 && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">
+                            {count}
+                          </Badge>
+                        )}
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome ou URL..."
+              value={searchWebhooks}
+              onChange={(e) => setSearchWebhooks(e.target.value)}
+              className="pl-8 h-9 text-xs bg-card"
+            />
+          </div>
+        </div>
+
+        {filterGroup !== 'all' && (
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setFilterGroup('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
-              filterGroup === 'all'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
-            }`}
+            className="text-xs h-9 text-muted-foreground hover:text-foreground self-start sm:self-auto"
           >
-            Todos ({webhooks.length})
-          </button>
-
-          {WEBHOOK_GROUPS.map(grp => {
-            const grpEvents = WEBHOOK_EVENTS_CATALOG.filter(e => e.group === grp.id).map(e => e.eventType);
-            const count = webhooks.filter(w => w.events.some(ev => grpEvents.includes(ev))).length;
-
-            return (
-              <button
-                key={grp.id}
-                onClick={() => setFilterGroup(grp.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
-                  filterGroup === grp.id
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {renderGroupIcon(grp.id, 'h-3.5 w-3.5')}
-                <span>{grp.name}</span>
-                {count > 0 && (
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                    filterGroup === grp.id ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted-foreground/20 text-muted-foreground'
-                  }`}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Search */}
-        <div className="relative w-full md:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nome ou URL..."
-            value={searchWebhooks}
-            onChange={(e) => setSearchWebhooks(e.target.value)}
-            className="pl-8 h-9 text-xs"
-          />
-        </div>
+            Limpar filtro
+          </Button>
+        )}
       </div>
 
       {/* Webhooks List */}
@@ -693,34 +721,39 @@ export const Webhooks: React.FC = () => {
                 </button>
               </div>
 
-              {/* Group Quick Filter Pills inside Modal */}
-              <div className="flex items-center gap-1 overflow-x-auto pb-1.5 scrollbar-none">
-                <button
-                  type="button"
-                  onClick={() => setModalFilterGroup('all')}
-                  className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
-                    modalFilterGroup === 'all'
-                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                      : 'bg-muted hover:bg-muted/80 text-muted-foreground'
-                  }`}
+              {/* Group Quick Filter Dropdown inside Modal */}
+              <div className="w-full sm:w-72">
+                <Select
+                  value={modalFilterGroup}
+                  onValueChange={(val) => setModalFilterGroup(val as WebhookGroupId | 'all')}
                 >
-                  Todos os Grupos
-                </button>
-                {WEBHOOK_GROUPS.map(g => (
-                  <button
-                    key={g.id}
-                    type="button"
-                    onClick={() => setModalFilterGroup(g.id)}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium whitespace-nowrap transition-colors ${
-                      modalFilterGroup === g.id
-                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                        : 'bg-muted hover:bg-muted/80 text-muted-foreground'
-                    }`}
-                  >
-                    {renderGroupIcon(g.id, 'h-3 w-3')}
-                    <span>{g.name.replace('Eventos de ', '')}</span>
-                  </button>
-                ))}
+                  <SelectTrigger className="h-8 text-xs bg-muted/40">
+                    <div className="flex items-center gap-2 truncate">
+                      {modalFilterGroup === 'all' ? (
+                        <WebhookIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      ) : (
+                        <span className="shrink-0">{renderGroupIcon(modalFilterGroup, 'h-3.5 w-3.5')}</span>
+                      )}
+                      <SelectValue placeholder="Filtrar por grupo de eventos" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs">
+                      Todos os Grupos de Eventos ({WEBHOOK_EVENTS_CATALOG.length})
+                    </SelectItem>
+                    {WEBHOOK_GROUPS.map(g => {
+                      const count = WEBHOOK_EVENTS_CATALOG.filter(e => e.group === g.id).length;
+                      return (
+                        <SelectItem key={g.id} value={g.id} className="text-xs">
+                          <div className="flex items-center gap-2">
+                            {renderGroupIcon(g.id, 'h-3.5 w-3.5 text-muted-foreground')}
+                            <span>{g.name} ({count})</span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Grouped Events Accordion / Section List */}
