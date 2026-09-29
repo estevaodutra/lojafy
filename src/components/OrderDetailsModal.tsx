@@ -220,7 +220,22 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       });
 
       if (error) {
-        throw error;
+        let errorDetail = error.message;
+        try {
+          if ('context' in error && (error as any).context) {
+            const errBody = await (error as any).context.json();
+            if (errBody?.error || errBody?.details) {
+              errorDetail = errBody.error || errBody.details;
+            }
+          }
+        } catch {
+          // ignore json parse error
+        }
+        throw new Error(errorDetail);
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
       }
 
       toast({
@@ -233,7 +248,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     } catch (error: any) {
       console.error('Erro ao disparar webhook:', error);
       toast({
-        title: "Erro",
+        title: "Erro ao disparar webhook",
         description: error?.message || "Não foi possível disparar o webhook.",
         variant: "destructive",
       });

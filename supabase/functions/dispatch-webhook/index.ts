@@ -386,6 +386,7 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    const body = await req.json().catch(() => ({}));
     const { 
       event_type, 
       payload: providedPayload, 
@@ -435,11 +436,17 @@ Deno.serve(async (req) => {
       console.log(`[dispatch-webhook] Dados reais encontrados para ${event_type}`);
     }
 
-    // Identificar URL de destino: overrideUrl direto ou busca em registered_webhooks / webhook_settings
-    let targetUrl = overrideUrl;
-    let targetToken = overrideToken || '';
+    // Identificar URLs de destino: overrideUrl direto ou busca em registered_webhooks / webhook_settings
+    interface TargetEndpoint {
+      url: string;
+      token?: string;
+      name?: string;
+    }
+    const targets: TargetEndpoint[] = [];
 
-    if (!targetUrl) {
+    if (overrideUrl) {
+      targets.push({ url: overrideUrl, token: overrideToken || '', name: 'Teste / Override' });
+    } else {
       // 1. Tentar ler do registro de webhooks cadastrados
       const { data: registryConfig } = await supabase
         .from('webhook_settings')
@@ -454,10 +461,13 @@ Deno.serve(async (req) => {
             const matches = list.filter((w: any) =>
               (w.active || is_test) && w.url && Array.isArray(w.events) && w.events.includes(event_type)
             );
-            if (matches.length > 0) {
-              targetUrl = matches[0].url;
-              targetToken = matches[0].token || registryConfig.secret_token;
-            }
+            matches.forEach((m: any) => {
+              targets.push({
+                url: m.url,
+                token: m.token || registryConfig.secret_token || '',
+                name: m.name,
+              });
+            });
           }
         } catch (e) {
           console.error('[dispatch-webhook] Erro ao parsear registered_webhooks:', e);
@@ -465,7 +475,7 @@ Deno.serve(async (req) => {
       }
 
       // 2. Fallback para configuração legada por tipo de evento
-      if (!targetUrl) {
+      if (targets.length === 0) {
         const { data: legacyConfig } = await supabase
           .from('webhook_settings')
           .select('*')
@@ -473,25 +483,25 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (legacyConfig && (legacyConfig.active || is_test) && legacyConfig.webhook_url) {
-          targetUrl = legacyConfig.webhook_url;
-          targetToken = legacyConfig.secret_token;
+          targets.push({
+            url: legacyConfig.webhook_url,
+            token: legacyConfig.secret_token || '',
+            name: legacyConfig.name || `Webhook ${event_type}`,
+          });
         }
       }
     }
 
-    if (!targetUrl) {
+    if (targets.length === 0) {
       console.log(`[dispatch-webhook] Nenhum webhook ativo encontrado para o evento: ${event_type}`);
       return new Response(
-        JSON.stringify({ success: false, error: `Nenhum webhook ativo configurado para ${event_type}` }),
-        { status: is_test ? 400 : 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ 
+          success: false, 
+          error: `Nenhum webhook ativo configurado para o evento "${event_type}". Acesse Apps > Webhooks no painel para cadastrar uma URL.` 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    const webhookConfig = {
-      webhook_url: targetUrl,
-      secret_token: targetToken,
-      active: true,
-    };
 
     // Deduplicacao atomica contra Race Conditions e disparos simultaneos
     if (event_type === 'order.paid' && !is_test && !ignore_deduplication && payload?.order_id) {
@@ -521,7 +531,7 @@ Deno.serve(async (req) => {
       console.log(`[dispatch-webhook] Lock de envio adquirido com sucesso para pedido ${lockOrder[0]?.order_number || payload.order_id}`);
     }
 
-        // Montar payload final
+    // Montar payload final
     const webhookPayload: WebhookPayload = {
       event: event_type,
       timestamp: new Date().toISOString(),
@@ -537,85 +547,98 @@ Deno.serve(async (req) => {
 
     const payloadString = JSON.stringify(webhookPayload);
 
-    // Gerar assinatura HMAC
-    let signature = '';
-    if (webhookConfig.secret_token) {
-      signature = await generateHmacSignature(webhookConfig.secret_token, payloadString);
-    }
+    // Timeout: 60s para order.paid (n8n pode demorar), 15s para outros eventos
+    const timeoutMs = event_type === 'order.paid' ? 60000 : 15000;
 
-    console.log(`[dispatch-webhook] Enviando para: ${webhookConfig.webhook_url}`);
+    // Disparar em paralelo para todos os endpoints configurados
+    const dispatchResults = await Promise.all(
+      targets.map(async (target) => {
+        let signature = '';
+        if (target.token) {
+          signature = await generateHmacSignature(target.token, payloadString);
+        }
 
-    // Timeout: 60s para order.paid (n8n pode demorar), 10s para outros eventos
-    const timeoutMs = event_type === 'order.paid' ? 60000 : 10000;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        console.log(`[dispatch-webhook] Enviando para: ${target.url} (${target.name || 'sem nome'})`);
 
-    let statusCode = 0;
-    let responseBody = '';
-    let errorMessage = '';
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    try {
-      const response = await fetch(webhookConfig.webhook_url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Webhook-Signature': signature,
-          'X-Webhook-Event': event_type,
-          'X-Webhook-Timestamp': webhookPayload.timestamp,
-        },
-        body: payloadString,
-        signal: controller.signal,
-      });
+        let statusCode = 0;
+        let responseBody = '';
+        let errorMessage = '';
 
-      clearTimeout(timeoutId);
-      statusCode = response.status;
-      responseBody = await response.text().catch(() => '');
-      
-      console.log(`[dispatch-webhook] Resposta: ${statusCode}`);
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      
-      if (fetchError.name === 'AbortError') {
-        errorMessage = `Timeout: webhook não respondeu em ${timeoutMs / 1000} segundos`;
-        statusCode = 408;
-      } else {
-        errorMessage = fetchError.message || 'Erro ao conectar com webhook';
-        statusCode = 0;
-      }
-      console.error(`[dispatch-webhook] Erro no fetch:`, errorMessage);
-    }
+        try {
+          const response = await fetch(target.url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Webhook-Signature': signature,
+              'X-Webhook-Event': event_type,
+              'X-Webhook-Timestamp': webhookPayload.timestamp,
+            },
+            body: payloadString,
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+          statusCode = response.status;
+          responseBody = await response.text().catch(() => '');
+          console.log(`[dispatch-webhook] Resposta de ${target.url}: ${statusCode}`);
+        } catch (fetchError: any) {
+          clearTimeout(timeoutId);
+          if (fetchError?.name === 'AbortError') {
+            errorMessage = `Timeout: webhook não respondeu em ${timeoutMs / 1000} segundos`;
+            statusCode = 408;
+          } else {
+            errorMessage = fetchError?.message || 'Erro ao conectar com webhook';
+            statusCode = 0;
+          }
+          console.error(`[dispatch-webhook] Erro no fetch para ${target.url}:`, errorMessage);
+        }
+
+        // Registrar no log
+        await supabase
+          .from('webhook_dispatch_logs')
+          .insert({
+            event_type,
+            payload: { ...webhookPayload, _target_url: target.url, _target_name: target.name },
+            status_code: statusCode,
+            response_body: responseBody.substring(0, 1000), // Limitar tamanho
+            error_message: errorMessage || null,
+          });
+
+        return {
+          url: target.url,
+          name: target.name,
+          statusCode,
+          responseBody,
+          errorMessage,
+          success: statusCode >= 200 && statusCode < 300,
+        };
+      })
+    );
+
+    const atLeastOneSuccess = dispatchResults.some(r => r.success);
+    const primaryResult = dispatchResults[0];
 
     // Atualizar status no webhook_settings
     await supabase
       .from('webhook_settings')
       .update({
         last_triggered_at: new Date().toISOString(),
-        last_status_code: statusCode,
-        last_error_message: errorMessage || null,
+        last_status_code: primaryResult.statusCode,
+        last_error_message: primaryResult.errorMessage || null,
       })
       .eq('event_type', event_type);
-
-    // Registrar no log
-    await supabase
-      .from('webhook_dispatch_logs')
-      .insert({
-        event_type,
-        payload: webhookPayload,
-        status_code: statusCode,
-        response_body: responseBody.substring(0, 1000), // Limitar tamanho
-        error_message: errorMessage || null,
-      });
-
-    const success = statusCode >= 200 && statusCode < 300;
 
     // Marcar status do envio do webhook no pedido (apenas order.paid em produção)
     if (event_type === 'order.paid' && !is_test && payload?.order_id) {
       const updatePayload: Record<string, any> = {
-        webhook_paid_status: success ? 'sent' : 'failed',
+        webhook_paid_status: atLeastOneSuccess ? 'sent' : 'failed',
         webhook_paid_dispatched_at: new Date().toISOString(),
-        webhook_paid_error: success
+        webhook_paid_error: atLeastOneSuccess
           ? null
-          : `${statusCode} - ${(errorMessage || responseBody || '').toString().substring(0, 500)}`,
+          : `${primaryResult.statusCode} - ${(primaryResult.errorMessage || primaryResult.responseBody || '').toString().substring(0, 500)}`,
       };
       const { error: updErr } = await supabase
         .from('orders')
@@ -628,18 +651,19 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        success,
+        success: atLeastOneSuccess,
         event_type,
-        status_code: statusCode,
-        error: errorMessage || undefined,
+        dispatches: dispatchResults,
+        status_code: primaryResult.statusCode,
+        error: atLeastOneSuccess ? undefined : primaryResult.errorMessage || `Webhook retornou HTTP ${primaryResult.statusCode}`,
       }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: atLeastOneSuccess ? 200 : 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('[dispatch-webhook] Erro inesperado:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: error?.message || String(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

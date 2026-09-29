@@ -172,17 +172,39 @@ serve(async (req) => {
     });
 
     if (dispatchError) {
-      console.error('âŒ Erro ao disparar webhook:', dispatchError);
+      console.error('Erro ao disparar webhook:', dispatchError);
+      let errorMsg = dispatchError.message;
+      try {
+        if ('context' in dispatchError && (dispatchError as any).context) {
+          const errBody = await (dispatchError as any).context.json();
+          if (errBody?.error || errBody?.details) {
+            errorMsg = errBody.error || errBody.details;
+          }
+        }
+      } catch {
+        // ignore
+      }
       return new Response(
         JSON.stringify({ 
-          error: 'Failed to dispatch webhook', 
+          error: errorMsg || 'Falha ao disparar webhook', 
           details: dispatchError.message 
         }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('âœ… Webhook order.paid disparado manualmente com sucesso');
+    if (dispatchResult && dispatchResult.success === false) {
+      console.error('Webhook retornou falha:', dispatchResult);
+      return new Response(
+        JSON.stringify({
+          error: dispatchResult.error || 'Nenhum webhook ativo configurado ou endpoint retornou erro',
+          details: dispatchResult,
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Webhook order.paid disparado manualmente com sucesso');
 
     return new Response(
       JSON.stringify({
