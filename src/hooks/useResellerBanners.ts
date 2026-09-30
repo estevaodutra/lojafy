@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 export interface ResellerBanner {
   id: string;
   reseller_id: string;
-  banner_type: 'carousel' | 'featured';
+  banner_type: 'carousel' | 'featured' | 'footer';
   desktop_image_url: string;
   mobile_image_url?: string;
   link_url?: string;
@@ -16,7 +16,7 @@ export interface ResellerBanner {
   updated_at?: string;
 }
 
-export const useResellerBanners = (resellerId?: string, bannerType?: 'carousel' | 'featured') => {
+export const useResellerBanners = (resellerId?: string, bannerType?: 'carousel' | 'featured' | 'footer') => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

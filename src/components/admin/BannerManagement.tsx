@@ -19,7 +19,7 @@ interface Banner {
   mobile_image_url?: string;
   link_url?: string;
   open_new_tab: boolean;
-  banner_type: 'carousel' | 'featured';
+  banner_type: 'carousel' | 'featured' | 'footer';
   button_text?: string;
   button_link?: string;
   position: number;
@@ -29,7 +29,7 @@ interface Banner {
 }
 
 const BannerManagement = () => {
-  const [activeTab, setActiveTab] = useState<'carousel' | 'featured'>('carousel');
+  const [activeTab, setActiveTab] = useState<'carousel' | 'featured' | 'footer'>('carousel');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const { toast } = useToast();
@@ -61,6 +61,7 @@ const BannerManagement = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-banners'] });
+      queryClient.invalidateQueries({ queryKey: ['footer-banners'] });
       toast({
         title: "Banner excluído",
         description: "O banner foi excluído com sucesso.",
@@ -86,6 +87,7 @@ const BannerManagement = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-banners'] });
+      queryClient.invalidateQueries({ queryKey: ['footer-banners'] });
       toast({
         title: "Status atualizado",
         description: "O status do banner foi atualizado com sucesso.",
@@ -111,28 +113,30 @@ const BannerManagement = () => {
   };
 
   const activeBannersCount = banners.filter(banner => banner.active).length;
-  const maxBanners = activeTab === 'carousel' ? 5 : 6;
+  const maxBanners = activeTab === 'carousel' ? 5 : activeTab === 'featured' ? 6 : 5;
+  const tabLabel = activeTab === 'carousel' ? 'rotativos' : activeTab === 'featured' ? 'de destaque' : 'do rodapé';
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold mb-2">Gerenciar Banners</h2>
         <p className="text-muted-foreground">
-          Gerencie os banners da página inicial
+          Gerencie os banners da sua loja
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'carousel' | 'featured')}>
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'carousel' | 'featured' | 'footer')}>
+        <TabsList className="grid w-full max-w-lg grid-cols-3">
           <TabsTrigger value="carousel">Banners Rotativos</TabsTrigger>
           <TabsTrigger value="featured">Banners de Destaque</TabsTrigger>
+          <TabsTrigger value="footer">Banners do Rodapé</TabsTrigger>
         </TabsList>
 
         <TabsContent value={activeTab} className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">
-                Máximo de {maxBanners} banners {activeTab === 'carousel' ? 'rotativos' : 'de destaque'} ativos ({activeBannersCount}/{maxBanners})
+                Máximo de {maxBanners} banners {tabLabel} ativos ({activeBannersCount}/{maxBanners})
               </p>
             </div>
             <Button 
@@ -150,7 +154,7 @@ const BannerManagement = () => {
             <Card className="border-warning bg-warning/5">
               <CardContent className="pt-6">
                 <p className="text-warning font-medium">
-                  Você atingiu o limite máximo de {maxBanners} banners {activeTab === 'carousel' ? 'rotativos' : 'de destaque'} ativos. 
+                  Você atingiu o limite máximo de {maxBanners} banners {tabLabel} ativos. 
                   Desative um banner existente para adicionar um novo.
                 </p>
               </CardContent>
@@ -168,7 +172,7 @@ const BannerManagement = () => {
                 <CardContent className="text-center py-12">
                   <h3 className="text-lg font-medium mb-2">Nenhum banner encontrado</h3>
                   <p className="text-muted-foreground mb-4">
-                    Crie seu primeiro banner {activeTab === 'carousel' ? 'rotativo' : 'de destaque'}.
+                    Crie seu primeiro banner {tabLabel}.
                   </p>
                   <Button onClick={() => setIsFormOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" />

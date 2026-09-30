@@ -22,7 +22,7 @@ interface Banner {
   mobile_height?: number;
   link_url?: string;
   open_new_tab: boolean;
-  banner_type: 'carousel' | 'featured';
+  banner_type: 'carousel' | 'featured' | 'footer';
   button_text?: string;
   button_link?: string;
   position: number;
@@ -33,7 +33,7 @@ interface BannerFormProps {
   isOpen: boolean;
   onClose: () => void;
   banner?: Banner | null;
-  bannerType: 'carousel' | 'featured';
+  bannerType: 'carousel' | 'featured' | 'footer';
   existingBanners: Banner[];
 }
 
@@ -50,7 +50,7 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, banner
   });
   
   const [imageOnly, setImageOnly] = useState(true);
-  const maxBanners = bannerType === 'carousel' ? 5 : 6;
+  const maxBanners = bannerType === 'carousel' ? 5 : bannerType === 'featured' ? 6 : 5;
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -106,7 +106,7 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, banner
   };
 
   const createBannerMutation = useMutation({
-    mutationFn: async (data: typeof formData & { banner_type: 'carousel' | 'featured' }) => {
+    mutationFn: async (data: typeof formData & { banner_type: 'carousel' | 'featured' | 'footer' }) => {
       const { error } = await supabase
         .from('banners')
         .insert([data]);
@@ -117,6 +117,7 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, banner
       queryClient.invalidateQueries({ queryKey: ['admin-banners'] });
       queryClient.invalidateQueries({ queryKey: ['banners'] });
       queryClient.invalidateQueries({ queryKey: ['featured-banners'] });
+      queryClient.invalidateQueries({ queryKey: ['footer-banners'] });
       toast({
         title: "Banner criado",
         description: "O banner foi criado com sucesso.",
@@ -133,7 +134,7 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, banner
   });
 
   const updateBannerMutation = useMutation({
-    mutationFn: async (data: typeof formData & { banner_type: 'carousel' | 'featured' }) => {
+    mutationFn: async (data: typeof formData & { banner_type: 'carousel' | 'featured' | 'footer' }) => {
       if (!banner) throw new Error('Banner não encontrado');
       
       const { error } = await supabase
@@ -147,6 +148,7 @@ const BannerForm: React.FC<BannerFormProps> = ({ isOpen, onClose, banner, banner
       queryClient.invalidateQueries({ queryKey: ['admin-banners'] });
       queryClient.invalidateQueries({ queryKey: ['banners'] });
       queryClient.invalidateQueries({ queryKey: ['featured-banners'] });
+      queryClient.invalidateQueries({ queryKey: ['footer-banners'] });
       toast({
         title: "Banner atualizado",
         description: "O banner foi atualizado com sucesso.",

@@ -11,7 +11,7 @@ interface ResellerBannerFormProps {
   onClose: () => void;
   banner?: ResellerBanner | null;
   resellerId: string;
-  bannerType: 'carousel' | 'featured';
+  bannerType: 'carousel' | 'featured' | 'footer';
   existingBanners: ResellerBanner[];
 }
 
@@ -31,7 +31,7 @@ const ResellerBannerForm: React.FC<ResellerBannerFormProps> = ({
     active: true,
   });
 
-  const maxBanners = bannerType === 'carousel' ? 5 : 6;
+  const maxBanners = bannerType === 'carousel' ? 5 : bannerType === 'featured' ? 6 : 5;
 
   useEffect(() => {
     if (banner) {
@@ -84,7 +84,7 @@ const ResellerBannerForm: React.FC<ResellerBannerFormProps> = ({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {banner ? 'Editar Banner' : `Novo Banner ${bannerType === 'carousel' ? 'Rotativo' : 'de Destaque'}`}
+            {banner ? 'Editar Banner' : `Novo Banner ${bannerType === 'carousel' ? 'Rotativo' : bannerType === 'featured' ? 'de Destaque' : 'do Rodapé'}`}
           </DialogTitle>
         </DialogHeader>
 

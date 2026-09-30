@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 const ResellerBanners = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'carousel' | 'featured'>('carousel');
+  const [activeTab, setActiveTab] = useState<'carousel' | 'featured' | 'footer'>('carousel');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBanner, setEditingBanner] = useState<ResellerBanner | null>(null);
 
@@ -28,7 +28,8 @@ const ResellerBanners = () => {
   };
 
   const activeBannersCount = banners.filter(b => b.active).length;
-  const maxBanners = activeTab === 'carousel' ? 5 : 6;
+  const maxBanners = activeTab === 'carousel' ? 5 : activeTab === 'featured' ? 6 : 5;
+  const tabLabel = activeTab === 'carousel' ? 'rotativos' : activeTab === 'featured' ? 'de destaque' : 'do rodapé';
 
   const BannerList = () => {
     if (isLoading) {
@@ -46,7 +47,7 @@ const ResellerBanners = () => {
           <CardContent className="text-center py-12">
             <h3 className="text-lg font-medium mb-2">Nenhum banner encontrado</h3>
             <p className="text-muted-foreground mb-4">
-              Crie seu primeiro banner {activeTab === 'carousel' ? 'rotativo' : 'de destaque'}.
+              Crie seu primeiro banner {tabLabel}.
             </p>
             <Button onClick={() => setIsFormOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -147,65 +148,35 @@ const ResellerBanners = () => {
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'carousel' | 'featured')}>
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'carousel' | 'featured' | 'footer')}>
+        <TabsList className="grid w-full max-w-lg grid-cols-3">
           <TabsTrigger value="carousel">Banners Rotativos</TabsTrigger>
           <TabsTrigger value="featured">Banners de Destaque</TabsTrigger>
+          <TabsTrigger value="footer">Banners do Rodapé</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="carousel" className="space-y-4">
+        <TabsContent value={activeTab} className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">
-                Máximo de 5 banners rotativos ativos ({activeBannersCount}/5)
+                Máximo de {maxBanners} banners {tabLabel} ativos ({activeBannersCount}/{maxBanners})
               </p>
             </div>
             <Button 
               onClick={() => setIsFormOpen(true)}
-              disabled={activeBannersCount >= 5}
+              disabled={activeBannersCount >= maxBanners}
             >
               <Plus className="h-4 w-4 mr-2" />
               Novo Banner
-              {activeBannersCount >= 5 && " (Limite atingido)"}
+              {activeBannersCount >= maxBanners && " (Limite atingido)"}
             </Button>
           </div>
 
-          {activeBannersCount >= 5 && (
+          {activeBannersCount >= maxBanners && (
             <Card className="border-warning bg-warning/5">
               <CardContent className="pt-6">
                 <p className="text-warning font-medium">
-                  Você atingiu o limite máximo de 5 banners rotativos ativos. 
-                  Desative um banner existente para adicionar um novo.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          <BannerList />
-        </TabsContent>
-
-        <TabsContent value="featured" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">
-                Máximo de 6 banners de destaque ativos ({activeBannersCount}/6)
-              </p>
-            </div>
-            <Button 
-              onClick={() => setIsFormOpen(true)}
-              disabled={activeBannersCount >= 6}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Banner
-              {activeBannersCount >= 6 && " (Limite atingido)"}
-            </Button>
-          </div>
-
-          {activeBannersCount >= 6 && (
-            <Card className="border-warning bg-warning/5">
-              <CardContent className="pt-6">
-                <p className="text-warning font-medium">
-                  Você atingiu o limite máximo de 6 banners de destaque ativos. 
+                  Você atingiu o limite máximo de {maxBanners} banners {tabLabel} ativos. 
                   Desative um banner existente para adicionar um novo.
                 </p>
               </CardContent>
