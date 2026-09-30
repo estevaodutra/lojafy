@@ -306,11 +306,11 @@ export const Webhooks: React.FC = () => {
       <div className="space-y-4">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <button 
-            onClick={() => navigate('/super-admin/apps')} 
+            onClick={() => navigate('/super-admin/recursos')} 
             className="hover:text-foreground flex items-center gap-1 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span>Voltar para Apps</span>
+            <span>Voltar para Recursos</span>
           </button>
           <span>/</span>
           <span className="text-foreground font-medium">Webhooks</span>

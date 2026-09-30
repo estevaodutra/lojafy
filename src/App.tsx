@@ -401,6 +401,8 @@ const App = () => {
                   <Route path="logs" element={<SystemLogs />} />
                   <Route path="apps" element={<AdminApps />} />
                   <Route path="apps/webhooks" element={<AdminWebhooks />} />
+                  <Route path="recursos" element={<AdminApps />} />
+                  <Route path="recursos/webhooks" element={<AdminWebhooks />} />
                 </Route>
 
                 {/* Supplier Panel Routes */}

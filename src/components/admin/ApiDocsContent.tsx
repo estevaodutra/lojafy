@@ -317,14 +317,14 @@ export const ApiDocsContent: React.FC<ApiDocsContentProps> = ({
             <div className="space-y-1">
               <h3 className="text-base font-semibold flex items-center gap-2 text-foreground">
                 <Webhook className="h-5 w-5 text-primary" />
-                Gerenciamento Centralizado em Apps &gt; Webhooks
+                Gerenciamento Centralizado em Recursos &gt; Webhooks
               </h3>
               <p className="text-sm text-muted-foreground">
-                Todos os webhooks agora são gerenciados de forma centralizada em <strong>Apps &gt; Webhooks</strong>, com separação de eventos por grupos (Usuários, Pedidos, Estoque, etc.), múltiplos destinos para o mesmo evento e visualização de payload.
+                Todos os webhooks agora são gerenciados de forma centralizada em <strong>Recursos &gt; Webhooks</strong>, com separação de eventos por grupos (Usuários, Pedidos, Estoque, etc.), múltiplos destinos para o mesmo evento e visualização de payload.
               </p>
             </div>
             <Button 
-              onClick={() => navigate('/super-admin/apps/webhooks')} 
+              onClick={() => navigate('/super-admin/recursos/webhooks')} 
               className="gap-2 shrink-0 bg-[#5B47FB] hover:bg-[#4C39EC] text-white"
             >
               <span>Abrir Gerenciador de Webhooks</span>

@@ -18,7 +18,7 @@ export const Apps: React.FC = () => {
     <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-300">
       {/* Header */}
       <div className="border-b pb-6">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Apps</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Recursos</h1>
         <p className="text-muted-foreground mt-1 text-base">
           Gerencie as integrações e conexões de webhooks com serviços externos.
         </p>
@@ -27,7 +27,7 @@ export const Apps: React.FC = () => {
       {/* Grid containing ONLY Webhooks as requested */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card
-          onClick={() => navigate('/super-admin/apps/webhooks')}
+          onClick={() => navigate('/super-admin/recursos/webhooks')}
           className="group relative cursor-pointer border border-border/80 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden bg-card hover:bg-accent/5 rounded-2xl"
         >
           <CardContent className="h-48 p-6 flex flex-col items-center justify-center text-center">

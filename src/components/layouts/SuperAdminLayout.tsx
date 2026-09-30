@@ -135,8 +135,8 @@ const superAdminMenuItems = [
     icon: ScrollText,
   },
   {
-    title: 'Apps',
-    url: '/super-admin/apps',
+    title: 'Recursos',
+    url: '/super-admin/recursos',
     icon: LayoutGrid,
   },
 ];
@@ -220,7 +220,7 @@ const SuperAdminSidebar = () => {
                     ) : (
                       <SidebarMenuButton 
                         asChild
-                        className={'url' in item && (currentPath === item.url || (item.url !== '/super-admin' && currentPath.startsWith(item.url + '/'))) ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground' : ''}
+                        className={'url' in item && (currentPath === item.url || (item.url !== '/super-admin' && currentPath.startsWith(item.url + '/')) || (item.url === '/super-admin/recursos' && currentPath.startsWith('/super-admin/apps'))) ? 'bg-sidebar-accent font-semibold text-sidebar-accent-foreground' : ''}
                       >
                         <button onClick={() => navigate(('url' in item ? item.url : '') as string)}>
                           <item.icon className="mr-2 h-4 w-4" />

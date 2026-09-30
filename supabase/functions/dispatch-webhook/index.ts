@@ -497,7 +497,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: `Nenhum webhook ativo configurado para o evento "${event_type}". Acesse Apps > Webhooks no painel para cadastrar uma URL.` 
+          error: `Nenhum webhook ativo configurado para o evento "${event_type}". Acesse Recursos > Webhooks no painel para cadastrar uma URL.` 
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
