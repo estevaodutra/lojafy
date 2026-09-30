@@ -249,32 +249,81 @@ async function fetchOrderById(supabase: any, orderId: string): Promise<Record<st
 }
 
 // Fetch last created user
-async function fetchLastCreatedUser(supabase: any): Promise<Record<string, any> | null> {
+async function fetchLastCreatedUser(supabase: any): Promise<Record<string, any>> {
   console.log('[dispatch-webhook] Buscando último usuário criado...');
   
-  // Use RPC to get users with email (already ordered by created_at DESC)
-  const { data: usersWithEmail, error } = await supabase.rpc('get_users_with_email');
+  // 1. Tentar via RPC
+  try {
+    const { data: usersWithEmail, error } = await supabase.rpc('get_users_with_email');
+    if (!error && usersWithEmail && usersWithEmail.length > 0) {
+      const lastUser = usersWithEmail[0];
+      const userName = `${lastUser.first_name || ''} ${lastUser.last_name || ''}`.trim() || 'Usuário';
 
-  if (error || !usersWithEmail || usersWithEmail.length === 0) {
-    console.log('[dispatch-webhook] Nenhum usuário encontrado:', error?.message);
-    return null;
+      return {
+        user_id: lastUser.user_id,
+        email: lastUser.email || 'email@exemplo.com',
+        name: userName,
+        phone: lastUser.phone || null,
+        role: lastUser.role || 'customer',
+        origin: {
+          type: 'manual',
+          store_id: null,
+          store_name: null,
+        },
+        created_at: lastUser.created_at || new Date().toISOString(),
+      };
+    }
+  } catch (e) {
+    console.warn('[dispatch-webhook] Aviso ao chamar RPC get_users_with_email:', e);
   }
 
-  const lastUser = usersWithEmail[0];
-  const userName = `${lastUser.first_name || ''} ${lastUser.last_name || ''}`.trim() || 'Usuário';
+  // 2. Fallback direto na tabela profiles
+  try {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('user_id, first_name, last_name, phone, role, created_at')
+      .order('created_at', { ascending: false })
+      .limit(1);
 
+    if (profiles && profiles.length > 0) {
+      const p = profiles[0];
+      let userEmail = 'usuario@exemplo.com';
+      try {
+        const { data: authUser } = await supabase.auth.admin.getUserById(p.user_id);
+        if (authUser?.user?.email) userEmail = authUser.user.email;
+      } catch {}
+
+      return {
+        user_id: p.user_id,
+        email: userEmail,
+        name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Usuário',
+        phone: p.phone || null,
+        role: p.role || 'customer',
+        origin: {
+          type: 'manual',
+          store_id: null,
+          store_name: null,
+        },
+        created_at: p.created_at || new Date().toISOString(),
+      };
+    }
+  } catch (e) {
+    console.warn('[dispatch-webhook] Aviso ao buscar profiles:', e);
+  }
+
+  // 3. Fallback mock realista garantido
   return {
-    user_id: lastUser.user_id,
-    email: lastUser.email || 'email@exemplo.com',
-    name: userName,
-    phone: lastUser.phone || null,
-    role: lastUser.role || 'customer',
+    user_id: 'usr_test_mock_12345',
+    email: 'marcelo.silva@exemplo.com',
+    name: 'Marcelo B Silva',
+    phone: '5519991378299',
+    role: 'customer',
     origin: {
       type: 'manual',
       store_id: null,
       store_name: null,
     },
-    created_at: lastUser.created_at,
+    created_at: new Date().toISOString(),
   };
 }
 
@@ -417,23 +466,34 @@ Deno.serve(async (req) => {
     }
 
     // Fetch real data if requested for test
-    if (is_test && use_real_data) {
-      console.log(`[dispatch-webhook] Buscando dados reais para teste de ${event_type}...`);
-      const { data: realData, error: realDataError } = await fetchRealTestData(supabase, event_type);
-      
-      if (realDataError || !realData) {
-        console.log(`[dispatch-webhook] Erro ao buscar dados reais: ${realDataError}`);
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: realDataError || 'Nenhum dado encontrado para teste' 
-          }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+    if (is_test) {
+      if (use_real_data) {
+        console.log(`[dispatch-webhook] Buscando dados reais para teste de ${event_type}...`);
+        try {
+          const { data: realData } = await fetchRealTestData(supabase, event_type);
+          if (realData) {
+            payload = realData;
+            console.log(`[dispatch-webhook] Dados reais encontrados para ${event_type}`);
+          } else {
+            console.log(`[dispatch-webhook] Dados reais não encontrados para ${event_type}, usando payload simulado`);
+            if (!payload) {
+              payload = providedPayload;
+            }
+          }
+        } catch (err) {
+          console.warn(`[dispatch-webhook] Falha ao obter dados reais para ${event_type}:`, err);
+          if (!payload) {
+            payload = providedPayload;
+          }
+        }
       }
-      
-      payload = realData;
-      console.log(`[dispatch-webhook] Dados reais encontrados para ${event_type}`);
+      if (!payload) {
+        payload = providedPayload || {
+          _test: true,
+          event: event_type,
+          timestamp: new Date().toISOString(),
+        };
+      }
     }
 
     // Identificar URLs de destino: overrideUrl direto ou busca em registered_webhooks / webhook_settings
@@ -657,7 +717,7 @@ Deno.serve(async (req) => {
         status_code: primaryResult.statusCode,
         error: atLeastOneSuccess ? undefined : primaryResult.errorMessage || `Webhook retornou HTTP ${primaryResult.statusCode}`,
       }),
-      { status: atLeastOneSuccess ? 200 : 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {

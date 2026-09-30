@@ -345,7 +345,20 @@ export const useRegisteredWebhooks = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        let errorDetail = error.message;
+        try {
+          if ('context' in error && (error as any).context) {
+            const errBody = await (error as any).context.json();
+            if (errBody?.error || errBody?.message) {
+              errorDetail = errBody.error || errBody.message;
+            }
+          }
+        } catch {
+          // ignore
+        }
+        throw new Error(errorDetail);
+      }
 
       const statusCode = data?.status_code || (data?.success ? 200 : 500);
       const success = !!data?.success;
