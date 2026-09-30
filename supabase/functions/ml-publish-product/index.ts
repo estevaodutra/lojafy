@@ -552,19 +552,33 @@ async function handleRequest(req: Request) {
       }
 
       // 7. Ajuste de Modo de Frete (me1, me2)
-      if (/mode me1|mode me2|mode/i.test(errStr) && !modified) {
-        console.log('[ml-publish] 🔄 AUTOCORREÇÃO DE MODO DE FRETE: Ajustando frete...');
+      if (/mode me1|mode me2|mode|shipping/i.test(errStr) && !modified) {
+        console.log('[ml-publish] 🔄 AUTOCORREÇÃO DE MODO DE FRETE: Ajustando frete para not_specified...');
         mlPayload.shipping = { mode: 'not_specified', free_shipping: Number(price) >= 79 };
         modified = true;
       }
 
+      // 8. Correção de Pictures / Imagens inválidas
+      if (/invalid picture|picture|image/i.test(errStr) && Array.isArray(mlPayload.pictures) && mlPayload.pictures.length > 1 && !modified) {
+         console.log('[ml-publish] 🔄 AUTOCORREÇÃO DE IMAGENS: Removendo primeira imagem problemática...');
+         mlPayload.pictures = mlPayload.pictures.slice(1);
+         modified = true;
+      }
+
       if (!modified) {
-        console.log('[ml-publish] Aplicando retentativa genérica ampla com Brand, Model e not_specified...');
+        console.log('[ml-publish] 🔄 Aplicando retentativa genérica ampla com Brand, Model e not_specified...');
         const currentAttrs = (mlPayload.attributes as any[] || []);
-        if (!currentAttrs.some((a: any) => a.id === 'BRAND')) currentAttrs.push({ id: 'BRAND', value_name: product.brand || 'Genérica' });
-        if (!currentAttrs.some((a: any) => a.id === 'MODEL')) currentAttrs.push({ id: 'MODEL', value_name: product.model || 'Padrão' });
+        let genericModified = false;
+        if (!currentAttrs.some((a: any) => a.id === 'BRAND')) { currentAttrs.push({ id: 'BRAND', value_name: product.brand || 'Genérica' }); genericModified = true; }
+        if (!currentAttrs.some((a: any) => a.id === 'MODEL')) { currentAttrs.push({ id: 'MODEL', value_name: product.model || 'Padrão' }); genericModified = true; }
+        if (!currentAttrs.some((a: any) => a.id === 'ITEM_CONDITION')) { currentAttrs.push({ id: 'ITEM_CONDITION', value_id: '2230284', value_name: 'Novo' }); genericModified = true; }
+        
         mlPayload.attributes = currentAttrs;
-        break; // Sai do loop para evitar repetições infinitas se nada mudou
+        
+        if (!genericModified) {
+          console.log('[ml-publish] Nenhuma autocorreção possível restante. Interrompendo tentativas.');
+          break; // Sai do loop para evitar repetições infinitas se nada mudou de fato
+        }
       }
 
       console.log(`[ml-publish] 🚀 REPUBLICANDO AUTOMATICAMENTE (Tentativa ${retryCount + 1})...`);

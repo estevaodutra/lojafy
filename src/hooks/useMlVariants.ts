@@ -131,8 +131,15 @@ export function useMlVariants(productId?: string) {
       }
 
       if (!publishRes?.success) {
-        const cause = publishRes?.cause?.map((c: any) => c.message).join(', ');
-        throw new Error(publishRes?.error ?? 'Erro ao publicar' + (cause ? `: ${cause}` : ''));
+        const cause = Array.isArray(publishRes?.cause)
+          ? publishRes.cause.map((c: any) => typeof c === 'string' ? c : c.message || JSON.stringify(c)).filter(Boolean).join(', ')
+          : (typeof publishRes?.cause === 'string' ? publishRes.cause : '');
+        
+        let finalErrorMsg = publishRes?.error ?? 'Erro desconhecido ao publicar no Mercado Livre';
+        if (cause && !finalErrorMsg.includes(cause)) {
+          finalErrorMsg = `${finalErrorMsg} - Detalhes: ${cause}`;
+        }
+        throw new Error(finalErrorMsg);
       }
 
       // Atualizar variante no banco

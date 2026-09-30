@@ -179,15 +179,19 @@ export const useMercadoLivreIntegration = () => {
         let causeMsg = '';
         if (Array.isArray(rawCause)) {
           causeMsg = rawCause.map((c: any) => {
+            if (typeof c === 'string') return c;
             const field = c.references ? c.references.join(',') : (c.department || '');
-            return field ? `${c.message} [${field}]` : c.message;
-          }).join(' | ');
+            return field ? `${c.message} [${field}]` : (c.message || JSON.stringify(c));
+          }).filter(Boolean).join(' | ');
         } else if (rawCause) {
-          causeMsg = JSON.stringify(rawCause);
+          causeMsg = typeof rawCause === 'string' ? rawCause : JSON.stringify(rawCause);
         }
         
-        const errorTitle = publishResponse?.error || 'Erro desconhecido ao publicar no Mercado Livre';
-        throw new Error(causeMsg && causeMsg !== '[]' ? `${errorTitle} - Detalhes: ${causeMsg}` : errorTitle);
+        let finalErrorMsg = publishResponse?.error || 'Erro desconhecido ao publicar no Mercado Livre';
+        if (causeMsg && causeMsg !== '[]' && !finalErrorMsg.includes(causeMsg)) {
+          finalErrorMsg = `${finalErrorMsg} - Detalhes: ${causeMsg}`;
+        }
+        throw new Error(finalErrorMsg);
       }
 
       const permalink: string | null = publishResponse.permalink ?? null;
