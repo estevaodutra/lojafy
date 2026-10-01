@@ -778,22 +778,35 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
 
       let savedProduct;
       if (product?.id) {
-        const { data: updated, error } = await supabase
+        let updateRes = await supabase
           .from('products')
           .update(productData)
           .eq('id', product.id)
           .select()
           .single();
-        if (error) {
-          console.error("UPDATE ERROR:", error, "PAYLOAD:", productData);
+
+        if (updateRes.error && updateRes.error.message?.includes('supplier_cost_price')) {
+          console.warn("supplier_cost_price ainda não existe na tabela products, atualizando sem ele...");
+          const fallbackPayload = { ...productData };
+          delete fallbackPayload.supplier_cost_price;
+          updateRes = await supabase
+            .from('products')
+            .update(fallbackPayload)
+            .eq('id', product.id)
+            .select()
+            .single();
+        }
+
+        if (updateRes.error) {
+          console.error("UPDATE ERROR:", updateRes.error, "PAYLOAD:", productData);
           toast({ 
             title: "Erro ao atualizar produto", 
-            description: error.message || "Não foi possível atualizar o produto.",
+            description: updateRes.error.message || "Não foi possível atualizar o produto.",
             variant: "destructive" 
           });
           return;
         }
-        savedProduct = updated;
+        savedProduct = updateRes.data;
         toast({ title: "Produto atualizado com sucesso!" });
       } else {
         const insertPayload = {
@@ -803,21 +816,33 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
           original_images: imageUrls,
           original_saved_at: new Date().toISOString(),
         };
-        const { data: created, error } = await supabase
+        let createRes = await supabase
           .from('products')
           .insert(insertPayload)
           .select()
           .single();
-        if (error) {
-          console.error("INSERT ERROR:", error, "PAYLOAD:", insertPayload);
+
+        if (createRes.error && createRes.error.message?.includes('supplier_cost_price')) {
+          console.warn("supplier_cost_price ainda não existe na tabela products, inserindo sem ele...");
+          const fallbackPayload = { ...insertPayload };
+          delete fallbackPayload.supplier_cost_price;
+          createRes = await supabase
+            .from('products')
+            .insert(fallbackPayload)
+            .select()
+            .single();
+        }
+
+        if (createRes.error) {
+          console.error("INSERT ERROR:", createRes.error, "PAYLOAD:", insertPayload);
           toast({ 
             title: "Erro ao salvar produto", 
-            description: error.message || "Não foi possível cadastrar o produto.",
+            description: createRes.error.message || "Não foi possível cadastrar o produto.",
             variant: "destructive" 
           });
           return;
         }
-        savedProduct = created;
+        savedProduct = createRes.data;
         toast({ title: "Produto criado com sucesso!" });
       }
 
