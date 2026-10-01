@@ -219,6 +219,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
   const [productSearch, setProductSearch] = useState('');
   const [productStatusFilter, setProductStatusFilter] = useState('all');
   const [productCategoryFilter, setProductCategoryFilter] = useState('all');
+  const [productSupplierFilter, setProductSupplierFilter] = useState('all');
   const [productPage, setProductPage] = useState(1);
   const [productItemsPerPage, setProductItemsPerPage] = useState(25);
 
@@ -351,6 +352,24 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
     }
   });
 
+  // Organizações de Fornecedores (para filtro e exibição no admin)
+  const { data: supplierOrganizations = [] } = useQuery({
+    queryKey: ['meta-ads-supplier-organizations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('supplier_organizations')
+        .select('id, trade_name, legal_name, org_code')
+        .eq('active', true)
+        .order('trade_name');
+      if (error) {
+        console.warn('Erro ao carregar organizações fornecedoras:', error);
+        return [];
+      }
+      return data || [];
+    },
+    enabled: roleMode === 'admin',
+  });
+
   // 1. QUERY DE PRODUTOS
   const { data: products = [], isLoading: productsLoading, refetch: refetchProducts } = useQuery({
     queryKey: ['meta-ads-products', roleMode, user?.id, orgId],
@@ -397,12 +416,30 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
             id,
             name,
             slug
+          ),
+          supplier_organization:supplier_organizations!supplier_organization_id (
+            id,
+            trade_name,
+            legal_name,
+            org_code
+          ),
+          supplier_profile:profiles!supplier_id (
+            user_id,
+            first_name,
+            last_name,
+            business_name
           )
         `)
         .order('created_at', { ascending: false });
 
-      if (roleMode === 'supplier' && orgId) {
-        query = query.eq('supplier_organization_id', orgId);
+      if (roleMode === 'supplier') {
+        if (orgId && user?.id) {
+          query = query.or(`supplier_organization_id.eq.${orgId},supplier_id.eq.${user.id}`);
+        } else if (orgId) {
+          query = query.eq('supplier_organization_id', orgId);
+        } else if (user?.id) {
+          query = query.eq('supplier_id', user.id);
+        }
       }
 
       const { data, error } = await query;
@@ -412,7 +449,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
       }
       return data ?? [];
     },
-    enabled: !!user?.id && (roleMode !== 'supplier' || !!orgId),
+    enabled: !!user?.id,
   });
 
   // 2. QUERY DE ANÚNCIOS
@@ -564,7 +601,12 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
     const matchesCategory = productCategoryFilter === 'all' || product.category_id === productCategoryFilter;
 
-    return matchesSearch && matchesStatus && matchesCategory;
+    const matchesSupplier = productSupplierFilter === 'all' ||
+      (productSupplierFilter === 'unassigned' && !product.supplier_organization_id && !product.supplier_id) ||
+      product.supplier_organization_id === productSupplierFilter ||
+      product.supplier_id === productSupplierFilter;
+
+    return matchesSearch && matchesStatus && matchesCategory && matchesSupplier;
   });
 
   // PAGINAÇÃO DA TABELA PRODUTOS
@@ -1034,6 +1076,23 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                     </SelectContent>
                   </Select>
 
+                  {roleMode === 'admin' && (
+                    <Select value={productSupplierFilter} onValueChange={(val) => { setProductSupplierFilter(val); setProductPage(1); }}>
+                      <SelectTrigger className="w-44">
+                        <SelectValue placeholder="Fornecedor" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-64 overflow-y-auto">
+                        <SelectItem value="all">Todos os Fornecedores</SelectItem>
+                        <SelectItem value="unassigned">Sem Fornecedor / Próprio</SelectItem>
+                        {supplierOrganizations.map((sup: any) => (
+                          <SelectItem key={sup.id} value={sup.id}>
+                            {sup.trade_name || sup.legal_name || `Fornecedor (${sup.org_code})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
                   {selectedProductIds.length > 0 && (
                     <div className="flex items-center gap-2 flex-wrap">
                       <DropdownMenu>
@@ -1122,6 +1181,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                       <TableHead>Produto</TableHead>
                       <TableHead>SKU</TableHead>
                       <TableHead>Marketplace</TableHead>
+                      {roleMode === 'admin' && <TableHead>Fornecedor</TableHead>}
                       <TableHead className="text-right">Preço de Custo</TableHead>
                       <TableHead className="text-right">Preço de Venda</TableHead>
                       <TableHead className="text-center">Estoque</TableHead>
@@ -1133,14 +1193,14 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                   <TableBody>
                     {productsLoading ? (
                       <TableRow>
-                        <TableCell colSpan={10} className="text-center py-8">
+                        <TableCell colSpan={roleMode === 'admin' ? 11 : 10} className="text-center py-8">
                           <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto" />
                           <p className="text-sm text-muted-foreground mt-2">Carregando catálogo de produtos...</p>
                         </TableCell>
                       </TableRow>
                     ) : filteredProducts.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
+                        <TableCell colSpan={roleMode === 'admin' ? 11 : 10} className="text-center py-12 text-muted-foreground">
                           Nenhum produto encontrado.
                         </TableCell>
                       </TableRow>
@@ -1186,6 +1246,42 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                             <TableCell>
                               <img src="https://http2.mlstatic.com/static/org-img/homesnw/mercado-libre.png" alt="ML" className="h-4 object-contain" />
                             </TableCell>
+
+                            {/* Fornecedor (Visível apenas para Superadmin) */}
+                            {roleMode === 'admin' && (
+                              <TableCell>
+                                {(() => {
+                                  const org = product.supplier_organization;
+                                  const prof = product.supplier_profile;
+                                  const supplierDisplayName = org?.trade_name || org?.legal_name || prof?.business_name || (prof?.first_name ? `${prof.first_name} ${prof.last_name || ''}`.trim() : null);
+
+                                  if (supplierDisplayName) {
+                                    return (
+                                      <div className="flex flex-col gap-0.5 max-w-[160px]">
+                                        <Badge 
+                                          variant="outline" 
+                                          className="w-fit text-[11px] font-semibold bg-blue-50 text-blue-700 border-blue-200 truncate max-w-[150px]"
+                                          title={supplierDisplayName}
+                                        >
+                                          {supplierDisplayName}
+                                        </Badge>
+                                        {org?.org_code && (
+                                          <span className="text-[10px] text-muted-foreground font-mono">
+                                            Cód: {org.org_code}
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+
+                                  return (
+                                    <span className="text-xs text-muted-foreground italic">
+                                      Próprio / Sem Fornecedor
+                                    </span>
+                                  );
+                                })()}
+                              </TableCell>
+                            )}
 
                             {/* Preço de Custo */}
                             <TableCell className="text-right">

@@ -139,7 +139,7 @@ const SupplierProductDetail = () => {
   };
 
   const { data: product, isLoading } = useQuery({
-    queryKey: orgId && id ? supplierKeys.product(orgId, id) : ['supplier', 'product', 'pending'],
+    queryKey: ['supplier', 'product', orgId || 'direct', id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('products')
@@ -149,7 +149,7 @@ const SupplierProductDetail = () => {
       if (error) throw error;
       return data;
     },
-    enabled: !!orgId && !!id,
+    enabled: !!id,
   });
 
   const activeCandidate = candidates?.find(

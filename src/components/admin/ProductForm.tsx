@@ -78,6 +78,8 @@ const productSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório').max(255, 'Nome muito longo'),
   description: z.string().optional().or(z.literal('')),
   cost_price: z.coerce.number().min(0, 'Preço de custo não pode ser negativo').optional().or(z.literal('')),
+  supplier_cost_price: z.coerce.number().min(0, 'Preço de custo do fornecedor não pode ser negativo').optional().or(z.literal('')),
+  supplier_organization_id: z.string().optional().or(z.literal('')),
   price: z.coerce.number().min(0, 'Preço de venda não pode ser negativo').optional().or(z.literal('')),
   original_price: z.coerce.number().min(0, 'Preço promocional não pode ser negativo').optional().or(z.literal('')),
   use_auto_pricing: z.boolean().default(true),
@@ -143,6 +145,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
       name: product?.name || '',
       description: product?.description || '',
       cost_price: product?.cost_price && product.cost_price > 0 ? product.cost_price : undefined,
+      supplier_cost_price: product?.supplier_cost_price && product.supplier_cost_price > 0 ? product.supplier_cost_price : undefined,
+      supplier_organization_id: product?.supplier_organization_id || '',
       price: product?.price && product.price > 0 ? product.price : 0,
       original_price: product?.original_price || undefined,
       use_auto_pricing: product?.use_auto_pricing ?? true,
@@ -181,6 +185,24 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
       if (error) throw error;
       return data;
     },
+  });
+
+  // Organizações de fornecedores (para vínculo pelo SuperAdmin)
+  const { data: supplierOrganizations = [] } = useQuery({
+    queryKey: ['supplier-organizations-form'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('supplier_organizations')
+        .select('id, trade_name, legal_name, org_code, owner_user_id')
+        .eq('active', true)
+        .order('trade_name');
+      if (error) {
+        console.warn('Erro ao carregar organizações fornecedoras no form:', error);
+        return [];
+      }
+      return data || [];
+    },
+    enabled: isSuperAdmin(),
   });
 
   const selectedCategoryId = form.watch('category_id');
@@ -699,6 +721,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
         name: data.name,
         description: data.description || null,
         cost_price: data.cost_price !== undefined && data.cost_price !== '' && data.cost_price !== null ? Number(data.cost_price) : null,
+        supplier_cost_price: data.supplier_cost_price !== undefined && data.supplier_cost_price !== '' && data.supplier_cost_price !== null ? Number(data.supplier_cost_price) : null,
         price: Number(data.price || 0),
         original_price: data.original_price !== undefined && data.original_price !== '' && data.original_price !== null ? Number(data.original_price) : null,
         use_auto_pricing: data.use_auto_pricing,
@@ -737,6 +760,20 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
 
       if (isSupplier()) {
         productData.supplier_id = user?.id;
+        if (supplierOrgData?.organization?.id) {
+          productData.supplier_organization_id = supplierOrgData.organization.id;
+        }
+      } else if (isSuperAdmin()) {
+        if (data.supplier_organization_id && data.supplier_organization_id !== 'none' && data.supplier_organization_id.trim() !== '') {
+          productData.supplier_organization_id = data.supplier_organization_id;
+          const selectedOrg = supplierOrganizations.find((org: any) => org.id === data.supplier_organization_id);
+          if (selectedOrg?.owner_user_id) {
+            productData.supplier_id = selectedOrg.owner_user_id;
+          }
+        } else {
+          productData.supplier_organization_id = null;
+          productData.supplier_id = null;
+        }
       }
 
       let savedProduct;
@@ -1162,6 +1199,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
                   isGeneratingGtin={isGeneratingGtin}
                   onOpenMlSearch={() => setIsMlSearchModalOpen(true)}
                   onOpenAiExtractor={() => setIsAiExtractorModalOpen(true)}
+                  isSuperAdmin={isSuperAdmin()}
+                  supplierOrganizations={supplierOrganizations}
                 />
               </AccordionContent>
             </AccordionItem>
@@ -1193,6 +1232,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
                   watchedUseDefaultProfitMargin={watchedUseDefaultMargin}
                   priceBreakdown={priceBreakdown}
                   supplierSettings={supplierSettings}
+                  isSupplier={isSupplier()}
                 />
               </AccordionContent>
             </AccordionItem>

@@ -23,6 +23,7 @@ interface PricingSectionProps {
   watchedUseDefaultProfitMargin: boolean;
   priceBreakdown: PriceBreakdown | null;
   supplierSettings?: any;
+  isSupplier?: boolean;
 }
 
 export const PricingSection: React.FC<PricingSectionProps> = ({
@@ -31,6 +32,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
   watchedUseDefaultProfitMargin,
   priceBreakdown,
   supplierSettings,
+  isSupplier = false,
 }) => {
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
@@ -122,16 +124,17 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
           </div>
 
           {/* Valores de Preço */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             
-            {/* Preço de Custo */}
+            {/* Preço de Custo Original do Fornecedor */}
             <FormField
               control={form.control}
-              name="cost_price"
+              name="supplier_cost_price"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-xs font-semibold">
-                    Preço de Custo (R$) <span className="text-destructive">*</span>
+                  <FormLabel className="text-xs font-semibold flex items-center justify-between">
+                    <span>{isSupplier ? 'Seu Custo de Compra / Produção (R$)' : 'Custo do Fornecedor (R$)'}</span>
+                    <span className="text-[10px] text-muted-foreground font-normal">Opcional</span>
                   </FormLabel>
                   <FormControl>
                     <Input
@@ -142,19 +145,58 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
                       className="h-9 text-xs font-mono"
                     />
                   </FormControl>
+                  <p className="text-[10px] text-muted-foreground">
+                    {isSupplier 
+                      ? 'Quanto custa para você produzir ou adquirir este produto (referência interna).'
+                      : 'Custo declarado pelo fornecedor para análise de margem e precificação.'}
+                  </p>
                   <FormMessage className="text-[11px]" />
                 </FormItem>
               )}
             />
 
-            {/* Preço de Venda */}
+            {/* Preço de Venda do Fornecedor = Preço de Custo da Loja FAI */}
+            <FormField
+              control={form.control}
+              name="cost_price"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs font-semibold">
+                    {isSupplier 
+                      ? 'Seu Preço de Venda para Loja FAI (R$)' 
+                      : 'Preço de Custo Loja FAI (Repasse Fornecedor) (R$)'} 
+                    <span className="text-destructive">*</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0,00"
+                      {...field}
+                      className="h-9 text-xs font-mono font-medium text-foreground"
+                    />
+                  </FormControl>
+                  <p className="text-[10px] text-muted-foreground">
+                    {isSupplier 
+                      ? 'Valor líquido que você receberá da Loja FAI por cada unidade vendida.' 
+                      : 'Valor que a Loja FAI paga ao fornecedor. É a base de cálculo para a venda pública.'}
+                  </p>
+                  <FormMessage className="text-[11px]" />
+                </FormItem>
+              )}
+            />
+
+            {/* Preço de Venda Final na Plataforma */}
             <FormField
               control={form.control}
               name="price"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-xs font-semibold">
-                    Preço de Venda (R$) <span className="text-destructive">*</span>
+                    {isSupplier 
+                      ? 'Preço de Venda Público Estimado (R$)' 
+                      : 'Preço de Venda Público na Loja FAI (R$)'} 
+                    <span className="text-destructive">*</span>
                   </FormLabel>
                   <FormControl>
                     <Input
@@ -166,11 +208,11 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
                       className="h-9 text-xs font-mono font-bold text-foreground"
                     />
                   </FormControl>
-                  {watchedUseAutoPricing && (
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      Calculado via Precificação Automática. Desative a chave acima para digitar um valor manual.
-                    </p>
-                  )}
+                  <p className="text-[10px] text-muted-foreground">
+                    {watchedUseAutoPricing 
+                      ? 'Calculado automaticamente aplicando a margem da Loja FAI sobre o preço de custo.' 
+                      : 'Preço de catálogo exibido ao cliente e revendedores.'}
+                  </p>
                   <FormMessage className="text-[11px]" />
                 </FormItem>
               )}
@@ -182,7 +224,10 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
               name="original_price"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-xs font-semibold">Preço Promocional De (R$)</FormLabel>
+                  <FormLabel className="text-xs font-semibold flex items-center justify-between">
+                    <span>Preço Promocional "De" (R$)</span>
+                    <span className="text-[10px] text-muted-foreground font-normal">Opcional</span>
+                  </FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -192,6 +237,9 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
                       className="h-9 text-xs font-mono text-muted-foreground"
                     />
                   </FormControl>
+                  <p className="text-[10px] text-muted-foreground">
+                    Valor riscado de oferta anterior para atrair compradores.
+                  </p>
                   <FormMessage className="text-[11px]" />
                 </FormItem>
               )}
@@ -216,13 +264,22 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
 
               {priceBreakdown ? (
                 <div className="space-y-2 text-xs">
+                  {Number(form.watch('supplier_cost_price')) > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Custo Base do Fornecedor:</span>
+                      <span className="font-mono font-medium text-foreground">
+                        {formatCurrency(Number(form.watch('supplier_cost_price')))}
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between text-muted-foreground">
-                    <span>Preço de Custo:</span>
+                    <span>{isSupplier ? 'Seu Repasse da Venda:' : 'Preço Pago ao Fornecedor:'}</span>
                     <span className="font-mono font-medium text-foreground">{formatCurrency(priceBreakdown.costPrice)}</span>
                   </div>
 
                   <div className="flex justify-between text-muted-foreground">
-                    <span>Margem Aplicada:</span>
+                    <span>Margem da Loja FAI:</span>
                     <span className="font-mono font-medium text-foreground">{priceBreakdown.margin}%</span>
                   </div>
 
@@ -232,12 +289,12 @@ export const PricingSection: React.FC<PricingSectionProps> = ({
                   </div>
 
                   <div className="border-t pt-2 flex justify-between font-semibold text-foreground">
-                    <span>Preço Final de Venda:</span>
+                    <span>Preço Público Final:</span>
                     <span className="font-mono text-sm text-primary font-bold">{formatCurrency(priceBreakdown.totalPrice)}</span>
                   </div>
 
                   <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-2.5 flex justify-between items-center text-emerald-600 dark:text-emerald-400 font-bold mt-2">
-                    <span className="text-[11px]">Lucro Líquido Estimado:</span>
+                    <span className="text-[11px]">{isSupplier ? 'Lucro Líquido Loja FAI:' : 'Lucro Líquido Estimado:'}</span>
                     <span className="font-mono text-sm">{formatCurrency(priceBreakdown.estimatedNetProfit)}</span>
                   </div>
                 </div>

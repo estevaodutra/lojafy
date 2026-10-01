@@ -20,6 +20,8 @@ interface BasicInfoSectionProps {
   isGeneratingGtin: boolean;
   onOpenMlSearch?: () => void;
   onOpenAiExtractor?: () => void;
+  isSuperAdmin?: boolean;
+  supplierOrganizations?: any[];
 }
 
 export const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
@@ -34,6 +36,8 @@ export const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
   isGeneratingGtin,
   onOpenMlSearch,
   onOpenAiExtractor,
+  isSuperAdmin = false,
+  supplierOrganizations = [],
 }) => {
   return (
     <div className="space-y-6">
@@ -155,6 +159,49 @@ export const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
               )}
             />
           </div>
+
+          {/* Fornecedor Responsável (Disponível apenas para Superadmin) */}
+          {isSuperAdmin && (
+            <FormField
+              control={form.control}
+              name="supplier_organization_id"
+              render={({ field }) => (
+                <FormItem>
+                  <div className="flex items-center justify-between">
+                    <FormLabel className="text-xs font-semibold">Fornecedor Responsável</FormLabel>
+                    <span className="text-[10px] text-muted-foreground">
+                      Vincula o produto ao portal do fornecedor
+                    </span>
+                  </div>
+                  <Select 
+                    onValueChange={(val) => field.onChange(val === 'none' ? '' : val)} 
+                    value={field.value || 'none'}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue placeholder="Selecione um fornecedor ou deixe como Catálogo Próprio" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="max-h-60 overflow-y-auto">
+                      <SelectItem value="none" className="text-xs font-medium text-muted-foreground">
+                        Nenhum (Catálogo Próprio Loja FAI)
+                      </SelectItem>
+                      {supplierOrganizations?.map((sup: any) => (
+                        <SelectItem key={sup.id} value={sup.id} className="text-xs">
+                          {sup.trade_name || sup.legal_name || `Fornecedor (${sup.org_code})`}
+                          {sup.org_code ? ` • Cód: ${sup.org_code}` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription className="text-[10px]">
+                    O fornecedor selecionado poderá visualizar e atualizar este produto no portal dele.
+                  </FormDescription>
+                  <FormMessage className="text-[11px]" />
+                </FormItem>
+              )}
+            />
+          )}
 
           {/* Descrição */}
           <FormField

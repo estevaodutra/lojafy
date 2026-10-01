@@ -3229,6 +3229,7 @@ export type Database = {
           subcategory_id: string | null
           supplier_id: string | null
           supplier_organization_id: string | null
+          supplier_cost_price: number | null
           updated_at: string
           use_auto_pricing: boolean | null
           variations: Json | null
@@ -3291,6 +3292,7 @@ export type Database = {
           subcategory_id?: string | null
           supplier_id?: string | null
           supplier_organization_id?: string | null
+          supplier_cost_price?: number | null
           updated_at?: string
           use_auto_pricing?: boolean | null
           variations?: Json | null
@@ -3353,6 +3355,7 @@ export type Database = {
           subcategory_id?: string | null
           supplier_id?: string | null
           supplier_organization_id?: string | null
+          supplier_cost_price?: number | null
           updated_at?: string
           use_auto_pricing?: boolean | null
           variations?: Json | null
