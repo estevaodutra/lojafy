@@ -45,6 +45,7 @@ import { usePlans } from '@/hooks/usePlans';
 import { UserFeaturesSection } from './UserFeaturesSection';
 import { UserOrdersTab } from './UserOrdersTab';
 import { UserWalletTab } from './UserWalletTab';
+import { LeadCustomFieldsSection } from './LeadCustomFieldsSection';
 
 const ROLES = [
   { value: 'customer', label: 'Cliente' },
@@ -321,6 +322,9 @@ export const UserDetailsModal = ({ user, isOpen, onClose, onUserUpdated }: UserD
                     </Button>
                   </div>
                 )}
+
+                {/* Campos Personalizados do Lead */}
+                <LeadCustomFieldsSection leadId={user.user_id} leadName={userName} />
               </CardContent>
             </Card>
 
