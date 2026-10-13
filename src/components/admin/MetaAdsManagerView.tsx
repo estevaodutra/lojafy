@@ -19,7 +19,7 @@ import {
   Package, Megaphone, Plus, Search, Filter, Sparkles, Store, Copy, Edit3, PauseCircle, 
   PlayCircle, Archive, Trash2, ShieldCheck, History, Eye, ExternalLink, MoreHorizontal,
   TrendingUp, DollarSign, ShoppingBag, X, RefreshCw, Layers, CheckCircle2, ArrowRight,
-  Send, Loader2, ChevronDown, AlertTriangle
+  Send, Loader2, ChevronDown, AlertTriangle, Download, FileSpreadsheet
 } from 'lucide-react';
 import { AiVariationModal } from './AiVariationModal';
 import { AdHistoryModal } from './AdHistoryModal';
@@ -322,6 +322,95 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
   const formatPrice = (val: number | null | undefined) => {
     if (val === null || val === undefined) return 'R$ 0,00';
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(val));
+  };
+
+  // ── EXPORTAÇÃO CSV DE PRODUTOS ──────────────────────────────────────────
+  const handleExportCsv = (onlySelected: boolean = false) => {
+    let listToExport = products;
+    if (onlySelected && selectedProductIds.length > 0) {
+      listToExport = products.filter((p: any) => selectedProductIds.includes(p.id));
+    } else if (filteredProducts.length > 0 && (productSearch || productStatusFilter !== 'all' || productCategoryFilter !== 'all' || productSupplierFilter !== 'all')) {
+      listToExport = filteredProducts;
+    }
+
+    if (listToExport.length === 0) {
+      toast({ title: 'Nenhum produto disponível para exportar.', variant: 'destructive' });
+      return;
+    }
+
+    const headers = [
+      'ID',
+      'Nome do Produto',
+      'SKU',
+      'Fornecedor',
+      'Código Fornecedor',
+      'Categoria',
+      'Preço de Custo (R$)',
+      'Custo do Fornecedor (R$)',
+      'Preço de Venda (R$)',
+      'Estoque',
+      'Estoque Mínimo',
+      'Status',
+      'Status de Aprovação',
+      'GTIN / EAN-13',
+      'Marca',
+      'Data de Cadastro'
+    ];
+
+    const escapeCsv = (str: any) => {
+      if (str === null || str === undefined) return '""';
+      const clean = String(str).replace(/"/g, '""');
+      return `"${clean}"`;
+    };
+
+    const rows = listToExport.map((p: any) => {
+      const org = p.supplier_organization;
+      const prof = p.supplier_profile;
+      const supplierName = org?.trade_name || org?.legal_name || prof?.business_name || (prof?.first_name ? `${prof.first_name} ${prof.last_name || ''}`.trim() : '') || 'Próprio / Sem Fornecedor';
+      const supplierCode = org?.org_code || '';
+      const categoryName = p.categories?.name || 'Geral';
+      const costPrice = p.cost_price !== null && p.cost_price !== undefined ? Number(p.cost_price).toFixed(2).replace('.', ',') : '0,00';
+      const supplierCostPrice = p.supplier_cost_price !== null && p.supplier_cost_price !== undefined ? Number(p.supplier_cost_price).toFixed(2).replace('.', ',') : '';
+      const salePrice = p.price !== null && p.price !== undefined ? Number(p.price).toFixed(2).replace('.', ',') : '0,00';
+      const statusText = p.active ? 'Ativo' : 'Inativo';
+      const approvalText = p.approval_status === 'approved' ? 'Aprovado' : p.approval_status === 'draft' ? 'Rascunho' : (p.approval_status || 'Aprovado');
+      const createdAt = p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '';
+
+      return [
+        escapeCsv(p.id),
+        escapeCsv(p.name),
+        escapeCsv(p.sku || ''),
+        escapeCsv(supplierName),
+        escapeCsv(supplierCode),
+        escapeCsv(categoryName),
+        escapeCsv(costPrice),
+        escapeCsv(supplierCostPrice),
+        escapeCsv(salePrice),
+        escapeCsv(p.stock_quantity ?? 0),
+        escapeCsv(p.min_stock_level ?? 0),
+        escapeCsv(statusText),
+        escapeCsv(approvalText),
+        escapeCsv(p.gtin_ean13 || ''),
+        escapeCsv(p.brand || ''),
+        escapeCsv(createdAt)
+      ].join(';');
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `produtos_lojafy_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: 'Arquivo CSV gerado com sucesso!',
+      description: `${listToExport.length} produto(s) exportado(s).`
+    });
   };
 
   // ── MUTAÇÕES ───────────────────────────────────────────────────────────
@@ -961,10 +1050,20 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
         <div className="flex items-center gap-2 flex-wrap">
           {activeTab === 'products' ? (
-            <Button onClick={() => onNavigateToCreateProduct?.()} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Novo Produto
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={() => handleExportCsv(false)}
+                className="gap-2 border-slate-300 hover:bg-slate-50 text-slate-700 shadow-sm"
+              >
+                <Download className="h-4 w-4 text-emerald-600" />
+                Exportar CSV
+              </Button>
+              <Button onClick={() => onNavigateToCreateProduct?.()} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Novo Produto
+              </Button>
+            </>
           ) : (
             <>
               <Button
@@ -1093,11 +1192,31 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                     </Select>
                   )}
 
+                  <Button
+                    variant="outline"
+                    onClick={() => handleExportCsv(false)}
+                    className="gap-2 border-slate-300 hover:bg-slate-50 text-slate-700 shadow-xs h-10 px-3 shrink-0"
+                    title="Exportar produtos em planilha CSV (compatível com Excel)"
+                  >
+                    <Download className="h-4 w-4 text-emerald-600" />
+                    <span>Exportar CSV</span>
+                  </Button>
+
                   {selectedProductIds.length > 0 && (
                     <div className="flex items-center gap-2 flex-wrap">
+                      <Button
+                        variant="outline"
+                        onClick={() => handleExportCsv(true)}
+                        className="gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50 h-10"
+                        title="Exportar apenas os produtos selecionados"
+                      >
+                        <Download className="h-4 w-4" />
+                        Exportar Selecionados ({selectedProductIds.length})
+                      </Button>
+
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="outline" className="gap-2">
+                          <Button variant="outline" className="gap-2 h-10">
                             <Layers className="h-4 w-4" />
                             Atribuir Categoria
                             <ChevronDown className="h-4 w-4" />
