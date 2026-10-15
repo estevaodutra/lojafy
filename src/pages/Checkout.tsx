@@ -44,7 +44,9 @@ const Checkout = ({
   } = useToast();
   const {
     items: cartItems,
-    clearCart
+    clearCart,
+    syncPrices,
+    isUpdatingPrices
   } = useCart();
   const {
     user,
@@ -117,6 +119,30 @@ const Checkout = ({
       navigate("/carrinho");
     }
   }, [cartItems, navigate, toast]);
+
+  // Sincronizar produtos e preços do carrinho com o banco ao abrir o checkout
+  useEffect(() => {
+    let isMounted = true;
+    const autoSyncCheckout = async () => {
+      if (cartItems.length > 0) {
+        const result = await syncPrices();
+        if (isMounted && result.updated) {
+          const changes: string[] = [];
+          if (result.updatedItems.length > 0) changes.push(`${result.updatedItems.length} produto(s) atualizados com novas informações/valores`);
+          if (result.adjustedItems && result.adjustedItems.length > 0) changes.push(`${result.adjustedItems.length} ajustados por estoque`);
+          if (result.removedItems.length > 0) changes.push(`${result.removedItems.length} indisponíveis removidos`);
+          toast({
+            title: "Carrinho atualizado",
+            description: changes.join(" e "),
+          });
+        }
+      }
+    };
+    autoSyncCheckout();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Restore pending step if returning from auth login
   useEffect(() => {
@@ -410,7 +436,7 @@ const Checkout = ({
       console.error('Error saving user data:', error);
     }
   };
-  const createPixPayment = async () => {
+  const createPixPayment = async (freshCartItems?: OrderItem[]) => {
     setIsProcessingPayment(true);
     try {
       // Validate CPF
@@ -435,17 +461,22 @@ const Checkout = ({
         return;
       }
 
+      const activeItems = freshCartItems && freshCartItems.length > 0 ? freshCartItems : cartItems;
+      const currentSubtotal = activeItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      const currentDiscount = couponCode === "DESCONTO10" ? currentSubtotal * 0.1 : 0;
+      const currentTotal = currentSubtotal - currentDiscount + shippingCost;
+
       // Save user data and address before processing payment
       await saveUserDataAndAddress();
-      const orderItems = cartItems.map(item => ({
+      const orderItems = activeItems.map(item => ({
         productId: item.productId,
         productName: item.productName,
         quantity: item.quantity,
         unitPrice: item.price
       }));
       const paymentRequest: PixPaymentRequest = {
-        amount: parseFloat(total.toFixed(2)),
-        description: `Pedido - ${cartItems.length} item(s)`,
+        amount: parseFloat(currentTotal.toFixed(2)),
+        description: `Pedido - ${activeItems.length} item(s)`,
         payer: {
           email: formData.email,
           firstName: formData.firstName,
@@ -604,13 +635,41 @@ const Checkout = ({
       return;
     }
 
+    setIsProcessingPayment(true);
+    let freshItems = cartItems;
+    try {
+      const syncResult = await syncPrices();
+      if (syncResult.syncedCart && syncResult.syncedCart.length > 0) {
+        freshItems = syncResult.syncedCart;
+      }
+      if (syncResult.updated) {
+        toast({
+          title: "Informações sincronizadas",
+          description: "Os itens e preços do pedido foram atualizados de acordo com a loja.",
+        });
+      }
+    } catch (e) {
+      console.warn("Could not pre-sync before PIX:", e);
+    }
+
+    if (freshItems.length === 0) {
+      toast({
+        title: "Carrinho vazio",
+        description: "Os produtos selecionados não estão mais disponíveis.",
+        variant: "destructive"
+      });
+      setIsProcessingPayment(false);
+      return;
+    }
+
     // Check if there are high rotation products in cart
     const hasHighRotationProducts = await checkHighRotationProducts();
     if (hasHighRotationProducts) {
       setShowHighRotationAlert(true);
+      setIsProcessingPayment(false);
       return;
     }
-    await createPixPayment();
+    await createPixPayment(freshItems);
   };
   const checkHighRotationProducts = async (): Promise<boolean> => {
     // Não verificar produtos de alta rotação na loja do revendedor
@@ -650,35 +709,70 @@ const Checkout = ({
       navigate('/auth?redirect=' + encodeURIComponent(currentUrl));
       return;
     }
-    if (walletSaldo < total) {
+
+    setIsPayingWithWallet(true);
+    let freshItems = cartItems;
+    try {
+      const syncResult = await syncPrices();
+      if (syncResult.syncedCart && syncResult.syncedCart.length > 0) {
+        freshItems = syncResult.syncedCart;
+      }
+      if (syncResult.updated) {
+        toast({
+          title: "Valores atualizados",
+          description: "Os itens e preços do pedido foram atualizados de acordo com a loja.",
+        });
+      }
+    } catch (e) {
+      console.warn("Could not pre-sync before wallet pay:", e);
+    }
+
+    if (freshItems.length === 0) {
       toast({
-        title: "Saldo insuficiente",
-        description: `Seu saldo é ${formatPrice(walletSaldo)}. Faltam ${formatPrice(total - walletSaldo)}.`,
-        variant: "destructive",
+        title: "Carrinho vazio",
+        description: "Os produtos selecionados não estão mais disponíveis.",
+        variant: "destructive"
       });
+      setIsPayingWithWallet(false);
       return;
     }
-    setIsPayingWithWallet(true);
+
+    const currentSubtotal = freshItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const currentDiscount = couponCode === "DESCONTO10" ? currentSubtotal * 0.1 : 0;
+    const freshTotal = currentSubtotal - currentDiscount + shippingCost;
+
+    if (walletSaldo < freshTotal) {
+      toast({
+        title: "Saldo insuficiente",
+        description: `Seu saldo é ${formatPrice(walletSaldo)}. Valor atualizado do pedido: ${formatPrice(freshTotal)}. Faltam ${formatPrice(freshTotal - walletSaldo)}.`,
+        variant: "destructive",
+      });
+      setIsPayingWithWallet(false);
+      return;
+    }
     try {
       // Validate CPF
       if (!validateCPF(formData.cpf)) {
         toast({ title: "CPF inválido", description: "Por favor, informe um CPF válido.", variant: "destructive" });
+        setIsPayingWithWallet(false);
         return;
       }
       // Validate shipping label
       if (isLabelMethod()) {
         if (selectedShippingMethod?.requires_upload && !shippingFile) {
           toast({ title: "Etiqueta obrigatória", description: "Anexe a etiqueta de envio.", variant: "destructive" });
+          setIsPayingWithWallet(false);
           return;
         }
         if (!trackingCode.trim() || trackingCode !== confirmTrackingCode) {
           toast({ title: "Código de rastreio inválido", description: "Por favor, preencha e confirme o código de rastreio da etiqueta.", variant: "destructive" });
+          setIsPayingWithWallet(false);
           return;
         }
       }
       await saveUserDataAndAddress();
       // Create order first via edge function (same as PIX but we'll debit wallet)
-      const orderItems = cartItems.map(item => ({
+      const orderItems = freshItems.map(item => ({
         productId: item.productId,
         productName: item.productName,
         quantity: item.quantity,
@@ -686,8 +780,8 @@ const Checkout = ({
       }));
       const { data: orderData, error: orderError } = await supabase.functions.invoke('create-pix-payment', {
         body: {
-          amount: parseFloat(total.toFixed(2)),
-          description: `Pedido - ${cartItems.length} item(s)`,
+          amount: parseFloat(freshTotal.toFixed(2)),
+          description: `Pedido - ${freshItems.length} item(s)`,
           payer: {
             email: formData.email,
             firstName: formData.firstName,

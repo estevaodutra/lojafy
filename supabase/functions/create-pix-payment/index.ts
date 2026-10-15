@@ -86,6 +86,27 @@ async function handleRequest(req: Request): Promise<Response> {
     const externalReference = orderNumber;
     const notificationUrl = `${SUPABASE_URL}/functions/v1/webhook-mercadopago`;
 
+    // Buscar informacoes atuais dos produtos no banco para garantir nome e preco corretos
+    let dbProducts: any[] = [];
+    let resellerProducts: any[] = [];
+    if (orderItems?.length > 0) {
+      const productIds = orderItems.map(i => i.productId).filter(Boolean);
+      const { data: prods } = await supabase
+        .from('products')
+        .select('id, name, price, cost_price, image_url, brand, sku, supplier_id, active')
+        .in('id', productIds);
+      if (prods) dbProducts = prods;
+
+      if (reseller_id) {
+        const { data: resProds } = await supabase
+          .from('reseller_products')
+          .select('product_id, custom_price, active')
+          .eq('reseller_id', reseller_id)
+          .in('product_id', productIds);
+        if (resProds) resellerProducts = resProds;
+      }
+    }
+
     // Build N8N payload (compatible format)
     const n8nPayload = {
       orderNumber,
@@ -119,13 +140,21 @@ async function handleRequest(req: Request): Promise<Response> {
         cpf: payer.cpf.replace(/\D/g, ''),
         endereco: shippingAddress ?? null,
       },
-      produtos: orderItems?.map(item => ({
-        id: item.productId,
-        nome: item.productName,
-        preco_unitario: Number(item.unitPrice),
-        quantidade: Number(item.quantity),
-        valor_total_item: Number(item.quantity) * Number(item.unitPrice),
-      })) || [],
+      produtos: orderItems?.map(item => {
+        const p = dbProducts.find(x => x.id === item.productId);
+        const rp = resellerProducts.find(x => x.product_id === item.productId);
+        const liveName = p?.name || item.productName;
+        const livePrice = (rp?.custom_price && Number(rp.custom_price) > 0)
+          ? Number(rp.custom_price)
+          : (p?.price !== undefined ? Number(p.price) : Number(item.unitPrice));
+        return {
+          id: item.productId,
+          nome: liveName,
+          preco_unitario: livePrice,
+          quantidade: Number(item.quantity),
+          valor_total_item: Number(item.quantity) * livePrice,
+        };
+      }) || [],
       pagamento: {
         metodo: 'pix',
         valor: Number(amount),
@@ -265,23 +294,23 @@ async function handleRequest(req: Request): Promise<Response> {
 
     // Criar order items
     if (orderItems?.length > 0) {
-      const productIds = orderItems.map(i => i.productId);
-      const { data: products } = await supabase
-        .from('products')
-        .select('id, cost_price, image_url, brand, sku, supplier_id')
-        .in('id', productIds);
-
       const itemsData = orderItems.map(item => {
-        const p = products?.find(x => x.id === item.productId);
+        const p = dbProducts.find(x => x.id === item.productId);
+        const rp = resellerProducts.find(x => x.product_id === item.productId);
+        const liveName = p?.name || item.productName;
+        const livePrice = (rp?.custom_price && Number(rp.custom_price) > 0)
+          ? Number(rp.custom_price)
+          : (p?.price !== undefined ? Number(p.price) : Number(item.unitPrice));
+
         return {
           order_id: orderData.id,
           product_id: item.productId,
           quantity: item.quantity,
-          unit_price: item.unitPrice,
-          total_price: item.quantity * item.unitPrice,
+          unit_price: livePrice,
+          total_price: item.quantity * livePrice,
           product_snapshot: {
-            name: item.productName,
-            price: item.unitPrice,
+            name: liveName,
+            price: livePrice,
             cost_price: p?.cost_price ?? 0,
             image_url: p?.image_url ?? null,
             brand: p?.brand ?? null,

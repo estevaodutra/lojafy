@@ -74,27 +74,59 @@ const Carrinho = () => {
     if (items.length === 0) return;
     navigate('/checkout');
   };
+  // Sincronizar produtos, precos e estoque automaticamente ao abrir o carrinho
+  useEffect(() => {
+    let isMounted = true;
+    const autoSync = async () => {
+      if (items.length > 0) {
+        const result = await syncPrices();
+        if (isMounted && result.updated) {
+          const changes: string[] = [];
+          if (result.updatedItems.length > 0) {
+            changes.push(`${result.updatedItems.length} produto(s) com informações/preços atualizados`);
+          }
+          if (result.adjustedItems && result.adjustedItems.length > 0) {
+            changes.push(`${result.adjustedItems.length} produto(s) com quantidade ajustada ao estoque`);
+          }
+          if (result.removedItems.length > 0) {
+            changes.push(`${result.removedItems.length} produto(s) indisponíveis removidos`);
+          }
+          toast({
+            title: "Carrinho atualizado",
+            description: changes.join(" e "),
+            variant: result.removedItems.length > 0 ? "destructive" : "default"
+          });
+        }
+      }
+    };
+    autoSync();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const handleSyncPrices = async () => {
     const result = await syncPrices();
     if (result.updated) {
-      let message = '';
-      const changes = [];
+      const changes: string[] = [];
       if (result.updatedItems.length > 0) {
-        changes.push(`${result.updatedItems.length} produto(s) com preços atualizados`);
+        changes.push(`${result.updatedItems.length} produto(s) com informações/preços atualizados`);
+      }
+      if (result.adjustedItems && result.adjustedItems.length > 0) {
+        changes.push(`${result.adjustedItems.length} produto(s) com quantidade ajustada`);
       }
       if (result.removedItems.length > 0) {
-        changes.push(`${result.removedItems.length} produto(s) removidos (indisponíveis)`);
+        changes.push(`${result.removedItems.length} produto(s) indisponíveis removidos`);
       }
-      message = changes.join(' e ');
       toast({
         title: "Carrinho atualizado!",
-        description: message,
+        description: changes.join(" e "),
         variant: result.removedItems.length > 0 ? "destructive" : "default"
       });
     } else {
       toast({
         title: "✅ Tudo em dia!",
-        description: "Todos os preços e produtos estão atualizados"
+        description: "Todos os produtos, preços e estoque estão atualizados."
       });
     }
   };

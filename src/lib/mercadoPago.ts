@@ -55,28 +55,34 @@ export async function createModernPixPayment(paymentData: PixPaymentRequest): Pr
     });
 
     if (response.error) {
-      console.error('Error creating PIX payment:', response.error);
-      
-      // Melhor tratamento de erros do Edge Function
-      if (response.error.message) {
-        // Tentar fazer parse do corpo do erro para obter informações detalhadas
+      let errorMsg = response.error.message || 'Falha ao processar pagamento PIX';
+
+      // Tentar extrair o corpo do erro HTTP retornado pela Edge Function
+      if ('context' in response.error && (response.error as any).context) {
         try {
-          const errorBody = JSON.parse(response.error.message);
-          
-          if (errorBody.code === 'WEBHOOK_NOT_REGISTERED') {
-            throw new Error(`Webhook N8N não está ativo: ${errorBody.message}`);
-          } else if (errorBody.error) {
-            throw new Error(errorBody.error);
+          const ctx = (response.error as any).context;
+          const cloned = ctx.clone ? ctx.clone() : ctx;
+          const errorBody = await cloned.json();
+          if (errorBody?.error) {
+            errorMsg = errorBody.error;
+          } else if (errorBody?.message) {
+            errorMsg = errorBody.message;
           }
-        } catch (parseError) {
-          // Se não conseguir fazer parse, usar a mensagem original
-          console.log('Erro não é JSON válido, usando mensagem original');
+        } catch (_) {
+          try {
+            const rawText = await (response.error as any).context.text();
+            if (rawText && !rawText.includes('<html>')) {
+              errorMsg = rawText;
+            }
+          } catch (_) {}
         }
-        
-        throw new Error(response.error.message);
       }
-      
-      throw new Error('Failed to create PIX payment');
+
+      if (errorMsg.includes('WEBHOOK_NOT_REGISTERED')) {
+        throw new Error(`Webhook N8N não está ativo. Entre em contato com o suporte.`);
+      }
+
+      throw new Error(errorMsg);
     }
 
     console.log('PIX payment created successfully:', response.data);
