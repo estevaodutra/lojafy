@@ -445,6 +445,51 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
 
 // ── Gerenciador Global de Anúncios ───────────────────────────────────────────
 
+function parseListingMetadata(variantDesc?: string | null) {
+  if (!variantDesc) return { listing_type: 'gold_special', logistic_type: null, free_shipping: false };
+  try {
+    const parsed = JSON.parse(variantDesc);
+    return {
+      listing_type: parsed.listing_type_id || 'gold_special',
+      logistic_type: parsed.logistic_type || null,
+      free_shipping: Boolean(parsed.free_shipping),
+    };
+  } catch {
+    return { listing_type: 'gold_special', logistic_type: null, free_shipping: false };
+  }
+}
+
+function calculateMlFinances(price: number, listingType = 'gold_special', costPrice = 0) {
+  if (!price || price <= 0) {
+    return { feeTotal: 0, netReceived: 0, realProfit: 0, feeRate: 0.13, fixedFee: 0, shippingCost: 0, isPremium: false };
+  }
+
+  // Taxa de comissão média: Premium ~18%, Clássico ~13%
+  const isPremium = listingType === 'gold_pro' || listingType === 'premium';
+  const feeRate = isPremium ? 0.18 : 0.13;
+  const percentageFee = price * feeRate;
+
+  // Taxa fixa para produtos abaixo de R$ 79,00 cobrada pelo Mercado Livre
+  const fixedFee = price < 79 ? 6.00 : 0;
+
+  // Frete grátis obrigatório pelo Mercado Livre para produtos >= R$ 79 (estimativa média)
+  const shippingCost = price >= 79 ? 22.00 : 0;
+
+  const feeTotal = percentageFee + fixedFee + shippingCost;
+  const netReceived = Math.max(0, price - feeTotal);
+  const realProfit = costPrice > 0 ? netReceived - costPrice : netReceived;
+
+  return {
+    feeTotal,
+    netReceived,
+    realProfit,
+    feeRate,
+    fixedFee,
+    shippingCost,
+    isPremium,
+  };
+}
+
 function GlobalListings() {
   const [search, setSearch] = useState('');
   const [selectedSeller, setSelectedSeller] = useState('all');
@@ -490,7 +535,7 @@ function GlobalListings() {
       const { data: variants, error } = await supabase
         .from('ml_listing_variants')
         .select(`
-          id, ml_item_id, variant_title, price, status, visits, sales,
+          id, ml_item_id, variant_title, variant_description, price, status, visits, sales,
           permalink, thumbnail, user_id, product_id, last_synced_at,
           product:products(sku, cost_price, name, image_url)
         `)
@@ -772,20 +817,23 @@ function GlobalListings() {
               <TableRow>
                 <TableHead className="w-12">Ativo</TableHead>
                 <TableHead>Anúncio</TableHead>
+                <TableHead>Modalidade</TableHead>
                 <TableHead>SKU</TableHead>
                 <TableHead>Seller</TableHead>
-                <TableHead className="text-right">Valor</TableHead>
-                <TableHead className="text-right">Lucro</TableHead>
+                <TableHead className="text-right">Valor Venda</TableHead>
+                <TableHead className="text-right">Recebe do ML</TableHead>
+                <TableHead className="text-right">Lucro Líquido</TableHead>
                 <TableHead className="text-right">Visitas</TableHead>
                 <TableHead className="text-right">Vendas</TableHead>
-                <TableHead className="w-20">Ações</TableHead>
+                <TableHead className="w-16">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginatedListings.map((listing: any) => {
                 const price = Number(listing.price ?? 0);
                 const cost = Number(listing.product?.cost_price ?? 0);
-                const profit = price - cost;
+                const metadata = parseListingMetadata(listing.variant_description);
+                const finances = calculateMlFinances(price, metadata.listing_type, cost);
                 const isActive = listing.status === 'published';
                 const sellerName = [listing.seller?.first_name, listing.seller?.last_name].filter(Boolean).join(' ') || '—';
 
@@ -811,21 +859,87 @@ function GlobalListings() {
                         </div>
                       </div>
                     </TableCell>
+
+                    {/* Modalidade */}
+                    <TableCell>
+                      <div className="flex flex-col gap-1 items-start">
+                        {finances.isPremium ? (
+                          <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 text-[10px] font-semibold whitespace-nowrap">
+                            Premium (12x)
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-blue-500/30 text-blue-700 dark:text-blue-300 bg-blue-500/10 text-[10px] font-medium whitespace-nowrap">
+                            Clássico
+                          </Badge>
+                        )}
+                        {metadata.logistic_type === 'fulfillment' && (
+                          <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-[9px] gap-0.5 px-1 py-0">
+                            <Zap className="h-2.5 w-2.5" /> Full
+                          </Badge>
+                        )}
+                        {metadata.logistic_type === 'self_service' && (
+                          <Badge className="bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30 text-[9px] gap-0.5 px-1 py-0">
+                            Flex
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+
                     <TableCell className="font-mono text-xs text-muted-foreground">
                       {listing.product?.sku ?? '—'}
                     </TableCell>
                     <TableCell className="text-sm">{sellerName}</TableCell>
-                    <TableCell className="text-right font-medium">{price > 0 ? formatBRL(price) : '—'}</TableCell>
-                    <TableCell className={`text-right text-sm font-medium ${profit >= 0 ? 'text-green-600' : 'text-destructive'}`}>
-                      {cost > 0 ? formatBRL(profit) : '—'}
+
+                    {/* Valor Venda */}
+                    <TableCell className="text-right font-medium text-xs">
+                      {price > 0 ? formatBRL(price) : '—'}
                     </TableCell>
+
+                    {/* Recebe do ML */}
+                    <TableCell className="text-right">
+                      {price > 0 ? (
+                        <div>
+                          <span className="font-bold text-xs text-emerald-700 dark:text-emerald-400">
+                            {formatBRL(finances.netReceived)}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground block font-mono">
+                            Taxas: -{formatBRL(finances.feeTotal)}
+                          </span>
+                        </div>
+                      ) : '—'}
+                    </TableCell>
+
+                    {/* Lucro Líquido */}
+                    <TableCell className="text-right">
+                      {cost > 0 && price > 0 ? (
+                        <div>
+                          <span className={`font-bold text-xs ${finances.realProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+                            {finances.realProfit >= 0 ? `+${formatBRL(finances.realProfit)}` : formatBRL(finances.realProfit)}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground block font-mono">
+                            Custo: {formatBRL(cost)}
+                          </span>
+                        </div>
+                      ) : price > 0 ? (
+                        <div>
+                          <span className="font-bold text-xs text-emerald-600">
+                            +{formatBRL(finances.netReceived)}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground block italic">
+                            Sem custo
+                          </span>
+                        </div>
+                      ) : '—'}
+                    </TableCell>
+
                     <TableCell className="text-right text-sm text-muted-foreground">{listing.visits ?? 0}</TableCell>
                     <TableCell className="text-right text-sm text-muted-foreground">{listing.sales ?? 0}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         {listing.permalink && (
                           <Button size="icon" variant="ghost" className="h-7 w-7"
-                            onClick={() => window.open(listing.permalink, '_blank')}>
+                            onClick={() => window.open(listing.permalink, '_blank')}
+                            title="Abrir no Mercado Livre">
                             <ExternalLink className="h-3.5 w-3.5" />
                           </Button>
                         )}

@@ -165,11 +165,18 @@ async function processResellerItems(resellerUserId: string, queueId?: string) {
         .eq('ml_item_id', mlItemId)
         .maybeSingle();
 
+      const metadata = {
+        listing_type_id: item.listing_type_id || 'gold_special',
+        logistic_type: item.shipping?.logistic_type || null,
+        free_shipping: Boolean(item.shipping?.free_shipping),
+      };
+
       const variantData = {
         user_id: resellerUserId,
         product_id: productId,
         ml_item_id: mlItemId,
         variant_title: item.title ?? 'Sem título',
+        variant_description: JSON.stringify(metadata),
         price: Number(item.price ?? 0),
         status: mlStatus,
         permalink: item.permalink ?? null,
