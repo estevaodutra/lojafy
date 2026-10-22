@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -52,6 +52,13 @@ export const ProductGalleriesModal: React.FC<ProductGalleriesModalProps> = ({
   const [downloadProgress, setDownloadProgress] = useState<{ current: number; total: number; galleryName: string } | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [zoomImageUrl, setZoomImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (galleries.length > 0 && (!selectedGalleryId || !galleries.some(g => g.id === selectedGalleryId))) {
+      const main = galleries.find(g => g.is_main);
+      setSelectedGalleryId(main?.id || galleries[0]?.id || '');
+    }
+  }, [galleries, selectedGalleryId]);
 
   // Active gallery
   const activeGallery = galleries.find(g => g.id === selectedGalleryId) || galleries[0];

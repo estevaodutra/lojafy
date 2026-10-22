@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import ReactMarkdown from 'react-markdown';
 import Header from "@/components/Header";
@@ -162,10 +162,10 @@ const Produto = ({
   };
   const productImages = product.images && product.images.length > 0 ? product.images : [product.main_image_url || product.image_url || '/placeholder.svg'];
 
-  // Multi-galerias do produto
-  const productGalleries: ProductGalleryItem[] = useMemo(() => {
+  // Multi-galerias do produto (execução síncrona sem violação de Hooks)
+  const productGalleries: ProductGalleryItem[] = (() => {
     if (!product) return [];
-    const rawGalleries = (product as any).image_galleries || (product.attributes as any)?.image_galleries;
+    const rawGalleries = (product as any)?.image_galleries || (product?.attributes as any)?.image_galleries;
     if (Array.isArray(rawGalleries) && rawGalleries.length > 0) {
       return rawGalleries.map((g: any, idx: number) => ({
         id: g.id || `gal-${idx}`,
@@ -183,7 +183,7 @@ const Produto = ({
       }];
     }
     return [];
-  }, [product, productImages]);
+  })();
   
   // Get selected variant data
   const selectedVariantData = variants.find(v => v.id === selectedVariant);
@@ -809,7 +809,7 @@ const Produto = ({
           </section>}
       </main>
 
-      {product && (
+      {product && isGalleriesModalOpen && (
         <ProductGalleriesModal
           isOpen={isGalleriesModalOpen}
           onClose={() => setIsGalleriesModalOpen(false)}

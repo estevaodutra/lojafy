@@ -1,12 +1,41 @@
 import React, { useMemo } from 'react';
-import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { User, Package, Heart, HelpCircle, Settings, Home, LogOut, GraduationCap, Ticket, Rocket, Wallet } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Outlet } from 'react-router-dom';
+import { 
+  Sidebar, 
+  SidebarContent, 
+  SidebarProvider, 
+  SidebarTrigger,
+  SidebarRail,
+} from '@/components/ui/sidebar';
+import { 
+  User, 
+  Package, 
+  Heart, 
+  HelpCircle, 
+  Settings, 
+  Home, 
+  GraduationCap, 
+  Ticket, 
+  Rocket, 
+  Wallet 
+} from 'lucide-react';
 import { useFeature } from '@/hooks/useFeature';
+import {
+  LojafySidebarHeader,
+  LojafySidebarItem,
+  LojafySidebarFooter,
+  LojafySidebarGroup,
+} from '@/components/navigation';
 
-const baseMenuItems = [
-  { title: 'Resumo', url: '/minha-conta', icon: User },
+interface MenuItem {
+  title: string;
+  url: string;
+  icon: React.ComponentType<{ className?: string }>;
+  exactMatch?: boolean;
+}
+
+const baseMenuItems: MenuItem[] = [
+  { title: 'Resumo', url: '/minha-conta', icon: User, exactMatch: true },
   { title: 'Meus Pedidos', url: '/minha-conta/pedidos', icon: Package },
   { title: 'Carteira', url: '/minha-conta/carteira', icon: Wallet },
   { title: 'Meus Tickets', url: '/minha-conta/tickets', icon: Ticket },
@@ -16,14 +45,8 @@ const baseMenuItems = [
 ];
 
 const CustomerSidebar = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { signOut, profile } = useAuth();
   const { hasFeature: hasTop10Feature } = useFeature('top_10_produtos');
   const { hasFeature: hasAcademyFeature } = useFeature('lojafy_academy');
-  const currentPath = location.pathname;
-
-  const isActive = (path: string) => currentPath === path;
 
   const menuItems = useMemo(() => {
     const items = [...baseMenuItems];
@@ -41,69 +64,54 @@ const CustomerSidebar = () => {
     return items;
   }, [hasAcademyFeature, hasTop10Feature]);
 
-  const handleLogout = async () => {
-    await signOut();
-    navigate('/');
-  };
-
   return (
-    <Sidebar className="w-64">
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Minha Conta</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <Link 
-                      to={item.url}
-                      className={isActive(item.url) ? "bg-sidebar-accent text-sidebar-accent-foreground" : ""}
-                    >
-                      <item.icon className="mr-2 h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar font-sans select-none">
+      {/* 1. Header with Lojafy Logo */}
+      <LojafySidebarHeader
+        environmentName="Minha Conta"
+        dashboardUrl="/minha-conta"
+      />
 
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <button onClick={() => navigate('/')}>
-                    <Home className="mr-2 h-4 w-4" />
-                    <span>Voltar à Loja</span>
-                  </button>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <button onClick={handleLogout}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Sair</span>
-                  </button>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+      {/* 2. Independent Scrollable Menu Body */}
+      <SidebarContent className="px-2 py-2 gap-1 overflow-y-auto">
+        <LojafySidebarGroup label="Minha Conta">
+          {menuItems.map((item) => (
+            <LojafySidebarItem
+              key={item.title}
+              title={item.title}
+              url={item.url}
+              icon={item.icon}
+              exactMatch={item.exactMatch}
+            />
+          ))}
+        </LojafySidebarGroup>
       </SidebarContent>
+
+      {/* 3. Fixed Footer */}
+      <LojafySidebarFooter
+        actionItems={[
+          {
+            title: 'Voltar à Loja',
+            url: '/',
+            icon: Home,
+          },
+        ]}
+        customStoreUrl="/"
+        storeLabel="Voltar à Loja"
+      />
+
+      <SidebarRail />
     </Sidebar>
   );
 };
 
-const CustomerLayout: React.FC = () => {
+export const CustomerLayout: React.FC = () => {
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full overflow-x-hidden min-w-0">
+      <div className="min-h-screen flex w-full overflow-x-hidden min-w-0 bg-background">
         <CustomerSidebar />
         <main className="flex-1 min-w-0 flex flex-col overflow-x-hidden">
-          <header className="h-12 flex items-center border-b px-4 shrink-0 bg-background md:hidden">
+          <header className="h-14 flex items-center border-b px-4 shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <SidebarTrigger />
           </header>
           <div className="p-4 md:p-6 flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">

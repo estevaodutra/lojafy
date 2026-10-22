@@ -399,6 +399,7 @@ const App = () => {
                   <Route path="integracoes" element={<IntegracaoPage />} />
                   <Route path="base-conhecimento" element={<AIKnowledgeBase />} />
                   <Route path="suporte" element={<SupportManagement />} />
+                  <Route path="ajuda" element={<SupportManagement />} />
                   <Route path="api-docs" element={<ApiDocumentation />} />
                   <Route path="logs" element={<SystemLogs />} />
                   <Route path="apps" element={<AdminApps />} />

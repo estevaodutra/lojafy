@@ -1,19 +1,43 @@
 import React from 'react';
-import { Link, useLocation, Outlet, Navigate } from 'react-router-dom';
-import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { BarChart3, Package, ShoppingCart, Users, Settings, Home, Image, Globe, Star, MessageSquare, Mail, Palette, Truck, LogOut } from 'lucide-react';
+import { Outlet, Navigate } from 'react-router-dom';
+import { 
+  Sidebar, 
+  SidebarContent, 
+  SidebarProvider, 
+  SidebarTrigger,
+  SidebarRail,
+} from '@/components/ui/sidebar';
+import { 
+  BarChart3, 
+  Package, 
+  ShoppingCart, 
+  Users, 
+  Settings, 
+  Home, 
+  Image, 
+  Globe, 
+  MessageSquare, 
+  Mail, 
+  Palette, 
+  Truck, 
+  Loader2 
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2 } from 'lucide-react';
-import lojafyLogo from '@/assets/lojafy-logo-new.png';
+import {
+  LojafySidebarHeader,
+  LojafySidebarItem,
+  LojafySidebarFooter,
+  LojafySidebarGroup,
+} from '@/components/navigation';
 
 const adminMenuItems = [
-  { title: 'Dashboard', url: '/admin', icon: BarChart3 },
+  { title: 'Dashboard', url: '/admin', icon: BarChart3, exactMatch: true },
   { title: 'Produtos', url: '/admin/produtos', icon: Package },
   { title: 'Categorias', url: '/admin/categorias', icon: Package },
   { title: 'Pedidos', url: '/admin/pedidos', icon: ShoppingCart },
   { title: 'Frete', url: '/admin/frete', icon: Truck },
   { title: 'Clientes', url: '/admin/clientes', icon: Users },
-  { title: 'Integracoes', url: '/admin/integracoes', icon: Settings },
+  { title: 'Integrações', url: '/admin/integracoes', icon: Settings },
 ];
 
 const designMenuItems = [
@@ -25,102 +49,65 @@ const designMenuItems = [
 ];
 
 const AdminSidebar = () => {
-  const location = useLocation();
-  const { signOut } = useAuth();
-  const currentPath = location.pathname;
-
-  const isActive = (path: string) => currentPath === path;
-
-  const handleLogout = async () => {
-    await signOut();
-  };
-
   return (
-    <Sidebar collapsible="icon" className="w-64 border-r">
-      <SidebarContent>
-        <SidebarHeader className="p-4 border-b flex justify-center">
-          <img 
-            src={lojafyLogo} 
-            alt="Lojafy" 
-            className="w-72 h-20 object-contain"
-          />
-        </SidebarHeader>
-        <SidebarGroup>
-          <SidebarGroupLabel>Administração</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {adminMenuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <Link 
-                      to={item.url}
-                      className={isActive(item.url) ? "bg-sidebar-accent text-sidebar-accent-foreground" : ""}
-                    >
-                      <item.icon className="mr-2 h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar font-sans select-none">
+      {/* 1. Header with Lojafy Logo */}
+      <LojafySidebarHeader
+        environmentName="Administrador"
+        dashboardUrl="/admin"
+      />
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Design da Loja</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {designMenuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <Link 
-                      to={item.url}
-                      className={isActive(item.url) ? "bg-sidebar-accent text-sidebar-accent-foreground" : ""}
-                    >
-                      <item.icon className="mr-2 h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link to="/">
-                    <Home className="mr-2 h-4 w-4" />
-                    <span>Voltar à Loja</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <button onClick={handleLogout}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Sair</span>
-                  </button>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+      {/* 2. Independent Scrollable Menu Body */}
+      <SidebarContent className="px-2 py-2 gap-1 overflow-y-auto">
+        <LojafySidebarGroup label="Administração">
+          {adminMenuItems.map((item) => (
+            <LojafySidebarItem
+              key={item.title}
+              title={item.title}
+              url={item.url}
+              icon={item.icon}
+              exactMatch={item.exactMatch}
+            />
+          ))}
+        </LojafySidebarGroup>
+
+        <LojafySidebarGroup label="Design da Loja">
+          {designMenuItems.map((item) => (
+            <LojafySidebarItem
+              key={item.title}
+              title={item.title}
+              url={item.url}
+              icon={item.icon}
+            />
+          ))}
+        </LojafySidebarGroup>
       </SidebarContent>
+
+      {/* 3. Fixed Footer */}
+      <LojafySidebarFooter
+        actionItems={[
+          {
+            title: 'Voltar à Loja',
+            url: '/',
+            icon: Home,
+          },
+        ]}
+        customStoreUrl="/"
+        storeLabel="Voltar à Loja"
+      />
+
+      <SidebarRail />
     </Sidebar>
   );
 };
 
-const AdminLayout: React.FC = () => {
+export const AdminLayout: React.FC = () => {
   const { user, loading, isAdmin } = useAuth();
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -135,11 +122,11 @@ const AdminLayout: React.FC = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full overflow-x-hidden min-w-0">
+      <div className="min-h-screen flex w-full overflow-x-hidden min-w-0 bg-background">
         <AdminSidebar />
         <main className="flex-1 min-w-0 flex flex-col overflow-x-hidden">
-          <header className="flex items-center justify-end p-4 border-b bg-background shrink-0">
-            <SidebarTrigger className="md:hidden" />
+          <header className="h-14 flex items-center justify-between px-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0">
+            <SidebarTrigger />
           </header>
           <div className="p-4 md:p-6 flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
             <Outlet />

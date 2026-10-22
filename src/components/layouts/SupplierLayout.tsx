@@ -1,11 +1,10 @@
 import React from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import {
   LayoutDashboard,
   Package,
   Warehouse,
   Store,
-  LogOut,
   ShoppingCart,
   CheckCircle,
   Hand,
@@ -23,27 +22,28 @@ import {
 import {
   Sidebar,
   SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
   SidebarProvider,
   SidebarTrigger,
+  SidebarRail,
 } from '@/components/ui/sidebar';
-import { useAuth } from '@/contexts/AuthContext';
 import { useSupplierOrganization } from '@/hooks/supplier/useSupplierOrganization';
 import { AlertsStrip } from '@/components/supplier/dashboard/AlertsStrip';
+import {
+  LojafySidebarHeader,
+  LojafySidebarItem,
+  LojafySidebarFooter,
+  LojafySidebarGroup,
+} from '@/components/navigation';
 
 interface MenuItem {
   title: string;
   url: string;
   icon: React.ComponentType<{ className?: string }>;
+  exactMatch?: boolean;
 }
 
 const operationItems: MenuItem[] = [
-  { title: 'Dashboard', url: '/supplier', icon: LayoutDashboard },
+  { title: 'Dashboard', url: '/supplier', icon: LayoutDashboard, exactMatch: true },
   { title: 'Pedidos', url: '/supplier/pedidos', icon: ShoppingCart },
   { title: 'Separação', url: '/supplier/separacao', icon: Hand },
   { title: 'Embalagem', url: '/supplier/embalagem', icon: PackageOpen },
@@ -67,72 +67,66 @@ const settingsItems: MenuItem[] = [
   { title: 'Depósitos', url: '/supplier/configuracoes/depositos', icon: MapPin },
 ];
 
-const MenuGroup = ({ label, items }: { label: string; items: MenuItem[] }) => {
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  return (
-    <SidebarGroup>
-      <SidebarGroupLabel>{label}</SidebarGroupLabel>
-      <SidebarGroupContent>
-        <SidebarMenu>
-          {items.map((item) => (
-            <SidebarMenuItem key={item.url}>
-              <SidebarMenuButton
-                asChild
-                className={location.pathname === item.url ? 'bg-sidebar-accent' : ''}
-              >
-                <button onClick={() => navigate(item.url)}>
-                  <item.icon className="mr-2 h-4 w-4" />
-                  <span>{item.title}</span>
-                </button>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
-      </SidebarGroupContent>
-    </SidebarGroup>
-  );
-};
-
 const SupplierSidebar = () => {
-  const navigate = useNavigate();
-  const { signOut } = useAuth();
-
   return (
-    <Sidebar collapsible="icon" className="border-r">
-      <SidebarContent>
-        <div className="p-4">
-          <h2 className="text-lg font-semibold">Fornecedor</h2>
-        </div>
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar font-sans select-none">
+      {/* 1. Header with Lojafy Logo */}
+      <LojafySidebarHeader
+        environmentName="Fornecedor"
+        dashboardUrl="/supplier"
+      />
 
-        <MenuGroup label="Operação" items={operationItems} />
-        <MenuGroup label="Catálogo" items={catalogItems} />
-        <MenuGroup label="Configurações" items={settingsItems} />
+      {/* 2. Independent Scrollable Menu Body */}
+      <SidebarContent className="px-2 py-2 gap-1 overflow-y-auto">
+        <LojafySidebarGroup label="Operação">
+          {operationItems.map((item) => (
+            <LojafySidebarItem
+              key={item.url}
+              title={item.title}
+              url={item.url}
+              icon={item.icon}
+              exactMatch={item.exactMatch}
+            />
+          ))}
+        </LojafySidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <button onClick={() => navigate('/')}>
-                    <Store className="mr-2 h-4 w-4" />
-                    <span>Ver Loja</span>
-                  </button>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <button onClick={() => signOut()}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Sair</span>
-                  </button>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <LojafySidebarGroup label="Catálogo">
+          {catalogItems.map((item) => (
+            <LojafySidebarItem
+              key={item.url}
+              title={item.title}
+              url={item.url}
+              icon={item.icon}
+            />
+          ))}
+        </LojafySidebarGroup>
+
+        <LojafySidebarGroup label="Configurações">
+          {settingsItems.map((item) => (
+            <LojafySidebarItem
+              key={item.url}
+              title={item.title}
+              url={item.url}
+              icon={item.icon}
+            />
+          ))}
+        </LojafySidebarGroup>
       </SidebarContent>
+
+      {/* 3. Fixed Footer */}
+      <LojafySidebarFooter
+        actionItems={[
+          {
+            title: 'Ver Loja',
+            url: '/',
+            icon: Store,
+          },
+        ]}
+        customStoreUrl="/"
+        storeLabel="Ver Loja"
+      />
+
+      <SidebarRail />
     </Sidebar>
   );
 };
@@ -142,10 +136,10 @@ export const SupplierLayout: React.FC = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full overflow-x-hidden min-w-0">
+      <div className="min-h-screen flex w-full overflow-x-hidden min-w-0 bg-background">
         <SupplierSidebar />
         <main className="flex-1 min-w-0 flex flex-col overflow-x-hidden">
-          <header className="h-12 flex items-center gap-3 border-b px-4 shrink-0 bg-background">
+          <header className="h-14 flex items-center gap-3 border-b px-4 shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <SidebarTrigger />
             {orgData?.organization && (
               <span className="text-sm font-medium text-muted-foreground truncate">
