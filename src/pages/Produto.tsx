@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import ReactMarkdown from 'react-markdown';
 import Header from "@/components/Header";
@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { ImageZoomModal } from "@/components/ImageZoomModal";
-import { ChevronRight, ChevronLeft, Star, Heart, ShoppingCart, Truck, Shield, RotateCcw, Plus, Minus, Share2, ZoomIn, Package, Info, ExternalLink, Copy, Download, Loader2 } from "lucide-react";
+import { ProductGalleriesModal, ProductGalleryItem } from "@/components/ProductGalleriesModal";
+import { ChevronRight, ChevronLeft, Star, Heart, ShoppingCart, Truck, Shield, RotateCcw, Plus, Minus, Share2, ZoomIn, Package, Info, ExternalLink, Copy, Download, Loader2, Layers } from "lucide-react";
 import { useFavorites } from "@/contexts/FavoritesContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCart } from "@/contexts/CartContext";
@@ -46,6 +47,7 @@ const Produto = ({
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isGalleriesModalOpen, setIsGalleriesModalOpen] = useState(false);
   const galleryRef = useRef<HTMLDivElement>(null);
   
   const scrollGallery = (direction: 'left' | 'right') => {
@@ -55,8 +57,8 @@ const Produto = ({
     }
   };
 
-  const { isReseller, isSupplier, isSuperAdmin, role } = useUserRole();
-  const canCopyOrDownload = isReseller() || isSupplier() || isSuperAdmin() || role === 'admin';
+  const { isReseller, isSupplier, isSuperAdmin, role, isAuthenticated } = useUserRole();
+  const canCopyOrDownload = isReseller() || isSupplier() || isSuperAdmin() || role === 'admin' || isAuthenticated;
 
   // Fetch product from Supabase
   const {
@@ -131,7 +133,7 @@ const Produto = ({
             </div>
           </div>
         </main>
-        {showFooter && <Footer />}
+      {showFooter && <Footer />}
       </div>;
   }
   if (!product) {
@@ -159,6 +161,29 @@ const Produto = ({
     return Math.round((Number(product.price) - Number(product.original_price)) / Number(product.price) * 100);
   };
   const productImages = product.images && product.images.length > 0 ? product.images : [product.main_image_url || product.image_url || '/placeholder.svg'];
+
+  // Multi-galerias do produto
+  const productGalleries: ProductGalleryItem[] = useMemo(() => {
+    if (!product) return [];
+    const rawGalleries = (product as any).image_galleries || (product.attributes as any)?.image_galleries;
+    if (Array.isArray(rawGalleries) && rawGalleries.length > 0) {
+      return rawGalleries.map((g: any, idx: number) => ({
+        id: g.id || `gal-${idx}`,
+        name: g.name || (g.is_main ? 'Galeria Principal' : `Galeria ${idx + 1}`),
+        is_main: Boolean(g.is_main),
+        images: Array.isArray(g.images) ? g.images.filter(Boolean) : []
+      }));
+    }
+    if (productImages.length > 0) {
+      return [{
+        id: 'main',
+        name: 'Galeria Principal',
+        is_main: true,
+        images: productImages
+      }];
+    }
+    return [];
+  }, [product, productImages]);
   
   // Get selected variant data
   const selectedVariantData = variants.find(v => v.id === selectedVariant);
@@ -418,25 +443,40 @@ const Produto = ({
             </div>
             
             {productImages.length > 0 && canCopyOrDownload && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDownloadPhotos}
-                disabled={isDownloading}
-                className="w-full sm:w-auto gap-2"
-              >
-                {isDownloading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Baixando...
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-4 w-4" />
-                    Baixar {productImages.length > 1 ? `${productImages.length} Fotos` : 'Foto'}
-                  </>
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadPhotos}
+                  disabled={isDownloading}
+                  className="flex-1 sm:flex-initial gap-2"
+                >
+                  {isDownloading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Baixando...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4" />
+                      Baixar {productImages.length > 1 ? `${productImages.length} Fotos` : 'Foto'}
+                    </>
+                  )}
+                </Button>
+
+                {productGalleries.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setIsGalleriesModalOpen(true)}
+                    className="flex-1 sm:flex-initial gap-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-950/30 dark:hover:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800"
+                  >
+                    <Layers className="h-4 w-4" />
+                    Ver Galerias ({productGalleries.length})
+                  </Button>
                 )}
-              </Button>
+              </div>
             )}
           </div>
 
@@ -768,6 +808,15 @@ const Produto = ({
             </div>
           </section>}
       </main>
+
+      {product && (
+        <ProductGalleriesModal
+          isOpen={isGalleriesModalOpen}
+          onClose={() => setIsGalleriesModalOpen(false)}
+          productName={product.name}
+          galleries={productGalleries}
+        />
+      )}
 
       {showFooter && <Footer />}
     </div>;

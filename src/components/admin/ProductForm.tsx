@@ -39,7 +39,7 @@ import { StickySaveBar } from './product-form/StickySaveBar';
 import { BasicInfoSection } from './product-form/BasicInfoSection';
 import { PricingSection } from './product-form/PricingSection';
 import { StockSection } from './product-form/StockSection';
-import { ImagesSection } from './product-form/ImagesSection';
+import { ImagesSection, GalleryData } from './product-form/ImagesSection';
 import { DimensionsSection } from './product-form/DimensionsSection';
 import { SpecificationsSection } from './product-form/SpecificationsSection';
 import { SettingsSection } from './product-form/SettingsSection';
@@ -271,6 +271,80 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
     }
     return [];
   });
+
+  // Galerias de Imagens (Suporte a Múltiplas Galerias: Principal ⭐, Anúncios Facebook, Criativos, etc.)
+  const [galleries, setGalleries] = useState<GalleryData[]>(() => {
+    const rawGalleries = (product as any)?.image_galleries || (product?.attributes as any)?.image_galleries;
+
+    if (Array.isArray(rawGalleries) && rawGalleries.length > 0) {
+      const parsed: GalleryData[] = rawGalleries.map((g: any, gIdx: number) => ({
+        id: g.id || `gallery-${gIdx}`,
+        name: g.name || (g.is_main ? 'Galeria Principal' : `Galeria ${gIdx + 1}`),
+        isMain: Boolean(g.is_main),
+        images: Array.isArray(g.images)
+          ? g.images
+              .filter((url: string) => isUsableProductImage(url))
+              .map((url: string, idx: number) => ({
+                id: `gallery-${gIdx}-img-${idx}`,
+                preview: url,
+                url: url,
+                isMain: idx === 0,
+                isUploading: false,
+              }))
+          : []
+      }));
+
+      // Garante que pelo menos uma galeria seja a principal
+      if (!parsed.some(g => g.isMain)) {
+        parsed[0].isMain = true;
+      }
+      return parsed;
+    }
+
+    // Inicialização padrão: 1 galeria principal contendo as imagens existentes
+    const imageUrls: string[] = [];
+    if (product?.images && Array.isArray(product.images)) imageUrls.push(...product.images.filter(Boolean));
+    if (product?.image_url && typeof product.image_url === 'string' && !imageUrls.includes(product.image_url)) {
+      imageUrls.unshift(product.image_url);
+    }
+    if (product?.main_image_url && typeof product.main_image_url === 'string' && !imageUrls.includes(product.main_image_url)) {
+      imageUrls.unshift(product.main_image_url);
+    }
+    const filteredUrls = imageUrls.filter(url => isUsableProductImage(url));
+    const defaultImages: ImageFile[] = filteredUrls.map((url: string, index: number) => ({
+      id: `existing-${index}`,
+      preview: url,
+      url: url,
+      isMain: index === 0,
+      isUploading: false
+    }));
+
+    return [{
+      id: 'main',
+      name: 'Galeria Principal',
+      isMain: true,
+      images: defaultImages
+    }];
+  });
+
+  const handleGalleriesChange = (newGalleries: GalleryData[]) => {
+    setGalleries(newGalleries);
+    const mainGal = newGalleries.find(g => g.isMain) || newGalleries[0];
+    if (mainGal) {
+      setImages(mainGal.images);
+    }
+  };
+
+  const handleImagesChange = (newImages: ImageFile[]) => {
+    setImages(newImages);
+    setGalleries(prev => {
+      const hasMain = prev.some(g => g.isMain);
+      if (hasMain) {
+        return prev.map(g => g.isMain ? { ...g, images: newImages } : g);
+      }
+      return prev.map((g, idx) => idx === 0 ? { ...g, isMain: true, images: newImages } : g);
+    });
+  };
 
   // Variações e Dimensões
   const [variants, setVariants] = useState<ProductVariant[]>([]);
@@ -717,6 +791,29 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
         }
       }
 
+      // Multi-galerias sanitizadas (preserva todas as galerias com suas imagens)
+      const sanitizedGalleries = galleries.map(g => ({
+        id: g.id,
+        name: g.name,
+        is_main: g.isMain,
+        images: g.images
+          .map(img => img.url || img.preview)
+          .filter(url => isUsableProductImage(url))
+      }));
+
+      // A galeria principal define a lista de imagens públicas e a foto de capa
+      const mainGal = sanitizedGalleries.find(g => g.is_main) || sanitizedGalleries[0];
+      const mainGalleryUrls = mainGal && mainGal.images.length > 0 ? mainGal.images : sanitizedImageUrls;
+      const mainGalleryCover = mainGalleryUrls.length > 0 ? mainGalleryUrls[0] : sanitizedMainImageUrl;
+
+      let updatedAttributes: any = {};
+      if (product?.attributes && typeof product.attributes === 'object' && !Array.isArray(product.attributes)) {
+        updatedAttributes = { ...product.attributes };
+      } else if (Array.isArray(product?.attributes)) {
+        updatedAttributes = { ml_reference_attributes: product.attributes };
+      }
+      updatedAttributes.image_galleries = sanitizedGalleries;
+
       const productData: any = {
         name: data.name,
         description: data.description || null,
@@ -743,8 +840,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
         width: dimensions.width || null,
         length: dimensions.length || null,
         weight: dimensions.weight || null,
-        main_image_url: sanitizedMainImageUrl,
-        image_url: sanitizedMainImageUrl,
+        main_image_url: mainGalleryCover,
+        image_url: mainGalleryCover,
         active: targetActive,
         approval_status: targetApprovalStatus,
         stage: targetActive ? 'stage_2_enabled' : (product?.stage || 'stage_1_basic'),
@@ -754,7 +851,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
           ? data.reference_ad_url.trim().replace(/mercadolivre\.com\.br\/MLB(\d+)/i, 'mercadolivre.com.br/MLB-$1') 
           : null,
         specifications: specificationsObj,
-        images: sanitizedImageUrls,
+        attributes: updatedAttributes,
+        images: mainGalleryUrls,
         updated_at: new Date().toISOString(),
       };
 
@@ -1310,7 +1408,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
               <AccordionContent className="px-4 pb-4 pt-2 border-t">
                 <ImagesSection
                   images={images}
-                  onImagesChange={setImages}
+                  onImagesChange={handleImagesChange}
+                  galleries={galleries}
+                  onGalleriesChange={handleGalleriesChange}
                   maxImages={10}
                   productId={product?.id}
                 />
