@@ -451,6 +451,12 @@ function GlobalListings() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [toggling, setToggling] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
+  const [page, setPage] = useState(0);
+  const LISTINGS_PAGE_SIZE = 25;
+
+  useEffect(() => {
+    setPage(0);
+  }, [search, selectedSeller, statusFilter]);
 
   // Buscar lista de contas/sellers conectados para filtro
   const { data: sellers = [] } = useQuery({
@@ -648,6 +654,8 @@ function GlobalListings() {
   const pausedListings = listings.filter((l: any) => l.status !== 'published').length;
   const totalSales = listings.reduce((acc: number, l: any) => acc + (Number(l.sales) || 0), 0);
 
+  const paginatedListings = filtered.slice(page * LISTINGS_PAGE_SIZE, (page + 1) * LISTINGS_PAGE_SIZE);
+
   const formatBRL = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
   return (
@@ -774,7 +782,7 @@ function GlobalListings() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((listing: any) => {
+              {paginatedListings.map((listing: any) => {
                 const price = Number(listing.price ?? 0);
                 const cost = Number(listing.product?.cost_price ?? 0);
                 const profit = price - cost;
@@ -828,6 +836,38 @@ function GlobalListings() {
               })}
             </TableBody>
           </Table>
+        </div>
+      )}
+
+      {/* Paginação de 25 por página */}
+      {filtered.length > LISTINGS_PAGE_SIZE && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-muted-foreground">
+          <span>
+            Mostrando {page * LISTINGS_PAGE_SIZE + 1}–{Math.min((page + 1) * LISTINGS_PAGE_SIZE, filtered.length)} de {filtered.length} anúncio(s)
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 px-3 text-xs"
+              disabled={page === 0}
+              onClick={() => setPage(p => p - 1)}
+            >
+              Anterior
+            </Button>
+            <span className="text-xs font-medium px-1">
+              Página {page + 1} de {Math.ceil(filtered.length / LISTINGS_PAGE_SIZE)}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 px-3 text-xs"
+              disabled={(page + 1) * LISTINGS_PAGE_SIZE >= filtered.length}
+              onClick={() => setPage(p => p + 1)}
+            >
+              Próximo
+            </Button>
+          </div>
         </div>
       )}
     </div>
