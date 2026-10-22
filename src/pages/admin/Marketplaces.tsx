@@ -204,23 +204,21 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
   const handleQueueSync = async (resellerUserId: string, name: string) => {
     setQueueing(resellerUserId);
     try {
-      const { data: existing } = await supabase
-        .from('ml_sync_queue')
-        .select('id')
-        .eq('user_id', resellerUserId)
-        .in('status', ['pending', 'processing'])
-        .limit(1);
-
-      if (existing && existing.length > 0) {
-        toast({ title: 'Já na fila', description: `${name} já tem sincronização pendente.` });
-        return;
-      }
-
-      const { error } = await supabase.from('ml_sync_queue').insert({ user_id: resellerUserId, status: 'pending' });
+      toast({
+        title: 'Sincronizando anúncios...',
+        description: `Buscando anúncios de ${name} no Mercado Livre.`,
+      });
+      const { data, error } = await supabase.functions.invoke('ml-queue-processor', {
+        body: { reseller_user_id: resellerUserId },
+      });
       if (error) throw error;
-      toast({ title: 'Adicionado à fila', description: `${name} será sincronizado nos próximos 10 minutos.` });
-    } catch (err) {
-      toast({ title: 'Erro ao enfileirar', description: String(err), variant: 'destructive' });
+      toast({
+        title: 'Sincronização concluída!',
+        description: `${data?.imported ?? 0} anúncios importados com sucesso para ${name}.`,
+      });
+      refetch();
+    } catch (err: any) {
+      toast({ title: 'Erro ao sincronizar', description: err.message, variant: 'destructive' });
     } finally {
       setQueueing(null);
     }
@@ -452,6 +450,7 @@ function GlobalListings() {
   const [selectedSeller, setSelectedSeller] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [toggling, setToggling] = useState<string | null>(null);
+  const [syncingAll, setSyncingAll] = useState(false);
 
   // Buscar lista de contas/sellers conectados para filtro
   const { data: sellers = [] } = useQuery({
@@ -487,29 +486,52 @@ function GlobalListings() {
         .select(`
           id, ml_item_id, variant_title, price, status, visits, sales,
           permalink, thumbnail, user_id, product_id, last_synced_at,
-          product:products(sku, cost_price, name, image_url),
-          seller:profiles!ml_listing_variants_user_id_fkey(first_name, last_name)
+          product:products(sku, cost_price, name, image_url)
         `)
         .not('ml_item_id', 'is', null)
         .order('last_synced_at', { ascending: false })
         .limit(1000);
-      if (error) throw error;
+
+      if (error) {
+        console.error('Erro ao buscar ml_listing_variants:', error);
+      }
 
       // 2. Produtos publicados diretamente para não perder nenhum anúncio recente
-      const { data: published } = await supabase
+      const { data: published, error: pubErr } = await supabase
         .from('mercadolivre_published_products')
         .select(`
           id, ml_item_id, user_id, product_id, permalink, status, published_at,
-          product:products(sku, cost_price, name, price, image_url),
-          seller:profiles!mercadolivre_published_products_user_id_fkey(first_name, last_name)
+          product:products(sku, cost_price, name, price, image_url)
         `)
         .not('ml_item_id', 'is', null)
         .order('published_at', { ascending: false })
         .limit(500);
 
+      if (pubErr) {
+        console.error('Erro ao buscar mercadolivre_published_products:', pubErr);
+      }
+
+      // 3. Buscar perfis dos vendedores sem depender de FK
+      const allRows = [...(variants ?? []), ...(published ?? [])];
+      const userIds = Array.from(new Set(allRows.map((r: any) => r.user_id).filter(Boolean)));
+
+      let profileMap = new Map<string, any>();
+      if (userIds.length > 0) {
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('user_id, first_name, last_name')
+          .in('user_id', userIds);
+        profileMap = new Map((profs ?? []).map(p => [p.user_id, p]));
+      }
+
       const itemsMap = new Map<string, any>();
       (variants ?? []).forEach((v: any) => {
-        if (v.ml_item_id) itemsMap.set(v.ml_item_id, v);
+        if (v.ml_item_id) {
+          itemsMap.set(v.ml_item_id, {
+            ...v,
+            seller: profileMap.get(v.user_id),
+          });
+        }
       });
 
       (published ?? []).forEach((p: any) => {
@@ -528,15 +550,44 @@ function GlobalListings() {
             product_id: p.product_id,
             last_synced_at: p.published_at,
             product: p.product,
-            seller: p.seller,
+            seller: profileMap.get(p.user_id),
           });
         }
       });
 
       return Array.from(itemsMap.values());
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
+
+  const handleSyncAllListings = async () => {
+    setSyncingAll(true);
+    try {
+      toast({
+        title: 'Sincronizando anúncios do Mercado Livre...',
+        description: 'Buscando todos os anúncios ativos das contas conectadas. Isso pode levar alguns segundos.',
+      });
+      const { data, error } = await supabase.functions.invoke('ml-queue-processor', {
+        body: selectedSeller !== 'all'
+          ? { reseller_user_id: selectedSeller }
+          : { mode: 'sync_all_active' },
+      });
+      if (error) throw error;
+      toast({
+        title: 'Sincronização concluída com sucesso!',
+        description: 'Os anúncios foram atualizados e carregados na tela.',
+      });
+      refetch();
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao sincronizar anúncios',
+        description: err.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setSyncingAll(false);
+    }
+  };
 
   const handleToggle = async (listing: any) => {
     if (toggling) return;
@@ -664,7 +715,18 @@ function GlobalListings() {
 
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span>{filtered.length} anúncio(s)</span>
-          <Button size="sm" variant="outline" onClick={() => refetch()} title="Atualizar listagem">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={syncingAll}
+            onClick={handleSyncAllListings}
+            className="gap-1.5 text-xs font-medium"
+            title="Importar anúncios do Mercado Livre agora"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", syncingAll && "animate-spin")} />
+            {syncingAll ? 'Sincronizando...' : 'Sincronizar Anúncios ML'}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => refetch()} title="Atualizar listagem">
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -673,9 +735,27 @@ function GlobalListings() {
       {isLoading ? (
         <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <LayoutList className="h-10 w-10 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">Nenhum anúncio encontrado com os filtros selecionados.</p>
+        <div className="text-center py-12 text-muted-foreground space-y-3">
+          <LayoutList className="h-10 w-10 mx-auto opacity-30" />
+          <div>
+            <p className="text-sm font-semibold text-foreground">Nenhum anúncio encontrado</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {listings.length === 0
+                ? 'Os anúncios ainda não foram sincronizados das contas conectadas do Mercado Livre.'
+                : 'Nenhum anúncio corresponde aos filtros selecionados.'}
+            </p>
+          </div>
+          {listings.length === 0 && (
+            <Button
+              size="sm"
+              disabled={syncingAll}
+              onClick={handleSyncAllListings}
+              className="bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-semibold gap-1.5 text-xs shadow-xs"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", syncingAll && "animate-spin")} />
+              {syncingAll ? 'Sincronizando do Mercado Livre...' : 'Sincronizar Anúncios das Contas Agora'}
+            </Button>
+          )}
         </div>
       ) : (
         <div className="rounded-md border overflow-x-auto">
@@ -809,9 +889,17 @@ function HeaderIntegrationQueue() {
       await supabase.from('ml_sync_queue').insert(toInsert);
       toast({
         title: 'Fila iniciada',
-        description: `${toInsert.length} conta(s) adicionada(s) à fila de sincronização em lote.`,
+        description: `Sincronizando anúncios de ${toInsert.length} conta(s) em lote...`,
       });
       refetch();
+
+      // Dispara imediatamente a Edge Function para sincronizar todas as contas ativas
+      supabase.functions.invoke('ml-queue-processor', {
+        body: { mode: 'sync_all_active' },
+      }).then(() => {
+        refetch();
+        toast({ title: 'Sincronização em lote finalizada!' });
+      });
     } catch (err: any) {
       toast({ title: 'Erro ao iniciar fila', description: err.message, variant: 'destructive' });
     } finally {
