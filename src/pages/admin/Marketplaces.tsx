@@ -9,12 +9,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, RefreshCw, ShoppingBag, Users, MapPin, ChevronRight, MessageSquare, TrendingUp, Tag, Megaphone, Receipt, RotateCcw, Play, Trash2, Clock, LayoutList, ToggleLeft, ToggleRight, ExternalLink, Copy, Pencil, AlertTriangle, AlertCircle, Link as LinkIcon, ArrowLeft, ArrowRight, Store, Package, CheckCircle2, Sparkles } from "lucide-react";
+import { Download, RefreshCw, ShoppingBag, Users, MapPin, ChevronRight, MessageSquare, TrendingUp, Tag, Megaphone, Receipt, RotateCcw, Play, Trash2, Clock, LayoutList, ToggleLeft, ToggleRight, ExternalLink, Copy, Pencil, AlertTriangle, AlertCircle, Link as LinkIcon, ArrowLeft, ArrowRight, Store, Package, CheckCircle2, Sparkles, Settings, Key, Eye, EyeOff, Save, Globe, ShieldCheck } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
+import { useMarketplaceCredentials } from "@/hooks/useMarketplaceCredentials";
 import MlMensagens from "@/pages/reseller/MlMensagens";
 import MlMetricas from "@/pages/reseller/MlMetricas";
 import MlPromocoes from "@/pages/reseller/MlPromocoes";
@@ -67,7 +68,7 @@ async function triggerBulkResync(resellerUserId?: string) {
   return data;
 }
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 25;
 
 function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string, name: string) => void }) {
   const [syncing, setSyncing] = useState<string | null>(null);
@@ -753,84 +754,14 @@ function GlobalListings() {
   );
 }
 
-// ── Endpoints da Aplicação Mercado Livre ─────────────────────────────────────
+// ── Fila de Integração em Lote (Widget de Cabeçalho) ──────────────────────────
 
-function MlAppEndpointsCard() {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://lojafy-supabase.d2x.site';
-  const cleanSupabaseUrl = supabaseUrl.replace(/\/$/, '');
-  const webhookUrl = `${cleanSupabaseUrl}/functions/v1/ml-order-webhook`;
-  const redirectUri = `${cleanSupabaseUrl}/functions/v1/ml-oauth-callback`;
-
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast({
-      title: `${label} copiada!`,
-      description: 'URL copiada para a área de transferência.',
-    });
-  };
-
-  return (
-    <Card className="border-border/60 bg-muted/20">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-yellow-600" />
-          Endpoints Oficiais da Aplicação Mercado Livre
-        </CardTitle>
-        <CardDescription className="text-xs">
-          Configure estas URLs no seu aplicativo em <strong>developers.mercadolivre.com.br</strong> para recebimento de vendas e autorização OAuth.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3 pt-0">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="p-2.5 rounded-lg border bg-background space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium text-muted-foreground">Webhook de Vendas (Tópico: orders_v2)</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-[11px] gap-1"
-                onClick={() => copyToClipboard(webhookUrl, 'URL de Webhook')}
-              >
-                <Copy className="h-3 w-3" />
-                Copiar
-              </Button>
-            </div>
-            <code className="text-[11px] font-mono block bg-muted/60 p-1.5 rounded truncate select-all">
-              {webhookUrl}
-            </code>
-          </div>
-
-          <div className="p-2.5 rounded-lg border bg-background space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium text-muted-foreground">Redirect URI (Autenticação OAuth)</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-[11px] gap-1"
-                onClick={() => copyToClipboard(redirectUri, 'Redirect URI')}
-              >
-                <Copy className="h-3 w-3" />
-                Copiar
-              </Button>
-            </div>
-            <code className="text-[11px] font-mono block bg-muted/60 p-1.5 rounded truncate select-all">
-              {redirectUri}
-            </code>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ── Painel de Fila de Integração ─────────────────────────────────────────────
-
-function IntegrationQueue() {
+function HeaderIntegrationQueue() {
   const [starting, setStarting] = useState(false);
   const [clearing, setClearing] = useState(false);
 
-  const { data: queueStats, isLoading, refetch } = useQuery({
-    queryKey: ['ml-sync-queue-stats'],
+  const { data: queueStats, refetch } = useQuery({
+    queryKey: ['ml-sync-queue-stats-header'],
     queryFn: async () => {
       const { data } = await supabase
         .from('ml_sync_queue')
@@ -844,13 +775,12 @@ function IntegrationQueue() {
         total: rows.length,
       };
     },
-    refetchInterval: 30000,
+    refetchInterval: 15000,
   });
 
   const handleStart = async () => {
     setStarting(true);
     try {
-      // Buscar todos os revendedores com integração ativa
       const { data: integrations } = await supabase
         .from('mercadolivre_integrations')
         .select('user_id')
@@ -861,7 +791,6 @@ function IntegrationQueue() {
         return;
       }
 
-      // Verificar quem já está na fila (pending ou processing)
       const { data: existing } = await supabase
         .from('ml_sync_queue')
         .select('user_id')
@@ -880,11 +809,11 @@ function IntegrationQueue() {
       await supabase.from('ml_sync_queue').insert(toInsert);
       toast({
         title: 'Fila iniciada',
-        description: `${toInsert.length} revendedor(es) adicionados. Processamento a cada 10 minutos.`,
+        description: `${toInsert.length} conta(s) adicionada(s) à fila de sincronização em lote.`,
       });
       refetch();
-    } catch (err) {
-      toast({ title: 'Erro ao iniciar fila', description: String(err), variant: 'destructive' });
+    } catch (err: any) {
+      toast({ title: 'Erro ao iniciar fila', description: err.message, variant: 'destructive' });
     } finally {
       setStarting(false);
     }
@@ -896,7 +825,7 @@ function IntegrationQueue() {
       await supabase.from('ml_sync_queue').delete().in('status', ['done', 'failed']);
       toast({ title: 'Fila limpa', description: 'Itens concluídos e com falha removidos.' });
       refetch();
-    } catch (err) {
+    } catch {
       toast({ title: 'Erro ao limpar fila', variant: 'destructive' });
     } finally {
       setClearing(false);
@@ -905,67 +834,470 @@ function IntegrationQueue() {
 
   const stats = queueStats ?? { pending: 0, processing: 0, done: 0, failed: 0, total: 0 };
   const processed = stats.done + stats.failed;
-  const progress = stats.total > 0 ? Math.round((processed / stats.total) * 100) : 0;
   const isRunning = stats.pending > 0 || stats.processing > 0;
 
   return (
-    <Card className="mt-4">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Clock className="h-4 w-4 text-primary" />
-              Fila de Integração em Lote
-            </CardTitle>
-            <CardDescription className="text-xs mt-0.5">
-              Processa 1 revendedor a cada 10 minutos via pg_cron
-            </CardDescription>
+    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2.5 p-2 rounded-xl border bg-card/80 shadow-xs">
+      <div className="flex items-center gap-2 pr-2 sm:border-r border-border/60">
+        <div className={cn(
+          "h-8 w-8 rounded-lg flex items-center justify-center shrink-0",
+          isRunning ? "bg-amber-500/15 text-amber-600 animate-pulse" : "bg-muted text-muted-foreground"
+        )}>
+          <Clock className="h-4 w-4" />
+        </div>
+        <div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-foreground">Fila em Lote</span>
+            {isRunning ? (
+              <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 text-[9px] px-1 py-0 h-3.5">
+                Em andamento
+              </Badge>
+            ) : stats.total > 0 ? (
+              <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5">
+                Pronta
+              </Badge>
+            ) : null}
           </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => refetch()}>
-              <RefreshCw className="h-3.5 w-3.5" />
-            </Button>
-            {processed > 0 && (
-              <Button size="sm" variant="outline" disabled={clearing} onClick={handleClear}>
-                <Trash2 className="h-3.5 w-3.5 mr-1" />
-                Limpar
-              </Button>
+          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-mono">
+            {stats.total === 0 ? (
+              <span>Vazia (pg_cron a cada 10m)</span>
+            ) : (
+              <>
+                <span className="text-amber-600 font-semibold">{stats.pending} pend</span>
+                {stats.processing > 0 && <span className="text-blue-600 font-semibold">• {stats.processing} proc</span>}
+                <span className="text-emerald-600 font-semibold">• {stats.done} ok</span>
+                {stats.failed > 0 && <span className="text-destructive font-semibold">• {stats.failed} err</span>}
+              </>
             )}
-            <Button size="sm" disabled={starting || isRunning} onClick={handleStart}>
-              <Play className="h-3.5 w-3.5 mr-1" />
-              {starting ? 'Iniciando...' : isRunning ? 'Em andamento' : 'Iniciar Fila'}
-            </Button>
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {isLoading ? (
-          <Skeleton className="h-16 w-full" />
-        ) : stats.total === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            Fila vazia. Clique em "Iniciar Fila" para sincronizar todos os revendedores.
-          </p>
-        ) : (
-          <>
-            <div className="flex gap-4 text-sm">
-              <span className="text-amber-600 font-medium">⏳ {stats.pending} aguardando</span>
-              {stats.processing > 0 && <span className="text-blue-600 font-medium">🔄 {stats.processing} processando</span>}
-              <span className="text-green-600 font-medium">✅ {stats.done} concluídos</span>
-              {stats.failed > 0 && <span className="text-destructive font-medium">❌ {stats.failed} falhas</span>}
-            </div>
-            <div className="space-y-1">
-              <Progress value={progress} className="h-2" />
-              <p className="text-xs text-muted-foreground text-right">{progress}% — {processed}/{stats.total}</p>
-            </div>
-            {isRunning && (
-              <p className="text-xs text-muted-foreground">
-                Próximo processamento em até 10 minutos (pg_cron automático)
-              </p>
-            )}
-          </>
+      </div>
+
+      <div className="flex items-center gap-1.5 self-end sm:self-auto">
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 w-7 p-0"
+          onClick={() => refetch()}
+          title="Atualizar status da fila"
+        >
+          <RefreshCw className="h-3 w-3" />
+        </Button>
+
+        {processed > 0 && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-[11px] text-muted-foreground hover:text-destructive"
+            disabled={clearing}
+            onClick={handleClear}
+            title="Limpar itens concluídos"
+          >
+            <Trash2 className="h-3 w-3 mr-1" />
+            Limpar
+          </Button>
         )}
-      </CardContent>
-    </Card>
+
+        <Button
+          size="sm"
+          variant={isRunning ? "secondary" : "default"}
+          className="h-7 px-2.5 text-xs gap-1.5 font-medium"
+          disabled={starting || isRunning}
+          onClick={handleStart}
+        >
+          <Play className={cn("h-3 w-3", starting && "animate-spin")} />
+          {starting ? 'Iniciando...' : isRunning ? 'Sincronizando...' : 'Iniciar Fila em Lote'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Aba de Configurações do Mercado Livre ─────────────────────────────────────
+
+function MlSettingsTab() {
+  const { credentials, isLoading, updateCredentials, isUpdating } = useMarketplaceCredentials("mercadolivre");
+  const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
+  const [appUrl, setAppUrl] = useState('');
+  const [showSecret, setShowSecret] = useState(false);
+  const [testingRefresh, setTestingRefresh] = useState(false);
+
+  useEffect(() => {
+    if (credentials) {
+      setClientId(credentials.client_id || '');
+      setClientSecret(credentials.client_secret || '');
+      setAppUrl(credentials.app_url || '');
+    }
+  }, [credentials]);
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://lojafy-supabase.d2x.site';
+  const cleanSupabaseUrl = supabaseUrl.replace(/\/$/, '');
+  const webhookUrl = `${cleanSupabaseUrl}/functions/v1/ml-order-webhook`;
+  const redirectUri = `${cleanSupabaseUrl}/functions/v1/ml-oauth-callback`;
+  const refreshUrl = `${cleanSupabaseUrl}/functions/v1/ml-token-refresh`;
+  const proxyUrl = `${cleanSupabaseUrl}/functions/v1/ml-proxy`;
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: `${label} copiada!`,
+      description: 'URL copiada para a área de transferência.',
+    });
+  };
+
+  const handleSaveCredentials = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientId.trim() || !clientSecret.trim()) {
+      toast({
+        title: 'Campos obrigatórios',
+        description: 'Informe o Client ID (App ID) e o Client Secret.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    updateCredentials({
+      client_id: clientId.trim(),
+      client_secret: clientSecret.trim(),
+      app_url: appUrl.trim() || null,
+    });
+  };
+
+  const handleTestTokenRefresh = async () => {
+    setTestingRefresh(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ml-token-refresh', {
+        body: { mode: 'refresh_all_expiring' },
+      });
+      if (error || !data?.success) {
+        throw new Error(data?.error || error?.message || 'Falha ao testar renovação');
+      }
+      const s = data.summary;
+      toast({
+        title: 'Verificação em lote concluída',
+        description: `${s.total} contas analisadas: ${s.refreshed} renovada(s), ${s.failed} falha(s).`,
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao verificar tokens',
+        description: err.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setTestingRefresh(false);
+    }
+  };
+
+  const isConfigured = Boolean(credentials?.client_id && credentials?.client_secret);
+
+  return (
+    <div className="space-y-6">
+      {/* Header com Status Geral */}
+      <Card className="border-yellow-500/20 bg-gradient-to-r from-yellow-500/5 via-card to-card">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-yellow-400/20 text-yellow-600">
+                  <Settings className="h-5 w-5" />
+                </div>
+                <CardTitle className="text-lg font-bold">Configurações Oficiais do Mercado Livre</CardTitle>
+              </div>
+              <CardDescription className="text-xs">
+                Gerencie em um único local as credenciais da sua aplicação oficial (App ID / Secret), endpoints de webhook, OAuth e rotinas de renovação.
+              </CardDescription>
+            </div>
+            <div>
+              {isLoading ? (
+                <Skeleton className="h-6 w-24" />
+              ) : isConfigured ? (
+                <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 gap-1.5 font-medium text-xs">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Credenciais Configuradas
+                </Badge>
+              ) : (
+                <Badge variant="destructive" className="gap-1.5 font-medium text-xs">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  Credenciais Pendentes
+                </Badge>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Formulário de Credenciais da Aplicação */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Key className="h-4 w-4 text-primary" />
+              Credenciais da Aplicação (Developers)
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Credenciais obtidas no painel de desenvolvedores do Mercado Livre (developers.mercadolivre.com.br).
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-9 w-full" />
+                <Skeleton className="h-9 w-full" />
+                <Skeleton className="h-9 w-full" />
+              </div>
+            ) : (
+              <form onSubmit={handleSaveCredentials} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">
+                    App ID / Client ID <span className="text-destructive">*</span>
+                  </label>
+                  <Input
+                    placeholder="Ex: 2003351424267574"
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    className="font-mono text-xs"
+                    required
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Identificador numérico exclusivo da sua aplicação no Mercado Livre.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">
+                    Client Secret <span className="text-destructive">*</span>
+                  </label>
+                  <div className="relative">
+                    <Input
+                      type={showSecret ? "text" : "password"}
+                      placeholder="Chave secreta da aplicação"
+                      value={clientSecret}
+                      onChange={(e) => setClientSecret(e.target.value)}
+                      className="font-mono text-xs pr-10"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSecret(!showSecret)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Chave secreta utilizada para autorização OAuth e renovação contínua de tokens.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">
+                    URL da Aplicação (Opcional)
+                  </label>
+                  <Input
+                    placeholder="https://suaplataforma.com"
+                    value={appUrl}
+                    onChange={(e) => setAppUrl(e.target.value)}
+                    className="font-mono text-xs"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    URL base da sua plataforma para referências externas.
+                  </p>
+                </div>
+
+                <div className="pt-2 flex justify-end">
+                  <Button
+                    type="submit"
+                    disabled={isUpdating}
+                    className="bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-semibold gap-1.5 text-xs shadow-xs"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    {isUpdating ? 'Salvando...' : 'Salvar Credenciais'}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Status de Renovação & Saúde de Tokens */}
+        <Card className="flex flex-col justify-between">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-emerald-600" />
+              Automação & Renovação de Tokens
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Como o sistema mantém todas as contas do Mercado Livre ativas ininterruptamente.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3.5 text-xs">
+            <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
+              <div className="flex items-center gap-2 font-semibold text-foreground">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                Renovação Sob Demanda (Just In Time)
+              </div>
+              <p className="text-muted-foreground leading-relaxed text-[11px]">
+                Antes de qualquer publicação, sincronização ou processamento de pedido, o sistema verifica a validade do token. Se restar menos de 20 minutos, renova no Mercado Livre instantaneamente.
+              </p>
+            </div>
+
+            <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
+              <div className="flex items-center gap-2 font-semibold text-foreground">
+                <Clock className="h-4 w-4 text-primary" />
+                Agendamento Proativo (Cron a cada 2 Horas)
+              </div>
+              <p className="text-muted-foreground leading-relaxed text-[11px]">
+                Rotina automática agendada no GitHub Actions que executa a cada 2 horas em segundo plano, renovando proativamente qualquer conta com menos de 3 horas de validade restante.
+              </p>
+            </div>
+
+            <div className="p-3 rounded-lg border bg-muted/30 flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-foreground">Verificação Manual Imediata</p>
+                <p className="text-[11px] text-muted-foreground">Dispara a rotina de checagem em lote agora mesmo.</p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-xs"
+                disabled={testingRefresh}
+                onClick={handleTestTokenRefresh}
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5", testingRefresh && "animate-spin")} />
+                {testingRefresh ? 'Verificando...' : 'Verificar Agora'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Endpoints & URLs Oficiais da Integração */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Globe className="h-4 w-4 text-yellow-600" />
+            URLs & Endpoints Oficiais da Aplicação
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Copie e cole estas URLs diretamente no painel do seu aplicativo em <strong>developers.mercadolivre.com.br</strong>.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {/* 1. Webhook de Notificação */}
+            <div className="p-3 rounded-xl border bg-background space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-foreground block">Webhook de Notificação (Eventos de Pedidos)</span>
+                  <Badge variant="secondary" className="text-[10px] mt-0.5 font-normal">
+                    Tópicos: orders_v2, shipments, items, questions
+                  </Badge>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs gap-1"
+                  onClick={() => copyToClipboard(webhookUrl, 'URL de Webhook')}
+                >
+                  <Copy className="h-3 w-3" />
+                  Copiar
+                </Button>
+              </div>
+              <code className="text-[11px] font-mono block bg-muted/60 p-2 rounded truncate select-all border">
+                {webhookUrl}
+              </code>
+            </div>
+
+            {/* 2. Redirect URI OAuth */}
+            <div className="p-3 rounded-xl border bg-background space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-foreground block">Redirect URI (Autenticação e Conexão OAuth)</span>
+                  <Badge variant="secondary" className="text-[10px] mt-0.5 font-normal">
+                    Redirecionamento após consentimento do revendedor
+                  </Badge>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs gap-1"
+                  onClick={() => copyToClipboard(redirectUri, 'Redirect URI')}
+                >
+                  <Copy className="h-3 w-3" />
+                  Copiar
+                </Button>
+              </div>
+              <code className="text-[11px] font-mono block bg-muted/60 p-2 rounded truncate select-all border">
+                {redirectUri}
+              </code>
+            </div>
+
+            {/* 3. Renovação de Tokens */}
+            <div className="p-3 rounded-xl border bg-background space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-foreground block">Endpoint de Renovação de Tokens</span>
+                  <Badge variant="secondary" className="text-[10px] mt-0.5 font-normal">
+                    Rota interna disparada pelo cron e frontend
+                  </Badge>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs gap-1"
+                  onClick={() => copyToClipboard(refreshUrl, 'URL de Renovação de Tokens')}
+                >
+                  <Copy className="h-3 w-3" />
+                  Copiar
+                </Button>
+              </div>
+              <code className="text-[11px] font-mono block bg-muted/60 p-2 rounded truncate select-all border">
+                {refreshUrl}
+              </code>
+            </div>
+
+            {/* 4. Proxy da API Mercado Livre */}
+            <div className="p-3 rounded-xl border bg-background space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-foreground block">Proxy Seguro da API Mercado Livre</span>
+                  <Badge variant="secondary" className="text-[10px] mt-0.5 font-normal">
+                    Encaminha chamadas autenticadas com injeção de token
+                  </Badge>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs gap-1"
+                  onClick={() => copyToClipboard(proxyUrl, 'URL do Proxy ML')}
+                >
+                  <Copy className="h-3 w-3" />
+                  Copiar
+                </Button>
+              </div>
+              <code className="text-[11px] font-mono block bg-muted/60 p-2 rounded truncate select-all border">
+                {proxyUrl}
+              </code>
+            </div>
+          </div>
+
+          {/* Guia Rápido de Configuração */}
+          <div className="mt-4 p-4 rounded-xl border border-yellow-500/30 bg-yellow-500/5 space-y-2.5">
+            <h4 className="text-xs font-bold text-yellow-900 dark:text-yellow-200 flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5 text-yellow-600" />
+              Checklist de Configuração no Portal Mercado Livre Developers:
+            </h4>
+            <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside leading-relaxed">
+              <li>Acesse <a href="https://developers.mercadolivre.com.br" target="_blank" rel="noreferrer" className="text-yellow-600 dark:text-yellow-400 font-medium underline">developers.mercadolivre.com.br</a> e entre com sua conta desenvolvedor.</li>
+              <li>No seu aplicativo, cadastre a <strong>Redirect URI</strong> exatamente com a URL de redirecionamento acima.</li>
+              <li>Na aba de <strong>Notificações / Webhooks</strong>, cole a URL de Webhook de Pedidos e selecione os tópicos <code>orders_v2</code>, <code>shipments</code>, <code>items</code> e <code>questions</code>.</li>
+              <li>Copie o <strong>App ID</strong> e a <strong>Secret Key</strong> geradas e salve no formulário de credenciais acima.</li>
+            </ol>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -1419,21 +1751,12 @@ export default function Marketplaces() {
             Gestão do Mercado Livre
           </h1>
           <p className="text-muted-foreground text-sm">
-            Gerencie as contas do Mercado Livre de todos os revendedores, anúncios, pedidos e métricas
+            Gerencie as contas do Mercado Livre de todos os revendedores, anúncios, pedidos e configurações
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleSelectMarketplace(null)}
-            className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Outros marketplaces
-          </Button>
-        </div>
+        {/* Fila de Integração em Lote no Topo */}
+        <HeaderIntegrationQueue />
       </div>
 
       {/* Layout com Subsidebar ao lado da Sidebar Principal */}
@@ -1442,16 +1765,6 @@ export default function Marketplaces() {
         <aside className="w-full lg:w-64 shrink-0 bg-card border rounded-2xl p-3 shadow-xs sticky top-4 space-y-4">
           {/* Subsidebar Header */}
           <div className="space-y-3 pb-3 border-b border-border/60">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleSelectMarketplace(null)}
-              className="w-full justify-start text-xs text-muted-foreground hover:text-foreground h-8 px-2 -ml-1 gap-2"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Voltar para Marketplaces
-            </Button>
-
             <div className="flex items-center gap-2.5 px-1 pt-0.5">
               <div className="h-9 w-9 rounded-xl bg-yellow-400/20 border border-yellow-400/40 flex items-center justify-center p-1.5 shrink-0 shadow-xs">
                 <img
@@ -1583,6 +1896,32 @@ export default function Marketplaces() {
                 })}
               </div>
             </div>
+
+            {/* Grupo 3: Sistema & Configurações */}
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-2.5">
+                Integração
+              </span>
+              <div className="space-y-0.5 pt-1">
+                <button
+                  onClick={() => handleTabChange('settings')}
+                  className={cn(
+                    "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all text-left group",
+                    activeTab === 'settings'
+                      ? "bg-yellow-500/15 text-yellow-900 dark:text-yellow-200 font-semibold border border-yellow-500/30 shadow-xs"
+                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                  )}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Settings className={cn(
+                      "h-4 w-4 shrink-0 transition-colors",
+                      activeTab === 'settings' ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground group-hover:text-foreground"
+                    )} />
+                    <span className="truncate">Configurações & URLs</span>
+                  </div>
+                </button>
+              </div>
+            </div>
           </nav>
         </aside>
 
@@ -1600,8 +1939,10 @@ export default function Marketplaces() {
               <ConnectedAccounts onSelectReseller={handleSelectReseller} />
             </CardContent>
           </Card>
-          <MlAppEndpointsCard />
-          <IntegrationQueue />
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-4">
+          <MlSettingsTab />
         </TabsContent>
 
         <TabsContent value="global-listings">
