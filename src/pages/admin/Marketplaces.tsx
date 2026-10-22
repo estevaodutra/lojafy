@@ -83,9 +83,12 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
       // Busca todas as integrações cadastradas (incluindo as que precisam de reconexão)
       const { data: intgData, error } = await supabase
         .from('mercadolivre_integrations')
-        .select('user_id, ml_user_id, is_active, last_refreshed_at, expires_at, last_error, last_error_at')
+        .select('user_id, ml_user_id, is_active, last_refreshed_at, expires_at')
         .order('last_refreshed_at', { ascending: false });
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao buscar integrações do Mercado Livre:', error);
+        return [];
+      }
 
       const userIds = (intgData ?? []).map(i => i.user_id);
       if (userIds.length === 0) return [];
@@ -316,7 +319,7 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
               const now = new Date();
               const isExpired = expiresAt ? expiresAt < now : false;
               const isExpiringSoon = expiresAt ? (!isExpired && expiresAt.getTime() < now.getTime() + 2 * 60 * 60 * 1000) : false;
-              const isReauthNeeded = intg.is_active === false || (intg.last_error && intg.last_error.includes('invalid_grant'));
+              const isReauthNeeded = intg.is_active === false;
               const isRefreshingThis = refreshingToken === intg.user_id;
 
               return (
@@ -453,14 +456,24 @@ function GlobalListings() {
   const { data: sellers = [] } = useQuery({
     queryKey: ['admin-ml-sellers-list'],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data: intgs, error } = await supabase
         .from('mercadolivre_integrations')
-        .select(`
-          user_id, ml_user_id,
-          profile:profiles(first_name, last_name)
-        `)
+        .select('user_id, ml_user_id')
         .eq('is_active', true);
-      return (data ?? []) as any[];
+      if (error || !intgs || intgs.length === 0) return [];
+
+      const userIds = intgs.map(i => i.user_id);
+      const { data: profs } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name')
+        .in('user_id', userIds);
+
+      const profMap = new Map((profs ?? []).map(p => [p.user_id, p]));
+      return intgs.map(i => ({
+        user_id: i.user_id,
+        ml_user_id: i.ml_user_id,
+        profile: profMap.get(i.user_id),
+      }));
     },
   });
 
