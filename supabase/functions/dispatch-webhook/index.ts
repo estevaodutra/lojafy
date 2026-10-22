@@ -248,6 +248,165 @@ async function fetchOrderById(supabase: any, orderId: string): Promise<Record<st
   };
 }
 
+// Fetch last ML fulfillment order for real webhook testing
+async function fetchLastMlFulfillmentOrder(supabase: any): Promise<Record<string, any>> {
+  console.log('[dispatch-webhook] Buscando pedido Mercado Livre para simulação/teste...');
+  
+  const { data: order } = await supabase
+    .from('orders')
+    .select(`
+      id,
+      order_number,
+      total_amount,
+      payment_method,
+      payment_status,
+      status,
+      user_id,
+      reseller_id,
+      ml_order_id,
+      ml_shipment_id,
+      ml_label_url,
+      tracking_code,
+      pix_qr_code,
+      pix_qr_code_base64,
+      payment_expires_at,
+      shipping_address,
+      created_at
+    `)
+    .not('ml_order_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const orderId = order?.id || 'ord_ml_mock_12345';
+  const orderNumber = order?.order_number || '461';
+  const mlOrderId = order?.ml_order_id || '2000008492049';
+  const mlShipmentId = order?.ml_shipment_id || '43290184910';
+  const tracking = order?.tracking_code || 'BR209481928ML';
+  const shippingAddr = (order?.shipping_address as any) || {
+    name: 'Carlos Eduardo Oliveira',
+    email: 'carlos.oliveira@gmail.com',
+    phone: '11987654321',
+    cpf: '12345678901',
+    city: 'São Paulo',
+    state: 'SP',
+    zip_code: '01310-100',
+    street: 'Av. Paulista',
+    number: '1000',
+  };
+
+  let resellerData = null;
+  const resellerId = order?.reseller_id || 'usr_reseller_mock';
+  if (order?.reseller_id) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('first_name, last_name, phone')
+      .eq('user_id', order.reseller_id)
+      .maybeSingle();
+    const { data: store } = await supabase
+      .from('reseller_stores')
+      .select('store_name')
+      .eq('user_id', order.reseller_id)
+      .maybeSingle();
+    let resellerEmail = null;
+    try {
+      const { data: authUser } = await supabase.auth.admin.getUserById(order.reseller_id);
+      resellerEmail = authUser?.user?.email || null;
+    } catch {}
+    resellerData = {
+      id: order.reseller_id,
+      name: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 'Revendedor Lojafy',
+      email: resellerEmail || 'revendedor@lojafy.app',
+      phone: profile?.phone || null,
+      store_name: store?.store_name || 'Loja Principal',
+    };
+  } else {
+    resellerData = {
+      id: resellerId,
+      name: 'Revendedor Demonstração',
+      email: 'revendedor@lojafy.app',
+      phone: '11999998888',
+      store_name: 'Minha Loja Mercado Livre',
+    };
+  }
+
+  let items: any[] = [
+    {
+      product_id: 'prod_mock_001',
+      name: 'Fone de Ouvido Bluetooth TWS Pro',
+      sku: 'FONE-TWS-BLK',
+      quantity: 1,
+      unit_price: 149.90,
+      cost_price: 65.00,
+      total_cost: 65.00,
+      ml_item_id: 'MLB389201948',
+    }
+  ];
+
+  if (order?.id) {
+    const { data: dbItems } = await supabase
+      .from('order_items')
+      .select('product_id, quantity, unit_price, total_price, product_snapshot, supplier_id, supplier_unit_cost, supplier_total_cost')
+      .eq('order_id', order.id);
+
+    if (dbItems && dbItems.length > 0) {
+      items = dbItems.map((i: any) => ({
+        product_id: i.product_id,
+        name: i.product_snapshot?.name || 'Produto Mercado Livre',
+        sku: i.product_snapshot?.sku || null,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        cost_price: i.supplier_unit_cost || (i.unit_price * 0.6),
+        total_cost: i.supplier_total_cost || ((i.supplier_unit_cost || i.unit_price * 0.6) * i.quantity),
+        ml_item_id: i.product_snapshot?.ml_item_id || null,
+      }));
+    }
+  }
+
+  const totalCost = items.reduce((sum: number, i: any) => sum + (Number(i.total_cost) || 0), 0);
+  const walletDeducted = Math.min(20.00, totalCost);
+  const remainingPix = Math.max(0, totalCost - walletDeducted);
+
+  return {
+    order_id: orderId,
+    order_number: orderNumber,
+    origin: 'mercadolivre',
+    ml_order_id: mlOrderId,
+    ml_shipment_id: mlShipmentId,
+    total_order_amount: order?.total_amount || 149.90,
+    supplier_cost: totalCost,
+    tracking_code: tracking,
+    shipping_label_url: order?.ml_label_url || 'https://api.mercadolibre.com/shipments/demo/labels?response_type=pdf2',
+    status: order?.status || 'pendente',
+    buyer: {
+      user_id: order?.user_id || null,
+      email: shippingAddr.email || 'carlos.oliveira@gmail.com',
+      name: shippingAddr.name || 'Carlos Eduardo Oliveira',
+      phone: shippingAddr.phone || null,
+      document: shippingAddr.cpf || null,
+      shipping_address: shippingAddr,
+    },
+    reseller: resellerData,
+    supplier: {
+      id: 'sup_mock_001',
+      name: 'Distribuidora Central Tech',
+    },
+    items,
+    payment: {
+      total_cost: totalCost,
+      wallet_balance_before: 50.00,
+      wallet_deducted: walletDeducted,
+      wallet_balance_after: 30.00,
+      pix_amount_required: remainingPix,
+      pix_qr_code: order?.pix_qr_code || '00020126580014br.gov.bcb.pix0136123e4567-e89b-12d3-a456-426614174000520400005303986540545.005802BR5913Lojafy Pagtos6009SAO PAULO62070503***6304ABCD',
+      pix_qr_code_base64: order?.pix_qr_code_base64 || null,
+      pix_payment_id: order?.payment_id || 'pix_pay_demo_123',
+      pix_expires_at: order?.payment_expires_at || new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+      is_fully_paid: remainingPix === 0,
+    },
+  };
+}
+
 // Fetch last created user
 async function fetchLastCreatedUser(supabase: any): Promise<Record<string, any>> {
   console.log('[dispatch-webhook] Buscando último usuário criado...');
@@ -387,6 +546,13 @@ async function fetchRealTestData(supabase: any, eventType: string): Promise<{ da
       return {
         data: orderData,
         error: orderData ? null : 'Nenhum pedido pago encontrado para teste',
+      };
+
+    case 'order.automatic_fulfillment':
+      const mlData = await fetchLastMlFulfillmentOrder(supabase);
+      return {
+        data: mlData,
+        error: mlData ? null : 'Nenhum pedido do Mercado Livre encontrado para teste',
       };
     
     case 'user.created':

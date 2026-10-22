@@ -5,13 +5,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useResellerOrders } from "@/hooks/useResellerOrders";
-import { Search, Package, Download, MapPin, AlertCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useResellerOrders, type ResellerOrder } from "@/hooks/useResellerOrders";
+import { Search, Package, Download, MapPin, AlertCircle, QrCode, Copy, Check, Clock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ALL_STATUSES, ORDER_STATUS_CONFIG, getStatusConfig, type OrderStatus } from "@/constants/orderStatus";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 async function downloadLabel(orderId: string, orderNumber: string) {
   const { data: { session } } = await supabase.auth.getSession();
@@ -39,9 +41,30 @@ async function downloadLabel(orderId: string, orderNumber: string) {
 
 function ResellerOrders() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedPixOrder, setSelectedPixOrder] = useState<ResellerOrder | null>(null);
+  const [copied, setCopied] = useState(false);
   const { data: orders, isLoading } = useResellerOrders(statusFilter, searchTerm);
+
+  const handleCopyPix = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      toast({
+        title: "Código Pix copiado!",
+        description: "Cole no app do seu banco para efetuar o pagamento.",
+      });
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      toast({
+        title: "Erro ao copiar",
+        description: "Selecione e copie o código manualmente.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const getStatusCounts = () => {
     if (!orders) return { all: 0 } as Record<string, number>;
@@ -153,6 +176,12 @@ function ResellerOrders() {
                                 🛒 Mercado Livre
                               </Badge>
                             )}
+                            {order.payment_status === 'pending' && order.pix_qr_code && (
+                              <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 text-xs">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Pix Fulfillment Pendente
+                              </Badge>
+                            )}
                           </div>
                           <div className="space-y-1 text-sm text-muted-foreground">
                             <p>
@@ -195,6 +224,16 @@ function ResellerOrders() {
                               Corrigir Etiqueta
                             </Button>
                           )}
+                          {order.payment_status === "pending" && order.pix_qr_code && (
+                            <Button
+                              size="sm"
+                              className="text-xs gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm w-full md:w-auto"
+                              onClick={() => setSelectedPixOrder(order)}
+                            >
+                              <QrCode className="h-3.5 w-3.5" />
+                              Pagar Pix (Fulfillment)
+                            </Button>
+                          )}
                           {order.ml_shipment_id && (
                             <Button
                               size="sm"
@@ -228,6 +267,79 @@ function ResellerOrders() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Modal de Pagamento Pix para Fulfillment */}
+      <Dialog open={!!selectedPixOrder} onOpenChange={(open) => !open && setSelectedPixOrder(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="h-5 w-5 text-emerald-600" />
+              Pagar Pix de Fulfillment
+            </DialogTitle>
+            <DialogDescription>
+              Pedido #{selectedPixOrder?.order_number}
+              {selectedPixOrder?.ml_order_id && ` • Mercado Livre #${selectedPixOrder.ml_order_id}`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedPixOrder && (
+            <div className="space-y-4 pt-2">
+              {selectedPixOrder.notes && (
+                <div className="p-3 bg-muted/60 rounded-md text-xs text-muted-foreground">
+                  {selectedPixOrder.notes}
+                </div>
+              )}
+
+              {selectedPixOrder.pix_qr_code_base64 && (
+                <div className="flex flex-col items-center justify-center p-3 bg-white rounded-lg border">
+                  <img
+                    src={
+                      selectedPixOrder.pix_qr_code_base64.startsWith("data:")
+                        ? selectedPixOrder.pix_qr_code_base64
+                        : `data:image/png;base64,${selectedPixOrder.pix_qr_code_base64}`
+                    }
+                    alt="QR Code Pix"
+                    className="w-48 h-48 object-contain"
+                  />
+                  <span className="text-xs text-muted-foreground mt-2">
+                    Abra o app do seu banco e aponte a câmera
+                  </span>
+                </div>
+              )}
+
+              {selectedPixOrder.pix_qr_code && (
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground block">
+                    Pix Copia e Cola
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      readOnly
+                      value={selectedPixOrder.pix_qr_code}
+                      className="text-xs font-mono bg-muted/40 select-all"
+                    />
+                    <Button
+                      size="sm"
+                      className="shrink-0 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                      onClick={() => handleCopyPix(selectedPixOrder.pix_qr_code!)}
+                    >
+                      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      {copied ? "Copiado!" : "Copiar"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 p-3 bg-amber-50 text-amber-900 border border-amber-200 rounded-md text-xs">
+                <Clock className="h-4 w-4 shrink-0 text-amber-600" />
+                <span>
+                  Prazo de <strong>24 horas</strong> para pagamento. Assim que pago, o pedido é liberado automaticamente para o fornecedor enviar.
+                </span>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

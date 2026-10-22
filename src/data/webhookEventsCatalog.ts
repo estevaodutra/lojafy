@@ -218,6 +218,84 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
 
   // ── 2. Eventos de Pedido ────────────────────────────────────────────────────
   {
+    eventType: 'order.automatic_fulfillment',
+    group: 'order',
+    title: 'Pedido automático (Mercado Livre)',
+    description: 'Disparado assim que uma venda do Mercado Livre é capturada, calculando o custo do fornecedor, abatendo saldo da carteira, gerando cobrança Pix (24h) e disponibilizando a etiqueta oficial de envio.',
+    status: 'production',
+    samplePayload: {
+      event: 'order.automatic_fulfillment',
+      timestamp: '2026-10-22T01:00:00.000Z',
+      data: {
+        order: {
+          id: 'b6e82845-f09b-4389-bd6b-80fc47849e7b',
+          order_number: 'LOJ-ML-10492',
+          ml_order_id: '2000008492049',
+          status: 'pending_cost_payment',
+          total_order_amount: 149.90,
+          created_at: '2026-10-22T01:00:00.000Z'
+        },
+        payment_split: {
+          total_cost: 85.00,
+          wallet_balance_used: 20.00,
+          remaining_pix_amount: 65.00,
+          gateway_fee: 0.00,
+          payment_method: 'wallet_and_pix',
+          pix: {
+            copy_paste_code: '00020101021226840014br.gov.bcb.pix2562...',
+            qr_code_base64: 'data:image/png;base64,iVBORw0KGgo...',
+            expires_at: '2026-10-23T01:00:00.000Z',
+            expires_in_hours: 24
+          }
+        },
+        shipping: {
+          carrier: 'Mercado Envios',
+          ml_shipment_id: '439201940',
+          tracking_code: 'BR104920492ML',
+          label_url: 'https://lojafy-supabase.d2x.site/storage/v1/object/sign/shipping-labels/etiqueta-10492.pdf?token=...'
+        },
+        buyer: {
+          name: 'Maria Silva',
+          email: 'maria.silva@exemplo.com',
+          phone: '(11) 98765-4321',
+          document: '123.456.789-00',
+          address: {
+            street: 'Av. Paulista',
+            number: '1000',
+            complement: 'Apto 42',
+            neighborhood: 'Bela Vista',
+            city: 'São Paulo',
+            state: 'SP',
+            zipcode: '01310-100'
+          }
+        },
+        reseller: {
+          user_id: '45d2e091-7b9e-4b68-80f4-526bf764f691',
+          name: 'João Vendedor',
+          email: 'joao.vendedor@exemplo.com',
+          phone: '(11) 99999-8888',
+          store_name: 'Minha Loja VIP'
+        },
+        supplier: {
+          id: 'supplier-uuid',
+          name: 'Distribuidora Tech Brasil',
+          email: 'contato@techbrasil.com.br',
+          phone: '(11) 3333-4444'
+        },
+        items: [
+          {
+            product_id: '92ba8745-f09b-4389-bd6b-80fc47849e7b',
+            sku: 'TECH-FONE-BT-PRETO',
+            name: 'Fone Bluetooth TWS Pro',
+            quantity: 1,
+            unit_price_ml: 149.90,
+            cost_price: 85.00
+          }
+        ]
+      }
+    }
+  },
+  {
     eventType: 'order.paid',
     group: 'order',
     title: 'Compra aprovada (Pedido pago)',

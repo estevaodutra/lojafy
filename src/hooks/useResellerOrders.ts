@@ -16,6 +16,10 @@ export interface ResellerOrder {
   ml_label_url?: string | null;
   tracking_code?: string | null;
   ml_order_id?: string | null;
+  pix_qr_code?: string | null;
+  pix_qr_code_base64?: string | null;
+  payment_expires_at?: string | null;
+  notes?: string | null;
   profiles?: {
     first_name: string;
     last_name: string;

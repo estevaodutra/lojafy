@@ -291,15 +291,18 @@ serve(async (req) => {
         console.error('[mp-webhook] Split failed:', e);
       }
 
-      // Notificar comprador
+      // Notificar comprador ou revendedor (se pedido Mercado Livre)
       if (orderData.user_id) {
         try {
+          const isMlOrder = !!orderData.ml_order_id;
           await supabase.from('notifications').insert({
             user_id: orderData.user_id,
-            title: '✅ Pagamento confirmado!',
-            message: `Seu pedido ${orderData.order_number} foi pago e está sendo processado.`,
+            title: isMlOrder ? '✅ Pagamento Pix Mercado Livre confirmado!' : '✅ Pagamento confirmado!',
+            message: isMlOrder
+              ? `O Pix de fulfillment do pedido ML #${orderData.order_number} foi confirmado! A etiqueta oficial e os dados foram liberados para o fornecedor preparar o envio.`
+              : `Seu pedido ${orderData.order_number} foi pago e está sendo processado.`,
             type: 'order_paid',
-            action_url: '/minha-conta/pedidos',
+            action_url: isMlOrder ? '/reseller/pedidos' : '/minha-conta/pedidos',
             action_label: 'Ver Pedido',
           });
         } catch (e: any) {
