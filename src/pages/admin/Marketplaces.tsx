@@ -22,6 +22,7 @@ import MlPublicidade from "@/pages/reseller/MlPublicidade";
 import MlFaturamento from "@/pages/reseller/MlFaturamento";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 // ── Download de etiqueta (super admin pode baixar de qualquer pedido) ────────
 async function downloadLabelAsAdmin(orderId: string, orderNumber: string) {
@@ -772,7 +773,8 @@ export default function Marketplaces() {
   const currentMp = searchParams.get('mp');
   const [selectedMarketplace, setSelectedMarketplace] = useState<string | null>(currentMp || null);
   const [selectedReseller, setSelectedReseller] = useState<{ id: string; name: string } | null>(null);
-  const [activeTab, setActiveTab] = useState('accounts');
+  const currentTab = searchParams.get('tab') || 'accounts';
+  const [activeTab, setActiveTab] = useState(currentTab);
 
   useEffect(() => {
     if (currentMp && currentMp !== selectedMarketplace) {
@@ -782,10 +784,24 @@ export default function Marketplaces() {
     }
   }, [currentMp]);
 
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab');
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    if (selectedMarketplace) {
+      setSearchParams({ mp: selectedMarketplace, tab });
+    }
+  };
+
   const handleSelectMarketplace = (mp: string | null) => {
     setSelectedMarketplace(mp);
     if (mp) {
-      setSearchParams({ mp });
+      setSearchParams({ mp, tab: activeTab });
     } else {
       setSearchParams({});
     }
@@ -811,7 +827,7 @@ export default function Marketplaces() {
 
   const handleSelectReseller = (id: string, name: string) => {
     setSelectedReseller({ id, name });
-    setActiveTab('listings');
+    handleTabChange('listings');
   };
 
   // Se nenhum marketplace selecionado, exibe o Hub com os Cards
@@ -1036,54 +1052,159 @@ export default function Marketplaces() {
         </div>
       </div>
 
-      {selectedReseller && (
-        <Card className="border-yellow-300 bg-yellow-50/50">
-          <CardContent className="flex items-center justify-between py-3 px-4">
-            <p className="text-sm font-medium">
-              Operando como: <strong>{selectedReseller.name}</strong>
-            </p>
-            <Button size="sm" variant="outline" onClick={() => setSelectedReseller(null)}>
-              Sair
+      {/* Layout com Subsidebar ao lado da Sidebar Principal */}
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        {/* Subsidebar */}
+        <aside className="w-full lg:w-64 shrink-0 bg-card border rounded-2xl p-3 shadow-xs sticky top-4 space-y-4">
+          {/* Subsidebar Header */}
+          <div className="space-y-3 pb-3 border-b border-border/60">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleSelectMarketplace(null)}
+              className="w-full justify-start text-xs text-muted-foreground hover:text-foreground h-8 px-2 -ml-1 gap-2"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Voltar para Marketplaces
             </Button>
-          </CardContent>
-        </Card>
-      )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="accounts">
-            <Users className="h-4 w-4 mr-2" />Contas Conectadas
-          </TabsTrigger>
-          <TabsTrigger value="global-listings">
-            <LayoutList className="h-4 w-4 mr-2" />Todos os Anúncios
-          </TabsTrigger>
-          <TabsTrigger value="orders">
-            <ShoppingBag className="h-4 w-4 mr-2" />Pedidos ML
-          </TabsTrigger>
-          <TabsTrigger value="listings" disabled={!selectedReseller}>
-            Anúncios {selectedReseller ? `(${selectedReseller.name})` : ''}
-          </TabsTrigger>
-          <TabsTrigger value="messages" disabled={!selectedReseller}>
-            <MessageSquare className="h-4 w-4 mr-1" />
-            Mensagens {selectedReseller ? `(${selectedReseller.name})` : ''}
-          </TabsTrigger>
-          <TabsTrigger value="metrics" disabled={!selectedReseller}>
-            <TrendingUp className="h-4 w-4 mr-1" />
-            Métricas
-          </TabsTrigger>
-          <TabsTrigger value="promotions" disabled={!selectedReseller}>
-            <Tag className="h-4 w-4 mr-1" />
-            Promoções
-          </TabsTrigger>
-          <TabsTrigger value="ads" disabled={!selectedReseller}>
-            <Megaphone className="h-4 w-4 mr-1" />
-            Publicidade
-          </TabsTrigger>
-          <TabsTrigger value="billing" disabled={!selectedReseller}>
-            <Receipt className="h-4 w-4 mr-1" />
-            Faturamento
-          </TabsTrigger>
-        </TabsList>
+            <div className="flex items-center gap-2.5 px-1 pt-0.5">
+              <div className="h-9 w-9 rounded-xl bg-yellow-400/20 border border-yellow-400/40 flex items-center justify-center p-1.5 shrink-0 shadow-xs">
+                <img
+                  src="/mercadolivre-logo.png"
+                  alt="Mercado Livre"
+                  className="h-6 w-6 object-contain"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-xs font-bold text-foreground truncate">Mercado Livre</h2>
+                  <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 text-[9px] px-1 py-0 h-3.5 border-emerald-500/30">
+                    Ativo
+                  </Badge>
+                </div>
+                <p className="text-[10px] text-muted-foreground truncate">Gestão Integrada</p>
+              </div>
+            </div>
+
+            {selectedReseller && (
+              <div className="p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 space-y-1">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">Operando como:</span>
+                  <button
+                    onClick={() => setSelectedReseller(null)}
+                    className="font-medium text-yellow-700 dark:text-yellow-400 hover:underline"
+                  >
+                    Sair
+                  </button>
+                </div>
+                <p className="text-xs font-semibold text-foreground truncate">{selectedReseller.name}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Subsidebar Navigation Groups */}
+          <nav className="space-y-4">
+            {/* Grupo 1: Global */}
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-2.5">
+                Visão Geral
+              </span>
+              <div className="space-y-0.5 pt-1">
+                {[
+                  { value: 'accounts', label: 'Contas Conectadas', icon: Users, badge: mlStats?.accountsCount },
+                  { value: 'global-listings', label: 'Todos os Anúncios', icon: LayoutList, badge: mlStats?.listingsCount },
+                  { value: 'orders', label: 'Pedidos ML', icon: ShoppingBag, badge: mlStats?.ordersCount },
+                ].map((item) => (
+                  <button
+                    key={item.value}
+                    onClick={() => handleTabChange(item.value)}
+                    className={cn(
+                      "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all text-left group",
+                      activeTab === item.value
+                        ? "bg-yellow-500/15 text-yellow-900 dark:text-yellow-200 font-semibold border border-yellow-500/30 shadow-xs"
+                        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                    )}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <item.icon className={cn(
+                        "h-4 w-4 shrink-0 transition-colors",
+                        activeTab === item.value ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground group-hover:text-foreground"
+                      )} />
+                      <span className="truncate">{item.label}</span>
+                    </div>
+                    {item.badge !== undefined && item.badge > 0 && (
+                      <span className={cn(
+                        "text-[10px] px-1.5 py-0.2 rounded-full font-mono",
+                        activeTab === item.value ? "bg-yellow-500/25 text-yellow-900 dark:text-yellow-200 font-bold" : "bg-muted text-muted-foreground"
+                      )}>
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Grupo 2: Revendedor Específico */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between px-2.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                  Revendedor
+                </span>
+                {selectedReseller && (
+                  <Badge variant="outline" className="text-[9px] px-1 py-0 border-yellow-500/40 text-yellow-700">
+                    Ativo
+                  </Badge>
+                )}
+              </div>
+              <div className="space-y-0.5 pt-1">
+                {[
+                  { value: 'listings', label: `Anúncios ${selectedReseller ? `(${selectedReseller.name.split(' ')[0]})` : ''}`, icon: LayoutList },
+                  { value: 'messages', label: 'Mensagens', icon: MessageSquare },
+                  { value: 'metrics', label: 'Métricas', icon: TrendingUp },
+                  { value: 'promotions', label: 'Promoções', icon: Tag },
+                  { value: 'ads', label: 'Publicidade', icon: Megaphone },
+                  { value: 'billing', label: 'Faturamento', icon: Receipt },
+                ].map((item) => {
+                  const isItemDisabled = !selectedReseller;
+                  return (
+                    <button
+                      key={item.value}
+                      onClick={() => handleTabChange(item.value)}
+                      className={cn(
+                        "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all text-left group",
+                        activeTab === item.value
+                          ? "bg-yellow-500/15 text-yellow-900 dark:text-yellow-200 font-semibold border border-yellow-500/30 shadow-xs"
+                          : isItemDisabled
+                            ? "text-muted-foreground/60 hover:bg-muted/40 hover:text-muted-foreground"
+                            : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <item.icon className={cn(
+                          "h-4 w-4 shrink-0 transition-colors",
+                          activeTab === item.value ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground group-hover:text-foreground"
+                        )} />
+                        <span className="truncate">{item.label}</span>
+                      </div>
+                      {isItemDisabled && (
+                        <span className="text-[9px] text-muted-foreground/50">Requer conta</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </nav>
+        </aside>
+
+        {/* Área de Conteúdo da Aba */}
+        <div className="flex-1 min-w-0">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
 
         <TabsContent value="accounts">
           <Card>
@@ -1242,7 +1363,9 @@ export default function Marketplaces() {
             </Card>
           )}
         </TabsContent>
-      </Tabs>
+          </Tabs>
+        </div>
+      </div>
     </div>
   );
 }
