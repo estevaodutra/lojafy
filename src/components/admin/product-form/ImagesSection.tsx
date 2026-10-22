@@ -153,9 +153,12 @@ export const ImagesSection: React.FC<ImagesSectionProps> = ({
     });
   };
 
-  // Criar nova galeria
-  const handleCreateGallery = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Criar nova galeria (sem submeter o formulário principal do produto)
+  const handleCreateGallery = (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const trimmed = newGalleryName.trim();
     if (!trimmed) {
       toast({
@@ -179,9 +182,14 @@ export const ImagesSection: React.FC<ImagesSectionProps> = ({
     setNewGalleryName('');
     setIsCreateOpen(false);
 
+    // Abre imediatamente o gerenciador de upload para a galeria recém-criada
+    setTimeout(() => {
+      setIsManagerOpen(true);
+    }, 120);
+
     toast({
       title: "Nova Galeria Criada!",
-      description: `Galeria "${trimmed}" adicionada com sucesso. Você já pode enviar imagens.`,
+      description: `Galeria "${trimmed}" adicionada. O gerenciador de fotos foi aberto para você adicionar imagens.`,
     });
   };
 
@@ -192,9 +200,12 @@ export const ImagesSection: React.FC<ImagesSectionProps> = ({
     setIsRenameOpen(true);
   };
 
-  // Salvar renomeação
-  const handleSaveRename = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Salvar renomeação (sem submeter o formulário principal do produto)
+  const handleSaveRename = (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (!renameGalleryId || !renamedName.trim()) return;
 
     const updated = galleries.map(g => 
@@ -571,7 +582,7 @@ export const ImagesSection: React.FC<ImagesSectionProps> = ({
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleCreateGallery} className="space-y-4 pt-2">
+          <div className="space-y-4 pt-2">
             <div className="space-y-2">
               <Label htmlFor="gallery-name" className="text-xs font-semibold">
                 Nome da Galeria
@@ -581,6 +592,13 @@ export const ImagesSection: React.FC<ImagesSectionProps> = ({
                 placeholder="Ex: Anúncios Facebook, Criativos Instagram, Fotos Lifestyle"
                 value={newGalleryName}
                 onChange={(e) => setNewGalleryName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleCreateGallery(e);
+                  }
+                }}
                 autoFocus
                 className="h-9 text-xs"
               />
@@ -594,16 +612,29 @@ export const ImagesSection: React.FC<ImagesSectionProps> = ({
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => setIsCreateOpen(false)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsCreateOpen(false);
+                }}
                 className="text-xs"
               >
                 Cancelar
               </Button>
-              <Button type="submit" size="sm" className="text-xs font-semibold">
+              <Button
+                type="button"
+                size="sm"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleCreateGallery(e);
+                }}
+                className="text-xs font-semibold"
+              >
                 Criar Galeria
               </Button>
             </DialogFooter>
-          </form>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -620,7 +651,7 @@ export const ImagesSection: React.FC<ImagesSectionProps> = ({
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSaveRename} className="space-y-4 pt-2">
+          <div className="space-y-4 pt-2">
             <div className="space-y-2">
               <Label htmlFor="rename-gallery" className="text-xs font-semibold">
                 Novo Nome da Galeria
@@ -629,6 +660,13 @@ export const ImagesSection: React.FC<ImagesSectionProps> = ({
                 id="rename-gallery"
                 value={renamedName}
                 onChange={(e) => setRenamedName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSaveRename(e);
+                  }
+                }}
                 autoFocus
                 className="h-9 text-xs"
               />
@@ -639,16 +677,29 @@ export const ImagesSection: React.FC<ImagesSectionProps> = ({
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => setIsRenameOpen(false)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsRenameOpen(false);
+                }}
                 className="text-xs"
               >
                 Cancelar
               </Button>
-              <Button type="submit" size="sm" className="text-xs font-semibold">
+              <Button
+                type="button"
+                size="sm"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSaveRename(e);
+                }}
+                className="text-xs font-semibold"
+              >
                 Salvar Nome
               </Button>
             </DialogFooter>
-          </form>
+          </div>
         </DialogContent>
       </Dialog>
 
