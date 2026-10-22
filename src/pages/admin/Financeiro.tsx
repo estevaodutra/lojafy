@@ -19,8 +19,14 @@ import {
   Users, 
   ArrowUpDown, 
   Search, 
-  Coins, 
-  Activity
+  Coins,
+  Activity,
+  Download,
+  Eye,
+  TrendingUp,
+  TrendingDown,
+  Copy,
+  Check
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -276,7 +282,7 @@ function WithdrawalsTab() {
   );
 }
 
-// ── Aba 2: Histórico de Transações (REMODELADO COMO LISTA DE PEDIDOS) ───────────
+// ── Aba 2: Histórico de Transações (REMODELADO & ROBUSTO) ───────────
 
 function TransactionsTab() {
   const { toast } = useToast();
@@ -286,10 +292,12 @@ function TransactionsTab() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [syncing, setSyncing] = useState(false);
+  const [selectedTx, setSelectedTx] = useState<any | null>(null);
+  const [copiedId, setCopiedId] = useState(false);
 
   const limit = 20;
 
-  // Custom fetch to allow search, types, and pagination dynamically
+  // Custom fetch sem falha de PostgREST join
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['admin-transactions-enhanced', page, typeFilter, search],
     queryFn: async () => {
@@ -299,10 +307,7 @@ function TransactionsTab() {
         .from('wallet_transactions')
         .select(`
           *,
-          wallet:wallets!wallet_transactions_wallet_id_fkey(user_id),
-          profile:wallets!wallet_transactions_wallet_id_fkey(
-            profiles!wallets_user_id_fkey(first_name, last_name, role)
-          )
+          wallet:wallets(user_id)
         `, { count: 'exact' });
 
       // Apply type filter
@@ -310,7 +315,7 @@ function TransactionsTab() {
         query = query.eq('tipo', typeFilter);
       }
 
-      // Apply search in description or user name / ID
+      // Apply search in description
       if (search.trim()) {
         query = query.ilike('descricao', `%${search.trim()}%`);
       }
@@ -319,8 +324,36 @@ function TransactionsTab() {
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
-      if (error) throw error;
-      return { transactions: txs ?? [], total: count ?? 0 };
+      if (error) {
+        console.error('Erro ao buscar transações:', error);
+        throw error;
+      }
+
+      // Buscar com segurança os profiles correspondentes aos user_ids
+      const userIds = Array.from(
+        new Set((txs || []).map((t: any) => t.wallet?.user_id).filter(Boolean))
+      ) as string[];
+
+      let profilesMap = new Map();
+      if (userIds.length > 0) {
+        const { data: profiles, error: pError } = await supabase
+          .from('profiles')
+          .select('user_id, first_name, last_name, role')
+          .in('user_id', userIds);
+
+        if (!pError && profiles) {
+          profilesMap = new Map(profiles.map(p => [p.user_id, p]));
+        }
+      }
+
+      const formattedTxs = (txs || []).map((t: any) => ({
+        ...t,
+        profile: {
+          profiles: profilesMap.get(t.wallet?.user_id) || null
+        }
+      }));
+
+      return { transactions: formattedTxs, total: count ?? 0 };
     }
   });
 
@@ -337,7 +370,7 @@ function TransactionsTab() {
       queryClient.invalidateQueries({ queryKey: ['admin-financeiro-stats'] });
       toast({
         title: 'Sincronização Concluída',
-        description: `Transações históricas sincronizadas com sucesso. Pagos: ${res.orders_paid_synced}, Enviados: ${res.orders_shipped_synced}, Cancelados: ${res.orders_cancelled_synced}`,
+        description: `Transações históricas sincronizadas com sucesso. Pagos: ${res?.orders_paid_synced ?? 0}, Enviados: ${res?.orders_shipped_synced ?? 0}, Cancelados: ${res?.orders_cancelled_synced ?? 0}`,
       });
       setSyncing(false);
     },
@@ -351,8 +384,96 @@ function TransactionsTab() {
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / limit);
 
+  // Totais rápidos da página atual
+  const pageStats = transactions.reduce((acc: { entradas: number; saidas: number }, tx: any) => {
+    const isCredit = Number(tx.saldo_posterior ?? 0) > Number(tx.saldo_anterior ?? 0);
+    const val = Math.abs(Number(tx.valor) || 0);
+    if (isCredit) acc.entradas += val;
+    else acc.saidas += val;
+    return acc;
+  }, { entradas: 0, saidas: 0 });
+
+  function exportCSV() {
+    if (transactions.length === 0) {
+      toast({ variant: 'destructive', title: 'Sem dados para exportar' });
+      return;
+    }
+
+    const headers = ["ID Transacao", "Data", "Pedido", "Usuario", "Funcao", "Operacao", "Tipo", "Valor", "Taxa", "Saldo Anterior", "Saldo Posterior", "Descricao"];
+    const rows = transactions.map((tx: any) => {
+      const isCredit = Number(tx.saldo_posterior ?? 0) > Number(tx.saldo_anterior ?? 0);
+      const userObj = tx.profile?.profiles;
+      const userName = userObj ? [userObj.first_name, userObj.last_name].filter(Boolean).join(" ") : "Usuario";
+      return [
+        tx.id,
+        format(new Date(tx.created_at), "yyyy-MM-dd HH:mm:ss"),
+        getOrderNumber(tx.descricao),
+        `"${userName}"`,
+        userObj?.role || "",
+        isCredit ? "Entrada (+)" : "Saida (-)",
+        TIPO_LABELS[tx.tipo] ?? tx.tipo,
+        (isCredit ? "" : "-") + Math.abs(tx.valor).toFixed(2),
+        (tx.taxa ?? 0).toFixed(2),
+        Number(tx.saldo_anterior ?? 0).toFixed(2),
+        Number(tx.saldo_posterior ?? 0).toFixed(2),
+        `"${(tx.descricao || "").replace(/"/g, '""')}"`
+      ].join(",");
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `transacoes_lojafy_${format(new Date(), "yyyyMMdd_HHmm")}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({ title: 'Exportação gerada', description: 'Arquivo CSV baixado com sucesso.' });
+  }
+
+  function copyTxId(id: string) {
+    navigator.clipboard.writeText(id);
+    setCopiedId(true);
+    setTimeout(() => setCopiedId(false), 2000);
+    toast({ title: 'ID copiado para a área de transferência' });
+  }
+
   return (
     <div className="space-y-4">
+      {/* Resumo Rápido */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="p-3 bg-white rounded-lg border flex items-center justify-between">
+          <div>
+            <span className="text-xs text-muted-foreground font-medium">Entradas na Página</span>
+            <p className="text-lg font-bold text-green-600">+{formatBRL(pageStats.entradas)}</p>
+          </div>
+          <div className="p-2 bg-green-50 text-green-600 rounded-md">
+            <TrendingUp className="h-4 w-4" />
+          </div>
+        </div>
+
+        <div className="p-3 bg-white rounded-lg border flex items-center justify-between">
+          <div>
+            <span className="text-xs text-muted-foreground font-medium">Saídas / Repasses</span>
+            <p className="text-lg font-bold text-destructive">-{formatBRL(pageStats.saidas)}</p>
+          </div>
+          <div className="p-2 bg-red-50 text-destructive rounded-md">
+            <TrendingDown className="h-4 w-4" />
+          </div>
+        </div>
+
+        <div className="p-3 bg-white rounded-lg border flex items-center justify-between">
+          <div>
+            <span className="text-xs text-muted-foreground font-medium">Total de Registros</span>
+            <p className="text-lg font-bold text-foreground">{total} movimentações</p>
+          </div>
+          <div className="p-2 bg-blue-50 text-blue-600 rounded-md">
+            <ArrowUpDown className="h-4 w-4" />
+          </div>
+        </div>
+      </div>
+
       {/* Filters & Actions */}
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
@@ -387,10 +508,22 @@ function TransactionsTab() {
           </Select>
         </div>
 
-        {/* Sync and Refresh actions */}
-        <div className="flex gap-2 w-full md:w-auto justify-end">
+        {/* Sync, Export and Refresh actions */}
+        <div className="flex flex-wrap gap-2 w-full md:w-auto justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportCSV}
+            disabled={transactions.length === 0}
+            title="Exportar para arquivo CSV"
+          >
+            <Download className="h-4 w-4 mr-1.5" />
+            Exportar CSV
+          </Button>
+
           <Button 
             variant="outline" 
+            size="sm"
             className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
             onClick={() => syncMutation.mutate()}
             disabled={syncing}
@@ -408,7 +541,7 @@ function TransactionsTab() {
             )}
           </Button>
 
-          <Button variant="outline" onClick={() => refetch()}>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
@@ -422,7 +555,20 @@ function TransactionsTab() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <ArrowUpDown className="h-10 w-10 mb-3 opacity-40" />
-            <p>Nenhuma transação encontrada</p>
+            <p className="font-medium text-foreground">Nenhuma transação encontrada</p>
+            <p className="text-sm text-muted-foreground mt-1 text-center max-w-md">
+              Se você acabou de configurar a plataforma ou fez vendas recentemente, utilize o botão <strong>"Sincronizar Pedidos Antigos"</strong> para processar as movimentações históricas.
+            </p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-4 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+              onClick={() => syncMutation.mutate()}
+              disabled={syncing}
+            >
+              <Activity className="h-4 w-4 mr-2" />
+              Sincronizar Agora
+            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -438,6 +584,7 @@ function TransactionsTab() {
                 <TableHead>Taxa</TableHead>
                 <TableHead>Descrição</TableHead>
                 <TableHead>Data</TableHead>
+                <TableHead className="text-right">Detalhes</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -446,7 +593,11 @@ function TransactionsTab() {
                 const userObj = tx.profile?.profiles;
                 const name = userObj ? [userObj.first_name, userObj.last_name].filter(Boolean).join(" ") : "Usuário";
                 return (
-                  <TableRow key={tx.id}>
+                  <TableRow 
+                    key={tx.id} 
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => setSelectedTx(tx)}
+                  >
                     <TableCell className="font-mono font-semibold text-sm whitespace-nowrap">
                       {getOrderNumber(tx.descricao)}
                     </TableCell>
@@ -471,8 +622,21 @@ function TransactionsTab() {
                       {tx.taxa > 0 ? formatBRL(tx.taxa) : "—"}
                     </TableCell>
                     <TableCell className="text-sm max-w-xs truncate" title={tx.descricao}>{tx.descricao}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                       {format(new Date(tx.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedTx(tx);
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 );
@@ -493,9 +657,134 @@ function TransactionsTab() {
           </Button>
         </div>
       )}
+
+      {/* Modal de Detalhes da Transação */}
+      <Dialog open={!!selectedTx} onOpenChange={(open) => { if (!open) setSelectedTx(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowUpDown className="h-5 w-5 text-indigo-600" />
+              Detalhes da Transação
+            </DialogTitle>
+            <DialogDescription>
+              Informações completas e trilha de auditoria da movimentação
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedTx && (() => {
+            const isCredit = Number(selectedTx.saldo_posterior ?? 0) > Number(selectedTx.saldo_anterior ?? 0);
+            const userObj = selectedTx.profile?.profiles;
+            const name = userObj ? [userObj.first_name, userObj.last_name].filter(Boolean).join(" ") : "Usuário";
+
+            return (
+              <div className="space-y-4 py-2 text-sm">
+                {/* Cabeçalho do Valor */}
+                <div className="p-4 rounded-lg bg-muted/60 flex items-center justify-between border">
+                  <div>
+                    <span className="text-xs text-muted-foreground uppercase font-semibold">Valor da Operação</span>
+                    <p className={`text-2xl font-bold ${isCredit ? 'text-green-600' : 'text-destructive'}`}>
+                      {isCredit ? "+" : "-"}{formatBRL(Math.abs(selectedTx.valor))}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <Badge variant={isCredit ? "default" : "destructive"}>
+                      {isCredit ? "Crédito (Entrada)" : "Débito (Saída)"}
+                    </Badge>
+                    <p className="text-xs text-muted-foreground mt-1 capitalize">
+                      {TIPO_LABELS[selectedTx.tipo] ?? selectedTx.tipo}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Grid de detalhes */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-2.5 rounded-md border bg-card">
+                    <span className="text-xs text-muted-foreground">Usuário Beneficiário / Titular</span>
+                    <p className="font-semibold text-foreground truncate">{name}</p>
+                    <Badge variant={getRoleBadgeVariant(userObj?.role)} className="mt-1">
+                      {getRoleLabel(userObj?.role)}
+                    </Badge>
+                  </div>
+
+                  <div className="p-2.5 rounded-md border bg-card">
+                    <span className="text-xs text-muted-foreground">Data e Horário</span>
+                    <p className="font-semibold text-foreground">
+                      {format(new Date(selectedTx.created_at), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
+                    </p>
+                    <span className="text-xs text-muted-foreground">Status: Concluído</span>
+                  </div>
+                </div>
+
+                {/* Evolução de Saldo */}
+                <div className="p-3 border rounded-md space-y-2 bg-card">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase">Evolução da Carteira</span>
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="p-2 bg-muted rounded">
+                      <span className="text-muted-foreground block">Saldo Anterior</span>
+                      <strong className="text-sm">{formatBRL(Number(selectedTx.saldo_anterior ?? 0))}</strong>
+                    </div>
+                    <div className="p-2 bg-muted rounded">
+                      <span className="text-muted-foreground block">Operação</span>
+                      <strong className={`text-sm ${isCredit ? 'text-green-600' : 'text-destructive'}`}>
+                        {isCredit ? "+" : "-"}{formatBRL(Math.abs(selectedTx.valor))}
+                      </strong>
+                    </div>
+                    <div className="p-2 bg-muted rounded">
+                      <span className="text-muted-foreground block">Saldo Posterior</span>
+                      <strong className="text-sm">{formatBRL(Number(selectedTx.saldo_posterior ?? 0))}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Descrição & Pedido */}
+                <div className="space-y-1.5 p-3 border rounded-md bg-card">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase">Descrição</span>
+                    {getOrderNumber(selectedTx.descricao) !== "—" && (
+                      <Badge variant="outline" className="font-mono">
+                        Pedido {getOrderNumber(selectedTx.descricao)}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-foreground">{selectedTx.descricao || "Sem descrição informada"}</p>
+                  {selectedTx.taxa > 0 && (
+                    <p className="text-xs text-muted-foreground">Taxa da transação: {formatBRL(selectedTx.taxa)}</p>
+                  )}
+                </div>
+
+                {/* Identificadores e Auditoria */}
+                <div className="space-y-1 text-xs text-muted-foreground font-mono bg-muted/40 p-2.5 rounded border">
+                  <div className="flex items-center justify-between">
+                    <span>ID Transação: {selectedTx.id}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5"
+                      onClick={() => copyTxId(selectedTx.id)}
+                    >
+                      {copiedId ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
+                    </Button>
+                  </div>
+                  <p>ID Carteira: {selectedTx.wallet_id}</p>
+                  {selectedTx.referencia_tipo && (
+                    <p>Referência: {selectedTx.referencia_tipo} ({selectedTx.referencia_id || 'N/A'})</p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedTx(null)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 // ── Aba 3: Configurações Financeiras ─────────────────────────────────────────
 

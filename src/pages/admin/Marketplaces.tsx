@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, RefreshCw, ShoppingBag, Users, MapPin, ChevronRight, MessageSquare, TrendingUp, Tag, Megaphone, Receipt, RotateCcw, Play, Trash2, Clock, LayoutList, ToggleLeft, ToggleRight, ExternalLink, Copy, Pencil, AlertTriangle } from "lucide-react";
+import { Download, RefreshCw, ShoppingBag, Users, MapPin, ChevronRight, MessageSquare, TrendingUp, Tag, Megaphone, Receipt, RotateCcw, Play, Trash2, Clock, LayoutList, ToggleLeft, ToggleRight, ExternalLink, Copy, Pencil, AlertTriangle, ArrowLeft, ArrowRight, Store, Package, CheckCircle2, Sparkles } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -767,24 +768,272 @@ function ResellerListings({ resellerUserId, resellerName }: { resellerUserId: st
 // ── Página principal ──────────────────────────────────────────────────────────
 
 export default function Marketplaces() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentMp = searchParams.get('mp');
+  const [selectedMarketplace, setSelectedMarketplace] = useState<string | null>(currentMp || null);
   const [selectedReseller, setSelectedReseller] = useState<{ id: string; name: string } | null>(null);
   const [activeTab, setActiveTab] = useState('accounts');
+
+  useEffect(() => {
+    if (currentMp && currentMp !== selectedMarketplace) {
+      setSelectedMarketplace(currentMp);
+    } else if (!currentMp && selectedMarketplace) {
+      setSelectedMarketplace(null);
+    }
+  }, [currentMp]);
+
+  const handleSelectMarketplace = (mp: string | null) => {
+    setSelectedMarketplace(mp);
+    if (mp) {
+      setSearchParams({ mp });
+    } else {
+      setSearchParams({});
+    }
+  };
+
+  // Estatísticas para o card do Mercado Livre no hub
+  const { data: mlStats, isLoading: loadingStats } = useQuery({
+    queryKey: ['admin-ml-hub-stats'],
+    queryFn: async () => {
+      const [{ count: accountsCount }, { count: listingsCount }, { count: ordersCount }] = await Promise.all([
+        supabase.from('mercadolivre_integrations').select('*', { count: 'exact', head: true }).eq('is_active', true),
+        supabase.from('ml_listing_variants').select('*', { count: 'exact', head: true }),
+        supabase.from('orders').select('*', { count: 'exact', head: true }).eq('payment_method', 'mercadolivre'),
+      ]);
+      return {
+        accountsCount: accountsCount ?? 0,
+        listingsCount: listingsCount ?? 0,
+        ordersCount: ordersCount ?? 0,
+      };
+    },
+    staleTime: 1000 * 60 * 2,
+  });
 
   const handleSelectReseller = (id: string, name: string) => {
     setSelectedReseller({ id, name });
     setActiveTab('listings');
   };
 
+  // Se nenhum marketplace selecionado, exibe o Hub com os Cards
+  if (selectedMarketplace !== 'mercadolivre') {
+    return (
+      <div className="space-y-6">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="p-2 rounded-lg bg-yellow-500/10 text-yellow-600">
+              <ShoppingBag className="h-6 w-6" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight">Marketplaces</h1>
+          </div>
+          <p className="text-muted-foreground text-sm">
+            Selecione uma plataforma integrada para gerenciar canais de venda, revendedores, pedidos e anúncios.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Card Mercado Livre (Ativo) */}
+          <Card 
+            className="group relative overflow-hidden border-2 border-yellow-400/70 hover:border-yellow-500 transition-all duration-200 hover:shadow-xl hover:shadow-yellow-500/10 cursor-pointer flex flex-col justify-between bg-gradient-to-b from-card via-card to-yellow-500/5"
+            onClick={() => handleSelectMarketplace('mercadolivre')}
+          >
+            <div className="p-6 space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="h-14 w-14 rounded-2xl bg-yellow-400/20 border border-yellow-400/40 flex items-center justify-center p-2 shadow-sm group-hover:scale-105 transition-transform overflow-hidden">
+                  <img 
+                    src="/mercadolivre-logo.png" 
+                    alt="Mercado Livre" 
+                    className="h-10 w-10 object-contain"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 gap-1.5 font-medium">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Ativo & Conectado
+                  </Badge>
+                  <span className="text-[11px] text-muted-foreground font-mono">Oficial API</span>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-bold text-foreground group-hover:text-yellow-600 transition-colors flex items-center gap-1.5">
+                  Mercado Livre
+                  <ChevronRight className="h-4 w-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-yellow-600" />
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Gerenciamento de contas de revendedores, sincronização de anúncios em massa, etiquetas de envio, mensagens pós-venda e faturamento.
+                </p>
+              </div>
+
+              {/* Resumo de métricas rápidas */}
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/60">
+                <div className="p-2.5 rounded-lg bg-background/80 border border-border/50 text-center">
+                  <p className="text-[11px] text-muted-foreground">Contas</p>
+                  <p className="text-base font-bold text-foreground">
+                    {loadingStats ? '...' : (mlStats?.accountsCount ?? 0)}
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-lg bg-background/80 border border-border/50 text-center">
+                  <p className="text-[11px] text-muted-foreground">Anúncios</p>
+                  <p className="text-base font-bold text-foreground">
+                    {loadingStats ? '...' : (mlStats?.listingsCount ?? 0)}
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-lg bg-background/80 border border-border/50 text-center">
+                  <p className="text-[11px] text-muted-foreground">Pedidos</p>
+                  <p className="text-base font-bold text-foreground">
+                    {loadingStats ? '...' : (mlStats?.ordersCount ?? 0)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Tags de funcionalidades */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                <Badge variant="secondary" className="text-[10px] py-0 font-normal">Multi-contas</Badge>
+                <Badge variant="secondary" className="text-[10px] py-0 font-normal">Etiquetas ML</Badge>
+                <Badge variant="secondary" className="text-[10px] py-0 font-normal">Mensagens SAC</Badge>
+                <Badge variant="secondary" className="text-[10px] py-0 font-normal">Publicidade Ads</Badge>
+              </div>
+            </div>
+
+            <CardFooter className="p-6 pt-0">
+              <Button 
+                className="w-full bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-semibold shadow-sm gap-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSelectMarketplace('mercadolivre');
+                }}
+              >
+                Acessar Mercado Livre
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </CardFooter>
+          </Card>
+
+          {/* Card Shopee (Em breve) */}
+          <Card className="flex flex-col justify-between border border-border/60 opacity-80 hover:opacity-100 transition-all bg-card/50">
+            <div className="p-6 space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="h-14 w-14 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center p-2 shadow-sm overflow-hidden">
+                  <img 
+                    src="/shopee-logo.png" 
+                    alt="Shopee" 
+                    className="h-10 w-10 object-contain"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                </div>
+                <Badge variant="outline" className="border-amber-500/30 text-amber-600 bg-amber-500/10">
+                  Em breve
+                </Badge>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-bold text-foreground">Shopee</h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Sincronização em massa de anúncios, suporte a etiquetas Shopee Xpress e gestão unificada de pedidos.
+                </p>
+              </div>
+
+              <div className="space-y-1.5 pt-4">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Progresso da integração</span>
+                  <span className="font-semibold text-foreground">65%</span>
+                </div>
+                <Progress value={65} className="h-1.5 bg-muted" />
+              </div>
+            </div>
+
+            <CardFooter className="p-6 pt-0">
+              <Button variant="outline" disabled className="w-full text-muted-foreground">
+                Em desenvolvimento
+              </Button>
+            </CardFooter>
+          </Card>
+
+          {/* Card Amazon (Em breve) */}
+          <Card className="flex flex-col justify-between border border-border/60 opacity-80 hover:opacity-100 transition-all bg-card/50">
+            <div className="p-6 space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="h-14 w-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center p-2.5 shadow-sm">
+                  <Package className="h-8 w-8 text-blue-600" />
+                </div>
+                <Badge variant="outline" className="border-blue-500/30 text-blue-600 bg-blue-500/10">
+                  Em breve
+                </Badge>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-bold text-foreground">Amazon Brasil</h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Conexão oficial com Amazon Seller Central, suporte à logística DBA/FBA e sincronização de catálogo.
+                </p>
+              </div>
+
+              <div className="space-y-1.5 pt-4">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Progresso da integração</span>
+                  <span className="font-semibold text-foreground">50%</span>
+                </div>
+                <Progress value={50} className="h-1.5 bg-muted" />
+              </div>
+            </div>
+
+            <CardFooter className="p-6 pt-0">
+              <Button variant="outline" disabled className="w-full text-muted-foreground">
+                Em desenvolvimento
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <ShoppingBag className="h-7 w-7 text-yellow-500" />
-          Gestão de Marketplaces
-        </h1>
-        <p className="text-muted-foreground">
-          Gerencie as contas do Mercado Livre de todos os revendedores
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border/60">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 mb-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleSelectMarketplace(null)}
+              className="gap-1.5 text-xs text-muted-foreground hover:text-foreground h-8"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Voltar para Marketplaces
+            </Button>
+            <span className="text-muted-foreground text-xs">/</span>
+            <Badge className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30 font-semibold text-xs">
+              Mercado Livre
+            </Badge>
+          </div>
+          <h1 className="text-3xl font-bold flex items-center gap-2.5">
+            <div className="p-1.5 rounded-lg bg-yellow-400/20 text-yellow-600">
+              <Store className="h-6 w-6" />
+            </div>
+            Gestão do Mercado Livre
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Gerencie as contas do Mercado Livre de todos os revendedores, anúncios, pedidos e métricas
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleSelectMarketplace(null)}
+            className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Outros marketplaces
+          </Button>
+        </div>
       </div>
 
       {selectedReseller && (

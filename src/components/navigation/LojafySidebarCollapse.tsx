@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useSidebarAccordion } from './LojafySidebarGroup';
 
 export interface LojafySubItem {
   title: string;
@@ -22,6 +23,7 @@ export interface LojafySubItem {
 }
 
 export interface LojafySidebarCollapseProps {
+  id?: string;
   title: string;
   icon: React.ComponentType<{ className?: string }>;
   items: LojafySubItem[];
@@ -29,6 +31,7 @@ export interface LojafySidebarCollapseProps {
 }
 
 export const LojafySidebarCollapse: React.FC<LojafySidebarCollapseProps> = ({
+  id,
   title,
   icon: Icon,
   items,
@@ -40,6 +43,9 @@ export const LojafySidebarCollapse: React.FC<LojafySidebarCollapseProps> = ({
   const isCollapsed = state === 'collapsed' && !isMobile;
   const currentPath = location.pathname;
   const contentId = useId();
+
+  const accordion = useSidebarAccordion();
+  const collapseId = id || title.toLowerCase();
 
   // Check if any child item matches the current route
   const isAnyChildActive = React.useMemo(() => {
@@ -53,17 +59,28 @@ export const LojafySidebarCollapse: React.FC<LojafySidebarCollapseProps> = ({
     });
   }, [currentPath, items]);
 
-  const [isOpen, setIsOpen] = useState(defaultOpen || isAnyChildActive);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen || isAnyChildActive);
+
+  // If inside an accordion group, determine open state from accordion context
+  const isOpen = accordion ? accordion.openCollapseId === collapseId : uncontrolledOpen;
 
   // Auto-expand when a child route is navigated to
   useEffect(() => {
     if (isAnyChildActive) {
-      setIsOpen(true);
+      if (accordion) {
+        accordion.setOpenCollapseId(collapseId);
+      } else {
+        setUncontrolledOpen(true);
+      }
     }
-  }, [isAnyChildActive]);
+  }, [isAnyChildActive, accordion, collapseId]);
 
   const handleToggle = () => {
-    setIsOpen((prev) => !prev);
+    if (accordion) {
+      accordion.toggleCollapse(collapseId);
+    } else {
+      setUncontrolledOpen((prev) => !prev);
+    }
   };
 
   const handleSubItemClick = (url: string) => {
