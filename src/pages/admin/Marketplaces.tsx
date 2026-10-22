@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, RefreshCw, ShoppingBag, Users, MapPin, ChevronRight, MessageSquare, TrendingUp, Tag, Megaphone, Receipt, RotateCcw, Play, Trash2, Clock, LayoutList, ToggleLeft, ToggleRight, ExternalLink, Copy, Pencil, AlertTriangle, ArrowLeft, ArrowRight, Store, Package, CheckCircle2, Sparkles } from "lucide-react";
+import { Download, RefreshCw, ShoppingBag, Users, MapPin, ChevronRight, MessageSquare, TrendingUp, Tag, Megaphone, Receipt, RotateCcw, Play, Trash2, Clock, LayoutList, ToggleLeft, ToggleRight, ExternalLink, Copy, Pencil, AlertTriangle, AlertCircle, Link as LinkIcon, ArrowLeft, ArrowRight, Store, Package, CheckCircle2, Sparkles } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -72,17 +72,18 @@ const PAGE_SIZE = 10;
 function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string, name: string) => void }) {
   const [syncing, setSyncing] = useState<string | null>(null);
   const [queueing, setQueueing] = useState<string | null>(null);
+  const [refreshingToken, setRefreshingToken] = useState<string | null>(null);
+  const [refreshingAll, setRefreshingAll] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [page, setPage] = useState(0);
 
   const { data: integrations = [], isLoading, refetch } = useQuery({
     queryKey: ['admin-ml-integrations'],
     queryFn: async () => {
-      // Two separate queries to avoid PostgREST nested JOIN + RLS blocking
+      // Busca todas as integrações cadastradas (incluindo as que precisam de reconexão)
       const { data: intgData, error } = await supabase
         .from('mercadolivre_integrations')
-        .select('user_id, ml_user_id, is_active, last_refreshed_at, expires_at')
-        .eq('is_active', true)
+        .select('user_id, ml_user_id, is_active, last_refreshed_at, expires_at, last_error, last_error_at')
         .order('last_refreshed_at', { ascending: false });
       if (error) throw error;
 
@@ -98,6 +99,87 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
       return (intgData ?? []).map(i => ({ ...i, profile: profileMap.get(i.user_id) }));
     },
   });
+
+  const handleRefreshToken = async (userId: string, name: string) => {
+    setRefreshingToken(userId);
+    try {
+      const { data, error } = await supabase.functions.invoke('ml-token-refresh', {
+        body: { user_id: userId, force: true },
+      });
+      if (error || !data?.success) {
+        throw new Error(data?.error || error?.message || 'Falha ao renovar token');
+      }
+      toast({
+        title: 'Token renovado!',
+        description: `O token de ${name} foi renovado com sucesso e está válido por mais 6 horas.`,
+      });
+      refetch();
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao renovar token',
+        description: err.message,
+        variant: 'destructive',
+      });
+      refetch();
+    } finally {
+      setRefreshingToken(null);
+    }
+  };
+
+  const handleRefreshAllTokens = async () => {
+    setRefreshingAll(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ml-token-refresh', {
+        body: { mode: 'refresh_all_expiring' },
+      });
+      if (error || !data?.success) {
+        throw new Error(data?.error || error?.message || 'Falha ao renovar tokens');
+      }
+      const s = data.summary;
+      toast({
+        title: 'Renovação em lote concluída',
+        description: `${s.refreshed} conta(s) renovada(s) com sucesso.${s.failed > 0 ? ` ${s.failed} falha(s).` : ''}`,
+      });
+      refetch();
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao renovar contas',
+        description: err.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setRefreshingAll(false);
+    }
+  };
+
+  const handleCopyReauthLink = async (userId: string, name: string) => {
+    try {
+      const { data: creds } = await supabase
+        .from('marketplace_credentials')
+        .select('client_id')
+        .eq('marketplace', 'mercadolivre')
+        .maybeSingle();
+
+      const clientId = creds?.client_id || import.meta.env.VITE_ML_CLIENT_ID || '2003351424267574';
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://lojafy-supabase.d2x.site';
+      const cleanSupabaseUrl = supabaseUrl.replace(/\/$/, '');
+      const redirectUri = `${cleanSupabaseUrl}/functions/v1/ml-oauth-callback`;
+      const state = `${userId}:${redirectUri}`;
+      const authUrl = `https://auth.mercadolibre.com.br/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
+
+      await navigator.clipboard.writeText(authUrl);
+      toast({
+        title: 'Link de Reconexão copiado!',
+        description: `Envie o link para ${name}. Ao autorizar, a conta será reativada automaticamente na Lojafy.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao gerar link',
+        description: err.message,
+        variant: 'destructive',
+      });
+    }
+  };
 
   const handleResync = async (resellerUserId?: string, name?: string) => {
     const key = resellerUserId ?? 'all';
@@ -167,13 +249,23 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{integrations.length} conta(s) conectada(s)</p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button 
+            variant="default" 
+            size="sm" 
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+            disabled={refreshingAll} 
+            onClick={handleRefreshAllTokens}
+          >
+            <RefreshCw className={`h-4 w-4 mr-1.5 ${refreshingAll ? 'animate-spin' : ''}`} />
+            {refreshingAll ? 'Renovando...' : 'Renovar Todos os Tokens'}
+          </Button>
           <Button variant="outline" size="sm" disabled={!!syncing} onClick={() => handleResync(undefined)}>
-            <RotateCcw className={`h-4 w-4 mr-2 ${syncing === 'all' ? 'animate-spin' : ''}`} />
-            {syncing === 'all' ? 'Sincronizando...' : 'Re-sincronizar Todos'}
+            <RotateCcw className={`h-4 w-4 mr-1.5 ${syncing === 'all' ? 'animate-spin' : ''}`} />
+            {syncing === 'all' ? 'Sincronizando...' : 'Re-sincronizar Anúncios'}
           </Button>
           <Button variant="outline" size="sm" onClick={() => { setPage(0); refetch(); }}>
-            <RefreshCw className="h-4 w-4 mr-2" />Atualizar
+            <RefreshCw className="h-4 w-4 mr-1.5" />Atualizar
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -221,30 +313,106 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
             {integrations.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((intg: any) => {
               const name = [intg.profile?.first_name, intg.profile?.last_name].filter(Boolean).join(' ') || 'Usuário';
               const expiresAt = intg.expires_at ? new Date(intg.expires_at) : null;
-              const isExpired = expiresAt ? expiresAt < new Date() : false;
-              const isSyncingThis = syncing === intg.user_id;
+              const now = new Date();
+              const isExpired = expiresAt ? expiresAt < now : false;
+              const isExpiringSoon = expiresAt ? (!isExpired && expiresAt.getTime() < now.getTime() + 2 * 60 * 60 * 1000) : false;
+              const isReauthNeeded = intg.is_active === false || (intg.last_error && intg.last_error.includes('invalid_grant'));
+              const isRefreshingThis = refreshingToken === intg.user_id;
+
               return (
-                <TableRow key={intg.user_id}>
-                  <TableCell className="font-medium">{name}</TableCell>
-                  <TableCell><Badge variant="outline" className="capitalize">{intg.profile?.role}</Badge></TableCell>
+                <TableRow key={intg.user_id} className={isReauthNeeded ? 'bg-destructive/5' : undefined}>
+                  <TableCell className="font-medium">
+                    <div className="space-y-0.5">
+                      <p className="font-semibold text-foreground text-xs">{name}</p>
+                      <span className="text-[10px] text-muted-foreground font-mono">{intg.user_id.slice(0, 8)}...</span>
+                    </div>
+                  </TableCell>
+                  <TableCell><Badge variant="outline" className="capitalize text-[11px]">{intg.profile?.role || 'reseller'}</Badge></TableCell>
                   <TableCell className="font-mono text-xs">{intg.ml_user_id}</TableCell>
                   <TableCell>
-                    {expiresAt ? (
-                      <span className={isExpired ? 'text-destructive text-xs' : 'text-xs text-muted-foreground'}>
-                        {isExpired ? '⚠️ Expirado — ' : ''}
-                        {format(expiresAt, "dd/MM/yy HH:mm", { locale: ptBR })}
-                      </span>
-                    ) : '—'}
+                    {isReauthNeeded ? (
+                      <Badge variant="destructive" className="gap-1 text-[11px] font-medium">
+                        <AlertCircle className="h-3 w-3" /> Reconexão Necessária
+                      </Badge>
+                    ) : isExpired ? (
+                      <div className="space-y-1">
+                        <Badge variant="outline" className="border-destructive/40 text-destructive bg-destructive/10 gap-1 text-[11px]">
+                          <AlertTriangle className="h-3 w-3" /> Expirado
+                        </Badge>
+                        <p className="text-[10px] text-muted-foreground">
+                          {expiresAt ? format(expiresAt, "dd/MM/yy HH:mm", { locale: ptBR }) : ''}
+                        </p>
+                      </div>
+                    ) : isExpiringSoon ? (
+                      <div className="space-y-1">
+                        <Badge variant="outline" className="border-amber-500/40 text-amber-600 bg-amber-500/10 gap-1 text-[11px]">
+                          <Clock className="h-3 w-3" /> Expira em breve
+                        </Badge>
+                        <p className="text-[10px] text-muted-foreground">
+                          {expiresAt ? format(expiresAt, "dd/MM HH:mm", { locale: ptBR }) : ''}
+                        </p>
+                      </div>
+                    ) : expiresAt ? (
+                      <div className="space-y-0.5">
+                        <Badge variant="outline" className="border-emerald-500/40 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 gap-1 text-[11px]">
+                          <CheckCircle2 className="h-3 w-3" /> Ativo
+                        </Badge>
+                        <p className="text-[10px] text-muted-foreground">
+                          Válido até {format(expiresAt, "dd/MM HH:mm", { locale: ptBR })}
+                        </p>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" disabled={!!queueing || queueing === intg.user_id}
-                        onClick={() => handleQueueSync(intg.user_id, name)}>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {/* Botão de Renovação Rápida de Token */}
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-8 px-2.5 text-xs text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 border-emerald-300 dark:border-emerald-800"
+                        disabled={isRefreshingThis || isReauthNeeded}
+                        onClick={() => handleRefreshToken(intg.user_id, name)}
+                        title="Forçar renovação do token do Mercado Livre agora"
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 mr-1 ${isRefreshingThis ? 'animate-spin' : ''}`} />
+                        {isRefreshingThis ? '...' : 'Renovar'}
+                      </Button>
+
+                      {/* Botão Copiar Link de Reconexão (WhatsApp) */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 dark:border-blue-800"
+                        onClick={() => handleCopyReauthLink(intg.user_id, name)}
+                        title="Copiar link de autorização OAuth para enviar no WhatsApp do revendedor"
+                      >
+                        <LinkIcon className="h-3.5 w-3.5 mr-1" />
+                        Link
+                      </Button>
+
+                      {/* Botão Sincronizar Fila de Anúncios */}
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-8 px-2.5 text-xs"
+                        disabled={!!queueing || queueing === intg.user_id || isReauthNeeded}
+                        onClick={() => handleQueueSync(intg.user_id, name)}
+                      >
                         <Play className={`h-3 w-3 mr-1 ${queueing === intg.user_id ? 'animate-spin' : ''}`} />
                         {queueing === intg.user_id ? '...' : 'Sincronizar'}
                       </Button>
-                      <Button size="sm" variant="default" onClick={() => onSelectReseller(intg.user_id, name)}>
-                        Operar como <ChevronRight className="h-3 w-3 ml-1" />
+
+                      {/* Operar como */}
+                      <Button 
+                        size="sm" 
+                        variant="default" 
+                        className="h-8 px-2.5 text-xs"
+                        disabled={isReauthNeeded}
+                        onClick={() => onSelectReseller(intg.user_id, name)}
+                      >
+                        Operar como <ChevronRight className="h-3 w-3 ml-0.5" />
                       </Button>
                     </div>
                   </TableCell>
