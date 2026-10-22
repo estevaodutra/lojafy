@@ -740,6 +740,76 @@ function GlobalListings() {
   );
 }
 
+// ── Endpoints da Aplicação Mercado Livre ─────────────────────────────────────
+
+function MlAppEndpointsCard() {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://lojafy-supabase.d2x.site';
+  const cleanSupabaseUrl = supabaseUrl.replace(/\/$/, '');
+  const webhookUrl = `${cleanSupabaseUrl}/functions/v1/ml-order-webhook`;
+  const redirectUri = `${cleanSupabaseUrl}/functions/v1/ml-oauth-callback`;
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: `${label} copiada!`,
+      description: 'URL copiada para a área de transferência.',
+    });
+  };
+
+  return (
+    <Card className="border-border/60 bg-muted/20">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-yellow-600" />
+          Endpoints Oficiais da Aplicação Mercado Livre
+        </CardTitle>
+        <CardDescription className="text-xs">
+          Configure estas URLs no seu aplicativo em <strong>developers.mercadolivre.com.br</strong> para recebimento de vendas e autorização OAuth.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3 pt-0">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="p-2.5 rounded-lg border bg-background space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium text-muted-foreground">Webhook de Vendas (Tópico: orders_v2)</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[11px] gap-1"
+                onClick={() => copyToClipboard(webhookUrl, 'URL de Webhook')}
+              >
+                <Copy className="h-3 w-3" />
+                Copiar
+              </Button>
+            </div>
+            <code className="text-[11px] font-mono block bg-muted/60 p-1.5 rounded truncate select-all">
+              {webhookUrl}
+            </code>
+          </div>
+
+          <div className="p-2.5 rounded-lg border bg-background space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium text-muted-foreground">Redirect URI (Autenticação OAuth)</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[11px] gap-1"
+                onClick={() => copyToClipboard(redirectUri, 'Redirect URI')}
+              >
+                <Copy className="h-3 w-3" />
+                Copiar
+              </Button>
+            </div>
+            <code className="text-[11px] font-mono block bg-muted/60 p-1.5 rounded truncate select-all">
+              {redirectUri}
+            </code>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── Painel de Fila de Integração ─────────────────────────────────────────────
 
 function IntegrationQueue() {
@@ -1507,7 +1577,7 @@ export default function Marketplaces() {
         <div className="flex-1 min-w-0">
           <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
 
-        <TabsContent value="accounts">
+        <TabsContent value="accounts" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Contas Mercado Livre</CardTitle>
@@ -1517,6 +1587,7 @@ export default function Marketplaces() {
               <ConnectedAccounts onSelectReseller={handleSelectReseller} />
             </CardContent>
           </Card>
+          <MlAppEndpointsCard />
           <IntegrationQueue />
         </TabsContent>
 
