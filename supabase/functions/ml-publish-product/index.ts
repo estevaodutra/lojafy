@@ -151,6 +151,67 @@ function autoFillAttribute(attr: any, product: any): { id: string; value_name: s
   return { id: attrId, value_name: 'Padrão' };
 }
 
+/**
+ * Tradutor inteligente de erros técnicos da API do Mercado Livre
+ * para mensagens claras e amigáveis ao usuário.
+ */
+function translateMlError(rawMessage: string, responseBody: any): string {
+  const combined = `${rawMessage} ${JSON.stringify(responseBody || {})}`.toLowerCase();
+
+  if (combined.includes('attribute') && (combined.includes('brand') || combined.includes('marca'))) {
+    return 'O campo Marca (BRAND) é obrigatório nesta categoria no Mercado Livre.';
+  }
+  if (combined.includes('attribute') && (combined.includes('model') || combined.includes('modelo'))) {
+    return 'O campo Modelo (MODEL) é obrigatório nesta categoria no Mercado Livre.';
+  }
+  if (combined.includes('perfume_name')) {
+    return 'O campo Nome do Perfume é obrigatório nesta categoria no Mercado Livre.';
+  }
+  if (combined.includes('unit_volume') || combined.includes('volume')) {
+    return 'O campo Volume (UNIT_VOLUME) é obrigatório com unidade de medida nesta categoria.';
+  }
+  if (combined.includes('gtin') || combined.includes('empty_gtin_reason') || combined.includes('product identifier')) {
+    return 'O código de barras informado não possui formato válido para o padrão GS1/EAN do Mercado Livre.';
+  }
+  if (combined.includes('length is over of 60') || (combined.includes('title') && combined.includes('length'))) {
+    return 'O título do anúncio ultrapassou o limite máximo de 60 caracteres permitido pelo Mercado Livre.';
+  }
+  if (combined.includes('family_name')) {
+    return 'O nome do grupo de produtos (family_name) excedeu o limite máximo de caracteres permitido.';
+  }
+  if (combined.includes('free shipping') || combined.includes('mandatory free shipping')) {
+    return 'Produtos com valor igual ou superior a R$ 79,00 exigem frete grátis obrigatório de acordo com as regras do Mercado Livre.';
+  }
+  if (combined.includes('mode me1') || combined.includes('mode me2') || combined.includes('shipping')) {
+    return 'O modo de logística configurado não é suportado pelo seu perfil de vendedor no Mercado Livre.';
+  }
+  if (combined.includes('picture') || combined.includes('image')) {
+    return 'As imagens do produto não atendem aos critérios de dimensões mínimas (500x500px) ou formato do Mercado Livre.';
+  }
+  if (combined.includes('leaf category') || (combined.includes('category') && combined.includes('not allowed'))) {
+    return 'A categoria selecionada não aceita anúncios diretos. O Mercado Livre exige a seleção de uma subcategoria final.';
+  }
+  if (combined.includes('seller.unable_to_list') || combined.includes('unable to list')) {
+    return 'Sua conta do Mercado Livre está impossibilitada de anunciar no momento devido a pendências cadastrais ou fiscais no portal do Mercado Livre.';
+  }
+  if (combined.includes('invalid_grant') || combined.includes('token')) {
+    return 'O token de autorização do Mercado Livre expirou. Use o botão "Link" na aba Contas Conectadas para reconectar sua conta.';
+  }
+  if (combined.includes('price') || combined.includes('cents') || combined.includes('currency')) {
+    return 'O preço de venda é inválido ou está abaixo do valor mínimo permitido pelo Mercado Livre.';
+  }
+
+  // Extrair mensagem da primeira causa se existir
+  if (Array.isArray(responseBody?.cause) && responseBody.cause.length > 0) {
+    const first = responseBody.cause[0];
+    if (first.message) {
+      return `Mercado Livre: ${first.message}`;
+    }
+  }
+
+  return rawMessage;
+}
+
 async function handleRequest(req: Request) {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -597,11 +658,27 @@ async function handleRequest(req: Request) {
       const message = responseBody?.message ?? responseBody?.error ?? `ML API error ${publishRes.status}`;
       const causes: string[] = (responseBody?.cause ?? []).map((c: any) => c.message ?? JSON.stringify(c));
       const fullMessage = causes.length > 0 ? `${message} — cause: ${causes.join('; ')}` : message;
+      const friendlyError = translateMlError(fullMessage, responseBody);
+
+      // Inserir notificação in-app com mensagem amigável traduzida
+      try {
+        await supabase.from('notifications').insert({
+          user_id: user_id,
+          title: '⚠️ Erro ao publicar anúncio no Mercado Livre',
+          message: `Produto "${product.name}": ${friendlyError}`,
+          type: 'publish_error',
+          action_url: '/reseller/ml/anuncios',
+          action_label: 'Ver Anúncios',
+        });
+      } catch (notifErr) {
+        console.warn('[ml-publish] Aviso ao salvar notificação de erro:', notifErr);
+      }
       
       // Retornar HTTP 200 com success: false para que o cliente exiba a mensagem exata sem a mensagem genérica "non-2xx status code"
       return new Response(JSON.stringify({ 
         success: false, 
-        error: fullMessage, 
+        error: friendlyError, 
+        raw_error: fullMessage,
         cause: causes, 
         ml_response: responseBody 
       }), {
@@ -611,6 +688,75 @@ async function handleRequest(req: Request) {
     }
 
     console.log(`[ml-publish] ✅ Published item ${responseBody.id}: ${responseBody.permalink}`);
+
+    // 1. Inserir ou atualizar mercadolivre_published_products
+    try {
+      await supabase.from('mercadolivre_published_products').upsert({
+        user_id: user_id,
+        product_id: product.id,
+        status: 'published',
+        published_at: new Date().toISOString(),
+        ml_item_id: responseBody.id,
+        permalink: responseBody.permalink,
+      }, {
+        onConflict: 'user_id,product_id',
+      });
+      console.log(`[ml-publish] ✅ Salvo em mercadolivre_published_products: ${responseBody.id}`);
+    } catch (e) {
+      console.warn('[ml-publish] Aviso ao salvar em mercadolivre_published_products:', e);
+    }
+
+    // 2. Inserir ou atualizar ml_listing_variants
+    try {
+      const { data: existingVariant } = await supabase
+        .from('ml_listing_variants')
+        .select('id')
+        .eq('ml_item_id', responseBody.id)
+        .maybeSingle();
+
+      if (existingVariant) {
+        await supabase.from('ml_listing_variants').update({
+          variant_title: (product.name || '').substring(0, 60),
+          price: price,
+          status: 'published',
+          permalink: responseBody.permalink,
+          thumbnail: sanitizedImageUrls[0] || product.image_url || null,
+          category_id: mlPayload.category_id as string,
+          last_synced_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }).eq('id', existingVariant.id);
+      } else {
+        await supabase.from('ml_listing_variants').insert({
+          user_id: user_id,
+          product_id: product.id,
+          ml_item_id: responseBody.id,
+          variant_title: (product.name || '').substring(0, 60),
+          price: price,
+          status: 'published',
+          permalink: responseBody.permalink,
+          thumbnail: sanitizedImageUrls[0] || product.image_url || null,
+          category_id: mlPayload.category_id as string,
+          last_synced_at: new Date().toISOString(),
+        });
+      }
+      console.log(`[ml-publish] ✅ Salvo em ml_listing_variants: ${responseBody.id}`);
+    } catch (e) {
+      console.warn('[ml-publish] Aviso ao salvar em ml_listing_variants:', e);
+    }
+
+    // 3. Notificação in-app de sucesso
+    try {
+      await supabase.from('notifications').insert({
+        user_id: user_id,
+        title: '🛒 Anúncio publicado no Mercado Livre!',
+        message: `O produto "${product.name}" foi publicado com sucesso no Mercado Livre.`,
+        type: 'product_published',
+        action_url: '/reseller/ml/anuncios',
+        action_label: 'Ver Anúncios',
+      });
+    } catch (e) {
+      console.warn('[ml-publish] Aviso ao criar notificação de sucesso:', e);
+    }
 
     // Adicionar descrição em chamada separada
     const descriptionText = (product.description ?? product.name).substring(0, 50000);
@@ -638,7 +784,12 @@ async function handleRequest(req: Request) {
     }
 
     return new Response(
-      JSON.stringify({ success: true, ml_item_id: responseBody.id, permalink: responseBody.permalink, status: responseBody.status }),
+      JSON.stringify({ 
+        success: true, 
+        ml_item_id: responseBody.id, 
+        permalink: responseBody.permalink, 
+        status: responseBody.status 
+      }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

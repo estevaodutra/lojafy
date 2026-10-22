@@ -445,24 +445,81 @@ function ConnectedAccounts({ onSelectReseller }: { onSelectReseller: (id: string
 
 function GlobalListings() {
   const [search, setSearch] = useState('');
+  const [selectedSeller, setSelectedSeller] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [toggling, setToggling] = useState<string | null>(null);
+
+  // Buscar lista de contas/sellers conectados para filtro
+  const { data: sellers = [] } = useQuery({
+    queryKey: ['admin-ml-sellers-list'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('mercadolivre_integrations')
+        .select(`
+          user_id, ml_user_id,
+          profile:profiles(first_name, last_name)
+        `)
+        .eq('is_active', true);
+      return (data ?? []) as any[];
+    },
+  });
 
   const { data: listings = [], isLoading, refetch } = useQuery({
     queryKey: ['admin-global-listings'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // 1. Variantes de anúncio sincronizadas
+      const { data: variants, error } = await supabase
         .from('ml_listing_variants')
         .select(`
           id, ml_item_id, variant_title, price, status, visits, sales,
           permalink, thumbnail, user_id, product_id, last_synced_at,
-          product:products(sku, cost_price, name),
+          product:products(sku, cost_price, name, image_url),
           seller:profiles!ml_listing_variants_user_id_fkey(first_name, last_name)
         `)
         .not('ml_item_id', 'is', null)
         .order('last_synced_at', { ascending: false })
-        .limit(500);
+        .limit(1000);
       if (error) throw error;
-      return (data ?? []) as any[];
+
+      // 2. Produtos publicados diretamente para não perder nenhum anúncio recente
+      const { data: published } = await supabase
+        .from('mercadolivre_published_products')
+        .select(`
+          id, ml_item_id, user_id, product_id, permalink, status, published_at,
+          product:products(sku, cost_price, name, price, image_url),
+          seller:profiles!mercadolivre_published_products_user_id_fkey(first_name, last_name)
+        `)
+        .not('ml_item_id', 'is', null)
+        .order('published_at', { ascending: false })
+        .limit(500);
+
+      const itemsMap = new Map<string, any>();
+      (variants ?? []).forEach((v: any) => {
+        if (v.ml_item_id) itemsMap.set(v.ml_item_id, v);
+      });
+
+      (published ?? []).forEach((p: any) => {
+        if (p.ml_item_id && !itemsMap.has(p.ml_item_id)) {
+          itemsMap.set(p.ml_item_id, {
+            id: p.id,
+            ml_item_id: p.ml_item_id,
+            variant_title: p.product?.name || 'Produto ML',
+            price: Number(p.product?.price ?? 0),
+            status: p.status === 'published' ? 'published' : 'paused',
+            visits: 0,
+            sales: 0,
+            permalink: p.permalink,
+            thumbnail: p.product?.image_url || null,
+            user_id: p.user_id,
+            product_id: p.product_id,
+            last_synced_at: p.published_at,
+            product: p.product,
+            seller: p.seller,
+          });
+        }
+      });
+
+      return Array.from(itemsMap.values());
     },
     staleTime: 2 * 60 * 1000,
   });
@@ -491,6 +548,10 @@ function GlobalListings() {
 
       await supabase.from('ml_listing_variants').update({ status: newStatus }).eq('id', listing.id);
       refetch();
+      toast({
+        title: newStatus === 'published' ? 'Anúncio reativado' : 'Anúncio pausado',
+        description: `O anúncio ${listing.ml_item_id} foi ${newStatus === 'published' ? 'reativado' : 'pausado'} no Mercado Livre.`,
+      });
     } catch (err) {
       toast({ title: 'Erro ao alterar status', description: String(err), variant: 'destructive' });
     } finally {
@@ -498,26 +559,98 @@ function GlobalListings() {
     }
   };
 
-  const filtered = listings.filter(l =>
-    !search || l.variant_title?.toLowerCase().includes(search.toLowerCase()) ||
-    l.product?.sku?.toLowerCase().includes(search.toLowerCase()) ||
-    l.seller?.first_name?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = listings.filter((l: any) => {
+    // Filtro por vendedor / conta
+    if (selectedSeller !== 'all' && l.user_id !== selectedSeller) return false;
+
+    // Filtro por status
+    if (statusFilter === 'published' && l.status !== 'published') return false;
+    if (statusFilter === 'paused' && l.status === 'published') return false;
+
+    // Filtro de busca textual
+    if (!search) return true;
+    const term = search.toLowerCase();
+    const titleMatch = l.variant_title?.toLowerCase().includes(term);
+    const skuMatch = l.product?.sku?.toLowerCase().includes(term);
+    const mlIdMatch = l.ml_item_id?.toLowerCase().includes(term);
+    const sellerMatch = [l.seller?.first_name, l.seller?.last_name].filter(Boolean).join(' ').toLowerCase().includes(term);
+
+    return titleMatch || skuMatch || mlIdMatch || sellerMatch;
+  });
+
+  const totalListings = listings.length;
+  const activeListings = listings.filter((l: any) => l.status === 'published').length;
+  const pausedListings = listings.filter((l: any) => l.status !== 'published').length;
+  const totalSales = listings.reduce((acc: number, l: any) => acc + (Number(l.sales) || 0), 0);
 
   const formatBRL = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <Input
-          placeholder="Buscar por anúncio, SKU ou seller..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="max-w-xs"
-        />
+      {/* Cards de Métricas Consolidadas */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card className="p-3 shadow-none">
+          <p className="text-xs text-muted-foreground">Total de Anúncios</p>
+          <p className="text-xl font-bold mt-0.5">{totalListings}</p>
+        </Card>
+        <Card className="p-3 shadow-none">
+          <p className="text-xs text-muted-foreground">Anúncios Ativos</p>
+          <p className="text-xl font-bold text-emerald-600 mt-0.5">{activeListings}</p>
+        </Card>
+        <Card className="p-3 shadow-none">
+          <p className="text-xs text-muted-foreground">Anúncios Pausados</p>
+          <p className="text-xl font-bold text-amber-600 mt-0.5">{pausedListings}</p>
+        </Card>
+        <Card className="p-3 shadow-none">
+          <p className="text-xs text-muted-foreground">Vendas Acumuladas</p>
+          <p className="text-xl font-bold text-blue-600 mt-0.5">{totalSales}</p>
+        </Card>
+      </div>
+
+      {/* Barra de Filtros e Busca */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-1 min-w-[280px]">
+          <Input
+            placeholder="Buscar por anúncio, SKU, MLB ou seller..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="max-w-xs"
+          />
+
+          {/* Filtro de Seller / Conta */}
+          <Select value={selectedSeller} onValueChange={setSelectedSeller}>
+            <SelectTrigger className="w-[180px] text-xs">
+              <SelectValue placeholder="Todas as Contas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as Contas</SelectItem>
+              {sellers.map((s: any) => {
+                const name = [s.profile?.first_name, s.profile?.last_name].filter(Boolean).join(' ') || `ML ${s.ml_user_id}`;
+                return (
+                  <SelectItem key={s.user_id} value={s.user_id}>
+                    {name}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+
+          {/* Filtro de Status */}
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[130px] text-xs">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos Status</SelectItem>
+              <SelectItem value="published">Apenas Ativos</SelectItem>
+              <SelectItem value="paused">Apenas Pausados</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span>{filtered.length} anúncio(s)</span>
-          <Button size="sm" variant="outline" onClick={() => refetch()}>
+          <Button size="sm" variant="outline" onClick={() => refetch()} title="Atualizar listagem">
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -528,7 +661,7 @@ function GlobalListings() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <LayoutList className="h-10 w-10 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">Nenhum anúncio encontrado. Execute a fila de integração para importar.</p>
+          <p className="text-sm">Nenhum anúncio encontrado com os filtros selecionados.</p>
         </div>
       ) : (
         <div className="rounded-md border overflow-x-auto">

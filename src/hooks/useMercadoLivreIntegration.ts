@@ -242,15 +242,9 @@ export const useMercadoLivreIntegration = () => {
     onError: (error, { productId }) => {
       const message = error instanceof Error ? error.message : 'Erro desconhecido';
 
-      // Extrair causas específicas do ML (ex: atributo obrigatório, categoria inválida)
-      const causesMatch = message.match(/cause: (.+)/);
-      const causes = causesMatch ? causesMatch[1] : null;
-
       toast({
         title: 'Erro ao publicar no Mercado Livre',
-        description: causes
-          ? `${message.replace(/ — cause:.+/, '')}\n\nDetalhes: ${causes}`
-          : message,
+        description: message.replace(/^Erro ao publicar:\s*/i, ''),
         variant: 'destructive',
         duration: 10000,
       });
