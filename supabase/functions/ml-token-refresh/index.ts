@@ -90,18 +90,16 @@ export async function getValidToken(userId: string, force = false): Promise<{ ac
 
         const isInvalidGrant = errText.includes('invalid_grant') || refreshRes.status === 400;
 
-        // Registrar o erro no banco de dados para visibilidade no painel admin
-        await supabase
-          .from('mercadolivre_integrations')
-          .update({
-            last_error: `HTTP ${refreshRes.status}: ${errText}`,
-            last_error_at: new Date().toISOString(),
-            ...(isInvalidGrant ? { is_active: false } : {}),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('user_id', userId);
-
+        // Se a autorização foi revogada, marcar a integração como inativa
         if (isInvalidGrant) {
+          await supabase
+            .from('mercadolivre_integrations')
+            .update({
+              is_active: false,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('user_id', userId);
+
           throw new Error('Autorização revogada pelo Mercado Livre (invalid_grant). É necessário reconectar a conta.');
         }
 
@@ -111,8 +109,8 @@ export async function getValidToken(userId: string, force = false): Promise<{ ac
       const newToken = await refreshRes.json();
       const newExpiresAt = new Date(Date.now() + (newToken.expires_in ?? 21600) * 1000).toISOString();
 
-      // Salvar os novos tokens com sucesso e limpar erros anteriores
-      await supabase
+      // Salvar os novos tokens com sucesso no banco de dados
+      const { error: updateErr } = await supabase
         .from('mercadolivre_integrations')
         .update({
           access_token: newToken.access_token,
@@ -120,12 +118,15 @@ export async function getValidToken(userId: string, force = false): Promise<{ ac
           expires_in: newToken.expires_in ?? null,
           expires_at: newExpiresAt,
           last_refreshed_at: new Date().toISOString(),
-          last_error: null,
-          last_error_at: null,
           is_active: true,
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', userId);
+
+      if (updateErr) {
+        console.error(`[ml-token-refresh] Erro ao persistir tokens no banco para ${userId}:`, updateErr);
+        throw new Error(`Falha ao salvar novos tokens no banco de dados: ${updateErr.message}`);
+      }
 
       console.log(`✅ [ml-token-refresh] Token renovado com sucesso para ${userId}. Válido até ${newExpiresAt}`);
       return { access_token: newToken.access_token, ml_user_id: integration.ml_user_id };
