@@ -50,7 +50,7 @@ export const SuperAdminSidebar: React.FC = () => {
 
       {/* 2. Independent Scrollable Body with Definitive Architecture v2.2 */}
       <SidebarContent className="px-2 py-3 gap-0 overflow-y-auto">
-        <LojafySidebarGroup accordion>
+        <LojafySidebarGroup>
           {/* 01. Dashboard */}
           <LojafySidebarItem
             title="Dashboard"

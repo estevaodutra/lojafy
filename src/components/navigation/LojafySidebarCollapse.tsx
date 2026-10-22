@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useId } from 'react';
+import React, { useState, useEffect, useId, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -12,7 +12,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useSidebarAccordion } from './LojafySidebarGroup';
 
 export interface LojafySubItem {
   title: string;
@@ -31,7 +30,6 @@ export interface LojafySidebarCollapseProps {
 }
 
 export const LojafySidebarCollapse: React.FC<LojafySidebarCollapseProps> = ({
-  id,
   title,
   icon: Icon,
   items,
@@ -43,9 +41,6 @@ export const LojafySidebarCollapse: React.FC<LojafySidebarCollapseProps> = ({
   const isCollapsed = state === 'collapsed' && !isMobile;
   const currentPath = location.pathname;
   const contentId = useId();
-
-  const accordion = useSidebarAccordion();
-  const collapseId = id || title.toLowerCase();
 
   // Check if any child item matches the current route
   const isAnyChildActive = React.useMemo(() => {
@@ -59,28 +54,21 @@ export const LojafySidebarCollapse: React.FC<LojafySidebarCollapseProps> = ({
     });
   }, [currentPath, items]);
 
-  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen || isAnyChildActive);
+  const [isOpen, setIsOpen] = useState(defaultOpen || isAnyChildActive);
+  const prevPathRef = useRef(currentPath);
 
-  // If inside an accordion group, determine open state from accordion context
-  const isOpen = accordion ? accordion.openCollapseId === collapseId : uncontrolledOpen;
-
-  // Auto-expand when a child route is navigated to
+  // Only auto-open on actual page navigation, never overriding manual toggle while on the same page
   useEffect(() => {
-    if (isAnyChildActive) {
-      if (accordion) {
-        accordion.setOpenCollapseId(collapseId);
-      } else {
-        setUncontrolledOpen(true);
+    if (prevPathRef.current !== currentPath) {
+      prevPathRef.current = currentPath;
+      if (isAnyChildActive) {
+        setIsOpen(true);
       }
     }
-  }, [isAnyChildActive, accordion, collapseId]);
+  }, [currentPath, isAnyChildActive]);
 
   const handleToggle = () => {
-    if (accordion) {
-      accordion.toggleCollapse(collapseId);
-    } else {
-      setUncontrolledOpen((prev) => !prev);
-    }
+    setIsOpen((prev) => !prev);
   };
 
   const handleSubItemClick = (url: string) => {
