@@ -9,9 +9,6 @@ import { ptBR } from 'date-fns/locale';
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -46,7 +43,6 @@ import {
   Wallet,
   ShoppingBag,
   TrendingUp,
-  DollarSign,
   Search,
   RefreshCw,
   Download,
@@ -54,11 +50,9 @@ import {
   Package,
   ArrowUpRight,
   ArrowDownRight,
-  Building2,
   Percent,
   CheckCircle2,
   Clock,
-  XCircle,
   Receipt,
 } from 'lucide-react';
 
@@ -69,12 +63,8 @@ interface SupplierTransactionItem {
   sku: string | null;
   imageUrl: string | null;
   quantity: number;
-  unitGrossPrice: number;
-  totalGrossPrice: number;
   unitNetPrice: number;
   totalNetPrice: number;
-  feeAmount: number;
-  platformAmount: number;
 }
 
 interface SupplierSaleTransaction {
@@ -88,11 +78,9 @@ interface SupplierSaleTransaction {
   isCreditedToWallet: boolean;
   items: SupplierTransactionItem[];
   totalQuantity: number;
-  grossAmount: number;      // Produto pago pelo cliente (X)
-  platformAmount: number;   // Montante que ficou com a plataforma
-  feeAmount: number;        // Taxa da transação/gateway
-  feePercentage: number;    // % da taxa aplicada
-  netAmount: number;        // Quanto o fornecedor recebe líquido
+  productAmount: number; // Valor bruto do repasse do produto
+  feeAmount: number;     // Taxa aplicável ao fornecedor (se houver)
+  netAmount: number;     // Valor recebido pelo fornecedor
 }
 
 interface WalletLedgerEntry {
@@ -162,16 +150,12 @@ const SupplierFinanceiro: React.FC = () => {
     queryFn: async () => {
       const candidateUserIds = Array.from(new Set([userId, ownerUserId].filter(Boolean))) as string[];
 
-      // 1. Buscar configurações financeiras da plataforma (taxas e splits)
+      // 1. Buscar configurações financeiras da plataforma
       const { data: platformSettings } = await supabase
         .from('platform_settings')
-        .select('gateway_fee_percentage, platform_fee_value, platform_fee_type, split_fornecedor_percentual, split_plataforma_percentual')
+        .select('split_fornecedor_percentual')
         .maybeSingle();
 
-      // Taxa de transação padrão (ex: 4.5% transação + 1% contingência = 5.5% ou configurada no banco)
-      const gatewayFeePct = Number(platformSettings?.gateway_fee_percentage) > 0
-        ? Number(platformSettings?.gateway_fee_percentage)
-        : 5.5;
       const splitFornecedorPct = Number(platformSettings?.split_fornecedor_percentual) || 0;
 
       // 2. Buscar carteira do fornecedor
@@ -189,6 +173,7 @@ const SupplierFinanceiro: React.FC = () => {
 
       // 3. Buscar movimentações da carteira (wallet_transactions) e splits creditados
       let ledgerEntries: WalletLedgerEntry[] = [];
+      const ledgerFeeByOrderId = new Map<string, number>();
       if (walletData?.id) {
         const { data: wTxs } = await supabase
           .from('wallet_transactions')
@@ -196,9 +181,15 @@ const SupplierFinanceiro: React.FC = () => {
           .eq('wallet_id', walletData.id)
           .order('created_at', { ascending: false });
         ledgerEntries = (wTxs || []) as WalletLedgerEntry[];
+
+        for (const tx of ledgerEntries) {
+          if (tx.referencia_id && Number(tx.taxa) > 0) {
+            ledgerFeeByOrderId.set(tx.referencia_id, Number(tx.taxa));
+          }
+        }
       }
 
-      let splitsByOrderId = new Map<string, number>();
+      const splitsByOrderId = new Map<string, number>();
       if (candidateUserIds.length > 0) {
         const { data: splits } = await supabase
           .from('order_payment_splits')
@@ -215,7 +206,7 @@ const SupplierFinanceiro: React.FC = () => {
         }
       }
 
-      // 4. Buscar produtos do fornecedor para referência de preço/custo
+      // 4. Buscar produtos do fornecedor para referência de custo/repasse
       let productsQuery = supabase
         .from('products')
         .select('id, name, sku, price, cost_price, supplier_cost_price, main_image_url, image_url');
@@ -231,7 +222,7 @@ const SupplierFinanceiro: React.FC = () => {
       const { data: supplierProducts } = await productsQuery;
       const productsMap = new Map((supplierProducts || []).map(p => [p.id, p]));
 
-      // 5. Buscar fulfillments do fornecedor (fonte primária de vendas da organização)
+      // 5. Buscar fulfillments do fornecedor
       let fulfillmentsData: any[] = [];
       if (orgId) {
         const { data: fData } = await supabase
@@ -275,7 +266,7 @@ const SupplierFinanceiro: React.FC = () => {
         fulfillmentsData = fData || [];
       }
 
-      // Coletar todos os order_ids conhecidos (de fulfillments e de transações de carteira)
+      // Coletar todos os order_ids conhecidos
       const orderIdsSet = new Set<string>();
       fulfillmentsData.forEach(f => {
         if (f.order_id) orderIdsSet.add(f.order_id);
@@ -286,22 +277,21 @@ const SupplierFinanceiro: React.FC = () => {
         }
       });
 
-      // 6. Buscar order_items correspondentes (se disponíveis via RLS)
+      // 6. Buscar order_items correspondentes
       let orderItemsData: any[] = [];
       const allOrderIds = Array.from(orderIdsSet);
       if (allOrderIds.length > 0) {
         const { data: oiData } = await supabase
           .from('order_items')
-          .select('id, order_id, product_id, quantity, unit_price, total_price, product_snapshot, supplier_unit_cost, supplier_total_cost, supplier_net_amount, platform_fee_amount, reseller_margin_amount')
+          .select('id, order_id, product_id, quantity, unit_price, total_price, product_snapshot, supplier_unit_cost, supplier_total_cost, supplier_net_amount')
           .in('order_id', allOrderIds);
         if (oiData) orderItemsData = oiData;
       }
 
-      // Também buscar order_items diretamente vinculados ao supplier_id / supplier_organization_id caso não tenham fulfillment
       if (orgId || userId) {
         let directOiQuery = supabase
           .from('order_items')
-          .select('id, order_id, product_id, quantity, unit_price, total_price, product_snapshot, supplier_unit_cost, supplier_total_cost, supplier_net_amount, platform_fee_amount, reseller_margin_amount');
+          .select('id, order_id, product_id, quantity, unit_price, total_price, product_snapshot, supplier_unit_cost, supplier_total_cost, supplier_net_amount');
 
         if (orgId && userId) {
           directOiQuery = directOiQuery.or(`supplier_organization_id.eq.${orgId},supplier_id.eq.${userId}`);
@@ -351,7 +341,7 @@ const SupplierFinanceiro: React.FC = () => {
         }
       }
 
-      // Helper para calcular a decomposição financeira de um item
+      // Helper para calcular o valor recebido de cada item do fornecedor
       const buildItemFinancials = (params: {
         id: string;
         productId: string | null;
@@ -367,7 +357,6 @@ const SupplierFinanceiro: React.FC = () => {
         const sku = prod.sku || snapshot.sku || null;
         const imageUrl = prod.main_image_url || prod.image_url || snapshot.main_image_url || snapshot.image_url || null;
 
-        // 1. Preço unitário e total pago pelo cliente (Valor Bruto)
         const unitGrossPrice = Number(orderItem?.unit_price) > 0
           ? Number(orderItem.unit_price)
           : Number(snapshot?.price) > 0
@@ -378,7 +367,7 @@ const SupplierFinanceiro: React.FC = () => {
           ? Number(orderItem.total_price)
           : unitGrossPrice * quantity;
 
-        // 2. Valor Líquido que o Fornecedor recebe (Repasse Líquido)
+        // Valor que o fornecedor recebe pelo produto
         let totalNetPrice = 0;
         if (Number(orderItem?.supplier_net_amount) > 0) {
           totalNetPrice = Number(orderItem.supplier_net_amount);
@@ -391,20 +380,10 @@ const SupplierFinanceiro: React.FC = () => {
         } else if (splitFornecedorPct > 0) {
           totalNetPrice = totalGrossPrice * (splitFornecedorPct / 100);
         } else {
-          totalNetPrice = totalGrossPrice * 0.7;
+          totalNetPrice = totalGrossPrice;
         }
 
         const unitNetPrice = quantity > 0 ? totalNetPrice / quantity : totalNetPrice;
-
-        // 3. Taxa da Transação / Gateway
-        const rawFeeAmount = totalGrossPrice * (gatewayFeePct / 100);
-        const availableMargin = Math.max(0, totalGrossPrice - totalNetPrice);
-        const feeAmount = totalGrossPrice >= totalNetPrice
-          ? Math.min(rawFeeAmount, availableMargin)
-          : rawFeeAmount;
-
-        // 4. Montante que ficou com a Plataforma
-        const platformAmount = Math.max(0, totalGrossPrice - totalNetPrice - feeAmount);
 
         return {
           id,
@@ -413,12 +392,8 @@ const SupplierFinanceiro: React.FC = () => {
           sku,
           imageUrl,
           quantity,
-          unitGrossPrice,
-          totalGrossPrice,
           unitNetPrice,
           totalNetPrice,
-          feeAmount,
-          platformAmount,
         };
       };
 
@@ -426,7 +401,6 @@ const SupplierFinanceiro: React.FC = () => {
       const salesTransactions: SupplierSaleTransaction[] = [];
       const processedOrderIds = new Set<string>();
 
-      // A partir dos fulfillments da organização
       for (const f of fulfillmentsData) {
         const orderId = f.order_id;
         processedOrderIds.add(orderId);
@@ -444,7 +418,6 @@ const SupplierFinanceiro: React.FC = () => {
           });
         });
 
-        // Caso o fulfillment não tenha itens detalhados mas o pedido tenha order_items do fornecedor
         if (txItems.length === 0 && orderItemsByOrderId.has(orderId)) {
           const ois = orderItemsByOrderId.get(orderId) || [];
           for (const oi of ois) {
@@ -459,11 +432,9 @@ const SupplierFinanceiro: React.FC = () => {
           }
         }
 
-        const grossAmount = txItems.reduce((acc, i) => acc + i.totalGrossPrice, 0) || Number(orderObj?.total_amount || 0);
         const netAmount = splitsByOrderId.get(orderId) ?? txItems.reduce((acc, i) => acc + i.totalNetPrice, 0);
-        const rawFee = grossAmount * (gatewayFeePct / 100);
-        const feeAmount = grossAmount >= netAmount ? Math.min(rawFee, Math.max(0, grossAmount - netAmount)) : rawFee;
-        const platformAmount = Math.max(0, grossAmount - netAmount - feeAmount);
+        const feeAmount = ledgerFeeByOrderId.get(orderId) ?? 0;
+        const productAmount = netAmount + feeAmount;
         const totalQuantity = txItems.reduce((acc, i) => acc + i.quantity, 0) || 1;
 
         const isCredited = splitsByOrderId.has(orderId) || ledgerEntries.some(
@@ -481,15 +452,12 @@ const SupplierFinanceiro: React.FC = () => {
           isCreditedToWallet: isCredited,
           items: txItems,
           totalQuantity,
-          grossAmount,
-          platformAmount,
+          productAmount,
           feeAmount,
-          feePercentage: gatewayFeePct,
           netAmount,
         });
       }
 
-      // B. Incluir pedidos que têm order_items do fornecedor mas ainda não tinham fulfillment
       for (const [orderId, ois] of orderItemsByOrderId.entries()) {
         if (processedOrderIds.has(orderId)) continue;
         const supplierOis = ois.filter(
@@ -511,11 +479,9 @@ const SupplierFinanceiro: React.FC = () => {
           })
         );
 
-        const grossAmount = txItems.reduce((acc, i) => acc + i.totalGrossPrice, 0) || Number(orderObj?.total_amount || 0);
         const netAmount = splitsByOrderId.get(orderId) ?? txItems.reduce((acc, i) => acc + i.totalNetPrice, 0);
-        const rawFee = grossAmount * (gatewayFeePct / 100);
-        const feeAmount = grossAmount >= netAmount ? Math.min(rawFee, Math.max(0, grossAmount - netAmount)) : rawFee;
-        const platformAmount = Math.max(0, grossAmount - netAmount - feeAmount);
+        const feeAmount = ledgerFeeByOrderId.get(orderId) ?? 0;
+        const productAmount = netAmount + feeAmount;
         const totalQuantity = txItems.reduce((acc, i) => acc + i.quantity, 0) || 1;
 
         const isCredited = splitsByOrderId.has(orderId) || ledgerEntries.some(
@@ -533,15 +499,12 @@ const SupplierFinanceiro: React.FC = () => {
           isCreditedToWallet: isCredited,
           items: txItems,
           totalQuantity,
-          grossAmount,
-          platformAmount,
+          productAmount,
           feeAmount,
-          feePercentage: gatewayFeePct,
           netAmount,
         });
       }
 
-      // Ordenar por data decrescente
       salesTransactions.sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
@@ -550,7 +513,6 @@ const SupplierFinanceiro: React.FC = () => {
         wallet: walletData,
         salesTransactions,
         ledgerEntries,
-        gatewayFeePct,
       };
     },
   });
@@ -593,27 +555,19 @@ const SupplierFinanceiro: React.FC = () => {
 
     const totalSalesCount = validSales.length;
     const totalUnitsSold = validSales.reduce((acc, tx) => acc + tx.totalQuantity, 0);
-    const totalGrossAmount = validSales.reduce((acc, tx) => acc + tx.grossAmount, 0);
     const totalNetAmount = validSales.reduce((acc, tx) => acc + tx.netAmount, 0);
-    const totalPlatformAmount = validSales.reduce((acc, tx) => acc + tx.platformAmount, 0);
-    const totalFeeAmount = validSales.reduce((acc, tx) => acc + tx.feeAmount, 0);
     const pendingReleaseAmount = validSales
       .filter(tx => !tx.isCreditedToWallet)
       .reduce((acc, tx) => acc + tx.netAmount, 0);
 
     const walletBalance = wallet ? Number(wallet.saldo) : 0;
-    const walletBlocked = wallet ? Number(wallet.saldo_bloqueado) : 0;
 
     return {
       totalSalesCount,
       totalUnitsSold,
-      totalGrossAmount,
       totalNetAmount,
-      totalPlatformAmount,
-      totalFeeAmount,
       pendingReleaseAmount,
       walletBalance,
-      walletBlocked,
     };
   }, [salesTransactions, wallet]);
 
@@ -629,10 +583,8 @@ const SupplierFinanceiro: React.FC = () => {
       'Produtos',
       'Qtd Itens',
       'Status',
-      'Valor Pago Cliente (Bruto)',
-      'Montante Plataforma',
-      'Taxa Transacao',
-      'Valor Liquido Fornecedor',
+      'Taxa',
+      'Valor Recebido',
     ];
 
     const rows = filteredTransactions.map(tx => {
@@ -644,8 +596,6 @@ const SupplierFinanceiro: React.FC = () => {
         `"${productNames.replace(/"/g, '""')}"`,
         tx.totalQuantity,
         st,
-        tx.grossAmount.toFixed(2),
-        tx.platformAmount.toFixed(2),
         tx.feeAmount.toFixed(2),
         tx.netAmount.toFixed(2),
       ].join(',');
@@ -670,7 +620,7 @@ const SupplierFinanceiro: React.FC = () => {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Financeiro</h1>
           <p className="text-sm text-muted-foreground">
-            Acompanhe suas vendas realizadas, saldo na carteira da plataforma e o valor líquido de cada transação
+            Acompanhe suas vendas realizadas, saldo na carteira da plataforma e o valor recebido em cada transação
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -695,8 +645,8 @@ const SupplierFinanceiro: React.FC = () => {
         </div>
       </div>
 
-      {/* Cards de Indicadores (Saldo na Carteira + Vendas Realizadas + Total Líquido + Bruto) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Cards de Indicadores */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Card 1: Saldo na Carteira da Plataforma */}
         <Card className="border-emerald-200 dark:border-emerald-900 bg-emerald-50/30 dark:bg-emerald-950/10">
           <CardContent className="pt-6">
@@ -751,13 +701,13 @@ const SupplierFinanceiro: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Card 3: Total Líquido do Fornecedor */}
+        {/* Card 3: Total Recebido pelo Fornecedor */}
         <Card className="border-indigo-200 dark:border-indigo-900 bg-indigo-50/30 dark:bg-indigo-950/10">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Total Líquido (Seu Valor)
+                  Total Recebido
                 </p>
                 {isLoading ? (
                   <Skeleton className="h-8 w-28" />
@@ -767,37 +717,11 @@ const SupplierFinanceiro: React.FC = () => {
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Valor líquido total das suas vendas
+                  Soma recebida dos produtos vendidos
                 </p>
               </div>
               <div className="p-3 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-xl">
                 <TrendingUp className="h-6 w-6" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Card 4: Valor Bruto Pago pelos Clientes */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Total Pago pelos Clientes
-                </p>
-                {isLoading ? (
-                  <Skeleton className="h-8 w-28" />
-                ) : (
-                  <p className="text-2xl font-bold text-foreground">
-                    {formatBRL(metrics.totalGrossAmount)}
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Plataforma + taxas: {formatBRL(metrics.totalPlatformAmount + metrics.totalFeeAmount)}
-                </p>
-              </div>
-              <div className="p-3 bg-muted text-muted-foreground rounded-xl">
-                <DollarSign className="h-6 w-6" />
               </div>
             </div>
           </CardContent>
@@ -815,7 +739,7 @@ const SupplierFinanceiro: React.FC = () => {
           </TabsTrigger>
         </TabsList>
 
-        {/* ABA 1: TRANSAÇÕES DE VENDAS COM VALOR LÍQUIDO E DETALHAMENTO */}
+        {/* ABA 1: TRANSAÇÕES DE VENDAS */}
         <TabsContent value="transactions" className="space-y-4">
           <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
             <div className="relative w-full md:w-96">
@@ -853,7 +777,7 @@ const SupplierFinanceiro: React.FC = () => {
                 <Receipt className="h-12 w-12 text-muted-foreground/40 mb-3" />
                 <p className="font-semibold text-foreground">Nenhuma transação encontrada</p>
                 <p className="text-sm text-muted-foreground max-w-md mt-1">
-                  Assim que seus produtos forem vendidos na plataforma, todas as transações e os respectivos valores líquidos aparecerão listados aqui.
+                  Assim que seus produtos forem vendidos na plataforma, todas as transações e os valores recebidos aparecerão listados aqui.
                 </p>
               </CardContent>
             </Card>
@@ -867,8 +791,7 @@ const SupplierFinanceiro: React.FC = () => {
                     <TableHead className="text-center">Qtd</TableHead>
                     <TableHead>Data</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Produto Pago (Cliente)</TableHead>
-                    <TableHead className="text-right">Valor Líquido (Você Recebe)</TableHead>
+                    <TableHead className="text-right">Valor Recebido</TableHead>
                     <TableHead className="text-right">Detalhamento</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -908,7 +831,7 @@ const SupplierFinanceiro: React.FC = () => {
                               </div>
                             )}
                             <div className="min-w-0">
-                              <p className="text-sm font-medium truncate max-w-[240px]">
+                              <p className="text-sm font-medium truncate max-w-[260px]">
                                 {firstItem?.productName || 'Produto do Pedido'}
                               </p>
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -940,10 +863,6 @@ const SupplierFinanceiro: React.FC = () => {
                               </span>
                             )}
                           </div>
-                        </TableCell>
-
-                        <TableCell className="text-right text-sm text-muted-foreground font-mono whitespace-nowrap">
-                          {formatBRL(tx.grossAmount)}
                         </TableCell>
 
                         <TableCell className="text-right whitespace-nowrap">
@@ -1057,16 +976,16 @@ const SupplierFinanceiro: React.FC = () => {
           if (!open) setSelectedTransaction(null);
         }}
       >
-        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between pr-4">
-              <span className="flex items-center gap-2">
-                <Receipt className="h-5 w-5 text-primary" />
-                Detalhamento da Transação — Pedido #{selectedTransaction?.orderNumber}
-              </span>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="h-5 w-5 text-primary" />
+              Detalhamento — Pedido #{selectedTransaction?.orderNumber}
             </DialogTitle>
             <DialogDescription>
-              Demonstrativo transparente dos valores pagos, taxas da operação e seu recebimento líquido.
+              Realizado em{' '}
+              {selectedTransaction &&
+                format(new Date(selectedTransaction.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
             </DialogDescription>
           </DialogHeader>
 
@@ -1077,177 +996,19 @@ const SupplierFinanceiro: React.FC = () => {
               variant: 'outline' as const,
             };
 
-            const netPct = tx.grossAmount > 0 ? Math.round((tx.netAmount / tx.grossAmount) * 100) : 0;
-            const platformPct = tx.grossAmount > 0 ? Math.round((tx.platformAmount / tx.grossAmount) * 100) : 0;
-            const feePct = tx.grossAmount > 0 ? Math.max(0, 100 - netPct - platformPct) : 0;
-
             return (
-              <div className="space-y-5 py-2">
-                {/* 1. Card de Destaque: Quanto você está recebendo líquido */}
-                <div className="p-4 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                      Valor Líquido (Quanto você recebe)
-                    </span>
-                    <p className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">
-                      {formatBRL(tx.netAmount)}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                       Realizado em {format(new Date(tx.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1.5">
-                    <Badge variant={st.variant}>{st.label}</Badge>
-                    {tx.isCreditedToWallet ? (
-                      <Badge variant="outline" className="bg-emerald-100/80 text-emerald-800 border-emerald-300 text-xs">
-                        <CheckCircle2 className="h-3 w-3 mr-1" /> Liberado na Carteira
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-xs">
-                        <Clock className="h-3 w-3 mr-1" /> Liberação após envio
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-
-                {/* 2. Decomposição Passo a Passo da Transação */}
-                <div className="rounded-xl border bg-card p-4 space-y-3.5">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-bold text-foreground flex items-center gap-1.5">
-                      <DollarSign className="h-4 w-4 text-primary" />
-                      Resumo Financeiro da Transação
-                    </h4>
-                    <span className="text-xs text-muted-foreground">Decomposição do valor</span>
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-3 text-sm">
-                    {/* Linha 1: Produto pago foi X */}
-                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/40">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-600">
-                          <ShoppingBag className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-foreground">Valor do Produto Pago</p>
-                          <p className="text-xs text-muted-foreground">
-                            Montante bruto pago pelo cliente no pedido
-                          </p>
-                        </div>
-                      </div>
-                      <span className="font-mono font-bold text-base text-foreground">
-                        {formatBRL(tx.grossAmount)}
-                      </span>
-                    </div>
-
-                    {/* Linha 2: Esse montante ficou com a plataforma */}
-                    <div className="flex items-center justify-between p-2.5 rounded-lg border border-dashed">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 rounded-md bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600">
-                          <Building2 className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-foreground">(-) Montante da Plataforma</p>
-                          <p className="text-xs text-muted-foreground">
-                            Margem operacional retida pela plataforma / revenda
-                          </p>
-                        </div>
-                      </div>
-                      <span className="font-mono font-semibold text-indigo-600 dark:text-indigo-400">
-                        - {formatBRL(tx.platformAmount)}
-                      </span>
-                    </div>
-
-                    {/* Linha 3: Esse montante aqui é a taxa */}
-                    <div className="flex items-center justify-between p-2.5 rounded-lg border border-dashed">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-600">
-                          <Percent className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-foreground">
-                            (-) Taxa da Transação ({tx.feePercentage}%)
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Taxa de processamento do pagamento e segurança
-                          </p>
-                        </div>
-                      </div>
-                      <span className="font-mono font-semibold text-amber-600 dark:text-amber-400">
-                        - {formatBRL(tx.feeAmount)}
-                      </span>
-                    </div>
-
-                    <Separator />
-
-                    {/* Linha 4: Quanto você está recebendo líquido */}
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 rounded-md bg-emerald-500 text-white">
-                          <Wallet className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-emerald-700 dark:text-emerald-400">
-                            (=) Valor Líquido que Você Recebe
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Valor creditado para você por esta venda
-                          </p>
-                        </div>
-                      </div>
-                      <span className="font-mono font-extrabold text-lg text-emerald-600 dark:text-emerald-400">
-                        {formatBRL(tx.netAmount)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Barra visual de distribuição */}
-                  {tx.grossAmount > 0 && (
-                    <div className="pt-2 space-y-1.5">
-                      <div className="h-2.5 w-full rounded-full overflow-hidden flex bg-muted">
-                        <div
-                          className="bg-emerald-500 h-full transition-all"
-                          style={{ width: `${netPct}%` }}
-                          title={`Você recebe: ${netPct}%`}
-                        />
-                        <div
-                          className="bg-indigo-500 h-full transition-all"
-                          style={{ width: `${platformPct}%` }}
-                          title={`Plataforma: ${platformPct}%`}
-                        />
-                        <div
-                          className="bg-amber-500 h-full transition-all"
-                          style={{ width: `${feePct}%` }}
-                          title={`Taxa: ${feePct}%`}
-                        />
-                      </div>
-                      <div className="flex justify-between text-[11px] text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />
-                          Seu Líquido ({netPct}%)
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <span className="h-2 w-2 rounded-full bg-indigo-500 inline-block" />
-                          Plataforma ({platformPct}%)
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <span className="h-2 w-2 rounded-full bg-amber-500 inline-block" />
-                          Taxa ({feePct}%)
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* 3. Itens do Pedido nesta Transação */}
+              <div className="space-y-4 py-2">
+                {/* 1. Produto(s) Vendido(s) */}
                 {tx.items.length > 0 && (
                   <div className="rounded-xl border bg-card p-4 space-y-3">
-                    <h4 className="text-sm font-bold text-foreground flex items-center gap-1.5">
-                      <Package className="h-4 w-4 text-primary" />
-                      Produto(s) Vendido(s) ({tx.totalQuantity} {tx.totalQuantity === 1 ? 'unidade' : 'unidades'})
-                    </h4>
-                    <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                        <Package className="h-4 w-4 text-primary" />
+                        Produto(s) ({tx.totalQuantity} {tx.totalQuantity === 1 ? 'unidade' : 'unidades'})
+                      </h4>
+                      <Badge variant={st.variant}>{st.label}</Badge>
+                    </div>
+                    <div className="space-y-2">
                       {tx.items.map(item => (
                         <div
                           key={item.id}
@@ -1268,21 +1029,55 @@ const SupplierFinanceiro: React.FC = () => {
                             <div className="min-w-0">
                               <p className="text-sm font-semibold truncate">{item.productName}</p>
                               <p className="text-xs text-muted-foreground">
-                                {item.quantity}x • Pago pelo cliente: {formatBRL(item.unitGrossPrice)}/un
+                                {item.quantity}x {formatBRL(item.unitNetPrice)}
+                                {item.sku ? ` • SKU: ${item.sku}` : ''}
                               </p>
                             </div>
                           </div>
-                          <div className="text-right shrink-0">
-                            <span className="text-[11px] text-muted-foreground block">Seu líquido</span>
-                            <span className="font-mono font-bold text-sm text-emerald-600 dark:text-emerald-400">
-                              {formatBRL(item.totalNetPrice)}
-                            </span>
-                          </div>
+                          <span className="font-mono font-bold text-sm text-foreground shrink-0">
+                            {formatBRL(item.totalNetPrice)}
+                          </span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
+
+                {/* 2. Resumo: Valor do Produto, Taxa e Valor Recebido */}
+                <div className="rounded-xl border bg-card p-4 space-y-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Valor do Produto</span>
+                    <span className="font-mono font-semibold text-foreground">
+                      {formatBRL(tx.productAmount)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground flex items-center gap-1.5">
+                      <Percent className="h-3.5 w-3.5 text-amber-600" />
+                      Taxa
+                    </span>
+                    <span className="font-mono font-medium text-amber-600 dark:text-amber-400">
+                      {tx.feeAmount > 0 ? `- ${formatBRL(tx.feeAmount)}` : formatBRL(0)}
+                    </span>
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex items-center justify-between pt-1">
+                    <div>
+                      <span className="font-bold text-base text-foreground block">
+                        Valor Recebido
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {tx.isCreditedToWallet ? 'Creditado na sua carteira' : 'Liberação após envio'}
+                      </span>
+                    </div>
+                    <span className="font-mono font-extrabold text-xl text-emerald-600 dark:text-emerald-400">
+                      {formatBRL(tx.netAmount)}
+                    </span>
+                  </div>
+                </div>
               </div>
             );
           })()}
