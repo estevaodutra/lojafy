@@ -18,6 +18,7 @@ import {
   Truck,
   MapPin,
   Layers,
+  DollarSign,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -45,6 +46,7 @@ interface MenuItem {
 const operationItems: MenuItem[] = [
   { title: 'Dashboard', url: '/supplier', icon: LayoutDashboard, exactMatch: true },
   { title: 'Pedidos', url: '/supplier/pedidos', icon: ShoppingCart },
+  { title: 'Financeiro', url: '/supplier/financeiro', icon: DollarSign },
   { title: 'Separação', url: '/supplier/separacao', icon: Hand },
   { title: 'Embalagem', url: '/supplier/embalagem', icon: PackageOpen },
   { title: 'Expedição', url: '/supplier/expedicao', icon: Send },

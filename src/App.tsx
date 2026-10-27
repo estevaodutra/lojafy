@@ -117,6 +117,7 @@ const SupplierDashboard = lazy(() => import("./pages/supplier/Dashboard"));
 const SupplierProductManagement = lazy(() => import("./pages/supplier/ProductManagement"));
 const SupplierProductApproval = lazy(() => import("./pages/supplier/ProductApproval"));
 const SupplierOrderManagement = lazy(() => import("./pages/supplier/OrderManagement"));
+const SupplierFinanceiro = lazy(() => import("./pages/supplier/Financeiro"));
 const SupplierInventory = lazy(() => import("./pages/supplier/Inventory"));
 const SupplierPicking = lazy(() => import("./pages/supplier/Picking"));
 const SupplierPacking = lazy(() => import("./pages/supplier/Packing"));
@@ -423,6 +424,7 @@ const App = () => {
                 >
                   <Route index element={<SupplierDashboard />} />
                   <Route path="pedidos" element={<SupplierOrderManagement />} />
+                  <Route path="financeiro" element={<SupplierFinanceiro />} />
                   <Route path="separacao" element={<SupplierPicking />} />
                   <Route path="embalagem" element={<SupplierPacking />} />
                   <Route path="expedicao" element={<SupplierExpedition />} />
