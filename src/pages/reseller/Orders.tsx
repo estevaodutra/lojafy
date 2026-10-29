@@ -18,12 +18,17 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
-async function downloadLabel(orderId: string, orderNumber: string) {
+async function downloadLabel(order: ResellerOrder) {
+  if (order.ml_label_url) {
+    window.open(order.ml_label_url, '_blank');
+    return;
+  }
+
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return;
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const url = `${supabaseUrl}/functions/v1/ml-get-label?order_id=${orderId}`;
+  const url = `${supabaseUrl}/functions/v1/ml-get-label?order_id=${order.id}`;
 
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${session.access_token}` },
@@ -37,7 +42,7 @@ async function downloadLabel(orderId: string, orderNumber: string) {
   const blob = await res.blob();
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = `etiqueta-${orderNumber}.pdf`;
+  link.download = `etiqueta-${order.order_number}.pdf`;
   link.click();
   URL.revokeObjectURL(link.href);
 }
@@ -367,12 +372,12 @@ function ResellerOrders() {
                               Pagar Pix (Fulfillment)
                             </Button>
                           )}
-                          {order.ml_shipment_id && (
+                          {(order.ml_shipment_id || order.ml_label_url || (order as any).has_shipping_file) && (
                             <Button
                               size="sm"
                               variant="outline"
                               className="text-xs gap-1"
-                              onClick={() => downloadLabel(order.id, order.order_number)}
+                              onClick={() => downloadLabel(order)}
                             >
                               <Download className="h-3 w-3" />
                               Etiqueta

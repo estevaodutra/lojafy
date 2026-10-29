@@ -50,14 +50,12 @@ async function getValidTokenForIntegration(integration: {
 
 /**
  * Encontra a conta/revendedor dona de um pedido no Mercado Livre.
- * Se informado preferredUserId (user_id do sistema ou ml_user_id), testa essa conta primeiro.
- * Caso contrário, ou se falhar, busca nas contas ativas até encontrar a conta dona do pedido.
+ * Testa preferredUserId primeiro; se falhar, busca nas contas ativas.
  */
 async function findSellerForOrder(
   mlOrderId: string,
   preferredUserId?: string | number | null
 ): Promise<{ accessToken: string; resellerUserId: string; mlOrder: any; mlUserId?: number } | null> {
-  // 1. Tentar com preferredUserId se fornecido
   if (preferredUserId) {
     let query = supabase
       .from('mercadolivre_integrations')
@@ -91,7 +89,6 @@ async function findSellerForOrder(
     }
   }
 
-  // 2. Busca entre todas as contas ativas conectadas no Mercado Livre
   console.log(`[ml-order-webhook] Buscando proprietário do pedido ML #${mlOrderId} entre contas ativas...`);
   const { data: allIntegrations, error } = await supabase
     .from('mercadolivre_integrations')
@@ -114,7 +111,6 @@ async function findSellerForOrder(
         const mlOrder = await res.json();
         console.log(`[ml-order-webhook] ✅ Pedido ML #${mlOrderId} pertence ao revendedor ${intg.user_id} (ML User: ${mlOrder.seller?.id})`);
 
-        // Se ml_user_id não estava salvo no banco, atualizar para agilizar futuras buscas
         if (!intg.ml_user_id && mlOrder.seller?.id) {
           await supabase
             .from('mercadolivre_integrations')
@@ -139,7 +135,6 @@ async function findSellerForOrder(
 
 /**
  * Gera QR Code e Copia e Cola Pix com validade de 24 horas.
- * Tenta N8N primeiro; faz fallback para a API oficial do Mercado Pago se necessário.
  */
 async function generatePix24h(params: {
   orderNumber: string;
@@ -206,7 +201,6 @@ async function generatePix24h(params: {
   let qrCodeBase64: string | null = null;
   let paymentId: string | null = null;
 
-  // Tentativa 1: Webhook N8N
   try {
     console.log('[ml-order-webhook] Chamando N8N para gerar Pix (24h)...');
     const controller = new AbortController();
@@ -239,7 +233,6 @@ async function generatePix24h(params: {
     console.warn('[ml-order-webhook] Erro ao chamar N8N:', err);
   }
 
-  // Tentativa 2: API direta do Mercado Pago (fallback robusto)
   if (!qrCode && MP_ACCESS_TOKEN) {
     try {
       console.log('[ml-order-webhook] Gerando Pix via API direta Mercado Pago com expiração 24h...');
@@ -293,6 +286,240 @@ async function generatePix24h(params: {
 }
 
 /**
+ * Repara um pedido existente garantindo que etiqueta, rastreio, itens, custo e cobrança Pix estejam 100% corretos.
+ */
+async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
+  const mlOrderIdStr = String(orderRecord.ml_order_id);
+  console.log(`[ml-order-webhook] Reparando pedido #${orderRecord.order_number} (ML #${mlOrderIdStr})...`);
+
+  const { data: intg } = await supabase
+    .from('mercadolivre_integrations')
+    .select('user_id, ml_user_id, access_token, refresh_token, expires_at')
+    .eq('user_id', resellerUserId)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (!intg) return;
+  const token = await getValidTokenForIntegration(intg);
+
+  const oRes = await fetch(`https://api.mercadolibre.com/orders/${mlOrderIdStr}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!oRes.ok) return;
+  const mlOrder = await oRes.json();
+
+  // 1. Extrair ID da remessa oficial (shipping.id no ML)
+  const shipmentId = mlOrder.shipping?.id
+    ?? mlOrder.shipping_id
+    ?? mlOrder.shipments?.id
+    ?? mlOrder.order_items?.[0]?.shipping?.id
+    ?? mlOrder.order_items?.[0]?.shipment?.id
+    ?? null;
+
+  let publicLabelUrl = orderRecord.ml_label_url;
+  let trackingCode = orderRecord.tracking_code;
+
+  if (shipmentId) {
+    try {
+      console.log(`[ml-order-webhook] Baixando shipment ${shipmentId} para pedido #${orderRecord.order_number}...`);
+      const shRes = await fetch(`https://api.mercadolibre.com/shipments/${shipmentId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (shRes.ok) {
+        const shData = await shRes.json();
+        trackingCode = shData.tracking_number ?? shData.tracking_id ?? trackingCode;
+      }
+
+      const labelRes = await fetch(`https://api.mercadolibre.com/shipments/${shipmentId}/labels?response_type=pdf2`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (labelRes.ok) {
+        const labelBytes = await labelRes.arrayBuffer();
+        const filePath = `labels/${resellerUserId}/${orderRecord.id}/etiqueta-${mlOrderIdStr}.pdf`;
+        let targetBucket = 'shipping-labels';
+        const uploadRes = await supabase.storage.from(targetBucket).upload(filePath, labelBytes, {
+          contentType: 'application/pdf',
+          upsert: true,
+        });
+
+        if (uploadRes.error) {
+          const fbRes = await supabase.storage.from('shipping-files').upload(filePath, labelBytes, {
+            contentType: 'application/pdf',
+            upsert: true,
+          });
+          if (!fbRes.error) targetBucket = 'shipping-files';
+        }
+
+        const { data: signedData } = await supabase.storage.from(targetBucket).createSignedUrl(filePath, 604800);
+        publicLabelUrl = getPublicSignedUrl(signedData?.signedUrl) ?? `https://api.mercadolibre.com/shipments/${shipmentId}/labels?response_type=pdf2`;
+
+        await supabase.from('order_shipping_files').upsert({
+          order_id: orderRecord.id,
+          file_name: `etiqueta-${mlOrderIdStr}.pdf`,
+          file_path: filePath,
+          file_size: labelBytes.byteLength,
+          uploaded_at: new Date().toISOString(),
+        }, { onConflict: 'order_id,file_path' });
+      }
+    } catch (e) {
+      console.warn(`[ml-order-webhook] Erro ao baixar etiqueta no repair:`, e);
+    }
+  }
+
+  // 2. Recalcular itens e custo real do fornecedor
+  const orderItems = mlOrder.order_items ?? [];
+  let totalSupplierCost = 0;
+  let primarySupplierId: string | null = null;
+  const compiledItems: any[] = [];
+
+  for (const item of orderItems) {
+    const rawSku = (
+      item.item?.seller_sku ||
+      item.item?.seller_custom_field ||
+      item.item?.variation_attributes?.find((a: any) => a.id === 'SELLER_SKU')?.value_name ||
+      ''
+    ).trim() || null;
+
+    let matchedProd: any = null;
+
+    if (rawSku) {
+      const { data: p } = await supabase.from('products').select('*').eq('sku', rawSku).maybeSingle();
+      matchedProd = p;
+    }
+
+    if (!matchedProd && item.item?.id) {
+      const { data: pub } = await supabase.from('mercadolivre_published_products').select('product_id').eq('ml_item_id', item.item.id).maybeSingle();
+      if (pub?.product_id) {
+        const { data: p } = await supabase.from('products').select('*').eq('id', pub.product_id).maybeSingle();
+        matchedProd = p;
+      }
+    }
+
+    const unitPrice = Number(item.unit_price ?? 0);
+    const quantity = Number(item.quantity ?? 1);
+    const costPrice = Number(matchedProd?.cost_price ?? 0);
+    const itemTotalCost = Math.round(costPrice * quantity * 100) / 100;
+    totalSupplierCost += itemTotalCost;
+    if (matchedProd?.supplier_id && !primarySupplierId) primarySupplierId = matchedProd.supplier_id;
+
+    compiledItems.push({
+      productId: matchedProd?.id ?? null,
+      name: matchedProd?.name || item.item?.title || 'Produto Mercado Livre',
+      sku: rawSku || matchedProd?.sku || null,
+      quantity,
+      unitPrice,
+      costPrice,
+      totalCost: itemTotalCost,
+      supplierId: matchedProd?.supplier_id ?? null,
+      mlItemId: item.item?.id ?? null,
+    });
+  }
+
+  totalSupplierCost = Math.round(totalSupplierCost * 100) / 100;
+
+  // Atualizar itens do pedido no banco
+  if (compiledItems.length > 0 && compiledItems[0].productId) {
+    await supabase.from('order_items').delete().eq('order_id', orderRecord.id);
+    for (const ci of compiledItems) {
+      await supabase.from('order_items').insert({
+        order_id: orderRecord.id,
+        product_id: ci.productId,
+        quantity: ci.quantity,
+        unit_price: ci.unitPrice,
+        total_price: Math.round(ci.unitPrice * ci.quantity * 100) / 100,
+        supplier_id: ci.supplierId,
+        supplier_unit_cost: ci.costPrice,
+        supplier_total_cost: ci.totalCost,
+        product_snapshot: {
+          name: ci.name,
+          sku: ci.sku,
+          ml_item_id: ci.mlItemId,
+          cost_price: ci.costPrice,
+        },
+      });
+    }
+  }
+
+  // 3. Checar carteira e Pix para cobrança de fulfillment
+  const { data: wallet } = await supabase.from('wallets').select('saldo').eq('user_id', resellerUserId).maybeSingle();
+  const currentWalletBalance = Number(wallet?.saldo ?? 0);
+  let walletDeducted = 0;
+  let remainingPixAmount = 0;
+  let isFullyPaid = false;
+
+  if (totalSupplierCost <= 0) {
+    isFullyPaid = false;
+    remainingPixAmount = 0;
+  } else if (currentWalletBalance >= totalSupplierCost) {
+    walletDeducted = totalSupplierCost;
+    remainingPixAmount = 0;
+    isFullyPaid = true;
+  } else if (currentWalletBalance > 0) {
+    walletDeducted = currentWalletBalance;
+    remainingPixAmount = Math.round((totalSupplierCost - currentWalletBalance) * 100) / 100;
+    isFullyPaid = false;
+  } else {
+    remainingPixAmount = totalSupplierCost;
+    isFullyPaid = false;
+  }
+
+  let qrCode = null;
+  let qrCodeBase64 = null;
+  let pixPaymentId = null;
+  let pixExpiresAt = null;
+
+  if (remainingPixAmount > 0) {
+    const { data: resellerProfile } = await supabase.from('profiles').select('first_name, last_name, cpf, phone').eq('user_id', resellerUserId).maybeSingle();
+    let resellerEmail = null;
+    try {
+      const { data: authUser } = await supabase.auth.admin.getUserById(resellerUserId);
+      resellerEmail = authUser?.user?.email ?? null;
+    } catch {}
+
+    const pixRes = await generatePix24h({
+      orderNumber: orderRecord.order_number,
+      amount: remainingPixAmount,
+      description: `Fulfillment Pedido ML #${mlOrderIdStr} (Ped. #${orderRecord.order_number})`,
+      resellerUserId,
+      resellerProfile,
+      resellerEmail,
+      items: compiledItems,
+      mlOrderId: mlOrderIdStr,
+      walletDeducted,
+      totalCost: totalSupplierCost,
+    });
+    qrCode = pixRes.qrCode;
+    qrCodeBase64 = pixRes.qrCodeBase64;
+    pixPaymentId = pixRes.paymentId;
+    pixExpiresAt = pixRes.expiresAt;
+  }
+
+  const notesSummary = `Pedido via Mercado Livre #${mlOrderIdStr}. Custo Fornecedor: R$ ${totalSupplierCost.toFixed(2)} | Abate Carteira: R$ ${walletDeducted.toFixed(2)} | Pix 24h: R$ ${remainingPixAmount.toFixed(2)}`;
+
+  await supabase
+    .from('orders')
+    .update({
+      status: isFullyPaid ? 'recebido' : 'pendente',
+      payment_status: isFullyPaid ? 'paid' : 'pending',
+      payment_method: isFullyPaid ? 'wallet' : 'pix',
+      pix_qr_code: qrCode,
+      pix_qr_code_base64: qrCodeBase64,
+      payment_expires_at: isFullyPaid ? null : pixExpiresAt,
+      payment_id: isFullyPaid ? `wallet_${orderRecord.order_number}` : (pixPaymentId || `ml_${mlOrderIdStr}`),
+      ml_shipment_id: shipmentId ? String(shipmentId) : orderRecord.ml_shipment_id,
+      ml_label_url: publicLabelUrl,
+      tracking_code: trackingCode,
+      has_shipping_file: !!publicLabelUrl,
+      notes: notesSummary,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', orderRecord.id);
+
+  console.log(`✅ [ml-order-webhook] Pedido #${orderRecord.order_number} reparado! Custo: R$ ${totalSupplierCost}, Pix: R$ ${remainingPixAmount}, Etiqueta: ${!!publicLabelUrl}`);
+}
+
+/**
  * Processa um único pedido do Mercado Livre de forma ponta a ponta.
  */
 async function processSingleMlOrder(
@@ -315,7 +542,7 @@ async function processSingleMlOrder(
   // Idempotência: verificar se pedido já foi registrado no banco
   const { data: existingOrder } = await supabase
     .from('orders')
-    .select('id, order_number, status, payment_status')
+    .select('id, order_number, status, payment_status, ml_shipment_id')
     .or(`payment_id.eq.ml_${mlOrderIdStr},ml_order_id.eq.${mlOrderIdStr}`)
     .maybeSingle();
 
@@ -404,7 +631,6 @@ async function processSingleMlOrder(
     const unitPrice = Number(item.unit_price ?? 0);
     const quantity = Number(item.quantity ?? 1);
 
-    // Extrair SKU enviado no anúncio do Mercado Livre
     const rawSku = (
       item.item?.seller_sku ||
       item.item?.seller_custom_field ||
@@ -413,45 +639,72 @@ async function processSingleMlOrder(
     ).trim() || null;
 
     let matchedProductId: string | null = null;
+    let dbProduct: any = null;
 
-    // 1. Tentar localizar por ml_item_id em mercadolivre_published_products
-    if (mlItemId) {
+    // 1. Tentar por SKU exato na tabela products
+    if (rawSku) {
+      const { data: prodBySku } = await supabase
+        .from('products')
+        .select('id, name, cost_price, supplier_id, sku')
+        .eq('sku', rawSku)
+        .maybeSingle();
+
+      if (prodBySku) {
+        matchedProductId = prodBySku.id;
+        dbProduct = prodBySku;
+      }
+    }
+
+    // 2. Tentar por ml_item_id em mercadolivre_published_products
+    if (!matchedProductId && mlItemId) {
       const { data: published } = await supabase
         .from('mercadolivre_published_products')
         .select('product_id')
         .eq('ml_item_id', mlItemId)
         .maybeSingle();
-      matchedProductId = published?.product_id ?? null;
+      if (published?.product_id) {
+        const { data: p } = await supabase
+          .from('products')
+          .select('id, name, cost_price, supplier_id, sku')
+          .eq('id', published.product_id)
+          .maybeSingle();
+        if (p) {
+          matchedProductId = p.id;
+          dbProduct = p;
+        }
+      }
     }
 
-    // 2. Tentar localizar por ml_item_id em ml_listing_variants
-    if (!matchedProductId && mlItemId) {
-      const { data: variantByItem } = await supabase
-        .from('ml_listing_variants')
-        .select('product_id')
-        .eq('ml_item_id', mlItemId)
-        .maybeSingle();
-      matchedProductId = variantByItem?.product_id ?? null;
-    }
-
-    // 3. Fallback: localizar por SKU na tabela products
+    // 3. Tentar por internal_sku
     if (!matchedProductId && rawSku) {
-      const { data: prodBySku } = await supabase
+      const { data: prodByIntSku } = await supabase
         .from('products')
-        .select('id')
-        .or(`sku.eq.${rawSku},internal_sku.eq.${rawSku}`)
+        .select('id, name, cost_price, supplier_id, sku')
+        .eq('internal_sku', rawSku)
         .maybeSingle();
-      matchedProductId = prodBySku?.id ?? null;
+      if (prodByIntSku) {
+        matchedProductId = prodByIntSku.id;
+        dbProduct = prodByIntSku;
+      }
     }
 
-    // 4. Fallback: localizar por SKU na tabela ml_listing_variants
-    if (!matchedProductId && rawSku) {
-      const { data: variantBySku } = await supabase
-        .from('ml_listing_variants')
-        .select('product_id')
-        .eq('sku', rawSku)
-        .maybeSingle();
-      matchedProductId = variantBySku?.product_id ?? null;
+    // 4. Tentar por ml_listing_variants
+    if (!matchedProductId && (rawSku || mlItemId)) {
+      let vQuery = supabase.from('ml_listing_variants').select('product_id');
+      if (rawSku) vQuery = vQuery.eq('sku', rawSku);
+      else if (mlItemId) vQuery = vQuery.eq('ml_item_id', mlItemId);
+      const { data: vItem } = await vQuery.maybeSingle();
+      if (vItem?.product_id) {
+        const { data: p } = await supabase
+          .from('products')
+          .select('id, name, cost_price, supplier_id, sku')
+          .eq('id', vItem.product_id)
+          .maybeSingle();
+        if (p) {
+          matchedProductId = p.id;
+          dbProduct = p;
+        }
+      }
     }
 
     let costPrice = 0;
@@ -459,20 +712,12 @@ async function processSingleMlOrder(
     let sku: string | null = rawSku;
     let supplierId: string | null = null;
 
-    if (matchedProductId) {
-      const { data: dbProduct } = await supabase
-        .from('products')
-        .select('id, name, cost_price, supplier_id, sku')
-        .eq('id', matchedProductId)
-        .single();
-
-      if (dbProduct) {
-        productName = dbProduct.name;
-        sku = dbProduct.sku || sku;
-        costPrice = Number(dbProduct.cost_price ?? 0);
-        supplierId = dbProduct.supplier_id;
-        if (supplierId && !primarySupplierId) primarySupplierId = supplierId;
-      }
+    if (dbProduct) {
+      productName = dbProduct.name;
+      sku = dbProduct.sku || sku;
+      costPrice = Number(dbProduct.cost_price ?? 0);
+      supplierId = dbProduct.supplier_id;
+      if (supplierId && !primarySupplierId) primarySupplierId = supplierId;
     }
 
     const itemTotalCost = Math.round(costPrice * quantity * 100) / 100;
@@ -493,7 +738,6 @@ async function processSingleMlOrder(
 
   totalSupplierCost = Math.round(totalSupplierCost * 100) / 100;
 
-  // Buscar fornecedor principal se houver
   let supplierName: string | null = null;
   if (primarySupplierId) {
     const { data: supProfile } = await supabase
@@ -504,11 +748,10 @@ async function processSingleMlOrder(
     supplierName = supProfile?.company_name || `${supProfile?.first_name || ''} ${supProfile?.last_name || ''}`.trim() || null;
   }
 
-  // Gerar número de pedido sequencial
   const { data: orderNumData } = await supabase.rpc('generate_order_number');
   const orderNumber = (orderNumData as string) || String(Date.now()).slice(-8);
 
-  // Lógica financeira: Carteira + Pix (Expiração 24h)
+  // Lógica financeira: Carteira + Pix
   let { data: wallet } = await supabase
     .from('wallets')
     .select('id, saldo')
@@ -530,7 +773,7 @@ async function processSingleMlOrder(
   let isFullyPaid = false;
 
   if (totalSupplierCost <= 0) {
-    isFullyPaid = true;
+    isFullyPaid = false;
     remainingPixAmount = 0;
     walletDeducted = 0;
   } else if (currentWalletBalance >= totalSupplierCost) {
@@ -630,7 +873,6 @@ async function processSingleMlOrder(
 
   const orderId = newOrder.id;
 
-  // Registrar abate de carteira se houver
   if (walletDeducted > 0 && wallet) {
     const newWalletBalance = Math.round((currentWalletBalance - walletDeducted) * 100) / 100;
     await supabase
@@ -653,7 +895,6 @@ async function processSingleMlOrder(
       referencia_id: orderId,
       status: 'completed',
     });
-    console.log(`[ml-order-webhook] Carteira debitada em R$ ${walletDeducted.toFixed(2)}. Novo saldo: R$ ${newWalletBalance.toFixed(2)}`);
   }
 
   // Inserir itens do pedido
@@ -683,7 +924,6 @@ async function processSingleMlOrder(
     });
   }
 
-  // Histórico de status
   await supabase.from('order_status_history').insert({
     order_id: orderId,
     status: isFullyPaid ? 'recebido' : 'pendente',
@@ -692,8 +932,11 @@ async function processSingleMlOrder(
       : `Pedido ML #${mlOrderIdStr} recebido — aguardando pagamento Pix de fulfillment (24h)`,
   });
 
-  // Etiqueta oficial do Mercado Livre
-  const shipmentId = mlOrder.shipments?.id
+  // Extrair ID da remessa oficial (shipping.id no Mercado Livre)
+  const shipmentId = mlOrder.shipping?.id
+    ?? mlOrder.shipping_id
+    ?? mlOrder.shipments?.id
+    ?? mlOrder.order_items?.[0]?.shipping?.id
     ?? mlOrder.order_items?.[0]?.shipment?.id
     ?? null;
 
@@ -727,7 +970,6 @@ async function processSingleMlOrder(
         });
 
         if (uploadRes.error) {
-          console.warn('[ml-order-webhook] Falha no bucket shipping-labels, tentando shipping-files:', uploadRes.error);
           const fbRes = await supabase.storage.from('shipping-files').upload(filePath, labelBytes, {
             contentType: 'application/pdf',
             upsert: true,
@@ -752,7 +994,6 @@ async function processSingleMlOrder(
         console.log(`[ml-order-webhook] ✅ Etiqueta PDF armazenada: ${filePath}`);
       } else {
         publicLabelUrl = `https://api.mercadolibre.com/shipments/${shipmentId}/labels?response_type=pdf2`;
-        console.log('[ml-order-webhook] Etiqueta ainda não pronta em PDF, salvo endpoint de consulta');
       }
 
       await supabase
@@ -790,77 +1031,6 @@ async function processSingleMlOrder(
     });
   }
 
-  // Disparar evento de webhook
-  try {
-    console.log(`[ml-order-webhook] Disparando webhook order.automatic_fulfillment para pedido #${newOrder.order_number}...`);
-    await supabase.functions.invoke('dispatch-webhook', {
-      body: {
-        event_type: 'order.automatic_fulfillment',
-        payload: {
-          event: 'order.automatic_fulfillment',
-          timestamp: new Date().toISOString(),
-          order: {
-            id: orderId,
-            order_number: newOrder.order_number,
-            origin: 'mercadolivre',
-            ml_order_id: mlOrderIdStr,
-            ml_shipment_id: shipmentId ? String(shipmentId) : null,
-            total_order_amount: totalOrderAmount,
-            supplier_cost: totalSupplierCost,
-            tracking_code: trackingCode,
-            shipping_label_url: publicLabelUrl,
-            status: isFullyPaid ? 'recebido' : 'pendente',
-            created_at: new Date().toISOString(),
-          },
-          buyer: {
-            name: buyerName,
-            email: buyerEmail,
-            phone: buyerPhone,
-            document: buyerDoc,
-            shipping_address: shippingAddressPayload,
-          },
-          reseller: {
-            id: resellerUserId,
-            name: resellerProfile ? `${resellerProfile.first_name || ''} ${resellerProfile.last_name || ''}`.trim() : null,
-            email: resellerEmail,
-            phone: resellerProfile?.phone || null,
-            store_name: resellerStore?.store_name || null,
-          },
-          supplier: {
-            id: primarySupplierId,
-            name: supplierName,
-          },
-          items: compiledItems.map((i) => ({
-            product_id: i.productId,
-            name: i.name,
-            sku: i.sku,
-            quantity: i.quantity,
-            unit_price: i.unitPrice,
-            cost_price: i.costPrice,
-            total_cost: i.totalCost,
-            ml_item_id: i.mlItemId,
-          })),
-          payment: {
-            total_cost: totalSupplierCost,
-            wallet_balance_before: currentWalletBalance,
-            wallet_deducted: walletDeducted,
-            wallet_balance_after: Math.max(0, currentWalletBalance - walletDeducted),
-            pix_amount_required: remainingPixAmount,
-            pix_qr_code: qrCode,
-            pix_qr_code_base64: qrCodeBase64,
-            pix_payment_id: pixPaymentId,
-            pix_expires_at: isFullyPaid ? null : pixExpiresAt,
-            is_fully_paid: isFullyPaid,
-          },
-        },
-      },
-    });
-    console.log(`[ml-order-webhook] ✅ Webhook order.automatic_fulfillment despachado com sucesso!`);
-  } catch (dispatchErr) {
-    console.error('[ml-order-webhook] Erro ao despachar webhook order.automatic_fulfillment:', dispatchErr);
-  }
-
-  console.log(`✅ [ml-order-webhook] Pedido #${newOrder.order_number} processado com sucesso!`);
   return {
     success: true,
     order_id: orderId,
@@ -874,6 +1044,7 @@ async function processSingleMlOrder(
 
 /**
  * Sincroniza os pedidos recentes de um revendedor buscando direto na API do Mercado Livre.
+ * Também repara automaticamente pedidos pré-existentes que faltem etiqueta ou cálculo de custo.
  */
 async function syncResellerRecentOrders(resellerUserId: string) {
   console.log(`[ml-order-webhook] Sincronizando pedidos recentes do revendedor: ${resellerUserId}`);
@@ -891,7 +1062,6 @@ async function syncResellerRecentOrders(resellerUserId: string) {
 
   const token = await getValidTokenForIntegration(intg);
 
-  // Se ml_user_id não está salvo, buscar via /users/me
   let mlUserId = intg.ml_user_id;
   if (!mlUserId) {
     try {
@@ -915,7 +1085,24 @@ async function syncResellerRecentOrders(resellerUserId: string) {
     throw new Error('Não foi possível identificar o ID do vendedor no Mercado Livre.');
   }
 
-  // Buscar pedidos recentes (últimos 50 pedidos)
+  // 1. Reparar pedidos existentes que estejam sem etiqueta ou com custo zerado
+  const { data: existingUserOrders } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('reseller_id', resellerUserId)
+    .not('ml_order_id', 'is', null);
+
+  for (const existingOrd of existingUserOrders || []) {
+    if (!existingOrd.ml_shipment_id || existingOrd.notes?.includes('Custo Fornecedor: R$ 0.00')) {
+      try {
+        await repairExistingOrder(existingOrd, resellerUserId);
+      } catch (repErr) {
+        console.warn(`[ml-order-webhook] Erro no auto-repair do pedido #${existingOrd.order_number}:`, repErr);
+      }
+    }
+  }
+
+  // 2. Buscar pedidos recentes no Mercado Livre (últimos 50 pedidos pagos)
   const searchUrl = `https://api.mercadolibre.com/orders/search?seller=${mlUserId}&order.status=paid&sort=date_desc&limit=50`;
   const searchRes = await fetch(searchUrl, {
     headers: { 'Authorization': `Bearer ${token}` },
@@ -1034,45 +1221,6 @@ serve(async (req) => {
       }
     }
 
-    // Ação Debug: Inspecionar produto e pedidos
-    if (body.action === 'debug_order') {
-      const orderId = body.order_id || '2000019191794914';
-      const shipmentId = body.shipment_id || '48358493709';
-
-      // 1. Buscar produto no banco por SKU exato e aproximado
-      const { data: dbProductExact } = await supabase
-        .from('products')
-        .select('*')
-        .eq('sku', 'LJFADM000031');
-
-      const { data: dbProductIlike } = await supabase
-        .from('products')
-        .select('id, name, sku, internal_sku, cost_price, price, supplier_id')
-        .ilike('sku', '%LJFADM000031%');
-
-      const { data: dbProductName } = await supabase
-        .from('products')
-        .select('id, name, sku, internal_sku, cost_price, price, supplier_id')
-        .ilike('name', '%Palmilha%');
-
-      // 2. Buscar itens do pedido 639
-      const { data: order639 } = await supabase
-        .from('orders')
-        .select('*, order_items(*)')
-        .eq('ml_order_id', '2000019191794914')
-        .maybeSingle();
-
-      return new Response(JSON.stringify({
-        success: true,
-        db_product_exact: dbProductExact,
-        db_product_ilike: dbProductIlike,
-        db_product_name: dbProductName,
-        order_639: order639,
-      }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     // Ação 3: Importação direta por ID de pedido
     if (body.action === 'process_order' || body.order_id) {
       const targetOrderId = String(body.order_id || body.ml_order_id);
@@ -1083,22 +1231,38 @@ serve(async (req) => {
       });
     }
 
+    // Ação 4: Reparar pedidos de um revendedor
+    if (body.action === 'repair_orders' && body.user_id) {
+      const { data: userOrders } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('reseller_id', body.user_id)
+        .not('ml_order_id', 'is', null);
+
+      let repaired = 0;
+      for (const ord of userOrders || []) {
+        await repairExistingOrder(ord, body.user_id);
+        repaired++;
+      }
+
+      return new Response(JSON.stringify({ success: true, repaired }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { topic, resource, user_id: mlUserId, seller_id: sellerId } = body;
 
-    // Ping de teste do Mercado Livre
     if (!topic || !resource) {
       return new Response(JSON.stringify({ ok: true, message: 'Ping recebido' }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Notificação de Shipment do Mercado Livre: extrair pedido e processar
     if (topic === 'shipments') {
       const shipmentIdMatch = resource.match(/\/shipments\/(\d+)/);
       if (shipmentIdMatch) {
         const shipmentId = shipmentIdMatch[1];
         console.log(`[ml-order-webhook] Recebido tópico shipments #${shipmentId}. Buscando pedido associado...`);
-        // Encontrar shipment nas contas ativas
         const { data: allIntegrations } = await supabase
           .from('mercadolivre_integrations')
           .select('user_id, access_token, refresh_token, expires_at')
@@ -1129,7 +1293,6 @@ serve(async (req) => {
       });
     }
 
-    // Apenas pedidos (orders_v2 ou orders)
     if (topic !== 'orders_v2' && topic !== 'orders') {
       console.log('[ml-order-webhook] Ignorando tópico:', topic);
       return new Response(JSON.stringify({ ok: true, ignored_topic: topic }), {
@@ -1137,7 +1300,6 @@ serve(async (req) => {
       });
     }
 
-    // Extrair ID do pedido: "/orders/123456"
     const orderIdMatch = resource.match(/\/orders\/(\d+)/);
     if (!orderIdMatch) {
       console.error('[ml-order-webhook] Impossível extrair ID do pedido de:', resource);
