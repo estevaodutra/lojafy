@@ -1207,7 +1207,7 @@ serve(async (req) => {
       if (intg) {
         const token = await getValidTokenForIntegration(intg);
         for (const shId of ['48358493709', '47851085916']) {
-          const lRes = await fetch(`https://api.mercadolibre.com/shipments/${shId}/labels?response_type=pdf2`, {
+          const lRes = await fetch(`https://api.mercadolibre.com/shipment_labels?shipment_ids=${shId}&response_type=pdf`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           const text = await lRes.text();
