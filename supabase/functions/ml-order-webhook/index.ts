@@ -1038,59 +1038,74 @@ serve(async (req) => {
     if (body.action === 'debug_order') {
       const orderId = body.order_id || '2000015725821079';
       const shipmentId = body.shipment_id || '48358493709';
-      const { data: allIntegrations } = await supabase
+
+      // 1. Buscar produto no banco
+      const { data: dbProducts } = await supabase
+        .from('products')
+        .select('id, name, sku, internal_sku, cost_price, price, supplier_id')
+        .or(`sku.ilike.%LJFADM000031%,name.ilike.%Palmilha%`);
+
+      // 2. Buscar pedidos no banco
+      const { data: recentOrders } = await supabase
+        .from('orders')
+        .select('id, order_number, status, payment_status, total_amount, ml_order_id, ml_shipment_id, ml_label_url, notes, created_at, user_id, reseller_id')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      // 3. Buscar detalhes do shipment no ML
+      const { data: jessicaIntg } = await supabase
         .from('mercadolivre_integrations')
-        .select('user_id, ml_user_id, access_token, refresh_token, expires_at')
-        .eq('is_active', true);
+        .select('*')
+        .eq('user_id', '0a3e373c-cfcc-4170-be22-981fb62bb0f4')
+        .single();
 
-      const accounts: any[] = [];
-      for (const intg of allIntegrations || []) {
-        const token = await getValidTokenForIntegration(intg);
-        let meData = null;
+      let shipmentDetails = null;
+      let orderDetailsFromShipment = null;
+      if (jessicaIntg) {
+        const token = await getValidTokenForIntegration(jessicaIntg);
         try {
-          const meRes = await fetch('https://api.mercadolibre.com/users/me', {
+          const shRes = await fetch(`https://api.mercadolibre.com/shipments/${shipmentId}`, {
             headers: { Authorization: `Bearer ${token}` }
           });
-          if (meRes.ok) meData = await meRes.json();
-        } catch {}
-
-        let orderStatus = null;
-        let orderError = null;
-        try {
-          const oRes = await fetch(`https://api.mercadolibre.com/orders/${orderId}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          orderStatus = oRes.status;
-          if (!oRes.ok) orderError = await oRes.text();
-          else orderError = 'SUCCESS';
+          if (shRes.ok) {
+            shipmentDetails = await shRes.json();
+            if (shipmentDetails.order_id) {
+              const oRes = await fetch(`https://api.mercadolibre.com/orders/${shipmentDetails.order_id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              if (oRes.ok) orderDetailsFromShipment = await oRes.json();
+            }
+          }
         } catch (e: any) {
-          orderError = e.message;
+          shipmentDetails = { error: e.message };
         }
-
-        let shipmentStatus = null;
-        let shipmentError = null;
-        try {
-          const sRes = await fetch(`https://api.mercadolibre.com/shipments/${shipmentId}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          shipmentStatus = sRes.status;
-          if (!sRes.ok) shipmentError = await sRes.text();
-          else shipmentError = 'SUCCESS';
-        } catch (e: any) {
-          shipmentError = e.message;
-        }
-
-        accounts.push({
-          user_id: intg.user_id,
-          ml_user_id: intg.ml_user_id,
-          nickname: meData?.nickname,
-          email: meData?.email,
-          order_test: { status: orderStatus, result: orderError },
-          shipment_test: { status: shipmentStatus, result: shipmentError }
-        });
       }
 
-      return new Response(JSON.stringify({ success: true, accounts }), {
+      return new Response(JSON.stringify({
+        success: true,
+        db_products: dbProducts,
+        recent_orders: recentOrders,
+        shipment_details: shipmentDetails ? {
+          id: shipmentDetails.id,
+          order_id: shipmentDetails.order_id,
+          status: shipmentDetails.status,
+          substatus: shipmentDetails.substatus,
+          tracking_number: shipmentDetails.tracking_number,
+        } : null,
+        order_details_from_shipment: orderDetailsFromShipment ? {
+          id: orderDetailsFromShipment.id,
+          status: orderDetailsFromShipment.status,
+          shipping: orderDetailsFromShipment.shipping,
+          order_items: orderDetailsFromShipment.order_items?.map((i: any) => ({
+            item_id: i.item?.id,
+            title: i.item?.title,
+            seller_sku: i.item?.seller_sku,
+            seller_custom_field: i.item?.seller_custom_field,
+            unit_price: i.unit_price,
+            quantity: i.quantity,
+          })),
+        } : null,
+      }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
