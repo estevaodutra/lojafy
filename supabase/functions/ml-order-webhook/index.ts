@@ -318,6 +318,8 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
 
   let publicLabelUrl = orderRecord.ml_label_url;
   let trackingCode = orderRecord.tracking_code;
+  let isDelivered = false;
+  let isShipped = false;
 
   if (shipmentId) {
     try {
@@ -328,39 +330,43 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
       if (shRes.ok) {
         const shData = await shRes.json();
         trackingCode = shData.tracking_number ?? shData.tracking_id ?? trackingCode;
+        if (shData.status === 'delivered') isDelivered = true;
+        if (shData.status === 'shipped') isShipped = true;
       }
 
-      const labelRes = await fetch(`https://api.mercadolibre.com/shipments/${shipmentId}/labels?response_type=pdf2`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (labelRes.ok) {
-        const labelBytes = await labelRes.arrayBuffer();
-        const filePath = `labels/${resellerUserId}/${orderRecord.id}/etiqueta-${mlOrderIdStr}.pdf`;
-        let targetBucket = 'shipping-labels';
-        const uploadRes = await supabase.storage.from(targetBucket).upload(filePath, labelBytes, {
-          contentType: 'application/pdf',
-          upsert: true,
+      if (!isDelivered) {
+        const labelRes = await fetch(`https://api.mercadolibre.com/shipment_labels?shipment_ids=${shipmentId}&response_type=pdf`, {
+          headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        if (uploadRes.error) {
-          const fbRes = await supabase.storage.from('shipping-files').upload(filePath, labelBytes, {
+        if (labelRes.ok) {
+          const labelBytes = await labelRes.arrayBuffer();
+          const filePath = `labels/${resellerUserId}/${orderRecord.id}/etiqueta-${mlOrderIdStr}.pdf`;
+          let targetBucket = 'shipping-labels';
+          const uploadRes = await supabase.storage.from(targetBucket).upload(filePath, labelBytes, {
             contentType: 'application/pdf',
             upsert: true,
           });
-          if (!fbRes.error) targetBucket = 'shipping-files';
+
+          if (uploadRes.error) {
+            const fbRes = await supabase.storage.from('shipping-files').upload(filePath, labelBytes, {
+              contentType: 'application/pdf',
+              upsert: true,
+            });
+            if (!fbRes.error) targetBucket = 'shipping-files';
+          }
+
+          const { data: signedData } = await supabase.storage.from(targetBucket).createSignedUrl(filePath, 604800);
+          publicLabelUrl = getPublicSignedUrl(signedData?.signedUrl) ?? null;
+
+          await supabase.from('order_shipping_files').upsert({
+            order_id: orderRecord.id,
+            file_name: `etiqueta-${mlOrderIdStr}.pdf`,
+            file_path: filePath,
+            file_size: labelBytes.byteLength,
+            uploaded_at: new Date().toISOString(),
+          }, { onConflict: 'order_id,file_path' });
         }
-
-        const { data: signedData } = await supabase.storage.from(targetBucket).createSignedUrl(filePath, 604800);
-        publicLabelUrl = getPublicSignedUrl(signedData?.signedUrl) ?? `https://api.mercadolibre.com/shipments/${shipmentId}/labels?response_type=pdf2`;
-
-        await supabase.from('order_shipping_files').upsert({
-          order_id: orderRecord.id,
-          file_name: `etiqueta-${mlOrderIdStr}.pdf`,
-          file_path: filePath,
-          file_size: labelBytes.byteLength,
-          uploaded_at: new Date().toISOString(),
-        }, { onConflict: 'order_id,file_path' });
       }
     } catch (e) {
       console.warn(`[ml-order-webhook] Erro ao baixar etiqueta no repair:`, e);
@@ -441,14 +447,17 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
     }
   }
 
-  // 3. Checar carteira e Pix para cobrança de fulfillment
+  // 3. Checar status da remessa no ML (se já foi entregue ou despachado no ML)
   const { data: wallet } = await supabase.from('wallets').select('saldo').eq('user_id', resellerUserId).maybeSingle();
   const currentWalletBalance = Number(wallet?.saldo ?? 0);
   let walletDeducted = 0;
   let remainingPixAmount = 0;
   let isFullyPaid = false;
 
-  if (totalSupplierCost <= 0) {
+  if (isDelivered || isShipped) {
+    isFullyPaid = true;
+    remainingPixAmount = 0;
+  } else if (totalSupplierCost <= 0) {
     isFullyPaid = false;
     remainingPixAmount = 0;
   } else if (currentWalletBalance >= totalSupplierCost) {
@@ -469,7 +478,7 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
   let pixPaymentId = null;
   let pixExpiresAt = null;
 
-  if (remainingPixAmount > 0) {
+  if (remainingPixAmount > 0 && !isDelivered && !isShipped) {
     const { data: resellerProfile } = await supabase.from('profiles').select('first_name, last_name, cpf, phone').eq('user_id', resellerUserId).maybeSingle();
     let resellerEmail = null;
     try {
@@ -497,16 +506,34 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
 
   const notesSummary = `Pedido via Mercado Livre #${mlOrderIdStr}. Custo Fornecedor: R$ ${totalSupplierCost.toFixed(2)} | Abate Carteira: R$ ${walletDeducted.toFixed(2)} | Pix 24h: R$ ${remainingPixAmount.toFixed(2)}`;
 
+  let finalStatus = 'pendente';
+  let finalPaymentStatus = 'pending';
+  let finalPaymentMethod = 'pix';
+
+  if (isDelivered) {
+    finalStatus = 'finalizado';
+    finalPaymentStatus = 'paid';
+    finalPaymentMethod = 'mercadolivre';
+  } else if (isShipped) {
+    finalStatus = 'enviado';
+    finalPaymentStatus = 'paid';
+    finalPaymentMethod = 'mercadolivre';
+  } else if (isFullyPaid) {
+    finalStatus = 'recebido';
+    finalPaymentStatus = 'paid';
+    finalPaymentMethod = 'wallet';
+  }
+
   await supabase
     .from('orders')
     .update({
-      status: isFullyPaid ? 'recebido' : 'pendente',
-      payment_status: isFullyPaid ? 'paid' : 'pending',
-      payment_method: isFullyPaid ? 'wallet' : 'pix',
-      pix_qr_code: qrCode,
-      pix_qr_code_base64: qrCodeBase64,
-      payment_expires_at: isFullyPaid ? null : pixExpiresAt,
-      payment_id: isFullyPaid ? `wallet_${orderRecord.order_number}` : (pixPaymentId || `ml_${mlOrderIdStr}`),
+      status: finalStatus,
+      payment_status: finalPaymentStatus,
+      payment_method: finalPaymentMethod,
+      pix_qr_code: isFullyPaid || isDelivered || isShipped ? null : qrCode,
+      pix_qr_code_base64: isFullyPaid || isDelivered || isShipped ? null : qrCodeBase64,
+      payment_expires_at: isFullyPaid || isDelivered || isShipped ? null : pixExpiresAt,
+      payment_id: isDelivered || isShipped ? `ml_${mlOrderIdStr}` : (isFullyPaid ? `wallet_${orderRecord.order_number}` : (pixPaymentId || `ml_${mlOrderIdStr}`)),
       ml_shipment_id: shipmentId ? String(shipmentId) : orderRecord.ml_shipment_id,
       ml_label_url: publicLabelUrl,
       tracking_code: trackingCode,
@@ -516,7 +543,7 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
     })
     .eq('id', orderRecord.id);
 
-  console.log(`✅ [ml-order-webhook] Pedido #${orderRecord.order_number} reparado! Custo: R$ ${totalSupplierCost}, Pix: R$ ${remainingPixAmount}, Etiqueta: ${!!publicLabelUrl}`);
+  console.log(`✅ [ml-order-webhook] Pedido #${orderRecord.order_number} reparado! Status: ${finalStatus}, Custo: R$ ${totalSupplierCost}, Pix: R$ ${remainingPixAmount}, Etiqueta: ${!!publicLabelUrl}`);
 }
 
 /**
@@ -955,7 +982,7 @@ async function processSingleMlOrder(
         trackingCode = shipmentData.tracking_number ?? shipmentData.tracking_id ?? null;
       }
 
-      const labelRes = await fetch(`https://api.mercadolibre.com/shipments/${shipmentId}/labels?response_type=pdf2`, {
+      const labelRes = await fetch(`https://api.mercadolibre.com/shipment_labels?shipment_ids=${shipmentId}&response_type=pdf`, {
         headers: { 'Authorization': `Bearer ${accessToken}` },
       });
 
@@ -981,7 +1008,7 @@ async function processSingleMlOrder(
           .from(targetBucket)
           .createSignedUrl(filePath, 604800);
 
-        publicLabelUrl = getPublicSignedUrl(signedData?.signedUrl) ?? `https://api.mercadolibre.com/shipments/${shipmentId}/labels?response_type=pdf2`;
+        publicLabelUrl = getPublicSignedUrl(signedData?.signedUrl) ?? null;
 
         await supabase.from('order_shipping_files').insert({
           order_id: orderId,
@@ -993,7 +1020,7 @@ async function processSingleMlOrder(
 
         console.log(`[ml-order-webhook] ✅ Etiqueta PDF armazenada: ${filePath}`);
       } else {
-        publicLabelUrl = `https://api.mercadolibre.com/shipments/${shipmentId}/labels?response_type=pdf2`;
+        publicLabelUrl = null;
       }
 
       await supabase
@@ -1196,30 +1223,7 @@ serve(async (req) => {
         .order('created_at', { ascending: false })
         .limit(10);
 
-      // Testar baixar etiqueta do ML para shipment 48358493709 e 47851085916
-      const { data: intg } = await supabase
-        .from('mercadolivre_integrations')
-        .select('*')
-        .eq('user_id', '0a3e373c-cfcc-4170-be22-981fb62bb0f4')
-        .single();
-
-      let labelTestResult: any = {};
-      if (intg) {
-        const token = await getValidTokenForIntegration(intg);
-        for (const shId of ['48358493709', '47851085916']) {
-          const lRes = await fetch(`https://api.mercadolibre.com/shipment_labels?shipment_ids=${shId}&response_type=pdf`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const text = await lRes.text();
-          labelTestResult[shId] = {
-            status: lRes.status,
-            contentType: lRes.headers.get('content-type'),
-            sample: text.slice(0, 300)
-          };
-        }
-      }
-
-      return new Response(JSON.stringify({ success: true, orders: recentOrders, labelTestResult }), {
+      return new Response(JSON.stringify({ success: true, orders: recentOrders }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

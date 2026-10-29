@@ -18,35 +18,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
-async function downloadLabel(order: ResellerOrder) {
-  if (order.ml_label_url) {
-    window.open(order.ml_label_url, '_blank');
-    return;
-  }
-
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return;
-
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const url = `${supabaseUrl}/functions/v1/ml-get-label?order_id=${order.id}`;
-
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${session.access_token}` },
-  });
-
-  if (!res.ok) {
-    console.error('Failed to download label:', res.status);
-    return;
-  }
-
-  const blob = await res.blob();
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `etiqueta-${order.order_number}.pdf`;
-  link.click();
-  URL.revokeObjectURL(link.href);
-}
-
 function ResellerOrders() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -58,11 +29,81 @@ function ResellerOrders() {
   const [selectedPixOrder, setSelectedPixOrder] = useState<ResellerOrder | null>(null);
   const [copied, setCopied] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [downloadingLabelId, setDownloadingLabelId] = useState<string | null>(null);
   const [isManualImportOpen, setIsManualImportOpen] = useState(false);
   const [manualOrderId, setManualOrderId] = useState("");
   const [isImportingManual, setIsImportingManual] = useState(false);
 
   const { data: orders, isLoading } = useResellerOrders(statusFilter, searchTerm);
+
+  const handleDownloadLabel = async (order: ResellerOrder) => {
+    setDownloadingLabelId(order.id);
+    try {
+      if (order.ml_label_url) {
+        window.open(order.ml_label_url, '_blank');
+        toast({
+          title: "Etiqueta aberta!",
+          description: `Visualizando etiqueta do pedido #${order.order_number}.`,
+        });
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Não autenticado",
+          description: "Faça login novamente para baixar a etiqueta.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Buscando etiqueta...",
+        description: "Obtendo arquivo oficial do Mercado Livre...",
+      });
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const url = `${supabaseUrl}/functions/v1/ml-get-label?order_id=${order.id}`;
+
+      const res = await fetch(url, {
+        headers: {
+          'apikey': anonKey,
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `Erro ${res.status} ao obter etiqueta no Mercado Livre.`);
+      }
+
+      const blob = await res.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `etiqueta-${order.order_number}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+
+      toast({
+        title: "Etiqueta baixada!",
+        description: `Download do PDF do pedido #${order.order_number} concluído.`,
+      });
+    } catch (err: any) {
+      console.error('Erro ao baixar etiqueta:', err);
+      toast({
+        title: "Não foi possível baixar a etiqueta",
+        description: err.message || "Tente novamente ou verifique o status da remessa no Mercado Livre.",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloadingLabelId(null);
+    }
+  };
 
   const handleCopyPix = async (code: string) => {
     try {
@@ -376,10 +417,15 @@ function ResellerOrders() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="text-xs gap-1"
-                              onClick={() => downloadLabel(order)}
+                              disabled={downloadingLabelId === order.id}
+                              className="text-xs gap-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                              onClick={() => handleDownloadLabel(order)}
                             >
-                              <Download className="h-3 w-3" />
+                              {downloadingLabelId === order.id ? (
+                                <RefreshCw className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Download className="h-3 w-3" />
+                              )}
                               Etiqueta
                             </Button>
                           )}
