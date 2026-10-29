@@ -13,6 +13,8 @@ import { Link } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useMercadoLivreIntegration } from '@/hooks/useMercadoLivreIntegration';
+import { getProductMarketplaceLinks } from '@/utils/marketplaceLinks';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import ProductDeleteDialog from './ProductDeleteDialog';
 
@@ -83,6 +85,7 @@ const ProductTable: React.FC<ProductTableProps> = ({
   const [isSelectAllChecked, setIsSelectAllChecked] = useState(false);
   const itemsPerPage = 10;
   const { toast } = useToast();
+  const { publishedProducts = [] } = useMercadoLivreIntegration();
 
   // Filter products based on search and filters
   const filteredProducts = products.filter(product => {
@@ -619,6 +622,7 @@ const ProductTable: React.FC<ProductTableProps> = ({
                   <TableBody>
                     {currentProducts.map((product) => {
                       const adsCount = product.ml_listing_variants?.length || product.product_marketplace_data?.length || 0;
+                      const mkpLinks = getProductMarketplaceLinks(product, product.ml_listing_variants || [], publishedProducts);
                       return (
                         <TableRow 
                           key={product.id}
@@ -715,8 +719,30 @@ const ProductTable: React.FC<ProductTableProps> = ({
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
+                                <DropdownMenuContent align="end" className="w-56">
                                   <DropdownMenuLabel>Ações do Produto</DropdownMenuLabel>
+                                  {mkpLinks.length > 0 && (
+                                    <>
+                                      {mkpLinks.map((link, lIdx) => (
+                                        <DropdownMenuItem
+                                          key={lIdx}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            window.open(link.url, '_blank', 'noopener,noreferrer');
+                                          }}
+                                          className="cursor-pointer font-medium text-amber-700 dark:text-amber-400 focus:text-amber-800 focus:bg-amber-50 dark:focus:bg-amber-950/30"
+                                        >
+                                          {link.badgeIcon ? (
+                                            <img src={link.badgeIcon} alt="" className="h-3.5 w-3.5 mr-2 object-contain shrink-0" />
+                                          ) : (
+                                            <ExternalLink className="h-4 w-4 mr-2 text-amber-600 shrink-0" />
+                                          )}
+                                          <span className="truncate">Visualizar no {link.name}</span>
+                                        </DropdownMenuItem>
+                                      ))}
+                                      <DropdownMenuSeparator />
+                                    </>
+                                  )}
                                   <DropdownMenuItem onClick={() => onEdit(product)}>
                                     <Edit className="mr-2 h-4 w-4" />
                                     Editar produto

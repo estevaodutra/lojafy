@@ -25,6 +25,7 @@ import { AiVariationModal } from './AiVariationModal';
 import { AdHistoryModal } from './AdHistoryModal';
 import { useSupplierOrganization } from '@/hooks/supplier/useSupplierOrganization';
 import { useMercadoLivreIntegration } from '@/hooks/useMercadoLivreIntegration';
+import { getProductMarketplaceLinks } from '@/utils/marketplaceLinks';
 
 interface MetaAdsManagerViewProps {
   roleMode?: 'admin' | 'supplier' | 'reseller';
@@ -250,7 +251,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
   const { data: orgData } = useSupplierOrganization();
   const orgId = orgData?.organization?.id;
 
-  const { isProductPublished, publishProduct, publishProductAsync } = useMercadoLivreIntegration();
+  const { isProductPublished, publishProduct, publishProductAsync, publishedProducts = [] } = useMercadoLivreIntegration();
   const [isBatchPublishing, setIsBatchPublishing] = useState(false);
   const [batchPublishProgress, setBatchPublishProgress] = useState({ current: 0, total: 0 });
 
@@ -479,6 +480,13 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                 id,
                 name,
                 slug
+              ),
+              product_marketplace_data (
+                id,
+                marketplace,
+                listing_id,
+                listing_status,
+                listing_url
               )
             )
           `)
@@ -505,6 +513,13 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
             id,
             name,
             slug
+          ),
+          product_marketplace_data (
+            id,
+            marketplace,
+            listing_id,
+            listing_status,
+            listing_url
           ),
           supplier_organization:supplier_organizations!supplier_organization_id (
             id,
@@ -1327,6 +1342,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                       paginatedProducts.map((product: any) => {
                         const isSelected = selectedProductIds.includes(product.id);
                         const adsCount = ads.filter((ad: any) => ad.product_id === product.id || ad.product?.id === product.id).length;
+                        const mkpLinks = getProductMarketplaceLinks(product, ads, publishedProducts);
 
                         return (
                           <TableRow 
@@ -1363,7 +1379,32 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
                             {/* Marketplace */}
                             <TableCell>
-                              <img src="https://http2.mlstatic.com/static/org-img/homesnw/mercado-libre.png" alt="ML" className="h-4 object-contain" />
+                              {mkpLinks.length > 0 ? (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {mkpLinks.map((link, lIdx) => (
+                                    <a
+                                      key={lIdx}
+                                      href={link.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      title={`Abrir anúncio no ${link.name}`}
+                                      className="inline-flex items-center gap-1 p-1 hover:bg-muted/80 rounded transition-colors group"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {link.badgeIcon ? (
+                                        <img src={link.badgeIcon} alt={link.name} className="h-4 object-contain" />
+                                      ) : (
+                                        <Badge variant="outline" className="text-[10px] py-0 px-1 font-medium bg-amber-50 text-amber-800 border-amber-300">
+                                          {link.name}
+                                        </Badge>
+                                      )}
+                                      <ExternalLink className="h-3 w-3 text-muted-foreground group-hover:text-foreground" />
+                                    </a>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">-</span>
+                              )}
                             </TableCell>
 
                             {/* Fornecedor (Visível apenas para Superadmin) */}
@@ -1510,8 +1551,27 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                                     <MoreHorizontal className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
+                                <DropdownMenuContent align="end" className="w-56">
                                   <DropdownMenuLabel>Ações do Produto</DropdownMenuLabel>
+                                  {mkpLinks.length > 0 && (
+                                    <>
+                                      {mkpLinks.map((link, lIdx) => (
+                                        <DropdownMenuItem
+                                          key={lIdx}
+                                          onClick={() => window.open(link.url, '_blank', 'noopener,noreferrer')}
+                                          className="cursor-pointer font-medium text-amber-700 dark:text-amber-400 focus:text-amber-800 focus:bg-amber-50 dark:focus:bg-amber-950/30"
+                                        >
+                                          {link.badgeIcon ? (
+                                            <img src={link.badgeIcon} alt="" className="h-3.5 w-3.5 mr-2 object-contain shrink-0" />
+                                          ) : (
+                                            <ExternalLink className="h-4 w-4 mr-2 text-amber-600 shrink-0" />
+                                          )}
+                                          <span className="truncate">Visualizar no {link.name}</span>
+                                        </DropdownMenuItem>
+                                      ))}
+                                      <DropdownMenuSeparator />
+                                    </>
+                                  )}
                                   <DropdownMenuItem onClick={() => onEditProduct?.(product)}>
                                     <Edit3 className="h-4 w-4 mr-2" /> Editar produto
                                   </DropdownMenuItem>
@@ -1850,6 +1910,19 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuLabel>Opções do Anúncio</DropdownMenuLabel>
+                                  {(() => {
+                                    const adUrl = ad.permalink || (ad.ml_item_id ? `https://produto.mercadolivre.com.br/${ad.ml_item_id}` : null);
+                                    if (!adUrl) return null;
+                                    return (
+                                      <DropdownMenuItem
+                                        onClick={() => window.open(adUrl, '_blank', 'noopener,noreferrer')}
+                                        className="cursor-pointer font-medium text-amber-700 dark:text-amber-400 focus:text-amber-800 focus:bg-amber-50 dark:focus:bg-amber-950/30"
+                                      >
+                                        <ExternalLink className="h-4 w-4 mr-2 text-amber-600 shrink-0" />
+                                        <span>Visualizar no {ad.marketplace === 'shopee' ? 'Shopee' : 'Mercado Livre'}</span>
+                                      </DropdownMenuItem>
+                                    );
+                                  })()}
                                   <DropdownMenuItem onClick={() => handleSinglePublishMl(ad.product_id || ad.product?.id)}>
                                     <Send className="h-4 w-4 mr-2 text-amber-600" /> Publicar Anúncio no Mercado Livre
                                   </DropdownMenuItem>
