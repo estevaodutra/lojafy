@@ -1188,6 +1188,19 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     console.log('[ml-order-webhook] Payload recebido:', JSON.stringify(body));
 
+    // Ação 0: Diagnóstico e inspeção
+    if (body.action === 'inspect_orders') {
+      const { data: recentOrders } = await supabase
+        .from('orders')
+        .select('id, order_number, status, payment_status, payment_method, ml_order_id, ml_shipment_id, ml_label_url, tracking_code, notes')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      return new Response(JSON.stringify({ success: true, orders: recentOrders }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Ação 1: Sincronização manual dos pedidos de um revendedor específico
     if (body.action === 'sync_reseller_orders' && body.user_id) {
       try {
