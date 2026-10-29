@@ -5,15 +5,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useResellerOrders, type ResellerOrder } from "@/hooks/useResellerOrders";
-import { Search, Package, Download, MapPin, AlertCircle, QrCode, Copy, Check, Clock } from "lucide-react";
+import { Search, Package, Download, MapPin, AlertCircle, QrCode, Copy, Check, Clock, RefreshCw, ShoppingBag } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ALL_STATUSES, ORDER_STATUS_CONFIG, getStatusConfig, type OrderStatus } from "@/constants/orderStatus";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 
 async function downloadLabel(orderId: string, orderNumber: string) {
   const { data: { session } } = await supabase.auth.getSession();
@@ -42,10 +45,18 @@ async function downloadLabel(orderId: string, orderNumber: string) {
 function ResellerOrders() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPixOrder, setSelectedPixOrder] = useState<ResellerOrder | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isManualImportOpen, setIsManualImportOpen] = useState(false);
+  const [manualOrderId, setManualOrderId] = useState("");
+  const [isImportingManual, setIsImportingManual] = useState(false);
+
   const { data: orders, isLoading } = useResellerOrders(statusFilter, searchTerm);
 
   const handleCopyPix = async (code: string) => {
@@ -66,6 +77,95 @@ function ResellerOrders() {
     }
   };
 
+  const handleSyncOrders = async () => {
+    if (!user?.id) return;
+    setIsSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ml-order-webhook', {
+        body: { action: 'sync_reseller_orders', user_id: user.id },
+      });
+
+      if (error) throw error;
+
+      await queryClient.invalidateQueries({ queryKey: ["reseller-orders"] });
+
+      if (data?.summary?.imported > 0) {
+        toast({
+          title: "Pedidos Sincronizados!",
+          description: `${data.summary.imported} novo(s) pedido(s) importado(s) do Mercado Livre com sucesso.`,
+        });
+      } else if (data?.summary?.already_existed > 0) {
+        toast({
+          title: "Tudo atualizado",
+          description: `Os ${data.summary.already_existed} pedidos recentes do Mercado Livre já constam no seu painel.`,
+        });
+      } else {
+        toast({
+          title: "Sincronização concluída",
+          description: "Nenhum novo pedido pago encontrado na sua conta do Mercado Livre.",
+        });
+      }
+    } catch (err: any) {
+      console.error("Erro ao sincronizar pedidos:", err);
+      toast({
+        title: "Erro ao sincronizar",
+        description: err.message || "Não foi possível puxar pedidos do Mercado Livre agora.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleManualImportOrder = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanId = manualOrderId.replace(/\D/g, "").trim();
+    if (!cleanId) {
+      toast({
+        title: "Número inválido",
+        description: "Informe o número do pedido do Mercado Livre (ex: 2000015725821079).",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsImportingManual(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ml-order-webhook', {
+        body: { action: 'process_order', order_id: cleanId, user_id: user?.id },
+      });
+
+      if (error || data?.error) {
+        throw new Error(data?.error || error?.message || "Falha ao importar pedido.");
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["reseller-orders"] });
+
+      if (data?.already_processed) {
+        toast({
+          title: "Pedido já cadastrado",
+          description: `O pedido #${cleanId} já está no seu sistema como #${data.order_number || ""}.`,
+        });
+      } else {
+        toast({
+          title: "Pedido importado com sucesso!",
+          description: `Pedido ML #${cleanId} registrado com sucesso (Pedido #${data.order_number}).`,
+        });
+      }
+      setIsManualImportOpen(false);
+      setManualOrderId("");
+    } catch (err: any) {
+      console.error("Erro ao importar pedido manual:", err);
+      toast({
+        title: "Erro ao importar pedido",
+        description: err.message || "Verifique se o pedido está pago e pertence à sua conta ML.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImportingManual(false);
+    }
+  };
+
   const getStatusCounts = () => {
     if (!orders) return { all: 0 } as Record<string, number>;
     
@@ -82,11 +182,35 @@ function ResellerOrders() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Gestão de Pedidos</h1>
-        <p className="text-muted-foreground mt-2">
-          Acompanhe todos os pedidos da sua loja
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Gestão de Pedidos</h1>
+          <p className="text-muted-foreground mt-2">
+            Acompanhe todos os pedidos da sua loja
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsManualImportOpen(true)}
+            className="gap-2 text-xs"
+          >
+            <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+            Puxar Pedido por Nº ML
+          </Button>
+
+          <Button
+            size="sm"
+            onClick={handleSyncOrders}
+            disabled={isSyncing}
+            className="gap-2 bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-semibold text-xs shadow-xs"
+          >
+            <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
+            {isSyncing ? "Sincronizando..." : "Sincronizar Mercado Livre"}
+          </Button>
+        </div>
       </div>
 
       {/* Métricas */}
@@ -257,16 +381,81 @@ function ResellerOrders() {
               <CardContent className="p-12 text-center">
                 <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold mb-2">Nenhum pedido encontrado</h3>
-                <p className="text-muted-foreground">
+                <p className="text-muted-foreground mb-4">
                   {searchTerm
                     ? "Tente buscar com outros termos"
                     : "Os pedidos da sua loja aparecerão aqui"}
                 </p>
+                <div className="flex items-center justify-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleSyncOrders}
+                    disabled={isSyncing}
+                    className="gap-1.5 text-xs"
+                  >
+                    <RefreshCw className={cn("h-3.5 w-3.5", isSyncing && "animate-spin")} />
+                    Sincronizar Agora
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Dialog para Importar por Número de Pedido ML */}
+      <Dialog open={isManualImportOpen} onOpenChange={setIsManualImportOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingBag className="h-5 w-5 text-yellow-500" />
+              Puxar Pedido do Mercado Livre
+            </DialogTitle>
+            <DialogDescription>
+              Cole o número do pedido gerado no Mercado Livre (ex: 2000015725821079) para importar e processar imediatamente no sistema.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleManualImportOrder} className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground">
+                Número do Pedido ML
+              </label>
+              <Input
+                placeholder="Ex: 2000015725821079"
+                value={manualOrderId}
+                onChange={(e) => setManualOrderId(e.target.value)}
+                className="font-mono text-sm"
+                required
+                autoFocus
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Localize esse código na lista de vendas do seu Mercado Livre (número iniciado com #).
+              </p>
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsManualImportOpen(false)}
+                disabled={isImportingManual}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={isImportingManual || !manualOrderId.trim()}
+                className="bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-semibold gap-1.5"
+              >
+                <RefreshCw className={cn("h-4 w-4", isImportingManual && "animate-spin")} />
+                {isImportingManual ? "Importando..." : "Importar Pedido"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Pagamento Pix para Fulfillment */}
       <Dialog open={!!selectedPixOrder} onOpenChange={(open) => !open && setSelectedPixOrder(null)}>

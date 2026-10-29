@@ -1,13 +1,13 @@
-name: Auto Refresh Mercado Livre Tokens
+name: Auto Refresh Mercado Livre Tokens & Sync Orders
 
 on:
   schedule:
-    # Executa a cada 2 horas para garantir que nenhum token expire
+    # Executa a cada 2 horas para garantir que nenhum token expire e pedidos pendentes sejam sincronizados
     - cron: '0 */2 * * *'
   workflow_dispatch:
 
 jobs:
-  refresh-tokens:
+  refresh-and-sync:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Proactive Token Refresh
@@ -16,3 +16,10 @@ jobs:
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg1NDU5NzI2LCJleHAiOjE5NDMxMzk3MjZ9.pcQQhBGEAgKG8sUtKiz00OBp09yA7NW0yPCqjiq-_sE" \
             -d '{"mode": "refresh_all_expiring"}'
+
+      - name: Trigger Automatic Order Sync Across All Connected ML Accounts
+        run: |
+          curl -s -X POST "https://lojafy-supabase.d2x.site/functions/v1/ml-order-webhook" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg1NDU5NzI2LCJleHAiOjE5NDMxMzk3MjZ9.pcQQhBGEAgKG8sUtKiz00OBp09yA7NW0yPCqjiq-_sE" \
+            -d '{"action": "sync_all_recent_orders"}'
