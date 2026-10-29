@@ -1017,6 +1017,67 @@ serve(async (req) => {
       });
     }
 
+    // Ação Debug: Verificar contas conectadas e testar busca do pedido
+    if (body.action === 'debug_order') {
+      const orderId = body.order_id || '2000015725821079';
+      const shipmentId = body.shipment_id || '48358493709';
+      const { data: allIntegrations } = await supabase
+        .from('mercadolivre_integrations')
+        .select('user_id, ml_user_id, access_token, refresh_token, expires_at')
+        .eq('is_active', true);
+
+      const accounts: any[] = [];
+      for (const intg of allIntegrations || []) {
+        const token = await getValidTokenForIntegration(intg);
+        let meData = null;
+        try {
+          const meRes = await fetch('https://api.mercadolibre.com/users/me', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (meRes.ok) meData = await meRes.json();
+        } catch {}
+
+        let orderStatus = null;
+        let orderError = null;
+        try {
+          const oRes = await fetch(`https://api.mercadolibre.com/orders/${orderId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          orderStatus = oRes.status;
+          if (!oRes.ok) orderError = await oRes.text();
+          else orderError = 'SUCCESS';
+        } catch (e: any) {
+          orderError = e.message;
+        }
+
+        let shipmentStatus = null;
+        let shipmentError = null;
+        try {
+          const sRes = await fetch(`https://api.mercadolibre.com/shipments/${shipmentId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          shipmentStatus = sRes.status;
+          if (!sRes.ok) shipmentError = await sRes.text();
+          else shipmentError = 'SUCCESS';
+        } catch (e: any) {
+          shipmentError = e.message;
+        }
+
+        accounts.push({
+          user_id: intg.user_id,
+          ml_user_id: intg.ml_user_id,
+          nickname: meData?.nickname,
+          email: meData?.email,
+          order_test: { status: orderStatus, result: orderError },
+          shipment_test: { status: shipmentStatus, result: shipmentError }
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true, accounts }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Ação 3: Importação direta por ID de pedido
     if (body.action === 'process_order' || body.order_id) {
       const targetOrderId = String(body.order_id || body.ml_order_id);
