@@ -1034,77 +1034,40 @@ serve(async (req) => {
       }
     }
 
-    // Ação Debug: Verificar contas conectadas e testar busca do pedido
+    // Ação Debug: Inspecionar produto e pedidos
     if (body.action === 'debug_order') {
-      const orderId = body.order_id || '2000015725821079';
+      const orderId = body.order_id || '2000019191794914';
       const shipmentId = body.shipment_id || '48358493709';
 
-      // 1. Buscar produto no banco
-      const { data: dbProducts } = await supabase
+      // 1. Buscar produto no banco por SKU exato e aproximado
+      const { data: dbProductExact } = await supabase
+        .from('products')
+        .select('*')
+        .eq('sku', 'LJFADM000031');
+
+      const { data: dbProductIlike } = await supabase
         .from('products')
         .select('id, name, sku, internal_sku, cost_price, price, supplier_id')
-        .or(`sku.ilike.%LJFADM000031%,name.ilike.%Palmilha%`);
+        .ilike('sku', '%LJFADM000031%');
 
-      // 2. Buscar pedidos no banco
-      const { data: recentOrders } = await supabase
+      const { data: dbProductName } = await supabase
+        .from('products')
+        .select('id, name, sku, internal_sku, cost_price, price, supplier_id')
+        .ilike('name', '%Palmilha%');
+
+      // 2. Buscar itens do pedido 639
+      const { data: order639 } = await supabase
         .from('orders')
-        .select('id, order_number, status, payment_status, total_amount, ml_order_id, ml_shipment_id, ml_label_url, notes, created_at, user_id, reseller_id')
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      // 3. Buscar detalhes do shipment no ML
-      const { data: jessicaIntg } = await supabase
-        .from('mercadolivre_integrations')
-        .select('*')
-        .eq('user_id', '0a3e373c-cfcc-4170-be22-981fb62bb0f4')
-        .single();
-
-      let shipmentDetails = null;
-      let orderDetailsFromShipment = null;
-      if (jessicaIntg) {
-        const token = await getValidTokenForIntegration(jessicaIntg);
-        try {
-          const shRes = await fetch(`https://api.mercadolibre.com/shipments/${shipmentId}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          if (shRes.ok) {
-            shipmentDetails = await shRes.json();
-            if (shipmentDetails.order_id) {
-              const oRes = await fetch(`https://api.mercadolibre.com/orders/${shipmentDetails.order_id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-              });
-              if (oRes.ok) orderDetailsFromShipment = await oRes.json();
-            }
-          }
-        } catch (e: any) {
-          shipmentDetails = { error: e.message };
-        }
-      }
+        .select('*, order_items(*)')
+        .eq('ml_order_id', '2000019191794914')
+        .maybeSingle();
 
       return new Response(JSON.stringify({
         success: true,
-        db_products: dbProducts,
-        recent_orders: recentOrders,
-        shipment_details: shipmentDetails ? {
-          id: shipmentDetails.id,
-          order_id: shipmentDetails.order_id,
-          status: shipmentDetails.status,
-          substatus: shipmentDetails.substatus,
-          tracking_number: shipmentDetails.tracking_number,
-        } : null,
-        order_details_from_shipment: orderDetailsFromShipment ? {
-          id: orderDetailsFromShipment.id,
-          status: orderDetailsFromShipment.status,
-          shipping: orderDetailsFromShipment.shipping,
-          order_items: orderDetailsFromShipment.order_items?.map((i: any) => ({
-            item_id: i.item?.id,
-            title: i.item?.title,
-            seller_sku: i.item?.seller_sku,
-            seller_custom_field: i.item?.seller_custom_field,
-            unit_price: i.unit_price,
-            quantity: i.quantity,
-          })),
-        } : null,
+        db_product_exact: dbProductExact,
+        db_product_ilike: dbProductIlike,
+        db_product_name: dbProductName,
+        order_639: order639,
       }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
