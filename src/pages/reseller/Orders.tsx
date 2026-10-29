@@ -87,6 +87,15 @@ function ResellerOrders() {
 
       if (error) throw error;
 
+      if (data?.not_connected || data?.success === false) {
+        toast({
+          title: "Mercado Livre não conectado",
+          description: data?.error || "Você precisa conectar sua conta do Mercado Livre no menu 'Lojafy Integra' antes de sincronizar.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       await queryClient.invalidateQueries({ queryKey: ["reseller-orders"] });
 
       if (data?.summary?.imported > 0) {

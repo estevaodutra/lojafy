@@ -1003,18 +1003,35 @@ serve(async (req) => {
 
     // Ação 1: Sincronização manual dos pedidos de um revendedor específico
     if (body.action === 'sync_reseller_orders' && body.user_id) {
-      const summary = await syncResellerRecentOrders(body.user_id);
-      return new Response(JSON.stringify({ success: true, summary }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      try {
+        const summary = await syncResellerRecentOrders(body.user_id);
+        return new Response(JSON.stringify({ success: true, summary }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (syncErr: any) {
+        console.warn(`[ml-order-webhook] Aviso na sincronização do usuário ${body.user_id}:`, syncErr.message);
+        return new Response(JSON.stringify({
+          success: false,
+          not_connected: syncErr.message.includes('não encontrada') || syncErr.message.includes('inativa'),
+          error: syncErr.message,
+        }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     // Ação 2: Sincronização em lote de todas as contas ativas (Cron ou Super Admin)
     if (body.action === 'sync_all_recent_orders' || body.mode === 'sync_all_recent_orders') {
-      const summary = await syncAllRecentOrders();
-      return new Response(JSON.stringify({ success: true, summary }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      try {
+        const summary = await syncAllRecentOrders();
+        return new Response(JSON.stringify({ success: true, summary }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (allErr: any) {
+        return new Response(JSON.stringify({ success: false, error: allErr.message }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     // Ação Debug: Verificar contas conectadas e testar busca do pedido
