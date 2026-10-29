@@ -1196,7 +1196,30 @@ serve(async (req) => {
         .order('created_at', { ascending: false })
         .limit(10);
 
-      return new Response(JSON.stringify({ success: true, orders: recentOrders }), {
+      // Testar baixar etiqueta do ML para shipment 48358493709 e 47851085916
+      const { data: intg } = await supabase
+        .from('mercadolivre_integrations')
+        .select('*')
+        .eq('user_id', '0a3e373c-cfcc-4170-be22-981fb62bb0f4')
+        .single();
+
+      let labelTestResult: any = {};
+      if (intg) {
+        const token = await getValidTokenForIntegration(intg);
+        for (const shId of ['48358493709', '47851085916']) {
+          const lRes = await fetch(`https://api.mercadolibre.com/shipments/${shId}/labels?response_type=pdf2`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const text = await lRes.text();
+          labelTestResult[shId] = {
+            status: lRes.status,
+            contentType: lRes.headers.get('content-type'),
+            sample: text.slice(0, 300)
+          };
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true, orders: recentOrders, labelTestResult }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
