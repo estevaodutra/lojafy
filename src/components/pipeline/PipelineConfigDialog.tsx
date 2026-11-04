@@ -23,20 +23,16 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { OrderPipeline, OrderPipelineStage } from "@/types/orderPipeline";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { OrderPipelineStage } from "@/types/orderPipeline";
 import { useOrderPipelines } from "@/hooks/useOrderPipelines";
 import { useUserRole } from "@/hooks/useUserRole";
 import { orderPipelineService } from "@/services/orderPipelineService";
-import { ALL_STATUSES, ORDER_STATUS_CONFIG, OrderStatus } from "@/constants/orderStatus";
 import {
-  GripVertical,
   Plus,
   Trash2,
   Edit2,
-  Save,
   RotateCcw,
-  Check,
   AlertTriangle,
   MoveDown,
   MoveUp,
@@ -117,7 +113,7 @@ export const PipelineConfigDialog: React.FC<PipelineConfigDialogProps> = ({
     setEditingStage({
       pipeline_id: currentPipeline.id,
       name: "",
-      status_key: "pendente",
+      status_key: "",
       order_index: currentPipeline.stages.length + 1,
       color_class: "bg-slate-100 text-slate-800 border-slate-300",
       icon_name: "Package",
@@ -132,13 +128,20 @@ export const PipelineConfigDialog: React.FC<PipelineConfigDialogProps> = ({
   };
 
   const handleSaveStageForm = async () => {
-    if (!editingStage || !editingStage.name || !editingStage.status_key) {
-      toast.error("Preencha o nome e o status da etapa.");
+    if (!editingStage || !editingStage.name?.trim()) {
+      toast.error("Informe o nome da etapa.");
       return;
     }
 
+    const trimmedName = editingStage.name.trim();
+
     try {
-      await saveStage(editingStage as any);
+      await saveStage({
+        ...editingStage,
+        name: trimmedName,
+        // O status do pedido é diretamente o nome da etapa
+        status_key: trimmedName,
+      } as any);
       setIsEditingModalOpen(false);
       setEditingStage(null);
     } catch {
@@ -147,14 +150,14 @@ export const PipelineConfigDialog: React.FC<PipelineConfigDialogProps> = ({
   };
 
   const handleRequestDeleteStage = async (stage: OrderPipelineStage) => {
-    const count = await orderPipelineService.countOrdersWithStatus(stage.status_key);
+    const count = await orderPipelineService.countOrdersWithStatus(stage.status_key || stage.name);
     setOrdersInStageCount(count);
     setStageToDelete(stage);
 
     // Pick first available other stage as target migration default
     const otherStages = currentPipeline.stages.filter((s) => s.id !== stage.id);
     if (otherStages.length > 0) {
-      setTargetMigrationStatus(otherStages[0].status_key);
+      setTargetMigrationStatus(otherStages[0].status_key || otherStages[0].name);
     }
 
     setIsMigrationDialogOpen(true);
@@ -196,7 +199,7 @@ export const PipelineConfigDialog: React.FC<PipelineConfigDialogProps> = ({
                   Configuração de Pipelines
                 </DialogTitle>
                 <DialogDescription>
-                  Gerencie as pipelines operacionais, etapas e relacionamentos de status (Exclusivo Super Admin).
+                  Gerencie as etapas operacionais das pipelines de pedidos (Exclusivo Super Admin).
                 </DialogDescription>
               </div>
               <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
@@ -278,11 +281,11 @@ export const PipelineConfigDialog: React.FC<PipelineConfigDialogProps> = ({
                     </button>
                   </div>
 
-                  <span className="text-xs font-mono text-muted-foreground w-5 text-center">
+                  <span className="text-xs font-mono text-muted-foreground w-5 text-center font-bold">
                     {idx + 1}
                   </span>
 
-                  <div className="space-y-0.5 min-w-0">
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-foreground truncate">
                         {stage.name}
@@ -292,12 +295,6 @@ export const PipelineConfigDialog: React.FC<PipelineConfigDialogProps> = ({
                           Inativo
                         </Badge>
                       )}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>Status vinculado:</span>
-                      <code className="bg-muted px-1.5 py-0.5 rounded font-mono text-[11px] text-foreground">
-                        {stage.status_key}
-                      </code>
                     </div>
                   </div>
                 </div>
@@ -335,7 +332,7 @@ export const PipelineConfigDialog: React.FC<PipelineConfigDialogProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Edit/Add Stage Dialog */}
+      {/* Edit/Add Stage Dialog - Simplificado: O status é o nome da etapa */}
       <Dialog open={isEditingModalOpen} onOpenChange={setIsEditingModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -343,7 +340,7 @@ export const PipelineConfigDialog: React.FC<PipelineConfigDialogProps> = ({
               {editingStage?.id ? "Editar Etapa" : "Nova Etapa da Pipeline"}
             </DialogTitle>
             <DialogDescription>
-              Defina o nome visível e o status operacional correspondente.
+              Defina o nome da etapa. O nome será exatamente o status exibido para o pedido e para o cliente.
             </DialogDescription>
           </DialogHeader>
 
@@ -353,44 +350,13 @@ export const PipelineConfigDialog: React.FC<PipelineConfigDialogProps> = ({
                 <Label htmlFor="stage-name">Nome da Etapa</Label>
                 <Input
                   id="stage-name"
-                  placeholder="Ex: Embalado > Aguardando Coleta"
+                  placeholder="Ex: Novo Pedido"
                   value={editingStage.name || ""}
                   onChange={(e) =>
                     setEditingStage({ ...editingStage, name: e.target.value })
                   }
+                  autoFocus
                 />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="stage-status">Status Relacionado do Pedido</Label>
-                <Select
-                  value={editingStage.status_key || "pendente"}
-                  onValueChange={(val) =>
-                    setEditingStage({ ...editingStage, status_key: val })
-                  }
-                >
-                  <SelectTrigger id="stage-status">
-                    <SelectValue placeholder="Selecione o status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ALL_STATUSES.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {ORDER_STATUS_CONFIG[s].label} ({s})
-                      </SelectItem>
-                    ))}
-                    {selectedPipelineKey === "occurrences" && (
-                      <>
-                        <SelectItem value="aberto">Ticket Aberto (aberto)</SelectItem>
-                        <SelectItem value="em_analise">Em Análise (em_analise)</SelectItem>
-                        <SelectItem value="aguardando_cliente">Aguardando Cliente</SelectItem>
-                        <SelectItem value="resolvido">Resolvido (resolvido)</SelectItem>
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-                <p className="text-[11px] text-muted-foreground">
-                  Quando um pedido entrar nesta etapa, seu status será atualizado para este valor.
-                </p>
               </div>
 
               <div className="flex items-center justify-between pt-2 border-t">
@@ -456,8 +422,8 @@ export const PipelineConfigDialog: React.FC<PipelineConfigDialogProps> = ({
                         {currentPipeline?.stages
                           .filter((s) => s.id !== stageToDelete?.id)
                           .map((s) => (
-                            <SelectItem key={s.id} value={s.status_key}>
-                              {s.name} ({s.status_key})
+                            <SelectItem key={s.id} value={s.status_key || s.name}>
+                              {s.name}
                             </SelectItem>
                           ))}
                       </SelectContent>

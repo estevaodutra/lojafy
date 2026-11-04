@@ -265,20 +265,26 @@ export const orderPipelineService = {
   },
 
   /**
-   * Salva/cria uma etapa
+   * Salva/cria uma etapa (o status do pedido é o nome da etapa)
    */
-  async saveStage(stage: Partial<OrderPipelineStage> & { pipeline_id: string; name: string; status_key: string }): Promise<OrderPipelineStage> {
+  async saveStage(stage: Partial<OrderPipelineStage> & { pipeline_id: string; name: string; status_key?: string }): Promise<OrderPipelineStage> {
     const isNew = !stage.id;
+    const stageName = stage.name.trim();
+    const stageStatus = stageName;
     let savedStage: OrderPipelineStage;
+
+    const current = this.getLocalPipelines();
+    const pipe = current.find((p) => p.id === stage.pipeline_id);
+    const oldStage = pipe?.stages.find((s) => s.id === stage.id);
 
     if (isNew) {
       const id = "stage-" + Math.random().toString(36).substring(2, 9);
       savedStage = {
         id,
         pipeline_id: stage.pipeline_id,
-        name: stage.name,
-        status_key: stage.status_key,
-        order_index: stage.order_index ?? 99,
+        name: stageName,
+        status_key: stageStatus,
+        order_index: stage.order_index ?? (pipe ? pipe.stages.length + 1 : 99),
         color_class: stage.color_class || "bg-slate-100 text-slate-800 border-slate-300",
         icon_name: stage.icon_name || "Package",
         is_active: stage.is_active ?? true,
@@ -299,17 +305,35 @@ export const orderPipelineService = {
         // fallback
       }
     } else {
-      savedStage = stage as OrderPipelineStage;
+      savedStage = {
+        ...(oldStage || {}),
+        ...stage,
+        name: stageName,
+        status_key: stageStatus,
+      } as OrderPipelineStage;
+
+      // Se o nome foi alterado, atualizar pedidos vinculados com o nome anterior
+      if (oldStage && (oldStage.name !== stageName || oldStage.status_key !== stageStatus)) {
+        try {
+          await supabase
+            .from("orders")
+            .update({ status: stageStatus, updated_at: new Date().toISOString() })
+            .or(`status.eq.${oldStage.status_key},status.eq.${oldStage.name}`);
+        } catch {
+          // ignore
+        }
+      }
+
       try {
         await supabase
           .from("order_pipeline_stages" as any)
           .update({
-            name: stage.name,
-            status_key: stage.status_key,
-            order_index: stage.order_index,
-            color_class: stage.color_class,
-            icon_name: stage.icon_name,
-            is_active: stage.is_active,
+            name: savedStage.name,
+            status_key: savedStage.status_key,
+            order_index: savedStage.order_index,
+            color_class: savedStage.color_class,
+            icon_name: savedStage.icon_name,
+            is_active: savedStage.is_active,
             updated_at: new Date().toISOString(),
           })
           .eq("id", stage.id);
@@ -319,7 +343,6 @@ export const orderPipelineService = {
     }
 
     // Atualiza localmente
-    const current = this.getLocalPipelines();
     const updated = current.map((p) => {
       if (p.id !== stage.pipeline_id) return p;
       const stages = isNew
