@@ -256,7 +256,7 @@ export const orderPipelineService = {
       orderedStageIds.forEach((id, idx) => {
         const found = stageMap.get(id);
         if (found) {
-          newStages.push({ ...found, order_index: idx + 1 });
+          newStages.push(Object.assign({}, found, { order_index: idx + 1 }));
         }
       });
       return { ...pipe, stages: newStages };
@@ -382,11 +382,15 @@ export const orderPipelineService = {
         ordersMigrated = currentOrdersCount;
         
         // Registrar histórico de migração em lote
-        await supabase.from("order_status_history" as any).insert({
-          order_id: null,
-          status: targetStatusKey,
-          notes: `Migrado da etapa ${stage.name} (${stage.status_key}) para ${targetStatusKey} pelo Super Admin`,
-        }).then(() => {}).catch(() => {});
+        try {
+          await supabase.from("order_status_history" as any).insert({
+            order_id: null,
+            status: targetStatusKey,
+            notes: `Migrado da etapa ${stage.name} (${stage.status_key}) para ${targetStatusKey} pelo Super Admin`,
+          });
+        } catch {
+          // ignore
+        }
       }
     }
 
