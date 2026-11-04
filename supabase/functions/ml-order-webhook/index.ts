@@ -1219,11 +1219,51 @@ serve(async (req) => {
     if (body.action === 'inspect_orders') {
       const { data: recentOrders } = await supabase
         .from('orders')
-        .select('id, order_number, status, payment_status, payment_method, ml_order_id, ml_shipment_id, ml_label_url, tracking_code, notes')
+        .select('id, order_number, status, payment_status, payment_method, ml_order_id, ml_shipment_id, ml_label_url, tracking_code, notes, created_at')
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(20);
 
-      return new Response(JSON.stringify({ success: true, orders: recentOrders }), {
+      // Inspecionar o pedido do print #2000015837503663 e shipment 48415142437
+      const { data: intg } = await supabase
+        .from('mercadolivre_integrations')
+        .select('*')
+        .eq('is_active', true)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      let mlInspect: any = {};
+      if (intg) {
+        const token = await getValidTokenForIntegration(intg);
+        // 1. Tentar como order
+        const oRes = await fetch(`https://api.mercadolibre.com/orders/2000015837503663`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const oData = await oRes.json().catch(() => ({}));
+
+        // 2. Tentar como pack
+        const pRes = await fetch(`https://api.mercadolibre.com/packs/2000015837503663`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const pData = await pRes.json().catch(() => ({}));
+
+        // 3. Tentar como shipment 48415142437
+        const shRes = await fetch(`https://api.mercadolibre.com/shipments/48415142437`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const shData = await shRes.json().catch(() => ({}));
+
+        mlInspect = {
+          order_status: oRes.status,
+          order_data: oData,
+          pack_status: pRes.status,
+          pack_data: pData,
+          shipment_status: shRes.status,
+          shipment_data: shData,
+        };
+      }
+
+      return new Response(JSON.stringify({ success: true, orders: recentOrders, mlInspect }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
