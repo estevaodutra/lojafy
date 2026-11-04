@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import OrderDetailsModal from "@/components/OrderDetailsModal";
 import { OrderSolicitations } from "@/components/admin/OrderSolicitations";
+import { OrderPipelineView } from "@/components/pipeline/OrderPipelineView";
+import { normalizeOrderToPipelineItem } from "@/utils/orderPipelineAdapter";
+import { OrderPipelineItem } from "@/types/orderPipeline";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, Package, Search, Filter, AlertCircle } from "lucide-react";
@@ -17,6 +20,7 @@ import { ptBR } from "date-fns/locale";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { useSupplierOrganization } from "@/hooks/supplier/useSupplierOrganization";
 import { FULFILLMENT_STATUS_CONFIG, type FulfillmentStatus } from "@/constants/fulfillmentStatus";
+import { SUPPLIER_STATUSES, ORDER_STATUS_CONFIG, OrderStatus } from "@/constants/orderStatus";
 
 interface SupplierOrderRow {
   id: string;
@@ -34,6 +38,8 @@ interface SupplierOrderRow {
   webhook_paid_dispatched_at?: string | null;
   webhook_paid_error?: string | null;
   sla_shipping_deadline?: string | null;
+  shipping_address?: any;
+  order_items?: any[];
   profiles: {
     first_name: string;
     last_name: string;
@@ -42,26 +48,19 @@ interface SupplierOrderRow {
 
 const ALL_STATUS_OPTIONS = [
   { value: "all", label: "Todos os status" },
-  { value: "awaiting_picking", label: "Aguardando Separação" },
-  { value: "picking", label: "Em Separação" },
-  { value: "picked", label: "Separado" },
-  { value: "packing", label: "Em Embalagem" },
-  { value: "packed", label: "Embalado" },
-  { value: "label_ready", label: "Etiqueta Pronta" },
-  { value: "shipped", label: "Enviado" },
-  { value: "in_transit", label: "Em Trânsito" },
-  { value: "delivered", label: "Entregue" },
-  { value: "occurrence", label: "Com Ocorrência" },
-  { value: "cancelled", label: "Cancelado" },
-  { value: "returned", label: "Devolvido" },
+  { value: "pendente", label: "Pedido Gerado > Aguardando Pagamento" },
+  { value: "pago", label: "Pedido Pago > Aguardando Recebimento" },
+  { value: "recebido", label: "Pedido Recebido > Aguardando Envio" },
+  { value: "embalado", label: "Embalado > Aguardando Envio" },
+  { value: "enviado", label: "Enviado" },
+  { value: "finalizado", label: "Finalizado" },
+  { value: "cancelado", label: "Cancelado" },
+  { value: "etiqueta_incorreta", label: "Erro | Etiqueta Incorreta" },
 ];
 
-/**
- * Visão geral de pedidos do fornecedor com o mesmo layout, informações e colunas do Superadmin.
- */
 const SupplierOrderManagement = () => {
   const [searchParams] = useSearchParams();
-  const slaParam = searchParams.get('sla');
+  const slaParam = searchParams.get("sla");
 
   const { data: orgData, isLoading: orgLoading } = useSupplierOrganization();
   const orgId = orgData?.organization?.id;
@@ -91,7 +90,7 @@ const SupplierOrderManagement = () => {
 
       // 1. Fetch fulfillments cleanly
       const { data: fulfillmentsData, error: fError } = await supabase
-        .from('supplier_fulfillments')
+        .from("supplier_fulfillments")
         .select(`
           id,
           order_id,
@@ -119,8 +118,8 @@ const SupplierOrderManagement = () => {
             webhook_paid_dispatched_at
           )
         `)
-        .eq('supplier_organization_id', orgId)
-        .order('created_at', { ascending: false });
+        .eq("supplier_organization_id", orgId)
+        .order("created_at", { ascending: false });
 
       if (fError) throw fError;
 
@@ -130,110 +129,128 @@ const SupplierOrderManagement = () => {
         return;
       }
 
-      const orderIds = [...new Set(fulfillmentsData.map(f => f.order_id).filter(Boolean))];
+      const orderIds = [...new Set(fulfillmentsData.map((f) => f.order_id).filter(Boolean))];
 
-      // 2. Fetch orders separately if joined orders is null due to RLS
+      // 2. Fetch orders and order_items
       let ordersData: any[] = [];
       if (orderIds.length > 0) {
         try {
-          const { data: oData, error: oError } = await supabase
-            .from('orders')
-            .select('id, order_number, status, payment_status, total_amount, user_id, created_at, has_shipping_file, shipping_address, billing_address, webhook_paid_status, webhook_paid_error, webhook_paid_dispatched_at')
-            .in('id', orderIds);
-          if (!oError && oData) {
-            ordersData = oData;
-          }
+          const { data: oData } = await supabase
+            .from("orders")
+            .select(`
+              id,
+              order_number,
+              status,
+              payment_status,
+              total_amount,
+              user_id,
+              created_at,
+              has_shipping_file,
+              shipping_address,
+              billing_address,
+              webhook_paid_status,
+              webhook_paid_error,
+              webhook_paid_dispatched_at,
+              order_items (
+                id,
+                product_id,
+                quantity,
+                unit_price,
+                total_price,
+                product_snapshot
+              )
+            `)
+            .in("id", orderIds);
+          if (oData) ordersData = oData;
         } catch (e) {
-          console.error('Error fetching orders directly:', e);
+          console.error("Error fetching orders directly:", e);
         }
       }
-      const ordersMap = new Map(ordersData.map(o => [o.id, o]));
+      const ordersMap = new Map(ordersData.map((o) => [o.id, o]));
 
+      // 3. Shipping files
       let shippingFilesData: Array<{ order_id: string }> = [];
       if (orderIds.length > 0) {
         try {
           const { data } = await supabase
-            .from('order_shipping_files')
-            .select('order_id')
-            .in('order_id', orderIds);
+            .from("order_shipping_files")
+            .select("order_id")
+            .in("order_id", orderIds);
           shippingFilesData = data || [];
         } catch (err) {
-          console.error('Error fetching shipping files:', err);
+          console.error("Error fetching shipping files:", err);
         }
       }
-      const ordersWithShippingFiles = new Set(shippingFilesData.map(f => f.order_id));
+      const ordersWithShippingFiles = new Set(shippingFilesData.map((f) => f.order_id));
 
-      const userIds = [...new Set(fulfillmentsData.map(f => (f.orders?.user_id || ordersMap.get(f.order_id)?.user_id)).filter(Boolean))];
+      // 4. Profiles
+      const userIds = [
+        ...new Set(
+          fulfillmentsData
+            .map((f) => f.orders?.user_id || ordersMap.get(f.order_id)?.user_id)
+            .filter(Boolean)
+        ),
+      ];
       let profilesData: Array<{ user_id: string; first_name: string | null; last_name: string | null }> = [];
       if (userIds.length > 0) {
         try {
           const { data } = await supabase
-            .from('profiles')
-            .select('user_id, first_name, last_name')
-            .in('user_id', userIds);
+            .from("profiles")
+            .select("user_id, first_name, last_name")
+            .in("user_id", userIds);
           profilesData = data || [];
         } catch (err) {
-          console.error('Error fetching profiles:', err);
+          console.error("Error fetching profiles:", err);
         }
 
         if (profilesData.length === 0 && currentUser?.id) {
           try {
-            const { data: rpcData } = await supabase.rpc('get_order_customer_names', { _user_id: currentUser.id });
+            const { data: rpcData } = await supabase.rpc("get_order_customer_names", {
+              _user_id: currentUser.id,
+            });
             if (rpcData && rpcData.length > 0) {
               profilesData = rpcData;
             }
-          } catch (rpcErr) {
-            console.error('Error calling get_order_customer_names RPC:', rpcErr);
+          } catch {
+            // ignore
           }
         }
       }
-      const profilesMap = new Map(profilesData.map(p => [p.user_id, p]));
+      const profilesMap = new Map(profilesData.map((p) => [p.user_id, p]));
 
       const parseAddress = (addr: any) => {
         if (!addr) return null;
-        if (typeof addr === 'string') {
-          try { return JSON.parse(addr); } catch (e) { return null; }
+        if (typeof addr === "string") {
+          try {
+            return JSON.parse(addr);
+          } catch {
+            return null;
+          }
         }
-        if (typeof addr === 'object') return addr;
+        if (typeof addr === "object") return addr;
         return null;
       };
 
-      const mappedRows: SupplierOrderRow[] = fulfillmentsData.map(item => {
+      const mappedRows: SupplierOrderRow[] = fulfillmentsData.map((item) => {
         const orderObj = (item.orders as any) || ordersMap.get(item.order_id) || {};
         const profile = orderObj?.user_id ? profilesMap.get(orderObj.user_id) : null;
 
-        let firstName = profile?.first_name || '';
-        let lastName = profile?.last_name || '';
+        let firstName = profile?.first_name || "";
+        let lastName = profile?.last_name || "";
 
         if (!firstName && !lastName && orderObj?.shipping_address) {
           const sa = parseAddress(orderObj.shipping_address);
           if (sa) {
             if (sa.first_name || sa.last_name) {
-              firstName = sa.first_name || '';
-              lastName = sa.last_name || '';
+              firstName = sa.first_name || "";
+              lastName = sa.last_name || "";
             } else {
-              const fullName = sa.name || sa.full_name || sa.recipient_name || sa.customer_name || sa.contact_name;
-              if (fullName && typeof fullName === 'string' && fullName.trim()) {
-                const parts = fullName.trim().split(' ');
+              const fullName =
+                sa.name || sa.full_name || sa.recipient_name || sa.customer_name || sa.contact_name;
+              if (fullName && typeof fullName === "string" && fullName.trim()) {
+                const parts = fullName.trim().split(" ");
                 firstName = parts[0];
-                lastName = parts.slice(1).join(' ');
-              }
-            }
-          }
-        }
-
-        if (!firstName && !lastName && orderObj?.billing_address) {
-          const ba = parseAddress(orderObj.billing_address);
-          if (ba) {
-            if (ba.first_name || ba.last_name) {
-              firstName = ba.first_name || '';
-              lastName = ba.last_name || '';
-            } else {
-              const fullName = ba.name || ba.full_name || ba.recipient_name || ba.customer_name || ba.contact_name;
-              if (fullName && typeof fullName === 'string' && fullName.trim()) {
-                const parts = fullName.trim().split(' ');
-                firstName = parts[0];
-                lastName = parts.slice(1).join(' ');
+                lastName = parts.slice(1).join(" ");
               }
             }
           }
@@ -241,38 +258,40 @@ const SupplierOrderManagement = () => {
 
         const hasShippingFile = Boolean(
           orderObj?.has_shipping_file ||
-          ordersWithShippingFiles.has(item.order_id) ||
-          item.label_status === 'generated' ||
-          item.label_status === 'printed' ||
-          item.status === 'label_ready'
+            ordersWithShippingFiles.has(item.order_id) ||
+            item.label_status === "generated" ||
+            item.label_status === "printed" ||
+            item.status === "label_ready"
         );
 
         return {
           id: orderObj?.id || item.id,
           fulfillment_id: item.id,
           order_id: item.order_id,
-          order_number: orderObj?.order_number || '',
-          status: item.status || orderObj?.status || 'awaiting_picking',
-          order_status: orderObj?.status || '',
-          payment_status: orderObj?.payment_status || 'pending',
+          order_number: orderObj?.order_number || "",
+          status: orderObj?.status || item.status || "recebido",
+          order_status: orderObj?.status || "",
+          payment_status: orderObj?.payment_status || "pending",
           total_amount: Number(orderObj?.total_amount || 0),
           created_at: orderObj?.created_at || item.created_at,
-          user_id: orderObj?.user_id || '',
+          user_id: orderObj?.user_id || "",
           has_shipping_file: hasShippingFile,
           webhook_paid_status: orderObj?.webhook_paid_status,
           webhook_paid_dispatched_at: orderObj?.webhook_paid_dispatched_at,
           webhook_paid_error: orderObj?.webhook_paid_error,
           sla_shipping_deadline: item.sla_shipping_deadline,
+          shipping_address: orderObj?.shipping_address,
+          order_items: orderObj?.order_items || [],
           profiles: {
-            first_name: firstName || 'Cliente',
-            last_name: lastName || '',
+            first_name: firstName || "Cliente",
+            last_name: lastName || "",
           },
         };
       });
 
       setOrders(mappedRows);
     } catch (error: any) {
-      console.error('Error fetching supplier orders:', error);
+      console.error("Error fetching supplier orders:", error);
       toast({
         title: "Erro",
         description: error?.message || "Erro ao carregar pedidos",
@@ -283,36 +302,41 @@ const SupplierOrderManagement = () => {
     }
   };
 
-  const updateOrderStatus = async (row: SupplierOrderRow, newStatus: string) => {
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    if (!SUPPLIER_STATUSES.includes(newStatus as OrderStatus)) {
+      toast({
+        title: "Ação não permitida",
+        description: `Fornecedores podem selecionar apenas os status: Recebido, Enviado ou Etiqueta Incorreta.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     const previousOrders = orders;
-    setOrders(prev => prev.map(o => o.fulfillment_id === row.fulfillment_id ? { ...o, status: newStatus } : o));
+    setOrders((prev) =>
+      prev.map((o) => (o.order_id === orderId || o.id === orderId ? { ...o, status: newStatus } : o))
+    );
 
     try {
-      const { error: fErr } = await supabase
-        .from('supplier_fulfillments')
-        .update({ status: newStatus as FulfillmentStatus })
-        .eq('id', row.fulfillment_id);
+      const { error: oErr } = await supabase
+        .from("orders")
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq("id", orderId);
 
-      if (fErr) {
-        const { error: oErr } = await supabase
-          .from('orders')
-          .update({ status: newStatus })
-          .eq('id', row.order_id);
-        if (oErr) throw oErr;
-      }
+      if (oErr) throw oErr;
 
-      await supabase.from('order_status_history').insert({
-        order_id: row.order_id,
+      await supabase.from("order_status_history").insert({
+        order_id: orderId,
         status: newStatus,
         notes: `Status atualizado pelo fornecedor`,
       });
 
       toast({
         title: "Sucesso",
-        description: "Status do pedido atualizado",
+        description: "Status do pedido atualizado com sucesso.",
       });
     } catch (error) {
-      console.error('Error updating order status:', error);
+      console.error("Error updating order status:", error);
       setOrders(previousOrders);
       toast({
         title: "Erro",
@@ -321,6 +345,25 @@ const SupplierOrderManagement = () => {
       });
     }
   };
+
+  // Convert to normalized pipeline items
+  const pipelineItems: OrderPipelineItem[] = useMemo(() => {
+    return orders.map((row) =>
+      normalizeOrderToPipelineItem({
+        id: row.order_id || row.id,
+        order_number: row.order_number,
+        status: row.status,
+        payment_status: row.payment_status,
+        total_amount: row.total_amount,
+        created_at: row.created_at,
+        user_id: row.user_id,
+        has_shipping_file: row.has_shipping_file,
+        shipping_address: row.shipping_address,
+        order_items: row.order_items,
+        profiles: row.profiles,
+      })
+    );
+  }, [orders]);
 
   const getPaymentStatusBadge = (status: string) => {
     const statusConfig = {
@@ -332,12 +375,15 @@ const SupplierOrderManagement = () => {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const filteredOrders = orders.filter(order => {
+  const filteredOrders = orders.filter((order) => {
     const matchesSearch =
       order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      `${order.profiles.first_name} ${order.profiles.last_name}`.toLowerCase().includes(searchTerm.toLowerCase());
+      `${order.profiles.first_name} ${order.profiles.last_name}`
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase());
 
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter || order.order_status === statusFilter;
+    const matchesStatus =
+      statusFilter === "all" || order.status === statusFilter || order.order_status === statusFilter;
 
     let matchesSla = true;
     if (slaParam === "late" && order.sla_shipping_deadline) {
@@ -360,24 +406,244 @@ const SupplierOrderManagement = () => {
   const showingFrom = filteredOrders.length > 0 ? startIndex + 1 : 0;
   const showingTo = Math.min(endIndex, filteredOrders.length);
 
+  // Existing table view
+  const listViewContent = (
+    <div className="space-y-4">
+      {filteredOrders.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          Mostrando {showingFrom}-{showingTo} de {filteredOrders.length} pedidos
+        </p>
+      )}
+
+      <Card>
+        <CardHeader className="py-4">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Filter className="w-4 h-4" />
+            Filtros
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Buscar por número do pedido ou cliente..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 h-9 text-xs"
+                />
+              </div>
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-56 h-9 text-xs">
+                <SelectValue placeholder="Status do pedido" />
+              </SelectTrigger>
+              <SelectContent>
+                {ALL_STATUS_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Número do Pedido</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Data</TableHead>
+                <TableHead>Pagamento</TableHead>
+                <TableHead>Webhook</TableHead>
+                <TableHead>Etiqueta</TableHead>
+                <TableHead>Total</TableHead>
+                <TableHead>Ações</TableHead>
+                <TableHead>Status de Envio</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-8">
+                    Carregando pedidos...
+                  </TableCell>
+                </TableRow>
+              ) : filteredOrders.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-8">
+                    Nenhum pedido encontrado
+                  </TableCell>
+                </TableRow>
+              ) : (
+                currentOrders.map((order) => {
+                  const clientName =
+                    order.profiles.first_name || order.profiles.last_name
+                      ? `${order.profiles.first_name} ${order.profiles.last_name}`.trim()
+                      : "Cliente";
+
+                  return (
+                    <TableRow key={order.fulfillment_id}>
+                      <TableCell className="font-medium">#{order.order_number}</TableCell>
+                      <TableCell>{clientName}</TableCell>
+                      <TableCell>
+                        {order.created_at
+                          ? format(new Date(order.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })
+                          : "—"}
+                      </TableCell>
+                      <TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
+                      <TableCell>
+                        {order.payment_status === "paid" ? (
+                          order.webhook_paid_status === "sent" ? (
+                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">
+                              ✓ Enviado
+                            </Badge>
+                          ) : order.webhook_paid_status === "failed" ? (
+                            <Badge
+                              variant="destructive"
+                              className="text-xs"
+                              title={order.webhook_paid_error ?? ""}
+                            >
+                              ✗ Falhou
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs text-muted-foreground">
+                              Não enviado
+                            </Badge>
+                          )
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {order.has_shipping_file ? (
+                          <Badge
+                            variant="default"
+                            className="bg-green-100 text-green-800 hover:bg-green-100"
+                          >
+                            📄 Enviada
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">📄 Pendente</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {new Intl.NumberFormat("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        }).format(order.total_amount)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedOrder(order)}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={order.status}
+                          onValueChange={(val) => updateOrderStatus(order.order_id, val)}
+                        >
+                          <SelectTrigger className="w-[180px] h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SUPPLIER_STATUSES.map((s) => (
+                              <SelectItem key={s} value={s}>
+                                {ORDER_STATUS_CONFIG[s].label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {totalPages > 1 && (
+        <div className="mt-4">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                if (
+                  page === 1 ||
+                  page === totalPages ||
+                  (page >= currentPage - 1 && page <= currentPage + 1)
+                ) {
+                  return (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                } else if (page === currentPage - 2 || page === currentPage + 2) {
+                  return (
+                    <PaginationItem key={page}>
+                      <span className="px-4">...</span>
+                    </PaginationItem>
+                  );
+                }
+                return null;
+              })}
+
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className={
+                    currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="container mx-auto p-4 sm:p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Gerenciar Pedidos</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Gerenciar Pedidos</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
             Todos os fulfillments da sua operação
-            {slaParam === 'late' && ' — mostrando atrasados'}
-            {slaParam === 'due_today' && ' — vencendo hoje'}
+            {slaParam === "late" && " — mostrando atrasados"}
+            {slaParam === "due_today" && " — vencendo hoje"}
           </p>
         </div>
-        <Badge variant="outline" className="text-sm">
-          <Package className="w-4 h-4 mr-1" />
+        <Badge variant="outline" className="w-fit text-xs px-3 py-1">
+          <Package className="w-3.5 h-3.5 mr-1 text-primary" />
           {orders.length} pedidos
         </Badge>
       </div>
 
-      <Tabs defaultValue="orders" className="space-y-6">
+      <Tabs defaultValue="orders" className="space-y-4">
         <TabsList>
           <TabsTrigger value="orders">Todos os Pedidos</TabsTrigger>
           <TabsTrigger value="solicitations" className="flex items-center gap-1.5">
@@ -386,215 +652,15 @@ const SupplierOrderManagement = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="orders" className="space-y-6">
-          {filteredOrders.length > 0 && (
-            <p className="text-sm text-muted-foreground">
-              Mostrando {showingFrom}-{showingTo} de {filteredOrders.length} pedidos
-            </p>
-          )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="w-5 h-5" />
-                Filtros
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                    <Input
-                      placeholder="Buscar por número do pedido ou cliente..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-52">
-                    <SelectValue placeholder="Status do pedido" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ALL_STATUS_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Número do Pedido</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Pagamento</TableHead>
-                    <TableHead>Webhook</TableHead>
-                    <TableHead>Etiqueta</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Ações</TableHead>
-                    <TableHead>Status de Envio</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8">
-                        Carregando pedidos...
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredOrders.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8">
-                        Nenhum pedido encontrado
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    currentOrders.map((order) => {
-                      const clientName =
-                        order.profiles.first_name || order.profiles.last_name
-                          ? `${order.profiles.first_name} ${order.profiles.last_name}`.trim()
-                          : "Cliente";
-
-                      return (
-                        <TableRow key={order.fulfillment_id}>
-                          <TableCell className="font-medium">
-                            #{order.order_number}
-                          </TableCell>
-                          <TableCell>{clientName}</TableCell>
-                          <TableCell>
-                            {order.created_at
-                              ? format(new Date(order.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })
-                              : "—"}
-                          </TableCell>
-                          <TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
-                          <TableCell>
-                            {order.payment_status === 'paid' ? (
-                              order.webhook_paid_status === 'sent' ? (
-                                <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">✓ Enviado</Badge>
-                              ) : order.webhook_paid_status === 'failed' ? (
-                                <Badge variant="destructive" className="text-xs" title={order.webhook_paid_error ?? ''}>✗ Falhou</Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-xs text-muted-foreground">Não enviado</Badge>
-                              )
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {order.has_shipping_file ? (
-                              <Badge
-                                variant="default"
-                                className="bg-green-100 text-green-800 hover:bg-green-200 cursor-pointer text-xs transition-colors"
-                                onClick={() => setSelectedOrder(order)}
-                                title="Clique para visualizar, baixar ou imprimir a etiqueta"
-                              >
-                                📄 Enviada
-                              </Badge>
-                            ) : (
-                              <Badge
-                                variant="outline"
-                                className="text-xs cursor-pointer hover:bg-accent"
-                                onClick={() => setSelectedOrder(order)}
-                                title="Clique para enviar ou verificar etiquetas"
-                              >
-                                📄 Pendente
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>R$ {order.total_amount.toFixed(2)}</TableCell>
-                          <TableCell>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setSelectedOrder(order)}
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                          </TableCell>
-                          <TableCell>
-                            <Select
-                              value={order.status}
-                              onValueChange={(value) => updateOrderStatus(order, value)}
-                            >
-                              <SelectTrigger className="w-[170px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {ALL_STATUS_OPTIONS.filter(o => o.value !== 'all').map((opt) => (
-                                  <SelectItem key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          {totalPages > 1 && (
-            <div className="mt-6">
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                    />
-                  </PaginationItem>
-
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                    if (
-                      page === 1 ||
-                      page === totalPages ||
-                      (page >= currentPage - 1 && page <= currentPage + 1)
-                    ) {
-                      return (
-                        <PaginationItem key={page}>
-                          <PaginationLink
-                            onClick={() => setCurrentPage(page)}
-                            isActive={currentPage === page}
-                            className="cursor-pointer"
-                          >
-                            {page}
-                          </PaginationLink>
-                        </PaginationItem>
-                      );
-                    } else if (page === currentPage - 2 || page === currentPage + 2) {
-                      return (
-                        <PaginationItem key={page}>
-                          <span className="px-4">...</span>
-                        </PaginationItem>
-                      );
-                    }
-                    return null;
-                  })}
-
-                  <PaginationItem>
-                    <PaginationNext
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
-          )}
+        <TabsContent value="orders" className="space-y-4">
+          <OrderPipelineView
+            orders={pipelineItems}
+            isLoading={loading}
+            onUpdateOrderStatus={updateOrderStatus}
+            listViewContent={listViewContent}
+            userScopeLabel="Fornecedor (Sua Operação)"
+            onRefreshOrders={fetchOrders}
+          />
         </TabsContent>
 
         <TabsContent value="solicitations">
@@ -604,7 +670,7 @@ const SupplierOrderManagement = () => {
 
       {selectedOrder && (
         <OrderDetailsModal
-          orderId={selectedOrder.order_id}
+          orderId={selectedOrder.order_id || selectedOrder.id}
           isOpen={!!selectedOrder}
           onClose={() => setSelectedOrder(null)}
         />

@@ -6,8 +6,12 @@ import AIKnowledgeBase from "./AIKnowledgeBase";
 import ShippingCutoffSettings from "@/components/admin/ShippingCutoffSettings";
 import WalletSettings from "@/components/admin/WalletSettings";
 import { MercadoLivreSettings } from "@/components/admin/MercadoLivreSettings";
+import { OrderPipelinesSettings } from "@/components/admin/OrderPipelinesSettings";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const Configuracoes = () => {
+  const { isSuperAdmin } = useUserRole();
+
   return (
     <div className="space-y-6">
       <div>
@@ -18,8 +22,11 @@ const Configuracoes = () => {
       </div>
 
       <Tabs defaultValue="platform" className="space-y-6">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="platform">Plataforma</TabsTrigger>
+          {isSuperAdmin() && (
+            <TabsTrigger value="pipelines">Pipelines de Pedidos</TabsTrigger>
+          )}
           <TabsTrigger value="mercadolivre">Mercado Livre</TabsTrigger>
           <TabsTrigger value="shipping">Envio</TabsTrigger>
           <TabsTrigger value="wallet">Carteira</TabsTrigger>
@@ -31,6 +38,12 @@ const Configuracoes = () => {
         <TabsContent value="platform" className="space-y-4">
           <Plataforma />
         </TabsContent>
+
+        {isSuperAdmin() && (
+          <TabsContent value="pipelines" className="space-y-4">
+            <OrderPipelinesSettings />
+          </TabsContent>
+        )}
 
         <TabsContent value="mercadolivre" className="space-y-4">
           <MercadoLivreSettings />

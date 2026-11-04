@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useResellerOrders, type ResellerOrder } from "@/hooks/useResellerOrders";
-import { Search, Package, Download, MapPin, AlertCircle, QrCode, Copy, Check, Clock, RefreshCw, ShoppingBag } from "lucide-react";
+import { Search, Package, Download, MapPin, AlertCircle, QrCode, Copy, Check, Clock, RefreshCw, ShoppingBag, Eye } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -17,6 +17,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { OrderPipelineView } from "@/components/pipeline/OrderPipelineView";
+import { normalizeOrderToPipelineItem } from "@/utils/orderPipelineAdapter";
+import { OrderPipelineItem } from "@/types/orderPipeline";
+import OrderDetailsModal from "@/components/OrderDetailsModal";
 
 function ResellerOrders() {
   const navigate = useNavigate();
@@ -34,6 +38,7 @@ function ResellerOrders() {
   const [isManualImportOpen, setIsManualImportOpen] = useState(false);
   const [manualOrderId, setManualOrderId] = useState("");
   const [isImportingManual, setIsImportingManual] = useState(false);
+  const [selectedDetailOrderId, setSelectedDetailOrderId] = useState<string | null>(null);
 
   const { data: orders, isLoading } = useResellerOrders(statusFilter, searchTerm);
 
@@ -141,41 +146,27 @@ function ResellerOrders() {
     }
   };
 
-  const handleCopyPix = async (code: string) => {
-    try {
-      await navigator.clipboard.writeText(code);
+  const handleCopyPix = () => {
+    if (selectedPixOrder?.pix_qr_code) {
+      navigator.clipboard.writeText(selectedPixOrder.pix_qr_code);
       setCopied(true);
       toast({
-        title: "Código Pix copiado!",
-        description: "Cole no app do seu banco para efetuar o pagamento.",
+        title: "Código copiado!",
+        description: "Código Pix copia e cola copiado para a área de transferência.",
       });
-      setTimeout(() => setCopied(false), 2500);
-    } catch {
-      toast({
-        title: "Erro ao copiar",
-        description: "Selecione e copie o código manualmente.",
-        variant: "destructive",
-      });
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
   const handleSyncOrders = async () => {
-    if (!user?.id) return;
     setIsSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('ml-order-webhook', {
-        body: { action: 'sync_reseller_orders', user_id: user.id },
+      const { data, error } = await supabase.functions.invoke("ml-order-webhook", {
+        body: { action: "sync_all_recent_orders", user_id: user?.id },
       });
 
-      if (error) throw error;
-
-      if (data?.not_connected || data?.success === false) {
-        toast({
-          title: "Mercado Livre não conectado",
-          description: data?.error || "Você precisa conectar sua conta do Mercado Livre no menu 'Lojafy Integra' antes de sincronizar.",
-          variant: "destructive",
-        });
-        return;
+      if (error) {
+        throw new Error(error.message || "Falha na chamada da Edge Function");
       }
 
       await queryClient.invalidateQueries({ queryKey: ["reseller-orders"] });
@@ -268,8 +259,208 @@ function ResellerOrders() {
   };
 
   const counts = getStatusCounts();
-
   const visibleTabs: (OrderStatus | "all")[] = ["all", ...ALL_STATUSES];
+
+  // Pipeline items normalization
+  const pipelineItems: OrderPipelineItem[] = useMemo(() => {
+    if (!orders) return [];
+    return orders.map((o) => normalizeOrderToPipelineItem(o));
+  }, [orders]);
+
+  // Existing list view
+  const listViewContent = (
+    <div className="space-y-6">
+      {/* Busca */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por número do pedido..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
+      {/* Tabs de Status */}
+      <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+        <TabsList className="flex-wrap h-auto">
+          {visibleTabs.map((tab) => (
+            <TabsTrigger key={tab} value={tab}>
+              {tab === "all" ? "Todos" : ORDER_STATUS_CONFIG[tab].label} ({counts[tab] || 0})
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        <TabsContent value={statusFilter} className="mt-6">
+          {isLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <Card key={i}>
+                  <CardContent className="p-6">
+                    <Skeleton className="h-20 w-full" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : orders && orders.length > 0 ? (
+            <div className="space-y-4">
+              {orders.map((order) => {
+                const statusInfo = getStatusConfig(order.status);
+                const StatusIcon = statusInfo.icon;
+                const isMlOrder = order.payment_method === 'mercadolivre' || !!order.ml_order_id;
+                const isPendingPayment = order.payment_status === 'pending' || order.status === 'pendente';
+
+                return (
+                  <Card key={order.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-5">
+                      {/* Top Header */}
+                      <div className="flex items-start justify-between gap-3 pb-3 border-b">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-bold text-lg text-slate-900 tracking-tight">#{order.order_number}</h3>
+
+                          {order.ml_order_id && (
+                            <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300 font-semibold text-xs px-2.5 py-0.5 gap-1.5 shadow-2xs">
+                              <ShoppingBag className="h-3 w-3 text-amber-600" />
+                              <span>ML: <strong>#{order.ml_order_id}</strong></span>
+                            </Badge>
+                          )}
+
+                          <Badge className={statusInfo.color}>
+                            <StatusIcon className="h-3 w-3 mr-1" />
+                            {statusInfo.label}
+                          </Badge>
+
+                          {(order.payment_status === "approved" || order.payment_status === "paid") && (
+                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
+                              Pago
+                            </Badge>
+                          )}
+
+                          {isPendingPayment && (
+                            <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 text-xs gap-1">
+                              <Clock className="h-3 w-3" />
+                              Pix Fulfillment Pendente
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <p className="text-xl font-bold text-primary">
+                            R$ {Number(order.total_amount).toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Informações centrais */}
+                      <div className="py-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-sm text-muted-foreground">
+                        <div>
+                          <strong className="text-slate-700">Cliente:</strong>{" "}
+                          <span>
+                            {order.profiles?.first_name} {order.profiles?.last_name}
+                          </span>
+                        </div>
+                        <div>
+                          <strong className="text-slate-700">Data:</strong>{" "}
+                          <span>
+                            {format(new Date(order.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                          </span>
+                        </div>
+                        {order.shipping_address && (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <span className="truncate">
+                              {order.shipping_address.city}/{order.shipping_address.state}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Informações de Envio e Etiqueta ML */}
+                      {(order.tracking_code || order.ml_shipment_id || order.ml_label_url) && (
+                        <div className="py-2.5 px-3 mb-3 bg-slate-50 rounded-lg border border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            {order.tracking_code && (
+                              <span className="text-slate-700">
+                                <strong>Rastreio:</strong>{" "}
+                                <code className="bg-white px-1.5 py-0.5 rounded border border-slate-300 font-mono text-[11px]">
+                                  {order.tracking_code}
+                                </code>
+                              </span>
+                            )}
+                            {order.ml_shipment_id && (
+                              <span className="text-slate-500">
+                                Remessa ML #{order.ml_shipment_id}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Ações */}
+                      <div className="flex items-center justify-between gap-3 pt-3 border-t flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedDetailOrderId(order.id)}
+                            className="text-xs"
+                          >
+                            <Eye className="w-3.5 h-3.5 mr-1" />
+                            Ver Detalhes
+                          </Button>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {isPendingPayment && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleGenerateOrPayPix(order)}
+                              disabled={generatingPixOrderId === order.id}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs shadow-xs"
+                            >
+                              <QrCode className="h-3.5 w-3.5" />
+                              {generatingPixOrderId === order.id
+                                ? "Gerando..."
+                                : order.pix_qr_code
+                                ? "Ver Pix"
+                                : "Pagar via Pix"}
+                            </Button>
+                          )}
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownloadLabel(order)}
+                            disabled={downloadingLabelId === order.id}
+                            className="gap-1.5 text-xs border-slate-300 hover:bg-slate-50"
+                          >
+                            <Download className="h-3.5 w-3.5 text-slate-600" />
+                            {downloadingLabelId === order.id ? "Baixando..." : "Baixar Etiqueta"}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Nenhum pedido encontrado</h3>
+                <p className="text-muted-foreground mb-4 text-sm">
+                  {statusFilter !== "all"
+                    ? "Não há pedidos com o status selecionado."
+                    : "Você ainda não possui pedidos registrados."}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -277,7 +468,7 @@ function ResellerOrders() {
         <div>
           <h1 className="text-3xl font-bold">Gestão de Pedidos</h1>
           <p className="text-muted-foreground mt-2">
-            Acompanhe todos os pedidos da sua loja
+            Acompanhe todos os pedidos da sua loja em formato Pipeline ou Lista
           </p>
         </div>
 
@@ -332,244 +523,120 @@ function ResellerOrders() {
         </Card>
       </div>
 
-      {/* Busca */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por número do pedido..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
-      </div>
+      {/* Order Pipeline View */}
+      <OrderPipelineView
+        orders={pipelineItems}
+        isLoading={isLoading}
+        onUpdateOrderStatus={async () => {
+          toast({
+            title: "Ação não permitida",
+            description: "Revendedores não podem alterar o status operacional diretamente.",
+            variant: "destructive",
+          });
+        }}
+        listViewContent={listViewContent}
+        userScopeLabel="Revendedor (Sua Loja)"
+        onRefreshOrders={() => queryClient.invalidateQueries({ queryKey: ["reseller-orders"] })}
+      />
 
-      {/* Tabs de Status */}
-      <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-        <TabsList className="flex-wrap h-auto">
-          {visibleTabs.map((tab) => (
-            <TabsTrigger key={tab} value={tab}>
-              {tab === "all" ? "Todos" : ORDER_STATUS_CONFIG[tab].label} ({counts[tab] || 0})
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        <TabsContent value={statusFilter} className="mt-6">
-          {isLoading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map(i => (
-                <Card key={i}>
-                  <CardContent className="p-6">
-                    <Skeleton className="h-20 w-full" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : orders && orders.length > 0 ? (
-            <div className="space-y-4">
-              {orders.map((order) => {
-                const statusInfo = getStatusConfig(order.status);
-                const StatusIcon = statusInfo.icon;
-                const isMlOrder = order.payment_method === 'mercadolivre' || !!order.ml_order_id;
-                const isPendingPayment = order.payment_status === 'pending' || order.status === 'pendente';
-
-                return (
-                  <Card key={order.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-5">
-                      {/* Top Header: Número do Pedido + Referência do Marketplace + Badges de Status + Valor */}
-                      <div className="flex items-start justify-between gap-3 pb-3 border-b">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-bold text-lg text-slate-900 tracking-tight">#{order.order_number}</h3>
-
-                          {order.ml_order_id && (
-                            <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300 font-semibold text-xs px-2.5 py-0.5 gap-1.5 shadow-2xs">
-                              <ShoppingBag className="h-3 w-3 text-amber-600" />
-                              <span>ML: <strong>#{order.ml_order_id}</strong></span>
-                            </Badge>
-                          )}
-
-                          <Badge className={statusInfo.color}>
-                            <StatusIcon className="h-3 w-3 mr-1" />
-                            {statusInfo.label}
-                          </Badge>
-
-                          {(order.payment_status === "approved" || order.payment_status === "paid") && (
-                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
-                              Pago
-                            </Badge>
-                          )}
-
-                          {isPendingPayment && (
-                            <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 text-xs gap-1">
-                              <Clock className="h-3 w-3" />
-                              Pix Fulfillment Pendente
-                            </Badge>
-                          )}
-                        </div>
-
-                        <div className="text-right shrink-0">
-                          <p className="text-xl font-bold text-primary">
-                            R$ {Number(order.total_amount).toFixed(2)}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Informações centrais: Cliente, Data e Destino */}
-                      <div className="py-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-sm text-muted-foreground">
-                        <div>
-                          <strong className="text-slate-700">Cliente:</strong>{" "}
-                          <span>
-                            {order.profiles
-                              ? `${order.profiles.first_name} ${order.profiles.last_name}`
-                              : order.shipping_address?.receiver_name || (isMlOrder ? 'Comprador Mercado Livre' : 'Cliente')}
-                          </span>
-                        </div>
-                        <div>
-                          <strong className="text-slate-700">Data:</strong>{" "}
-                          <span>
-                            {format(new Date(order.created_at), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", {
-                              locale: ptBR,
-                            })}
-                          </span>
-                        </div>
-                        {order.shipping_address && (order.shipping_address.city || order.shipping_address.state) && (
-                          <div>
-                            <strong className="text-slate-700">Destino:</strong>{" "}
-                            <span>
-                              {order.shipping_address.city ? `${order.shipping_address.city}, ` : ''}{order.shipping_address.state || ''}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Linha inferior: Código de rastreio à esquerda e Botões de ação à direita */}
-                      <div className="pt-3 border-t flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div>
-                          {order.tracking_code ? (
-                            <div className="flex items-center gap-1.5 text-blue-700 bg-blue-50/90 px-2.5 py-1 rounded-md border border-blue-200 text-xs font-medium w-fit">
-                              <MapPin className="h-3.5 w-3.5 text-blue-600 shrink-0" />
-                              <span className="text-muted-foreground">Rastreio:</span>
-                              <span className="font-mono font-bold tracking-wide">{order.tracking_code}</span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">Sem código de rastreio</span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2 flex-wrap sm:justify-end">
-                          {order.status === "etiqueta_incorreta" && (
-                            <Button
-                              size="sm"
-                              className="text-xs gap-1 bg-rose-600 hover:bg-rose-700 text-white"
-                              onClick={() => navigate(`/reseller/pedidos/corrigir-etiqueta/${order.id}`)}
-                            >
-                              <AlertCircle className="h-3 w-3" />
-                              Corrigir Etiqueta
-                            </Button>
-                          )}
-
-                          {isPendingPayment && (
-                            <Button
-                              size="sm"
-                              disabled={generatingPixOrderId === order.id}
-                              className="text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
-                              onClick={() => handleGenerateOrPayPix(order)}
-                            >
-                              {generatingPixOrderId === order.id ? (
-                                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <QrCode className="h-3.5 w-3.5" />
-                              )}
-                              Pagar Pix (Fulfillment)
-                            </Button>
-                          )}
-
-                          {(order.ml_shipment_id || order.ml_label_url || (order as any).has_shipping_file) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={downloadingLabelId === order.id}
-                              className="text-xs gap-1 border-slate-300 text-slate-700 hover:bg-slate-100"
-                              onClick={() => handleDownloadLabel(order)}
-                            >
-                              {downloadingLabelId === order.id ? (
-                                <RefreshCw className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <Download className="h-3 w-3" />
-                              )}
-                              Etiqueta
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Nenhum pedido encontrado</h3>
-                <p className="text-muted-foreground mb-4">
-                  {searchTerm
-                    ? "Tente buscar com outros termos"
-                    : "Os pedidos da sua loja aparecerão aqui"}
-                </p>
-                <div className="flex items-center justify-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleSyncOrders}
-                    disabled={isSyncing}
-                    className="gap-1.5 text-xs"
-                  >
-                    <RefreshCw className={cn("h-3.5 w-3.5", isSyncing && "animate-spin")} />
-                    Sincronizar Agora
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
-
-      {/* Dialog para Importar por Número de Pedido ML */}
-      <Dialog open={isManualImportOpen} onOpenChange={setIsManualImportOpen}>
+      {/* Modal Pix */}
+      <Dialog open={!!selectedPixOrder} onOpenChange={() => setSelectedPixOrder(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ShoppingBag className="h-5 w-5 text-yellow-500" />
-              Puxar Pedido do Mercado Livre
-            </DialogTitle>
+            <DialogTitle>Pagamento via Pix</DialogTitle>
             <DialogDescription>
-              Cole o número do pedido gerado no Mercado Livre (ex: 2000015725821079) para importar e processar imediatamente no sistema.
+              Escaneie o QR Code ou copie o código Pix para pagar o pedido #{selectedPixOrder?.order_number}.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleManualImportOrder} className="space-y-4 pt-2">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground">
-                Número do Pedido ML
-              </label>
-              <Input
-                placeholder="Ex: 2000015725821079"
-                value={manualOrderId}
-                onChange={(e) => setManualOrderId(e.target.value)}
-                className="font-mono text-sm"
-                required
-                autoFocus
-              />
-              <p className="text-[11px] text-muted-foreground">
-                Localize esse código na lista de vendas do seu Mercado Livre (número iniciado com #).
-              </p>
+          {selectedPixOrder && (
+            <div className="space-y-4 py-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-primary">
+                  R$ {Number(selectedPixOrder.total_amount).toFixed(2)}
+                </p>
+                {selectedPixOrder.payment_expires_at && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Vencimento:{" "}
+                    {format(new Date(selectedPixOrder.payment_expires_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                  </p>
+                )}
+              </div>
+
+              {selectedPixOrder.pix_qr_code_base64 && (
+                <div className="flex justify-center p-4 bg-white rounded-lg border">
+                  <img
+                    src={`data:image/png;base64,${selectedPixOrder.pix_qr_code_base64}`}
+                    alt="QR Code Pix"
+                    className="w-48 h-48"
+                  />
+                </div>
+              )}
+
+              {selectedPixOrder.pix_qr_code && (
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground font-medium">Código Copia e Cola:</label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      readOnly
+                      value={selectedPixOrder.pix_qr_code}
+                      className="text-xs font-mono select-all bg-muted"
+                    />
+                    <Button size="sm" onClick={handleCopyPix} className="gap-1 shrink-0">
+                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      {copied ? "Copiado!" : "Copiar"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedPixOrder(null)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Importar Pedido Manualmente */}
+      <Dialog open={isManualImportOpen} onOpenChange={setIsManualImportOpen}>
+        <DialogContent className="max-w-md">
+          <form onSubmit={handleManualImportOrder}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ShoppingBag className="h-5 w-5 text-amber-600" />
+                Puxar Pedido do Mercado Livre
+              </DialogTitle>
+              <DialogDescription>
+                Informe o número do pedido da sua conta Mercado Livre para cadastrá-lo imediatamente.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="py-4 space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Número do Pedido (Pack/Order ID do ML) *
+                </label>
+                <Input
+                  placeholder="Ex: 2000015725821079"
+                  value={manualOrderId}
+                  onChange={(e) => setManualOrderId(e.target.value)}
+                  className="font-mono text-sm"
+                  autoFocus
+                />
+              </div>
             </div>
 
-            <DialogFooter className="gap-2 sm:gap-0">
+            <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setIsManualImportOpen(false)}
+                onClick={() => {
+                  setIsManualImportOpen(false);
+                  setManualOrderId("");
+                }}
                 disabled={isImportingManual}
               >
                 Cancelar
@@ -577,9 +644,8 @@ function ResellerOrders() {
               <Button
                 type="submit"
                 disabled={isImportingManual || !manualOrderId.trim()}
-                className="bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-semibold gap-1.5"
+                className="bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-semibold"
               >
-                <RefreshCw className={cn("h-4 w-4", isImportingManual && "animate-spin")} />
                 {isImportingManual ? "Importando..." : "Importar Pedido"}
               </Button>
             </DialogFooter>
@@ -587,78 +653,14 @@ function ResellerOrders() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Pagamento Pix para Fulfillment */}
-      <Dialog open={!!selectedPixOrder} onOpenChange={(open) => !open && setSelectedPixOrder(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <QrCode className="h-5 w-5 text-emerald-600" />
-              Pagar Pix de Fulfillment
-            </DialogTitle>
-            <DialogDescription>
-              Pedido #{selectedPixOrder?.order_number}
-              {selectedPixOrder?.ml_order_id && ` • Mercado Livre #${selectedPixOrder.ml_order_id}`}
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedPixOrder && (
-            <div className="space-y-4 pt-2">
-              {selectedPixOrder.notes && (
-                <div className="p-3 bg-muted/60 rounded-md text-xs text-muted-foreground">
-                  {selectedPixOrder.notes}
-                </div>
-              )}
-
-              {selectedPixOrder.pix_qr_code_base64 && (
-                <div className="flex flex-col items-center justify-center p-3 bg-white rounded-lg border">
-                  <img
-                    src={
-                      selectedPixOrder.pix_qr_code_base64.startsWith("data:")
-                        ? selectedPixOrder.pix_qr_code_base64
-                        : `data:image/png;base64,${selectedPixOrder.pix_qr_code_base64}`
-                    }
-                    alt="QR Code Pix"
-                    className="w-48 h-48 object-contain"
-                  />
-                  <span className="text-xs text-muted-foreground mt-2">
-                    Abra o app do seu banco e aponte a câmera
-                  </span>
-                </div>
-              )}
-
-              {selectedPixOrder.pix_qr_code && (
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-muted-foreground block">
-                    Pix Copia e Cola
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      readOnly
-                      value={selectedPixOrder.pix_qr_code}
-                      className="text-xs font-mono bg-muted/40 select-all"
-                    />
-                    <Button
-                      size="sm"
-                      className="shrink-0 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
-                      onClick={() => handleCopyPix(selectedPixOrder.pix_qr_code!)}
-                    >
-                      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                      {copied ? "Copiado!" : "Copiar"}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2 p-3 bg-amber-50 text-amber-900 border border-amber-200 rounded-md text-xs">
-                <Clock className="h-4 w-4 shrink-0 text-amber-600" />
-                <span>
-                  Prazo de <strong>24 horas</strong> para pagamento. Assim que pago, o pedido é liberado automaticamente para o fornecedor enviar.
-                </span>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Shared OrderDetailsModal */}
+      {selectedDetailOrderId && (
+        <OrderDetailsModal
+          orderId={selectedDetailOrderId}
+          isOpen={!!selectedDetailOrderId}
+          onClose={() => setSelectedDetailOrderId(null)}
+        />
+      )}
     </div>
   );
 }

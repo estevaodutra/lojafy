@@ -10,16 +10,23 @@ export interface ResellerOrder {
   total_amount: number;
   created_at: string;
   user_id: string;
+  reseller_id?: string | null;
   shipping_address: any;
   payment_method?: string;
   ml_shipment_id?: string | null;
   ml_label_url?: string | null;
   tracking_code?: string | null;
+  tracking_number?: string | null;
   ml_order_id?: string | null;
+  external_reference?: string | null;
+  marketplace?: string | null;
+  has_shipping_file?: boolean | null;
+  shipping_label_status?: string | null;
   pix_qr_code?: string | null;
   pix_qr_code_base64?: string | null;
   payment_expires_at?: string | null;
   notes?: string | null;
+  order_items?: any[];
   profiles?: {
     first_name: string;
     last_name: string;
@@ -35,7 +42,19 @@ export const useResellerOrders = (statusFilter?: string, searchTerm?: string) =>
     queryFn: async () => {
       let query = supabase
         .from("orders")
-        .select("*")
+        .select(`
+          *,
+          order_items (
+            id,
+            product_id,
+            quantity,
+            unit_price,
+            total_price,
+            product_snapshot,
+            supplier_id,
+            supplier_organization_id
+          )
+        `)
         .eq("reseller_id", user?.id)
         .order("created_at", { ascending: false });
 
@@ -44,7 +63,9 @@ export const useResellerOrders = (statusFilter?: string, searchTerm?: string) =>
       }
 
       if (searchTerm) {
-        query = query.or(`order_number.ilike.%${searchTerm}%,ml_order_id.ilike.%${searchTerm}%,tracking_code.ilike.%${searchTerm}%`);
+        query = query.or(
+          `order_number.ilike.%${searchTerm}%,ml_order_id.ilike.%${searchTerm}%,tracking_code.ilike.%${searchTerm}%,tracking_number.ilike.%${searchTerm}%`
+        );
       }
 
       const { data: orders, error } = await query;
@@ -52,17 +73,22 @@ export const useResellerOrders = (statusFilter?: string, searchTerm?: string) =>
       if (error) throw error;
 
       // Buscar perfis dos usuários
-      const userIds = orders?.map(o => o.user_id) || [];
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("user_id, first_name, last_name")
-        .in("user_id", userIds);
+      const userIds = orders?.map((o) => o.user_id).filter(Boolean) || [];
+      let profiles: any[] = [];
+      if (userIds.length > 0) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("user_id, first_name, last_name, business_name")
+          .in("user_id", userIds);
+        profiles = data || [];
+      }
 
       // Combinar dados
-      const ordersWithProfiles = orders?.map(order => ({
-        ...order,
-        profiles: profiles?.find(p => p.user_id === order.user_id)
-      })) || [];
+      const ordersWithProfiles =
+        orders?.map((order) => ({
+          ...order,
+          profiles: profiles.find((p) => p.user_id === order.user_id),
+        })) || [];
 
       return ordersWithProfiles as ResellerOrder[];
     },

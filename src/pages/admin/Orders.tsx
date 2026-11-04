@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,13 +8,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import OrderDetailsModal from "@/components/OrderDetailsModal";
 import { OrderSolicitations } from "@/components/admin/OrderSolicitations";
+import { OrderPipelineView } from "@/components/pipeline/OrderPipelineView";
+import { normalizeOrderToPipelineItem } from "@/utils/orderPipelineAdapter";
+import { OrderPipelineItem } from "@/types/orderPipeline";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, Package, Search, Filter, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { ALL_STATUSES, ORDER_STATUS_CONFIG, getStatusConfig, getAvailableTransitions, type OrderStatus } from "@/constants/orderStatus";
+import { ALL_STATUSES, ORDER_STATUS_CONFIG, getStatusConfig } from "@/constants/orderStatus";
 
 interface Order {
   id: string;
@@ -24,10 +27,22 @@ interface Order {
   total_amount: number;
   created_at: string;
   user_id: string;
+  reseller_id?: string | null;
   has_shipping_file: boolean;
+  tracking_number?: string | null;
+  tracking_code?: string | null;
+  external_reference?: string | null;
+  marketplace?: string | null;
+  ml_order_id?: string | null;
+  ml_label_url?: string | null;
+  pix_qr_code?: string | null;
+  pix_qr_code_base64?: string | null;
+  payment_expires_at?: string | null;
   webhook_paid_status?: string | null;
   webhook_paid_dispatched_at?: string | null;
   webhook_paid_error?: string | null;
+  shipping_address?: any;
+  order_items?: any[];
   profiles: {
     first_name: string;
     last_name: string;
@@ -41,6 +56,9 @@ const AdminOrders = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [profilesMap, setProfilesMap] = useState<Map<string, any>>(new Map());
+  const [supplierOrgsMap, setSupplierOrgsMap] = useState<Map<string, any>>(new Map());
+  const [ticketsMap, setTicketsMap] = useState<Map<string, any>>(new Map());
   const ordersPerPage = 20;
   const { toast } = useToast();
 
@@ -51,11 +69,24 @@ const AdminOrders = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      
+
+      // 1. Fetch orders with order_items
       const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .from("orders")
+        .select(`
+          *,
+          order_items (
+            id,
+            product_id,
+            quantity,
+            unit_price,
+            total_price,
+            product_snapshot,
+            supplier_id,
+            supplier_organization_id
+          )
+        `)
+        .order("created_at", { ascending: false });
 
       if (ordersError) throw ordersError;
 
@@ -65,68 +96,118 @@ const AdminOrders = () => {
         return;
       }
 
-      const orderIds = ordersData.map(order => order.id);
-      
+      const orderIds = ordersData.map((order) => order.id);
+
+      // 2. Fetch shipping files status
       let shippingFilesData: Array<{ order_id: string }> = [];
       if (orderIds.length > 0) {
         try {
           const { data } = await supabase
-            .from('order_shipping_files')
-            .select('order_id')
-            .in('order_id', orderIds);
+            .from("order_shipping_files")
+            .select("order_id")
+            .in("order_id", orderIds);
           shippingFilesData = data || [];
         } catch (error) {
-          console.error('Error fetching shipping files:', error);
-          toast({
-            title: "Aviso",
-            description: "Não foi possível carregar status dos arquivos de envio.",
-            variant: "default",
-          });
+          console.error("Error fetching shipping files:", error);
         }
       }
 
       const ordersWithShippingFiles = new Set(
-        shippingFilesData.map(file => file.order_id)
+        shippingFilesData.map((file) => file.order_id)
       );
 
-      const userIds = [...new Set(ordersData.map(order => order.user_id).filter(Boolean))];
-      let profilesData: Array<{ user_id: string; first_name: string | null; last_name: string | null }> = [];
-      if (userIds.length > 0) {
-        try {
-          const { data } = await supabase
-            .from('profiles')
-            .select('user_id, first_name, last_name')
-            .in('user_id', userIds);
-          profilesData = data || [];
-        } catch (error) {
-          console.error('Error fetching profiles:', error);
-          toast({
-            title: "Aviso",
-            description: "Não foi possível carregar informações de clientes.",
-            variant: "default",
+      // 3. Fetch profiles (users, resellers, suppliers)
+      const allUserIds = new Set<string>();
+      ordersData.forEach((order) => {
+        if (order.user_id) allUserIds.add(order.user_id);
+        if (order.reseller_id) allUserIds.add(order.reseller_id);
+        if (Array.isArray(order.order_items)) {
+          order.order_items.forEach((item: any) => {
+            if (item.supplier_id) allUserIds.add(item.supplier_id);
           });
         }
+      });
+
+      const pMap = new Map<string, any>();
+      if (allUserIds.size > 0) {
+        try {
+          const { data: profs } = await supabase
+            .from("profiles")
+            .select("user_id, first_name, last_name, business_name, role")
+            .in("user_id", Array.from(allUserIds));
+          if (profs) {
+            profs.forEach((p) => pMap.set(p.user_id, p));
+          }
+        } catch (error) {
+          console.error("Error fetching profiles:", error);
+        }
       }
+      setProfilesMap(pMap);
 
-      const profilesMap = new Map(
-        profilesData.map(profile => [profile.user_id, profile])
-      );
+      // 4. Fetch supplier organizations
+      const orgIds = new Set<string>();
+      ordersData.forEach((order) => {
+        if (Array.isArray(order.order_items)) {
+          order.order_items.forEach((item: any) => {
+            if (item.supplier_organization_id) {
+              orgIds.add(item.supplier_organization_id);
+            }
+          });
+        }
+      });
 
-      const ordersWithProfiles = ordersData.map(order => {
-        const profile = profilesMap.get(order.user_id);
+      const sMap = new Map<string, any>();
+      if (orgIds.size > 0) {
+        try {
+          const { data: orgs } = await supabase
+            .from("supplier_organizations" as any)
+            .select("id, name, trade_name")
+            .in("id", Array.from(orgIds));
+          if (orgs) {
+            orgs.forEach((o: any) => sMap.set(o.id, o));
+          }
+        } catch {
+          // ignore
+        }
+      }
+      setSupplierOrgsMap(sMap);
+
+      // 5. Fetch active tickets
+      const tMap = new Map<string, any>();
+      if (orderIds.length > 0) {
+        try {
+          const { data: tickets } = await supabase
+            .from("order_tickets")
+            .select("id, order_id, status, tipo")
+            .in("order_id", orderIds)
+            .neq("status", "resolvido");
+          if (tickets) {
+            tickets.forEach((t) => tMap.set(t.order_id, t));
+          }
+        } catch {
+          // ignore
+        }
+      }
+      setTicketsMap(tMap);
+
+      // 6. Assemble orders with profiles
+      const ordersWithProfiles = ordersData.map((order) => {
+        const profile = pMap.get(order.user_id);
         return {
           ...order,
-          has_shipping_file: ordersWithShippingFiles.has(order.id),
-          profiles: profile ? {
-            first_name: profile.first_name,
-            last_name: profile.last_name
-          } : { first_name: '', last_name: '' }
+          has_shipping_file: ordersWithShippingFiles.has(order.id) || !!order.has_shipping_file,
+          profiles: profile
+            ? {
+                first_name: profile.first_name || "",
+                last_name: profile.last_name || "",
+              }
+            : { first_name: "", last_name: "" },
         };
       }) as Order[];
-      
+
       setOrders(ordersWithProfiles);
     } catch (error) {
-      console.error('Error fetching orders:', error);
+      console.error("Error fetching orders:", error);
       toast({
         title: "Erro",
         description: "Erro ao carregar pedidos",
@@ -138,38 +219,33 @@ const AdminOrders = () => {
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    // Optimistic update: save previous state and update UI immediately
+    // Optimistic update
     const previousOrders = orders;
-    setOrders(prev => prev.map(order => 
-      order.id === orderId ? { ...order, status: newStatus } : order
-    ));
+    setOrders((prev) =>
+      prev.map((order) => (order.id === orderId ? { ...order, status: newStatus } : order))
+    );
 
     try {
       const { error } = await supabase
-        .from('orders')
-        .update({ status: newStatus })
-        .eq('id', orderId);
+        .from("orders")
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq("id", orderId);
 
       if (error) throw error;
 
-      // Insert into status history (non-blocking, log errors)
-      const { error: historyError } = await supabase.from('order_status_history').insert({
+      // Status history
+      await supabase.from("order_status_history").insert({
         order_id: orderId,
         status: newStatus,
-        notes: `Status atualizado pelo admin`,
+        notes: `Status atualizado para ${newStatus}`,
       });
-
-      if (historyError) {
-        console.error('Error inserting status history:', historyError);
-      }
 
       toast({
         title: "Sucesso",
-        description: "Status do pedido atualizado",
+        description: "Status do pedido atualizado com sucesso.",
       });
     } catch (error) {
-      // Rollback on failure
-      console.error('Error updating order status:', error);
+      console.error("Error updating order status:", error);
       setOrders(previousOrders);
       toast({
         title: "Erro",
@@ -179,10 +255,16 @@ const AdminOrders = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const config = getStatusConfig(status);
-    return <Badge variant={config.variant}>{config.label}</Badge>;
-  };
+  // Convert raw orders to normalized pipeline items
+  const pipelineItems: OrderPipelineItem[] = useMemo(() => {
+    return orders.map((order) =>
+      normalizeOrderToPipelineItem(order, {
+        profilesMap,
+        supplierOrgsMap,
+        ticketsMap,
+      })
+    );
+  }, [orders, profilesMap, supplierOrgsMap, ticketsMap]);
 
   const getPaymentStatusBadge = (status: string) => {
     const statusConfig = {
@@ -194,9 +276,12 @@ const AdminOrders = () => {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      `${order.profiles.first_name} ${order.profiles.last_name}`.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredOrders = orders.filter((order) => {
+    const matchesSearch =
+      order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      `${order.profiles.first_name} ${order.profiles.last_name}`
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -212,218 +297,260 @@ const AdminOrders = () => {
   const showingFrom = filteredOrders.length > 0 ? startIndex + 1 : 0;
   const showingTo = Math.min(endIndex, filteredOrders.length);
 
-  return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Gerenciar Pedidos</h1>
+  // The existing table view
+  const listViewContent = (
+    <div className="space-y-4">
+      {filteredOrders.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          Mostrando {showingFrom}-{showingTo} de {filteredOrders.length} pedidos
+        </p>
+      )}
+
+      <Card>
+        <CardHeader className="py-4">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Filter className="w-4 h-4" />
+            Filtros da Lista
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Buscar por número do pedido ou cliente..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 h-9 text-xs"
+                />
+              </div>
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-56 h-9 text-xs">
+                <SelectValue placeholder="Status do pedido" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os status</SelectItem>
+                {ALL_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {ORDER_STATUS_CONFIG[s].label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Número do Pedido</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Data</TableHead>
+                <TableHead>Pagamento</TableHead>
+                <TableHead>Webhook</TableHead>
+                <TableHead>Etiqueta</TableHead>
+                <TableHead>Total</TableHead>
+                <TableHead>Ações</TableHead>
+                <TableHead>Status de Envio</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-8">
+                    Carregando pedidos...
+                  </TableCell>
+                </TableRow>
+              ) : filteredOrders.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-8">
+                    Nenhum pedido encontrado
+                  </TableCell>
+                </TableRow>
+              ) : (
+                currentOrders.map((order) => {
+                  return (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-medium">
+                        #{order.order_number}
+                      </TableCell>
+                      <TableCell>
+                        {order.profiles.first_name} {order.profiles.last_name}
+                      </TableCell>
+                      <TableCell>
+                        {format(new Date(order.created_at), "dd/MM/yyyy HH:mm", {
+                          locale: ptBR,
+                        })}
+                      </TableCell>
+                      <TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
+                      <TableCell>
+                        {order.payment_status === "paid" ? (
+                          order.webhook_paid_status === "sent" ? (
+                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">
+                              ✓ Enviado
+                            </Badge>
+                          ) : order.webhook_paid_status === "failed" ? (
+                            <Badge
+                              variant="destructive"
+                              className="text-xs"
+                              title={order.webhook_paid_error ?? ""}
+                            >
+                              ✗ Falhou
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs text-muted-foreground">
+                              Não enviado
+                            </Badge>
+                          )
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {order.has_shipping_file ? (
+                          <Badge
+                            variant="default"
+                            className="bg-green-100 text-green-800 hover:bg-green-100"
+                          >
+                            📄 Enviada
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">📄 Pendente</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {new Intl.NumberFormat("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        }).format(order.total_amount)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedOrder(order)}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={order.status}
+                          onValueChange={(value) => updateOrderStatus(order.id, value)}
+                        >
+                          <SelectTrigger className="w-[180px] h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ALL_STATUSES.map((s) => (
+                              <SelectItem key={s} value={s}>
+                                {ORDER_STATUS_CONFIG[s].label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {totalPages > 1 && (
+        <div className="mt-4">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                if (
+                  page === 1 ||
+                  page === totalPages ||
+                  (page >= currentPage - 1 && page <= currentPage + 1)
+                ) {
+                  return (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                } else if (page === currentPage - 2 || page === currentPage + 2) {
+                  return (
+                    <PaginationItem key={page}>
+                      <span className="px-4">...</span>
+                    </PaginationItem>
+                  );
+                }
+                return null;
+              })}
+
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className={
+                    currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
-        <Badge variant="outline" className="text-sm">
-          <Package className="w-4 h-4 mr-1" />
-          {orders.length} pedidos
+      )}
+    </div>
+  );
+
+  return (
+    <div className="container mx-auto p-4 sm:p-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Gestão de Pedidos</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+            Acompanhe o fluxo operacional em pipeline Kanban ou tabela de consulta
+          </p>
+        </div>
+        <Badge variant="outline" className="w-fit text-xs px-3 py-1">
+          <Package className="w-3.5 h-3.5 mr-1 text-primary" />
+          {orders.length} pedidos totais
         </Badge>
       </div>
 
-      <Tabs defaultValue="orders" className="space-y-6">
+      <Tabs defaultValue="pipeline_flow" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="orders">Todos os Pedidos</TabsTrigger>
+          <TabsTrigger value="pipeline_flow">Operação de Pedidos</TabsTrigger>
           <TabsTrigger value="solicitations" className="flex items-center gap-1.5">
             <AlertCircle className="h-4 w-4" />
-            Solicitações
+            Solicitações / Pós-Venda
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="orders" className="space-y-6">
-          {filteredOrders.length > 0 && (
-            <p className="text-sm text-muted-foreground">
-              Mostrando {showingFrom}-{showingTo} de {filteredOrders.length} pedidos
-            </p>
-          )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="w-5 h-5" />
-                Filtros
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                    <Input
-                      placeholder="Buscar por número do pedido ou cliente..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Status do pedido" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os status</SelectItem>
-                    {ALL_STATUSES.map((s) => (
-                      <SelectItem key={s} value={s}>{ORDER_STATUS_CONFIG[s].label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Número do Pedido</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Pagamento</TableHead>
-                    <TableHead>Webhook</TableHead>
-                    <TableHead>Etiqueta</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Ações</TableHead>
-                    <TableHead>Status de Envio</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                     <TableRow>
-                       <TableCell colSpan={9} className="text-center py-8">
-                         Carregando pedidos...
-                       </TableCell>
-                     </TableRow>
-                  ) : filteredOrders.length === 0 ? (
-                     <TableRow>
-                       <TableCell colSpan={9} className="text-center py-8">
-                         Nenhum pedido encontrado
-                       </TableCell>
-                     </TableRow>
-                   ) : (
-                    currentOrders.map((order) => {
-                      return (
-                       <TableRow key={order.id}>
-                         <TableCell className="font-medium">
-                           {order.order_number}
-                         </TableCell>
-                         <TableCell>
-                           {order.profiles.first_name} {order.profiles.last_name}
-                         </TableCell>
-                         <TableCell>
-                           {format(new Date(order.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                         </TableCell>
-                         <TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
-                         <TableCell>
-                           {order.payment_status === 'paid' ? (
-                             order.webhook_paid_status === 'sent' ? (
-                               <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">✓ Enviado</Badge>
-                             ) : order.webhook_paid_status === 'failed' ? (
-                               <Badge variant="destructive" className="text-xs" title={order.webhook_paid_error ?? ''}>✗ Falhou</Badge>
-                             ) : (
-                               <Badge variant="outline" className="text-xs text-muted-foreground">Não enviado</Badge>
-                             )
-                           ) : (
-                             <span className="text-xs text-muted-foreground">—</span>
-                           )}
-                         </TableCell>
-                         <TableCell>
-                           {order.has_shipping_file ? (
-                             <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
-                               📄 Enviada
-                             </Badge>
-                           ) : (
-                             <Badge variant="outline">
-                               📄 Pendente
-                             </Badge>
-                           )}
-                         </TableCell>
-                         <TableCell>R$ {order.total_amount.toFixed(2)}</TableCell>
-                         <TableCell>
-                           <Button
-                             variant="outline"
-                             size="sm"
-                             onClick={() => setSelectedOrder(order)}
-                           >
-                             <Eye className="w-4 h-4" />
-                           </Button>
-                         </TableCell>
-                         <TableCell>
-                           <Select
-                             value={order.status}
-                             onValueChange={(value) => updateOrderStatus(order.id, value)}
-                           >
-                             <SelectTrigger className="w-[160px]">
-                               <SelectValue />
-                             </SelectTrigger>
-                             <SelectContent>
-                               {ALL_STATUSES.map((s) => (
-                                 <SelectItem key={s} value={s}>{ORDER_STATUS_CONFIG[s].label}</SelectItem>
-                               ))}
-                             </SelectContent>
-                           </Select>
-                         </TableCell>
-                       </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          {totalPages > 1 && (
-            <div className="mt-6">
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious 
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                    />
-                  </PaginationItem>
-                  
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                    if (
-                      page === 1 ||
-                      page === totalPages ||
-                      (page >= currentPage - 1 && page <= currentPage + 1)
-                    ) {
-                      return (
-                        <PaginationItem key={page}>
-                          <PaginationLink
-                            onClick={() => setCurrentPage(page)}
-                            isActive={currentPage === page}
-                            className="cursor-pointer"
-                          >
-                            {page}
-                          </PaginationLink>
-                        </PaginationItem>
-                      );
-                    } else if (page === currentPage - 2 || page === currentPage + 2) {
-                      return (
-                        <PaginationItem key={page}>
-                          <span className="px-4">...</span>
-                        </PaginationItem>
-                      );
-                    }
-                    return null;
-                  })}
-                  
-                  <PaginationItem>
-                    <PaginationNext 
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
-          )}
+        <TabsContent value="pipeline_flow" className="space-y-4">
+          <OrderPipelineView
+            orders={pipelineItems}
+            isLoading={loading}
+            onUpdateOrderStatus={updateOrderStatus}
+            listViewContent={listViewContent}
+            userScopeLabel="Administração Geral"
+            onRefreshOrders={fetchOrders}
+          />
         </TabsContent>
 
         <TabsContent value="solicitations">
@@ -435,7 +562,10 @@ const AdminOrders = () => {
         <OrderDetailsModal
           orderId={selectedOrder.id}
           isOpen={!!selectedOrder}
-          onClose={() => setSelectedOrder(null)}
+          onClose={() => {
+            setSelectedOrder(null);
+            fetchOrders();
+          }}
         />
       )}
     </div>
