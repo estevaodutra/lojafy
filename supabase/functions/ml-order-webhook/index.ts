@@ -1,3 +1,4 @@
+// ml-order-webhook v2.5 - deduplication, pack reference and pix fulfillment
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { getPublicSignedUrl } from '../_shared/get-public-signed-url.ts';
