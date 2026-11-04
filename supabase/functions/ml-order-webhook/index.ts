@@ -49,6 +49,68 @@ async function getValidTokenForIntegration(integration: {
 }
 
 /**
+ * Busca dados completos de um pedido no Mercado Livre.
+ * Suporta IDs de pedido (/orders/{id}), IDs de carrinho/pacote (/packs/{id}) e IDs de remessa (/shipments/{id}).
+ */
+async function fetchOrderOrPack(id: string, token: string): Promise<any | null> {
+  const cleanId = String(id).trim();
+
+  // 1. Tentar /orders/{id}
+  try {
+    const oRes = await fetch(`https://api.mercadolibre.com/orders/${cleanId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (oRes.ok) {
+      const mlOrder = await oRes.json();
+      return mlOrder;
+    }
+  } catch {}
+
+  // 2. Tentar /packs/{id} (pedidos com múltiplos itens ou gerados via carrinho)
+  try {
+    const pRes = await fetch(`https://api.mercadolibre.com/packs/${cleanId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (pRes.ok) {
+      const pack = await pRes.json();
+      const firstOrderId = pack.orders?.[0]?.id;
+      if (firstOrderId) {
+        const subRes = await fetch(`https://api.mercadolibre.com/orders/${firstOrderId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (subRes.ok) {
+          const mlOrder = await subRes.json();
+          mlOrder.pack_id = pack.id || cleanId;
+          return mlOrder;
+        }
+      }
+    }
+  } catch {}
+
+  // 3. Tentar /shipments/{id}
+  try {
+    const shRes = await fetch(`https://api.mercadolibre.com/shipments/${cleanId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (shRes.ok) {
+      const shData = await shRes.json();
+      if (shData.order_id) {
+        const subRes = await fetch(`https://api.mercadolibre.com/orders/${shData.order_id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (subRes.ok) {
+          const mlOrder = await subRes.json();
+          if (shData.pack_id) mlOrder.pack_id = shData.pack_id;
+          return mlOrder;
+        }
+      }
+    }
+  } catch {}
+
+  return null;
+}
+
+/**
  * Encontra a conta/revendedor dona de um pedido no Mercado Livre.
  * Testa preferredUserId primeiro; se falhar, busca nas contas ativas.
  */
@@ -73,12 +135,9 @@ async function findSellerForOrder(
 
     if (prefIntg) {
       const token = await getValidTokenForIntegration(prefIntg);
-      const res = await fetch(`https://api.mercadolibre.com/orders/${mlOrderId}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      const mlOrder = await fetchOrderOrPack(mlOrderId, token);
 
-      if (res.ok) {
-        const mlOrder = await res.json();
+      if (mlOrder) {
         return {
           accessToken: token,
           resellerUserId: prefIntg.user_id,
@@ -103,12 +162,9 @@ async function findSellerForOrder(
   for (const intg of allIntegrations) {
     try {
       const token = await getValidTokenForIntegration(intg);
-      const res = await fetch(`https://api.mercadolibre.com/orders/${mlOrderId}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      const mlOrder = await fetchOrderOrPack(mlOrderId, token);
 
-      if (res.ok) {
-        const mlOrder = await res.json();
+      if (mlOrder) {
         console.log(`[ml-order-webhook] ✅ Pedido ML #${mlOrderId} pertence ao revendedor ${intg.user_id} (ML User: ${mlOrder.seller?.id})`);
 
         if (!intg.ml_user_id && mlOrder.seller?.id) {
@@ -564,16 +620,17 @@ async function processSingleMlOrder(
   error?: string;
   details?: any;
 }> {
-  const mlOrderIdStr = String(mlOrderId);
+  const mlOrderIdStr = String(mlOrderId).trim();
 
-  // Idempotência: verificar se pedido já foi registrado no banco
-  const { data: existingOrder } = await supabase
+  // 1. Idempotência antecipada: verificar se já existe pedido por ml_order_id, payment_id ou notes
+  const { data: existingOrders } = await supabase
     .from('orders')
-    .select('id, order_number, status, payment_status, ml_shipment_id')
-    .or(`payment_id.eq.ml_${mlOrderIdStr},ml_order_id.eq.${mlOrderIdStr}`)
-    .maybeSingle();
+    .select('id, order_number, status, payment_status, ml_shipment_id, ml_order_id')
+    .or(`payment_id.eq.ml_${mlOrderIdStr},ml_order_id.eq.${mlOrderIdStr},notes.ilike.%#${mlOrderIdStr}%`)
+    .limit(1);
 
-  if (existingOrder) {
+  if (existingOrders && existingOrders.length > 0) {
+    const existingOrder = existingOrders[0];
     console.log(`[ml-order-webhook] Pedido ML #${mlOrderIdStr} já existe: #${existingOrder.order_number}`);
     return {
       success: true,
@@ -595,7 +652,57 @@ async function processSingleMlOrder(
 
   const { accessToken, resellerUserId, mlOrder } = sellerInfo;
 
-  console.log(`[ml-order-webhook] Pedido ML #${mlOrderIdStr} recuperado. Status ML:`, mlOrder.status);
+  // Determinar o identificador de referência que o revendedor vê no painel do ML (pack_id se houver, ou id)
+  const packIdStr = mlOrder.pack_id ? String(mlOrder.pack_id) : null;
+  const realOrderIdStr = String(mlOrder.id);
+  const displayRef = packIdStr || realOrderIdStr;
+
+  console.log(`[ml-order-webhook] Pedido ML recuperado. Ref: #${displayRef} (Order #${realOrderIdStr}). Status ML:`, mlOrder.status);
+
+  // 2. Se for um carrinho/pack ou tiver pack_id, checar idempotência por ele e pelo order ID real
+  const { data: checkExistingPack } = await supabase
+    .from('orders')
+    .select('id, order_number, status, payment_status, ml_shipment_id, ml_order_id')
+    .or(`ml_order_id.eq.${displayRef},ml_order_id.eq.${realOrderIdStr},notes.ilike.%#${displayRef}%,notes.ilike.%#${realOrderIdStr}%`)
+    .limit(1);
+
+  if (checkExistingPack && checkExistingPack.length > 0) {
+    const existingOrder = checkExistingPack[0];
+    console.log(`[ml-order-webhook] Pedido ML #${displayRef} já existe no banco: #${existingOrder.order_number}`);
+    return {
+      success: true,
+      already_processed: true,
+      order_id: existingOrder.id,
+      order_number: existingOrder.order_number,
+    };
+  }
+
+  // 3. Checar idempotência pelo ID da remessa (shipping ID)
+  const shipmentId = mlOrder.shipping?.id
+    ?? mlOrder.shipping_id
+    ?? mlOrder.shipments?.id
+    ?? mlOrder.order_items?.[0]?.shipping?.id
+    ?? mlOrder.order_items?.[0]?.shipment?.id
+    ?? null;
+
+  if (shipmentId) {
+    const { data: checkExistingShipment } = await supabase
+      .from('orders')
+      .select('id, order_number, status, payment_status, ml_shipment_id, ml_order_id')
+      .eq('ml_shipment_id', String(shipmentId))
+      .limit(1);
+
+    if (checkExistingShipment && checkExistingShipment.length > 0) {
+      const existingOrder = checkExistingShipment[0];
+      console.log(`[ml-order-webhook] Pedido ML com remessa #${shipmentId} já existe no banco: #${existingOrder.order_number}`);
+      return {
+        success: true,
+        already_processed: true,
+        order_id: existingOrder.id,
+        order_number: existingOrder.order_number,
+      };
+    }
+  }
 
   // Processar apenas pedidos pagos no Mercado Livre
   if (mlOrder.status !== 'paid') {
@@ -865,7 +972,7 @@ async function processSingleMlOrder(
     comment: receiverAddress?.comment || null,
   };
 
-  const notesSummary = `Pedido via Mercado Livre #${mlOrderIdStr}. Custo Fornecedor: R$ ${totalSupplierCost.toFixed(2)} | Abate Carteira: R$ ${walletDeducted.toFixed(2)} | Pix 24h: R$ ${remainingPixAmount.toFixed(2)}`;
+  const notesSummary = `Pedido via Mercado Livre #${displayRef} (ML Order #${realOrderIdStr}). Custo Fornecedor: R$ ${totalSupplierCost.toFixed(2)} | Abate Carteira: R$ ${walletDeducted.toFixed(2)} | Pix 24h: R$ ${remainingPixAmount.toFixed(2)}`;
 
   const { data: newOrder, error: orderError } = await supabase
     .from('orders')
@@ -877,12 +984,12 @@ async function processSingleMlOrder(
       payment_method: isFullyPaid ? 'wallet' : 'pix',
       payment_status: isFullyPaid ? 'paid' : 'pending',
       status: isFullyPaid ? 'recebido' : 'pendente',
-      payment_id: isFullyPaid ? `wallet_${orderNumber}` : (pixPaymentId || `ml_${mlOrderIdStr}`),
+      payment_id: isFullyPaid ? `wallet_${orderNumber}` : (pixPaymentId || `ml_${displayRef}`),
       external_reference: `ml_pay_${orderNumber}`,
       pix_qr_code: qrCode,
       pix_qr_code_base64: qrCodeBase64,
       payment_expires_at: isFullyPaid ? null : pixExpiresAt,
-      ml_order_id: mlOrderIdStr,
+      ml_order_id: displayRef,
       shipping_address: shippingAddressPayload,
       notes: notesSummary,
     })
@@ -1217,54 +1324,17 @@ serve(async (req) => {
 
     // Ação 0: Diagnóstico e inspeção
     if (body.action === 'inspect_orders') {
-      // Inspecionar o pedido do print #2000015837503663 e shipment 48415142437
-      const { data: intg } = await supabase
-        .from('mercadolivre_integrations')
-        .select('*')
-        .eq('is_active', true)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .single();
+      // Inspecionar se ml_pack_id existe na tabela orders
+      const { data: testCol, error: colError } = await supabase
+        .from('orders')
+        .select('id, ml_order_id, ml_shipment_id, tracking_code, external_reference, notes')
+        .limit(1);
 
-      let mlInspect: any = {};
-      if (intg) {
-        const token = await getValidTokenForIntegration(intg);
-        // Pedido real 2000019311753292
-        const oRes = await fetch(`https://api.mercadolibre.com/orders/2000019311753292`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const oData = await oRes.json().catch(() => ({}));
-
-        // Contar quantos pedidos duplicados de 2000019284106296 existem
-        const { data: dupOrders } = await supabase
-          .from('orders')
-          .select('id, order_number, total_amount, status, payment_status, created_at, notes')
-          .eq('ml_order_id', '2000019284106296')
-          .order('created_at', { ascending: true });
-
-        // Ver saldo da carteira do revendedor
-        const { data: walletData } = await supabase
-          .from('wallets')
-          .select('*')
-          .eq('user_id', intg.user_id)
-          .maybeSingle();
-
-        mlInspect = {
-          order_2000019311753292: {
-            status: oRes.status,
-            order_status: oData.status,
-            pack_id: oData.pack_id,
-            buyer: oData.buyer,
-            items: oData.order_items,
-            shipping: oData.shipping,
-          },
-          duplicate_count: dupOrders?.length,
-          duplicate_orders: dupOrders,
-          wallet: walletData,
-        };
-      }
-
-      return new Response(JSON.stringify({ success: true, mlInspect }), {
+      return new Response(JSON.stringify({
+        success: true,
+        columns_test: testCol,
+        col_error: colError,
+      }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -1327,6 +1397,148 @@ serve(async (req) => {
       }
 
       return new Response(JSON.stringify({ success: true, repaired }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Ação 5: Gerar Pix de fulfillment sob demanda para um pedido
+    if (body.action === 'generate_pix_for_order' && body.order_id) {
+      const { data: orderToPix } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', body.order_id)
+        .single();
+
+      if (!orderToPix) {
+        return new Response(JSON.stringify({ success: false, error: 'Pedido não encontrado.' }), {
+          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (orderToPix.pix_qr_code) {
+        return new Response(JSON.stringify({
+          success: true,
+          pix_qr_code: orderToPix.pix_qr_code,
+          pix_qr_code_base64: orderToPix.pix_qr_code_base64,
+          payment_expires_at: orderToPix.payment_expires_at,
+        }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', orderToPix.id);
+
+      let totalCost = 0;
+      for (const it of orderItems || []) {
+        totalCost += Number(it.supplier_total_cost || it.total_price || 0);
+      }
+      if (totalCost <= 0) totalCost = Number(orderToPix.total_amount || 0);
+
+      const { data: resellerProfile } = await supabase.from('profiles').select('first_name, last_name, cpf, phone').eq('user_id', orderToPix.reseller_id).maybeSingle();
+      let resellerEmail = null;
+      try {
+        const { data: authUser } = await supabase.auth.admin.getUserById(orderToPix.reseller_id);
+        resellerEmail = authUser?.user?.email ?? null;
+      } catch {}
+
+      const pixRes = await generatePix24h({
+        orderNumber: orderToPix.order_number,
+        amount: totalCost,
+        description: `Fulfillment Pedido #${orderToPix.order_number}`,
+        resellerUserId: orderToPix.reseller_id,
+        resellerProfile,
+        resellerEmail,
+        items: orderItems || [],
+        mlOrderId: orderToPix.ml_order_id || orderToPix.order_number,
+        walletDeducted: 0,
+        totalCost,
+      });
+
+      await supabase.from('orders').update({
+        pix_qr_code: pixRes.qrCode,
+        pix_qr_code_base64: pixRes.qrCodeBase64,
+        payment_expires_at: pixRes.expiresAt,
+        payment_method: 'pix',
+        payment_status: 'pending',
+      }).eq('id', orderToPix.id);
+
+      return new Response(JSON.stringify({
+        success: true,
+        pix_qr_code: pixRes.qrCode,
+        pix_qr_code_base64: pixRes.qrCodeBase64,
+        payment_expires_at: pixRes.expiresAt,
+      }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Ação 6: Limpar pedidos duplicados, estornar carteira e importar pedido pendente do ML
+    if (body.action === 'clean_duplicates_and_refund') {
+      console.log('[ml-order-webhook] Executando limpeza de pedidos duplicados e estorno de carteira...');
+
+      // 1. Localizar pedidos duplicados de 2000019284106296
+      const { data: allDuplicates } = await supabase
+        .from('orders')
+        .select('id, order_number, reseller_id, created_at, notes')
+        .or('ml_order_id.eq.2000019284106296,notes.ilike.%#2000019284106296%')
+        .order('created_at', { ascending: true });
+
+      const deletedOrders: any[] = [];
+      let refundedTotal = 0;
+      const resellerUserId = allDuplicates?.[0]?.reseller_id || '2640edf0-819c-4f2f-89c7-c459dcf00413';
+
+      if (allDuplicates && allDuplicates.length > 1) {
+        // Manter o original (index 0: #890) e deletar os duplicados subsequentes
+        const duplicatesToDelete = allDuplicates.slice(1);
+        for (const dup of duplicatesToDelete) {
+          await supabase.from('order_items').delete().eq('order_id', dup.id);
+          await supabase.from('order_shipping_files').delete().eq('order_id', dup.id);
+          await supabase.from('order_status_history').delete().eq('order_id', dup.id);
+          await supabase.from('orders').delete().eq('id', dup.id);
+          deletedOrders.push(dup.order_number);
+          refundedTotal += 16.40;
+        }
+
+        // Estornar carteira da revendedora
+        if (refundedTotal > 0 && resellerUserId) {
+          const { data: w } = await supabase.from('wallets').select('*').eq('user_id', resellerUserId).maybeSingle();
+          if (w) {
+            const currentBal = Number(w.saldo || 0);
+            const newBal = Math.round((currentBal + refundedTotal) * 100) / 100;
+            await supabase.from('wallets').update({ saldo: newBal, updated_at: new Date().toISOString() }).eq('id', w.id);
+            await supabase.from('wallet_transactions').insert({
+              wallet_id: w.id,
+              tipo: 'estorno',
+              valor: refundedTotal,
+              taxa: 0,
+              valor_pago: refundedTotal,
+              saldo_anterior: currentBal,
+              saldo_posterior: newBal,
+              descricao: `Estorno de ${deletedOrders.length} cobranças duplicadas do pedido ML #2000019284106296 (Pedidos #${deletedOrders.join(', #')})`,
+              referencia_tipo: 'order',
+              status: 'completed',
+            });
+          }
+        }
+      }
+
+      // 2. Importar o pedido pendente do print #2000015837503663 (Hissao Saito)
+      let hissaoResult = null;
+      try {
+        hissaoResult = await processSingleMlOrder('2000015837503663', resellerUserId);
+      } catch (hErr: any) {
+        hissaoResult = { success: false, error: hErr.message };
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        deleted_orders: deletedOrders,
+        refunded_total: refundedTotal,
+        hissao_order: hissaoResult,
+      }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

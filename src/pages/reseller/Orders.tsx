@@ -30,11 +30,47 @@ function ResellerOrders() {
   const [copied, setCopied] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [downloadingLabelId, setDownloadingLabelId] = useState<string | null>(null);
+  const [generatingPixOrderId, setGeneratingPixOrderId] = useState<string | null>(null);
   const [isManualImportOpen, setIsManualImportOpen] = useState(false);
   const [manualOrderId, setManualOrderId] = useState("");
   const [isImportingManual, setIsImportingManual] = useState(false);
 
   const { data: orders, isLoading } = useResellerOrders(statusFilter, searchTerm);
+
+  const handleGenerateOrPayPix = async (order: ResellerOrder) => {
+    if (order.pix_qr_code) {
+      setSelectedPixOrder(order);
+      return;
+    }
+
+    setGeneratingPixOrderId(order.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('ml-order-webhook', {
+        body: { action: 'generate_pix_for_order', order_id: order.id },
+      });
+
+      if (error || !data?.success) {
+        throw new Error(data?.error || error?.message || 'Falha ao gerar cobrança Pix.');
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["reseller-orders"] });
+
+      setSelectedPixOrder({
+        ...order,
+        pix_qr_code: data.pix_qr_code,
+        pix_qr_code_base64: data.pix_qr_code_base64,
+        payment_expires_at: data.payment_expires_at,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Erro ao gerar Pix",
+        description: err.message || "Não foi possível gerar o código Pix agora.",
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingPixOrderId(null);
+    }
+  };
 
   const handleDownloadLabel = async (order: ResellerOrder) => {
     setDownloadingLabelId(order.id);
@@ -333,92 +369,126 @@ function ResellerOrders() {
               {orders.map((order) => {
                 const statusInfo = getStatusConfig(order.status);
                 const StatusIcon = statusInfo.icon;
+                const isMlOrder = order.payment_method === 'mercadolivre' || !!order.ml_order_id;
+                const isPendingPayment = order.payment_status === 'pending' || order.status === 'pendente';
 
                 return (
                   <Card key={order.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 flex-wrap mb-2">
-                            <h3 className="font-semibold text-lg">#{order.order_number}</h3>
-                            <Badge className={statusInfo.color}>
-                              <StatusIcon className="h-3 w-3 mr-1" />
-                              {statusInfo.label}
+                    <CardContent className="p-5">
+                      {/* Top Header: Número do Pedido + Referência do Marketplace + Badges de Status + Valor */}
+                      <div className="flex items-start justify-between gap-3 pb-3 border-b">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-bold text-lg text-slate-900 tracking-tight">#{order.order_number}</h3>
+
+                          {order.ml_order_id && (
+                            <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300 font-semibold text-xs px-2.5 py-0.5 gap-1.5 shadow-2xs">
+                              <ShoppingBag className="h-3 w-3 text-amber-600" />
+                              <span>ML: <strong>#{order.ml_order_id}</strong></span>
                             </Badge>
-                            {order.payment_status === "approved" && (
-                              <Badge variant="outline" className="bg-green-50 text-green-700">
-                                Pago
-                              </Badge>
-                            )}
-                            {order.payment_method === 'mercadolivre' && (
-                              <Badge className="bg-yellow-400 text-yellow-900 hover:bg-yellow-400 text-xs">
-                                🛒 Mercado Livre
-                              </Badge>
-                            )}
-                            {order.payment_status === 'pending' && order.pix_qr_code && (
-                              <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 text-xs">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Pix Fulfillment Pendente
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="space-y-1 text-sm text-muted-foreground">
-                            <p>
-                              <strong>Cliente:</strong>{" "}
-                              {order.profiles
-                                ? `${order.profiles.first_name} ${order.profiles.last_name}`
-                                : order.payment_method === 'mercadolivre' ? 'Comprador ML' : "Cliente"}
-                            </p>
-                            <p>
-                              <strong>Data:</strong>{" "}
-                              {format(new Date(order.created_at), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", {
-                                locale: ptBR,
-                              })}
-                            </p>
-                            {order.shipping_address && (
-                              <p>
-                                <strong>Endereço:</strong>{" "}
-                                {order.shipping_address.city}, {order.shipping_address.state}
-                              </p>
-                            )}
-                            {order.tracking_code && (
-                              <p className="flex items-center gap-1 text-blue-600">
-                                <MapPin className="h-3 w-3" />
-                                <strong>Rastreio:</strong> {order.tracking_code}
-                              </p>
-                            )}
-                          </div>
+                          )}
+
+                          <Badge className={statusInfo.color}>
+                            <StatusIcon className="h-3 w-3 mr-1" />
+                            {statusInfo.label}
+                          </Badge>
+
+                          {(order.payment_status === "approved" || order.payment_status === "paid") && (
+                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
+                              Pago
+                            </Badge>
+                          )}
+
+                          {isPendingPayment && (
+                            <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 text-xs gap-1">
+                              <Clock className="h-3 w-3" />
+                              Pix Fulfillment Pendente
+                            </Badge>
+                          )}
                         </div>
-                        <div className="text-right space-y-2">
-                          <p className="text-2xl font-bold text-primary">
+
+                        <div className="text-right shrink-0">
+                          <p className="text-xl font-bold text-primary">
                             R$ {Number(order.total_amount).toFixed(2)}
                           </p>
+                        </div>
+                      </div>
+
+                      {/* Informações centrais: Cliente, Data e Destino */}
+                      <div className="py-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-sm text-muted-foreground">
+                        <div>
+                          <strong className="text-slate-700">Cliente:</strong>{" "}
+                          <span>
+                            {order.profiles
+                              ? `${order.profiles.first_name} ${order.profiles.last_name}`
+                              : order.shipping_address?.receiver_name || (isMlOrder ? 'Comprador Mercado Livre' : 'Cliente')}
+                          </span>
+                        </div>
+                        <div>
+                          <strong className="text-slate-700">Data:</strong>{" "}
+                          <span>
+                            {format(new Date(order.created_at), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", {
+                              locale: ptBR,
+                            })}
+                          </span>
+                        </div>
+                        {order.shipping_address && (order.shipping_address.city || order.shipping_address.state) && (
+                          <div>
+                            <strong className="text-slate-700">Destino:</strong>{" "}
+                            <span>
+                              {order.shipping_address.city ? `${order.shipping_address.city}, ` : ''}{order.shipping_address.state || ''}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Linha inferior: Código de rastreio à esquerda e Botões de ação à direita */}
+                      <div className="pt-3 border-t flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                          {order.tracking_code ? (
+                            <div className="flex items-center gap-1.5 text-blue-700 bg-blue-50/90 px-2.5 py-1 rounded-md border border-blue-200 text-xs font-medium w-fit">
+                              <MapPin className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                              <span className="text-muted-foreground">Rastreio:</span>
+                              <span className="font-mono font-bold tracking-wide">{order.tracking_code}</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">Sem código de rastreio</span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap sm:justify-end">
                           {order.status === "etiqueta_incorreta" && (
                             <Button
                               size="sm"
-                              className="text-xs gap-1 bg-rose-600 hover:bg-rose-700 text-white w-full md:w-auto"
+                              className="text-xs gap-1 bg-rose-600 hover:bg-rose-700 text-white"
                               onClick={() => navigate(`/reseller/pedidos/corrigir-etiqueta/${order.id}`)}
                             >
                               <AlertCircle className="h-3 w-3" />
                               Corrigir Etiqueta
                             </Button>
                           )}
-                          {order.payment_status === "pending" && order.pix_qr_code && (
+
+                          {isPendingPayment && (
                             <Button
                               size="sm"
-                              className="text-xs gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm w-full md:w-auto"
-                              onClick={() => setSelectedPixOrder(order)}
+                              disabled={generatingPixOrderId === order.id}
+                              className="text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
+                              onClick={() => handleGenerateOrPayPix(order)}
                             >
-                              <QrCode className="h-3.5 w-3.5" />
+                              {generatingPixOrderId === order.id ? (
+                                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <QrCode className="h-3.5 w-3.5" />
+                              )}
                               Pagar Pix (Fulfillment)
                             </Button>
                           )}
+
                           {(order.ml_shipment_id || order.ml_label_url || (order as any).has_shipping_file) && (
                             <Button
                               size="sm"
                               variant="outline"
                               disabled={downloadingLabelId === order.id}
-                              className="text-xs gap-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                              className="text-xs gap-1 border-slate-300 text-slate-700 hover:bg-slate-100"
                               onClick={() => handleDownloadLabel(order)}
                             >
                               {downloadingLabelId === order.id ? (

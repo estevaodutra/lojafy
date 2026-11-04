@@ -44,7 +44,7 @@ export const useResellerOrders = (statusFilter?: string, searchTerm?: string) =>
       }
 
       if (searchTerm) {
-        query = query.or(`order_number.ilike.%${searchTerm}%`);
+        query = query.or(`order_number.ilike.%${searchTerm}%,ml_order_id.ilike.%${searchTerm}%,tracking_code.ilike.%${searchTerm}%`);
       }
 
       const { data: orders, error } = await query;
