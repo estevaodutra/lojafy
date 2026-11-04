@@ -1063,17 +1063,9 @@ async function processSingleMlOrder(
     order_id: orderId,
     status: isFullyPaid ? 'recebido' : 'pendente',
     notes: isFullyPaid
-      ? `Pedido ML #${mlOrderIdStr} pago com sucesso via carteira — liberado para preparação de envio`
-      : `Pedido ML #${mlOrderIdStr} recebido — aguardando pagamento Pix de fulfillment (24h)`,
+      ? `Pedido ML #${displayRef} pago com sucesso via carteira — liberado para preparação de envio`
+      : `Pedido ML #${displayRef} recebido — aguardando pagamento Pix de fulfillment (24h)`,
   });
-
-  // Extrair ID da remessa oficial (shipping.id no Mercado Livre)
-  const shipmentId = mlOrder.shipping?.id
-    ?? mlOrder.shipping_id
-    ?? mlOrder.shipments?.id
-    ?? mlOrder.order_items?.[0]?.shipping?.id
-    ?? mlOrder.order_items?.[0]?.shipment?.id
-    ?? null;
 
   let publicLabelUrl: string | null = null;
   let trackingCode: string | null = null;
