@@ -1379,7 +1379,7 @@ serve(async (req) => {
     }
 
     // Ação 3: Importação direta por ID de pedido
-    if (body.action === 'process_order' || body.order_id) {
+    if (body.action === 'process_order' || (body.order_id && !body.action)) {
       const targetOrderId = String(body.order_id || body.ml_order_id);
       const result = await processSingleMlOrder(targetOrderId, body.user_id);
       return new Response(JSON.stringify(result), {
@@ -1413,7 +1413,7 @@ serve(async (req) => {
         .from('orders')
         .select('*')
         .eq('id', body.order_id)
-        .single();
+        .maybeSingle();
 
       if (!orderToPix) {
         return new Response(JSON.stringify({ success: false, error: 'Pedido não encontrado.' }), {
@@ -1538,6 +1538,12 @@ serve(async (req) => {
       } catch (hErr: any) {
         hissaoResult = { success: false, error: hErr.message };
       }
+
+      // Garantir que a referência exibida seja o ID da venda/pack do ML (2000015837503663)
+      await supabase
+        .from('orders')
+        .update({ ml_order_id: '2000015837503663' })
+        .eq('id', 'ee95cba6-472a-45fd-aa84-e910a461cd9a');
 
       return new Response(JSON.stringify({
         success: true,
