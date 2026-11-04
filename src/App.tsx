@@ -16,6 +16,7 @@ import { useMandatoryNotifications } from "@/hooks/useMandatoryNotifications";
 import { WhatsAppRequiredModal } from "@/components/WhatsAppRequiredModal";
 import { useWhatsAppRequired } from "@/hooks/useWhatsAppRequired";
 import ChatWidget from "@/components/support/ChatWidget";
+import { SystemUpdateNotification } from "@/components/notifications/SystemUpdateNotification";
 import PublicStoreProviderRoute from "./components/public-store/PublicStoreProviderRoute";
 
 // Layouts (kept eager — shells needed before any child renders)
@@ -222,6 +223,7 @@ const AppWithNotifications = () => {
       <AppContent />
       <ImpersonationBanner />
       <ChatWidget />
+      <SystemUpdateNotification />
 
       {/* WhatsApp tem prioridade máxima */}
       {requiresWhatsApp && userId && (

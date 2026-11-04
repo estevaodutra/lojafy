@@ -59,6 +59,7 @@ const AdminOrders = () => {
   const [profilesMap, setProfilesMap] = useState<Map<string, any>>(new Map());
   const [supplierOrgsMap, setSupplierOrgsMap] = useState<Map<string, any>>(new Map());
   const [ticketsMap, setTicketsMap] = useState<Map<string, any>>(new Map());
+  const [productsMap, setProductsMap] = useState<Map<string, any>>(new Map());
   const ordersPerPage = 20;
   const { toast } = useToast();
 
@@ -83,7 +84,14 @@ const AdminOrders = () => {
             total_price,
             product_snapshot,
             supplier_id,
-            supplier_organization_id
+            supplier_organization_id,
+            product:products (
+              id,
+              name,
+              image_url,
+              images,
+              original_images
+            )
           )
         `)
         .order("created_at", { ascending: false });
@@ -190,6 +198,32 @@ const AdminOrders = () => {
       }
       setTicketsMap(tMap);
 
+      // 5.5 Fetch products map
+      const allProductIds = new Set<string>();
+      ordersData.forEach((order) => {
+        if (Array.isArray(order.order_items)) {
+          order.order_items.forEach((item: any) => {
+            if (item.product_id) allProductIds.add(item.product_id);
+          });
+        }
+      });
+
+      const prodMap = new Map<string, any>();
+      if (allProductIds.size > 0) {
+        try {
+          const { data: prods } = await supabase
+            .from("products")
+            .select("id, name, image_url, images, original_images")
+            .in("id", Array.from(allProductIds));
+          if (prods) {
+            prods.forEach((p) => prodMap.set(p.id, p));
+          }
+        } catch (error) {
+          console.error("Error fetching products:", error);
+        }
+      }
+      setProductsMap(prodMap);
+
       // 6. Assemble orders with profiles
       const ordersWithProfiles = ordersData.map((order) => {
         const profile = pMap.get(order.user_id);
@@ -262,9 +296,10 @@ const AdminOrders = () => {
         profilesMap,
         supplierOrgsMap,
         ticketsMap,
+        productsMap,
       })
     );
-  }, [orders, profilesMap, supplierOrgsMap, ticketsMap]);
+  }, [orders, profilesMap, supplierOrgsMap, ticketsMap, productsMap]);
 
   const getPaymentStatusBadge = (status: string) => {
     const statusConfig = {

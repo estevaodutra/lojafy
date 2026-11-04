@@ -157,7 +157,14 @@ const SupplierOrderManagement = () => {
                 quantity,
                 unit_price,
                 total_price,
-                product_snapshot
+                product_snapshot,
+                product:products (
+                  id,
+                  name,
+                  image_url,
+                  images,
+                  original_images
+                )
               )
             `)
             .in("id", orderIds);

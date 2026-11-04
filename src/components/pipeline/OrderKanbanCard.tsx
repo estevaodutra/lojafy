@@ -44,12 +44,17 @@ export const OrderKanbanCard: React.FC<OrderKanbanCardProps> = ({
         <div className="flex items-start justify-between gap-2 mb-2">
           {/* Left: Internal order number & identifiers */}
           <div className="space-y-1 min-w-0">
-            <div className="text-base font-bold tracking-tight text-foreground flex items-center gap-1.5">
+            <div className="text-base font-bold tracking-tight text-foreground flex items-center gap-1.5 flex-wrap">
               <span>#{order.order_number}</span>
+              {order.ml_order_id && (
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-300">
+                  ML: #{order.ml_order_id}
+                </span>
+              )}
             </div>
 
             {/* External Reference */}
-            {order.external_reference && (
+            {order.external_reference && order.external_reference !== order.ml_order_id && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-mono truncate max-w-[170px] cursor-help">
@@ -162,10 +167,19 @@ export const OrderKanbanCard: React.FC<OrderKanbanCardProps> = ({
 
           <div className="flex items-center justify-between text-[11px]">
             <span className="text-muted-foreground">Cliente:</span>
-            <span className="font-medium text-foreground truncate max-w-[180px] text-right" title={order.customer_name}>
+            <span className="font-medium text-foreground truncate max-w-[180px] text-right font-medium" title={order.customer_name}>
               {order.customer_name}
             </span>
           </div>
+
+          {(order.customer_city || order.customer_state) && (
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-muted-foreground">Destino:</span>
+              <span className="text-muted-foreground truncate max-w-[180px] text-right text-[10px]">
+                {[order.customer_city, order.customer_state].filter(Boolean).join(" / ")}
+              </span>
+            </div>
+          )}
 
           <div className="flex items-center justify-between text-[11px]">
             <span className="text-muted-foreground">Fornecedor:</span>

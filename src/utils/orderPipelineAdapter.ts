@@ -6,11 +6,13 @@ export function normalizeOrderToPipelineItem(
     profilesMap?: Map<string, any>;
     supplierOrgsMap?: Map<string, any>;
     ticketsMap?: Map<string, any>;
+    productsMap?: Map<string, any>;
   }
 ): OrderPipelineItem {
   const profilesMap = context?.profilesMap;
   const supplierOrgsMap = context?.supplierOrgsMap;
   const ticketsMap = context?.ticketsMap;
+  const productsMap = context?.productsMap;
 
   // External reference
   const externalRef =
@@ -55,24 +57,30 @@ export function normalizeOrderToPipelineItem(
   if (items.length > 0) {
     const first = items[0];
     const snapshot = first.product_snapshot || {};
-    const prod = first.product || {};
+    const prod = first.product || (first.product_id && productsMap?.get(first.product_id)) || {};
     
     // Extract thumbnail
     let img =
+      snapshot.image_url ||
+      snapshot.imageUrl ||
       snapshot.image ||
+      snapshot.thumbnail ||
       snapshot.images?.[0] ||
-      prod.images?.[0] ||
+      prod.image_url ||
+      prod.imageUrl ||
       prod.image ||
+      (Array.isArray(prod.images) && prod.images.length > 0 ? prod.images[0] : null) ||
+      (Array.isArray(prod.original_images) && prod.original_images.length > 0
+        ? (prod.original_images[0]?.url || prod.original_images[0])
+        : null) ||
+      order.product_image ||
+      order.image_url ||
       null;
-
-    if (!img && Array.isArray(prod.original_images) && prod.original_images.length > 0) {
-      img = prod.original_images[0]?.url || prod.original_images[0];
-    }
 
     mainProduct = {
       id: first.product_id,
       name: snapshot.name || prod.name || prod.title || "Produto",
-      imageUrl: img,
+      imageUrl: img || undefined,
       quantity: first.quantity || 1,
     };
 
@@ -81,7 +89,7 @@ export function normalizeOrderToPipelineItem(
     // Fallback if no order_items joined
     mainProduct = {
       name: order.product_name || "Item do Pedido",
-      imageUrl: order.product_image || undefined,
+      imageUrl: order.product_image || order.image_url || undefined,
       quantity: order.items_count || 1,
     };
     totalQuantity = order.items_count || 1;
@@ -99,20 +107,44 @@ export function normalizeOrderToPipelineItem(
     sellerName = p.business_name || `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Revendedor";
   }
 
-  // Customer resolution
-  let customerName = "Cliente";
-  if (order.user_id && profilesMap?.has(order.user_id)) {
-    const p = profilesMap.get(order.user_id);
-    customerName = `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Cliente";
-  } else if (order.profiles) {
-    customerName = `${order.profiles.first_name || ""} ${order.profiles.last_name || ""}`.trim() || "Cliente";
-  } else if (order.shipping_address) {
-    const addr = typeof order.shipping_address === "string"
-      ? JSON.parse(order.shipping_address || "{}")
-      : order.shipping_address;
-    if (addr.name || addr.receiver_name) {
-      customerName = addr.name || addr.receiver_name;
+  // Customer resolution: no marketplace e dropshipping, o cliente real é o destinatário em shipping_address!
+  let customerName = "";
+  let customerCity: string | null = null;
+  let customerState: string | null = null;
+  let parsedAddress: any = null;
+
+  if (order.shipping_address) {
+    try {
+      parsedAddress = typeof order.shipping_address === "string"
+        ? JSON.parse(order.shipping_address || "{}")
+        : order.shipping_address;
+      if (parsedAddress) {
+        customerName = (parsedAddress.receiver_name || parsedAddress.name || "").trim();
+        customerCity = parsedAddress.city || null;
+        customerState = parsedAddress.state || null;
+      }
+    } catch {
+      // ignore
     }
+  }
+
+  // Se não veio de shipping_address, buscar campos diretos de cliente
+  if (!customerName) {
+    customerName = (order.customer_name || order.buyer_name || order.client_name || "").trim();
+  }
+
+  // Apenas se user_id for DIFERENTE do reseller_id (ex: cliente de loja virtual própria)
+  if (!customerName && order.user_id && order.user_id !== order.reseller_id && profilesMap?.has(order.user_id)) {
+    const p = profilesMap.get(order.user_id);
+    customerName = `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.business_name || "";
+  }
+
+  if (!customerName && order.profiles && order.user_id !== order.reseller_id) {
+    customerName = `${order.profiles.first_name || ""} ${order.profiles.last_name || ""}`.trim();
+  }
+
+  if (!customerName) {
+    customerName = order.channel === "mercadolivre" || order.ml_order_id ? "Cliente Mercado Livre" : "Cliente Final";
   }
 
   // Supplier resolution
@@ -151,7 +183,12 @@ export function normalizeOrderToPipelineItem(
     total_quantity_count: totalQuantity,
     seller_name: sellerName,
     customer_name: customerName,
+    customer_city: customerCity,
+    customer_state: customerState,
+    shipping_address: parsedAddress,
     supplier_name: supplierName,
+    ml_order_id: order.ml_order_id || null,
+    ml_shipment_id: order.ml_shipment_id || null,
     pix_qr_code: order.pix_qr_code,
     pix_qr_code_base64: order.pix_qr_code_base64,
     payment_expires_at: order.payment_expires_at,

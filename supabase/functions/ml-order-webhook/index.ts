@@ -498,6 +498,7 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
       totalCost: itemTotalCost,
       supplierId: matchedProd?.supplier_id ?? null,
       mlItemId: item.item?.id ?? null,
+      imageUrl: matchedProd?.image_url || matchedProd?.images?.[0] || null,
     });
   }
 
@@ -521,6 +522,7 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
           sku: ci.sku,
           ml_item_id: ci.mlItemId,
           cost_price: ci.costPrice,
+          image_url: ci.imageUrl,
         },
       });
     }
@@ -823,7 +825,7 @@ async function processSingleMlOrder(
       if (published?.product_id) {
         const { data: p } = await supabase
           .from('products')
-          .select('id, name, cost_price, supplier_id, sku')
+          .select('id, name, cost_price, supplier_id, sku, image_url, images')
           .eq('id', published.product_id)
           .maybeSingle();
         if (p) {
@@ -837,7 +839,7 @@ async function processSingleMlOrder(
     if (!matchedProductId && rawSku) {
       const { data: prodByIntSku } = await supabase
         .from('products')
-        .select('id, name, cost_price, supplier_id, sku')
+        .select('id, name, cost_price, supplier_id, sku, image_url, images')
         .eq('internal_sku', rawSku)
         .maybeSingle();
       if (prodByIntSku) {
@@ -855,7 +857,7 @@ async function processSingleMlOrder(
       if (vItem?.product_id) {
         const { data: p } = await supabase
           .from('products')
-          .select('id, name, cost_price, supplier_id, sku')
+          .select('id, name, cost_price, supplier_id, sku, image_url, images')
           .eq('id', vItem.product_id)
           .maybeSingle();
         if (p) {
@@ -891,6 +893,7 @@ async function processSingleMlOrder(
       totalCost: itemTotalCost,
       supplierId,
       mlItemId,
+      imageUrl: dbProduct?.image_url || dbProduct?.images?.[0] || null,
     });
   }
 
@@ -1078,6 +1081,7 @@ async function processSingleMlOrder(
         sku: item.sku,
         ml_item_id: item.mlItemId,
         cost_price: item.costPrice,
+        image_url: item.imageUrl,
       },
     });
   }

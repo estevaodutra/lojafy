@@ -56,7 +56,12 @@ export interface OrderPipelineItem {
   // Parties
   seller_name: string;
   customer_name: string;
+  customer_city?: string | null;
+  customer_state?: string | null;
+  shipping_address?: any;
   supplier_name: string;
+  ml_order_id?: string | null;
+  ml_shipment_id?: string | null;
   
   // Actions states
   pix_qr_code?: string | null;

@@ -52,7 +52,14 @@ export const useResellerOrders = (statusFilter?: string, searchTerm?: string) =>
             total_price,
             product_snapshot,
             supplier_id,
-            supplier_organization_id
+            supplier_organization_id,
+            product:products (
+              id,
+              name,
+              image_url,
+              images,
+              original_images
+            )
           )
         `)
         .eq("reseller_id", user?.id)
@@ -83,11 +90,32 @@ export const useResellerOrders = (statusFilter?: string, searchTerm?: string) =>
         profiles = data || [];
       }
 
+      // Buscar produtos para garantir miniatura mesmo se join falhar
+      const productIds = new Set<string>();
+      orders?.forEach((o) => {
+        o.order_items?.forEach((it: any) => {
+          if (it.product_id) productIds.add(it.product_id);
+        });
+      });
+
+      const prodsMap = new Map<string, any>();
+      if (productIds.size > 0) {
+        const { data: prods } = await supabase
+          .from("products")
+          .select("id, name, image_url, images, original_images")
+          .in("id", Array.from(productIds));
+        prods?.forEach((p) => prodsMap.set(p.id, p));
+      }
+
       // Combinar dados
       const ordersWithProfiles =
         orders?.map((order) => ({
           ...order,
           profiles: profiles.find((p) => p.user_id === order.user_id),
+          order_items: order.order_items?.map((it: any) => ({
+            ...it,
+            product: it.product || prodsMap.get(it.product_id) || null,
+          })),
         })) || [];
 
       return ordersWithProfiles as ResellerOrder[];

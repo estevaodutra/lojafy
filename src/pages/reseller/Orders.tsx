@@ -355,8 +355,12 @@ function ResellerOrders() {
                       <div className="py-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-sm text-muted-foreground">
                         <div>
                           <strong className="text-slate-700">Cliente:</strong>{" "}
-                          <span>
-                            {order.profiles?.first_name} {order.profiles?.last_name}
+                          <span className="font-medium text-slate-900">
+                            {order.shipping_address?.receiver_name ||
+                             order.shipping_address?.name ||
+                             (order.user_id !== order.reseller_id && order.profiles ? `${order.profiles.first_name || ""} ${order.profiles.last_name || ""}`.trim() : null) ||
+                             order.customer_name ||
+                             (isMlOrder ? "Cliente Mercado Livre" : "Cliente")}
                           </span>
                         </div>
                         <div>
@@ -374,6 +378,55 @@ function ResellerOrders() {
                           </div>
                         )}
                       </div>
+
+                      {/* Miniatura e Dados do Produto */}
+                      {(() => {
+                        const firstItem = order.order_items?.[0];
+                        const itemSnapshot = firstItem?.product_snapshot || {};
+                        const itemProd = firstItem?.product || {};
+                        const itemThumb =
+                          itemSnapshot.image_url ||
+                          itemSnapshot.imageUrl ||
+                          itemSnapshot.image ||
+                          itemProd.image_url ||
+                          itemProd.imageUrl ||
+                          itemProd.images?.[0] ||
+                          order.product_image;
+                        const itemTitle = itemSnapshot.name || itemProd.name || order.product_name || "Produto";
+                        const itemQty = firstItem?.quantity || 1;
+
+                        return (
+                          <div className="flex items-center gap-3 mb-3 p-2 rounded-lg bg-slate-50 border border-slate-200">
+                            <div className="relative w-12 h-12 shrink-0 rounded bg-white border overflow-hidden flex items-center justify-center">
+                              {itemThumb ? (
+                                <img
+                                  src={itemThumb}
+                                  alt={itemTitle}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = "none";
+                                  }}
+                                />
+                              ) : (
+                                <Package className="w-5 h-5 text-slate-400" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold text-slate-800 line-clamp-1">
+                                {itemTitle}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground mt-0.5">
+                                {order.order_items && order.order_items.length > 1 ? (
+                                  <span>{itemQty} un. • <strong>+{order.order_items.length - 1} outros itens</strong></span>
+                                ) : (
+                                  <span>{itemQty} un.</span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       {/* Informações de Envio e Etiqueta ML */}
                       {(order.tracking_code || order.ml_shipment_id || order.ml_label_url) && (
