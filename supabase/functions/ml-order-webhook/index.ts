@@ -427,6 +427,31 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
     }
   }
 
+  // 1.5 Extrair dados do comprador/endereço
+  const buyerName = (
+    mlOrder.shipping?.receiver_address?.receiver_name ||
+    mlOrder.receiver_address?.receiver_name ||
+    `${mlOrder.buyer?.first_name || ''} ${mlOrder.buyer?.last_name || ''}`.trim() ||
+    mlOrder.buyer?.nickname ||
+    orderRecord.shipping_address?.name ||
+    'Cliente Mercado Livre'
+  );
+  const receiverAddress = mlOrder.shipping?.receiver_address || mlOrder.receiver_address;
+  const shippingAddressPayload = {
+    name: buyerName,
+    email: mlOrder.buyer?.email || orderRecord.shipping_address?.email || null,
+    phone: mlOrder.buyer?.phone?.number || orderRecord.shipping_address?.phone || null,
+    cpf: mlOrder.buyer?.billing_info?.doc_number || orderRecord.shipping_address?.cpf || null,
+    receiver_name: receiverAddress?.receiver_name || buyerName,
+    street: receiverAddress?.street_name || orderRecord.shipping_address?.street || null,
+    number: receiverAddress?.street_number || orderRecord.shipping_address?.number || null,
+    city: receiverAddress?.city?.name || orderRecord.shipping_address?.city || null,
+    state: receiverAddress?.state?.name || orderRecord.shipping_address?.state || null,
+    zip_code: receiverAddress?.zip_code || orderRecord.shipping_address?.zip_code || null,
+    neighborhood: receiverAddress?.neighborhood?.name || orderRecord.shipping_address?.neighborhood || null,
+    comment: receiverAddress?.comment || orderRecord.shipping_address?.comment || null,
+  };
+
   // 2. Recalcular itens e custo real do fornecedor
   const orderItems = mlOrder.order_items ?? [];
   let totalSupplierCost = 0;
@@ -591,6 +616,7 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
       ml_shipment_id: shipmentId ? String(shipmentId) : orderRecord.ml_shipment_id,
       ml_label_url: publicLabelUrl,
       tracking_code: trackingCode,
+      shipping_address: shippingAddressPayload,
       has_shipping_file: !!publicLabelUrl,
       notes: notesSummary,
       updated_at: new Date().toISOString(),
@@ -1388,23 +1414,35 @@ serve(async (req) => {
       });
     }
 
-    // Ação 4: Reparar pedidos de um revendedor
-    if (body.action === 'repair_orders' && body.user_id) {
-      const { data: userOrders } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('reseller_id', body.user_id)
-        .not('ml_order_id', 'is', null);
-
-      let repaired = 0;
-      for (const ord of userOrders || []) {
-        await repairExistingOrder(ord, body.user_id);
-        repaired++;
+    // Ação 4: Reparar pedidos de um revendedor ou pedido específico
+    if (body.action === 'repair_orders') {
+      if (body.order_id) {
+        const { data: ord } = await supabase.from('orders').select('*').eq('id', body.order_id).maybeSingle();
+        if (ord) {
+          await repairExistingOrder(ord, ord.reseller_id);
+          return new Response(JSON.stringify({ success: true, repaired: 1 }), {
+            status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
       }
+      if (body.user_id) {
+        const { data: userOrders } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('reseller_id', body.user_id)
+          .not('ml_order_id', 'is', null)
+          .limit(5);
 
-      return new Response(JSON.stringify({ success: true, repaired }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+        let repaired = 0;
+        for (const ord of userOrders || []) {
+          await repairExistingOrder(ord, body.user_id);
+          repaired++;
+        }
+
+        return new Response(JSON.stringify({ success: true, repaired }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     // Ação 5: Gerar Pix de fulfillment sob demanda para um pedido
