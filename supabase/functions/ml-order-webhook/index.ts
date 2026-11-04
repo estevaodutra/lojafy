@@ -359,11 +359,8 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
   if (!intg) return;
   const token = await getValidTokenForIntegration(intg);
 
-  const oRes = await fetch(`https://api.mercadolibre.com/orders/${mlOrderIdStr}`, {
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
-  if (!oRes.ok) return;
-  const mlOrder = await oRes.json();
+  const mlOrder = await fetchOrderOrPack(mlOrderIdStr, token);
+  if (!mlOrder) return;
 
   // 1. Extrair ID da remessa oficial (shipping.id no ML)
   const shipmentId = mlOrder.shipping?.id
@@ -1317,16 +1314,32 @@ serve(async (req) => {
 
     // Ação 0: Diagnóstico e inspeção
     if (body.action === 'inspect_orders') {
-      // Inspecionar se ml_pack_id existe na tabela orders
-      const { data: testCol, error: colError } = await supabase
+      let query = supabase
         .from('orders')
-        .select('id, ml_order_id, ml_shipment_id, tracking_code, external_reference, notes')
-        .limit(1);
+        .select('id, order_number, reseller_id, total_amount, payment_status, status, ml_order_id, ml_shipment_id, tracking_code, notes, shipping_address, created_at')
+        .order('created_at', { ascending: false });
+
+      if (body.order_id) {
+        query = query.eq('id', body.order_id);
+      } else if (body.order_number) {
+        query = query.eq('order_number', body.order_number);
+      } else if (body.reseller_id) {
+        query = query.eq('reseller_id', body.reseller_id);
+      }
+
+      const { data: ordersData, error: ordersError } = await query.limit(20);
+
+      let walletData = null;
+      if (body.reseller_id) {
+        const { data: w } = await supabase.from('wallets').select('*').eq('user_id', body.reseller_id).maybeSingle();
+        walletData = w;
+      }
 
       return new Response(JSON.stringify({
         success: true,
-        columns_test: testCol,
-        col_error: colError,
+        orders: ordersData,
+        wallet: walletData,
+        error: ordersError,
       }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
