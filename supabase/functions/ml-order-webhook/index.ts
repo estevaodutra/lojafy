@@ -1355,6 +1355,15 @@ serve(async (req) => {
 
       const { data: ordersData, error: ordersError } = await query.limit(20);
 
+      let itemsData = null;
+      if (ordersData && ordersData.length > 0 && (body.order_id || body.order_number)) {
+        const { data: its } = await supabase
+          .from('order_items')
+          .select('*, product:products(*)')
+          .eq('order_id', ordersData[0].id);
+        itemsData = its;
+      }
+
       let walletData = null;
       if (body.reseller_id) {
         const { data: w } = await supabase.from('wallets').select('*').eq('user_id', body.reseller_id).maybeSingle();
@@ -1364,6 +1373,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         success: true,
         orders: ordersData,
+        items: itemsData,
         wallet: walletData,
         error: ordersError,
       }), {
