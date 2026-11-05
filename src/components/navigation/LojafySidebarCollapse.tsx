@@ -19,6 +19,7 @@ export interface LojafySubItem {
   icon?: React.ComponentType<{ className?: string }>;
   badge?: string | number | null;
   aliases?: string[];
+  exactMatch?: boolean;
 }
 
 export interface LojafySidebarCollapseProps {
@@ -46,8 +47,8 @@ export const LojafySidebarCollapse: React.FC<LojafySidebarCollapseProps> = ({
   const isAnyChildActive = React.useMemo(() => {
     return items.some((item) => {
       if (currentPath === item.url) return true;
-      if (currentPath.startsWith(item.url + '/')) return true;
-      if (item.aliases?.some((alias) => currentPath === alias || currentPath.startsWith(alias + '/'))) {
+      if (!item.exactMatch && currentPath.startsWith(item.url + '/')) return true;
+      if (item.aliases?.some((alias) => currentPath === alias || (!item.exactMatch && currentPath.startsWith(alias + '/')))) {
         return true;
       }
       return false;
@@ -118,10 +119,11 @@ export const LojafySidebarCollapse: React.FC<LojafySidebarCollapseProps> = ({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             {items.map((sub) => {
-              const isSubActive =
-                currentPath === sub.url ||
-                currentPath.startsWith(sub.url + '/') ||
-                (sub.aliases?.some((a) => currentPath === a || currentPath.startsWith(a + '/')) ?? false);
+              const isSubActive = sub.exactMatch
+                ? currentPath === sub.url
+                : currentPath === sub.url ||
+                  currentPath.startsWith(sub.url + '/') ||
+                  (sub.aliases?.some((a) => currentPath === a || currentPath.startsWith(a + '/')) ?? false);
               const SubIcon = sub.icon;
 
               return (
@@ -187,10 +189,11 @@ export const LojafySidebarCollapse: React.FC<LojafySidebarCollapseProps> = ({
           className="relative ml-4 pl-3 border-l border-slate-200 dark:border-slate-800/80 mt-1 mb-1 space-y-1"
         >
           {items.map((sub) => {
-            const isSubActive =
-              currentPath === sub.url ||
-              currentPath.startsWith(sub.url + '/') ||
-              (sub.aliases?.some((a) => currentPath === a || currentPath.startsWith(a + '/')) ?? false);
+            const isSubActive = sub.exactMatch
+              ? currentPath === sub.url
+              : currentPath === sub.url ||
+                currentPath.startsWith(sub.url + '/') ||
+                (sub.aliases?.some((a) => currentPath === a || currentPath.startsWith(a + '/')) ?? false);
             const SubIcon = sub.icon;
 
             return (

@@ -1,7 +1,7 @@
 {
-  "hash": "10aab241165137e887118e3dce476cf0fee6a8b8",
-  "shortHash": "10aab24",
-  "message": "fix(orders): hide list scrollbars for 100% card width and expand layout to fill full screen height",
+  "hash": "0d1109393e20bab757ed02dd2251218bfd107d8e",
+  "shortHash": "0d11093",
+  "message": "feat(orders): implementacao gestao de pedidos 3.0 (arquitetura 4 subpaginas, arquivamento, automacoes e ordenacao cronologica)",
   "author": "Lojafy Developer",
-  "timestamp": 1793916556571
+  "timestamp": 1793917203110
 }

@@ -22,7 +22,9 @@ import {
   Truck, 
   GraduationCap, 
   Bell, 
-  Headphones 
+  Headphones,
+  AlertCircle,
+  Settings2
 } from 'lucide-react';
 import {
   Sidebar,
@@ -66,11 +68,33 @@ export const SuperAdminSidebar: React.FC = () => {
             icon={Package}
           />
 
-          {/* 03. Pedidos */}
-          <LojafySidebarItem
+          {/* 03. Pedidos (Collapse) */}
+          <LojafySidebarCollapse
             title="Pedidos"
-            url="/super-admin/pedidos"
             icon={ShoppingCart}
+            items={[
+              {
+                title: 'Operação de Pedidos',
+                url: '/super-admin/pedidos',
+                icon: ShoppingCart,
+                exactMatch: true,
+              },
+              {
+                title: 'Visão Geral',
+                url: '/super-admin/pedidos/visao-geral',
+                icon: BarChart3,
+              },
+              {
+                title: 'Ocorrências',
+                url: '/super-admin/pedidos/ocorrencias',
+                icon: AlertCircle,
+              },
+              {
+                title: 'Configurações',
+                url: '/super-admin/pedidos/configuracoes',
+                icon: Settings2,
+              },
+            ]}
           />
 
           {/* 04. Usuários (Renomeado de Clientes) */}

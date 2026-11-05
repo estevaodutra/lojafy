@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -81,8 +81,29 @@ interface Order {
 }
 
 const AdminOrders = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const currentTab = searchParams.get("tab") || "pedidos";
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+
+  const activeSubpage = useMemo(() => {
+    const path = location.pathname;
+    if (path.endsWith("/visao-geral") || searchParams.get("tab") === "visao-geral") return "visao-geral";
+    if (path.endsWith("/ocorrencias") || searchParams.get("tab") === "ocorrencias") return "ocorrencias";
+    if (path.endsWith("/configuracoes") || searchParams.get("tab") === "configuracoes") return "configuracoes";
+    return "pedidos";
+  }, [location.pathname, searchParams]);
+
+  const pageTitle = useMemo(() => {
+    switch (activeSubpage) {
+      case "visao-geral":
+        return "Visão Geral dos Pedidos";
+      case "ocorrencias":
+        return "Ocorrências & Pós-Venda";
+      case "configuracoes":
+        return "Configurações de Pedidos";
+      default:
+        return "Gestão de Pedidos";
+    }
+  }, [activeSubpage]);
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,10 +126,6 @@ const AdminOrders = () => {
   useEffect(() => {
     fetchOrders();
   }, []);
-
-  const handleTabChange = (val: string) => {
-    setSearchParams(val === "pedidos" ? {} : { tab: val });
-  };
 
   const fetchOrders = async () => {
     try {
@@ -660,59 +677,33 @@ const AdminOrders = () => {
 
   return (
     <div className="flex-1 min-h-0 h-full max-h-full flex flex-col overflow-hidden w-full space-y-1.5">
-      <Tabs
-        value={currentTab}
-        onValueChange={handleTabChange}
-        className="flex-1 min-h-0 flex flex-col overflow-hidden space-y-1.5"
-      >
-        {/* Compact Header Line with Definitive Navigation Architecture */}
-        <div className="flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold tracking-tight text-foreground">Gestão de Pedidos</h1>
-            
-            {/* The 4 Subpage Tabs */}
-            <TabsList className="h-7 bg-muted/60 p-0.5">
-              <TabsTrigger value="pedidos" className="text-xs h-6 px-2.5">
-                Pedidos
-              </TabsTrigger>
-              <TabsTrigger value="visao-geral" className="text-xs h-6 px-2.5 flex items-center gap-1">
-                <BarChart3 className="h-3 w-3" />
-                Visão Geral
-              </TabsTrigger>
-              <TabsTrigger value="ocorrencias" className="text-xs h-6 px-2.5 flex items-center gap-1">
-                <AlertCircle className="h-3 w-3 text-amber-500" />
-                Ocorrências
-              </TabsTrigger>
-              <TabsTrigger value="configuracoes" className="text-xs h-6 px-2.5 flex items-center gap-1">
-                <Settings2 className="h-3 w-3" />
-                Configurações
-              </TabsTrigger>
-            </TabsList>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs py-0.5 px-2 font-normal hidden sm:inline-flex">
-              <Package className="w-3 h-3 mr-1 text-primary" />
-              {activeOrdersCount} pedidos ativos
-            </Badge>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-              onClick={fetchOrders}
-              title="Atualizar lista de pedidos"
-            >
-              <RotateCw className="w-3.5 h-3.5" />
-            </Button>
-          </div>
+      {/* Header Line (Sem abas horizontais; navegação via collapse na sidebar) */}
+      <div className="flex items-center justify-between gap-3 shrink-0">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-bold tracking-tight text-foreground">{pageTitle}</h1>
         </div>
 
-        {/* ── Subpage 01: Pedidos (Kanban Operacional / Lista) ─────────── */}
-        <TabsContent
-          value="pedidos"
-          className="flex-1 min-h-0 flex flex-col overflow-hidden data-[state=active]:flex mt-0"
-        >
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-xs py-0.5 px-2 font-normal hidden sm:inline-flex">
+            <Package className="w-3 h-3 mr-1 text-primary" />
+            {activeOrdersCount} pedidos ativos
+          </Badge>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+            onClick={fetchOrders}
+            title="Atualizar lista de pedidos"
+          >
+            <RotateCw className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Renderização direta da subpágina ativa selecionada na sidebar */}
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        {activeSubpage === "pedidos" && (
           <OrderPipelineView
             orders={pipelineItems}
             isLoading={loading}
@@ -721,32 +712,20 @@ const AdminOrders = () => {
             userScopeLabel="Administração Geral"
             onRefreshOrders={fetchOrders}
           />
-        </TabsContent>
+        )}
 
-        {/* ── Subpage 02: Visão Geral (Dashboard de Métricas) ─────────── */}
-        <TabsContent
-          value="visao-geral"
-          className="flex-1 min-h-0 flex flex-col overflow-hidden data-[state=active]:flex mt-0"
-        >
+        {activeSubpage === "visao-geral" && (
           <OrdersOverviewSubpage orders={pipelineItems} />
-        </TabsContent>
+        )}
 
-        {/* ── Subpage 03: Ocorrências & Pós-Venda ─────────────────────── */}
-        <TabsContent
-          value="ocorrencias"
-          className="flex-1 min-h-0 flex flex-col overflow-hidden data-[state=active]:flex mt-0"
-        >
+        {activeSubpage === "ocorrencias" && (
           <OrdersOccurrencesSubpage orders={pipelineItems} />
-        </TabsContent>
+        )}
 
-        {/* ── Subpage 04: Configurações & Automações ──────────────────── */}
-        <TabsContent
-          value="configuracoes"
-          className="flex-1 min-h-0 flex flex-col overflow-hidden data-[state=active]:flex mt-0"
-        >
+        {activeSubpage === "configuracoes" && (
           <OrdersSettingsSubpage orders={pipelineItems} onRefreshOrders={fetchOrders} />
-        </TabsContent>
-      </Tabs>
+        )}
+      </div>
 
       {/* Order Details Modal (Shared) */}
       {selectedOrder && (

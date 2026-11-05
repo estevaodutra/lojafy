@@ -342,6 +342,9 @@ const App = () => {
                   <Route path="produtos" element={<AdminProducts />} />
                   <Route path="categorias" element={<AdminCategorias />} />
                   <Route path="pedidos" element={<AdminOrders />} />
+                  <Route path="pedidos/visao-geral" element={<AdminOrders />} />
+                  <Route path="pedidos/ocorrencias" element={<AdminOrders />} />
+                  <Route path="pedidos/configuracoes" element={<AdminOrders />} />
                   <Route path="clientes" element={<Clientes />} />
                   <Route path="integracoes" element={<IntegracaoPage />} />
                   <Route path="homepage" element={<HomepageManagement />} />
@@ -366,6 +369,9 @@ const App = () => {
                   {/* Novas rotas consolidadas */}
                   <Route path="catalogo" element={<Catalogo />} />
                   <Route path="pedidos" element={<AdminOrders />} />
+                  <Route path="pedidos/visao-geral" element={<AdminOrders />} />
+                  <Route path="pedidos/ocorrencias" element={<AdminOrders />} />
+                  <Route path="pedidos/configuracoes" element={<AdminOrders />} />
                   <Route path="clientes" element={<Clientes />} />
                   <Route path="design" element={<Design />} />
                   <Route path="configuracoes" element={<Configuracoes />} />
