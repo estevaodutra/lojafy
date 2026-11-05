@@ -141,17 +141,20 @@ export const SupplierLayout: React.FC = () => {
       <div className="min-h-screen flex w-full overflow-x-hidden min-w-0 bg-background">
         <SupplierSidebar />
         <main className="flex-1 min-w-0 flex flex-col overflow-x-hidden">
-          <header className="h-14 flex items-center gap-3 border-b px-4 shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <SidebarTrigger />
-            {orgData?.organization && (
-              <span className="text-sm font-medium text-muted-foreground truncate">
-                {orgData.organization.trade_name || orgData.organization.legal_name || 'Minha organização'}
-              </span>
-            )}
-            <div className="flex-1 min-w-0">
-              <AlertsStrip />
-            </div>
-          </header>
+          {/* Header mobile com trigger, ou faixa superior caso haja organização/alertas */}
+          {(orgData?.organization || true) && (
+            <header className="flex items-center gap-3 border-b px-4 py-2 shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+              <SidebarTrigger className="md:hidden" />
+              {orgData?.organization && (
+                <span className="text-sm font-medium text-muted-foreground truncate">
+                  {orgData.organization.trade_name || orgData.organization.legal_name || 'Minha organização'}
+                </span>
+              )}
+              <div className="flex-1 min-w-0">
+                <AlertsStrip />
+              </div>
+            </header>
+          )}
           <div className="p-4 md:p-6 flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
             <Outlet />
           </div>

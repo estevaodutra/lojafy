@@ -1,7 +1,7 @@
 {
-  "hash": "f6b55b871c692ec57af295414df7b0fb766badb9",
-  "shortHash": "f6b55b8",
-  "message": "fix(pwa): replace mobile screenshot icons with official Lojafy favicon PNGs",
+  "hash": "98ab59bf8f8504157562568e94b2876c6177a228",
+  "shortHash": "98ab59b",
+  "message": "fix(orders): tela fixa sem scroll de pagina e rolagem interna nas colunas do kanban",
   "author": "Lojafy Developer",
-  "timestamp": 1793910891673
+  "timestamp": 1793914236831
 }

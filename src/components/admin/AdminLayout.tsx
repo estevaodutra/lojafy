@@ -125,7 +125,8 @@ export const AdminLayout: React.FC = () => {
       <div className="min-h-screen flex w-full overflow-x-hidden min-w-0 bg-background">
         <AdminSidebar />
         <main className="flex-1 min-w-0 flex flex-col overflow-x-hidden">
-          <header className="h-14 flex items-center justify-between px-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0">
+          {/* Header exclusivo para dispositivos móveis */}
+          <header className="md:hidden h-12 flex items-center justify-between px-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0">
             <SidebarTrigger />
           </header>
           <div className="p-4 md:p-6 flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
