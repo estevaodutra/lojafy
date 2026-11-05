@@ -341,7 +341,7 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
           )
         ) : (
           /* List View: Scrolls independently inside the container */
-          <div className="flex-1 min-h-0 overflow-y-auto w-full pr-1">
+          <div className="flex-1 min-h-0 overflow-y-auto w-full pr-0 scrollbar-none">
             {listViewContent}
           </div>
         )}

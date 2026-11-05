@@ -553,7 +553,7 @@ const AdminOrders = () => {
   );
 
   return (
-    <div className="h-[calc(100vh-3.5rem-2rem)] md:h-[calc(100vh-3.5rem-3rem)] max-h-[calc(100vh-3.5rem-2rem)] md:max-h-[calc(100vh-3.5rem-3rem)] flex flex-col min-h-0 overflow-hidden w-full space-y-1.5">
+    <div className="flex-1 min-h-0 h-full max-h-full flex flex-col overflow-hidden w-full space-y-1.5">
       <Tabs defaultValue="pipeline_flow" className="flex-1 min-h-0 flex flex-col overflow-hidden space-y-1.5">
         {/* Compact Header Line */}
         <div className="flex items-center justify-between gap-3 shrink-0">

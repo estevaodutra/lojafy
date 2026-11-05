@@ -220,7 +220,7 @@ export const SuperAdminLayout: React.FC = () => {
           <header className="md:hidden h-12 flex items-center border-b px-4 shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <SidebarTrigger />
           </header>
-          <div className="p-4 md:p-6 flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden flex flex-col">
+          <div className="p-3 md:p-4 pb-2 md:pb-3 flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden flex flex-col">
             <Outlet />
           </div>
         </main>

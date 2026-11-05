@@ -105,7 +105,7 @@ export const OrderKanbanColumn: React.FC<OrderKanbanColumnProps> = ({
       </div>
 
       {/* Cards Scroll Area (Independent Vertical Scroll per Column) */}
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1 pb-2 space-y-2 scrollbar-thin scrollbar-thumb-muted-foreground/20 hover:scrollbar-thumb-muted-foreground/40">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-0 pb-2 space-y-2 scrollbar-none">
         <SortableContext items={orders.map((o) => o.id)} strategy={verticalListSortingStrategy}>
           {orders.map((order) => (
             <SortableOrderCard
