@@ -1,7 +1,7 @@
 {
-  "hash": "1dad358b9a4c5259d74ee95a3167336f594439e3",
-  "shortHash": "1dad358",
-  "message": "feat(ml): return items in inspect_orders",
+  "hash": "f6b55b871c692ec57af295414df7b0fb766badb9",
+  "shortHash": "f6b55b8",
+  "message": "fix(pwa): replace mobile screenshot icons with official Lojafy favicon PNGs",
   "author": "Lojafy Developer",
-  "timestamp": 1793820527763
+  "timestamp": 1793910891673
 }

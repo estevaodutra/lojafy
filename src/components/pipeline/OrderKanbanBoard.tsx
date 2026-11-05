@@ -182,8 +182,8 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="w-full overflow-x-auto pb-6 scrollbar-thin scrollbar-thumb-muted-foreground/20">
-        <div className="flex items-start gap-4 min-w-max px-1">
+      <div className="flex-1 min-h-0 w-full overflow-x-auto overflow-y-hidden pb-1 scrollbar-thin scrollbar-thumb-muted-foreground/20">
+        <div className="flex items-stretch h-full gap-3 min-w-max px-0.5">
           {activeStages.map((stage) => {
             const stageOrders = ordersByStage.get(stage.status_key || stage.name) || [];
             return (

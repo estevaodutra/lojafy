@@ -516,81 +516,51 @@ function ResellerOrders() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Gestão de Pedidos</h1>
-          <p className="text-muted-foreground mt-2">
-            Acompanhe todos os pedidos da sua loja em formato Pipeline ou Lista
-          </p>
-        </div>
+    <div className="h-[calc(100vh-3.5rem-2rem)] md:h-[calc(100vh-3.5rem-3rem)] max-h-[calc(100vh-3.5rem-2rem)] md:max-h-[calc(100vh-3.5rem-3rem)] flex flex-col min-h-0 overflow-hidden w-full space-y-1.5">
+      {/* Compact Top Header */}
+      <div className="flex items-center justify-between gap-3 shrink-0">
+        <h1 className="text-xl font-bold tracking-tight text-foreground">Gestão de Pedidos</h1>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setIsManualImportOpen(true)}
-            className="gap-2 text-xs"
+            className="gap-1.5 text-xs h-7"
           >
-            <ShoppingBag className="h-4 w-4 text-muted-foreground" />
-            Puxar Pedido por Nº ML
+            <ShoppingBag className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="hidden sm:inline">Puxar Pedido</span> ML
           </Button>
 
           <Button
             size="sm"
             onClick={handleSyncOrders}
             disabled={isSyncing}
-            className="gap-2 bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-semibold text-xs shadow-xs"
+            className="gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-semibold text-xs h-7 shadow-xs"
           >
-            <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
-            {isSyncing ? "Sincronizando..." : "Sincronizar Mercado Livre"}
+            <RefreshCw className={cn("h-3 w-3", isSyncing && "animate-spin")} />
+            <span className="hidden sm:inline">{isSyncing ? "Sincronizando..." : "Sincronizar ML"}</span>
           </Button>
         </div>
       </div>
 
-      {/* Métricas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Total de Pedidos</CardDescription>
-            <CardTitle className="text-3xl">{counts.all}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Pendentes</CardDescription>
-            <CardTitle className="text-3xl text-yellow-600">{counts.pendente || 0}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Recebidos</CardDescription>
-            <CardTitle className="text-3xl text-blue-600">{counts.recebido || 0}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Enviados</CardDescription>
-            <CardTitle className="text-3xl text-purple-600">{counts.enviado || 0}</CardTitle>
-          </CardHeader>
-        </Card>
+      {/* Order Pipeline View (Fills remaining height) */}
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <OrderPipelineView
+          orders={pipelineItems}
+          isLoading={isLoading}
+          onUpdateOrderStatus={async () => {
+            toast({
+              title: "Ação não permitida",
+              description: "Revendedores não podem alterar o status operacional diretamente.",
+              variant: "destructive",
+            });
+          }}
+          listViewContent={listViewContent}
+          userScopeLabel="Revendedor"
+          onRefreshOrders={() => queryClient.invalidateQueries({ queryKey: ["reseller-orders"] })}
+        />
       </div>
-
-      {/* Order Pipeline View */}
-      <OrderPipelineView
-        orders={pipelineItems}
-        isLoading={isLoading}
-        onUpdateOrderStatus={async () => {
-          toast({
-            title: "Ação não permitida",
-            description: "Revendedores não podem alterar o status operacional diretamente.",
-            variant: "destructive",
-          });
-        }}
-        listViewContent={listViewContent}
-        userScopeLabel="Revendedor (Sua Loja)"
-        onRefreshOrders={() => queryClient.invalidateQueries({ queryKey: ["reseller-orders"] })}
-      />
 
       {/* Modal Pix */}
       <Dialog open={!!selectedPixOrder} onOpenChange={() => setSelectedPixOrder(null)}>

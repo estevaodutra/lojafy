@@ -8,8 +8,6 @@ import OrderDetailsModal from "@/components/OrderDetailsModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
@@ -21,16 +19,12 @@ import {
 import {
   LayoutGrid,
   List,
-  SlidersHorizontal,
   Search,
-  Filter,
   Settings2,
   Package,
   QrCode,
   Copy,
   Check,
-  AlertCircle,
-  Truck,
   RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -81,7 +75,7 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
     return pipelines.find((p) => p.key === activePipelineKey) || pipelines[0];
   }, [pipelines, activePipelineKey]);
 
-  // Sellers and channels list for filters
+  // Sellers list for filters
   const uniqueSellers = useMemo(() => {
     const set = new Set<string>();
     orders.forEach((o) => {
@@ -175,66 +169,66 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
   };
 
   return (
-    <div className="w-full space-y-4">
-      {/* Top Bar: View Mode Switcher [ Pipeline ] [ Lista ] & Sub-pipelines */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card p-3 rounded-xl border shadow-xs">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Main Visualizer Switcher */}
-          <div className="flex items-center rounded-lg bg-muted p-1 border">
+    <div className="w-full h-full min-h-0 flex flex-col overflow-hidden space-y-1.5">
+      {/* Linha 1: Barra de Ações Compacta */}
+      <div className="flex flex-wrap items-center justify-between gap-2 p-1.5 px-2.5 rounded-lg border bg-card/90 shadow-2xs shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Main Visualizer Switcher: [ Pipeline ] [ Lista ] */}
+          <div className="flex items-center rounded-md bg-muted p-0.5 border">
             <Button
               variant={viewMode === "pipeline" ? "default" : "ghost"}
               size="sm"
-              className="h-8 px-3 text-xs font-semibold gap-1.5 shadow-none"
+              className="h-6 px-2.5 text-[11px] font-semibold gap-1 shadow-none"
               onClick={() => setViewMode("pipeline")}
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
+              <LayoutGrid className="w-3 h-3" />
               Pipeline
             </Button>
             <Button
               variant={viewMode === "list" ? "default" : "ghost"}
               size="sm"
-              className="h-8 px-3 text-xs font-semibold gap-1.5 shadow-none"
+              className="h-6 px-2.5 text-[11px] font-semibold gap-1 shadow-none"
               onClick={() => setViewMode("list")}
             >
-              <List className="w-3.5 h-3.5" />
+              <List className="w-3 h-3" />
               Lista
             </Button>
           </div>
 
           {/* Sub-Pipelines Selector (when in Pipeline view) */}
           {viewMode === "pipeline" && (
-            <div className="flex items-center rounded-lg bg-muted/60 p-1 border">
+            <div className="flex items-center rounded-md bg-muted/60 p-0.5 border">
               <Button
                 variant={activePipelineKey === "primary" ? "secondary" : "ghost"}
                 size="sm"
-                className="h-7 px-2.5 text-xs font-medium gap-1"
+                className="h-6 px-2 text-[11px] font-medium gap-1"
                 onClick={() => setActivePipelineKey("primary")}
               >
-                <Package className="w-3.5 h-3.5 text-primary" />
-                Pipeline Principal
+                <Package className="w-3 h-3 text-primary" />
+                Principal
               </Button>
               <Button
                 variant={activePipelineKey === "occurrences" ? "secondary" : "ghost"}
                 size="sm"
-                className="h-7 px-2.5 text-xs font-medium gap-1"
+                className="h-6 px-2 text-[11px] font-medium gap-1"
                 onClick={() => setActivePipelineKey("occurrences")}
               >
-                <RotateCcw className="w-3.5 h-3.5 text-amber-500" />
-                Retornos e Ocorrências
+                <RotateCcw className="w-3 h-3 text-amber-500" />
+                Retornos / Ocorrências
               </Button>
             </div>
           )}
         </div>
 
-        {/* Right side: Count Badge & Super Admin Settings */}
-        <div className="flex items-center gap-2">
+        {/* Right side: Count & Super Admin Settings */}
+        <div className="flex items-center gap-1.5">
           {userScopeLabel && (
-            <Badge variant="outline" className="text-xs font-normal">
+            <Badge variant="outline" className="text-[10px] font-normal py-0 h-5">
               {userScopeLabel}
             </Badge>
           )}
 
-          <Badge variant="secondary" className="text-xs font-semibold px-2.5 py-1">
+          <Badge variant="secondary" className="text-[11px] font-semibold px-2 py-0 h-5">
             {filteredOrders.length} pedido(s)
           </Badge>
 
@@ -242,97 +236,93 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
             <Button
               variant="outline"
               size="sm"
-              className="h-8 text-xs gap-1.5 border-dashed hover:border-primary"
+              className="h-6 text-[11px] px-2 gap-1 border-dashed hover:border-primary"
               onClick={() => setIsConfigOpen(true)}
             >
-              <Settings2 className="w-3.5 h-3.5 text-primary" />
-              <span className="hidden sm:inline">Configurar Pipelines</span>
+              <Settings2 className="w-3 h-3 text-primary" />
+              <span>Configurar</span>
             </Button>
           )}
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <Card className="shadow-none border bg-card/50">
-        <CardContent className="p-3">
-          <div className="flex flex-col md:flex-row gap-3 items-center">
-            {/* Search */}
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por #pedido, rastreio, cliente ou produto..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 h-9 text-xs"
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
+      {/* Linha 2: Barra de Filtros Compacta */}
+      <div className="flex flex-wrap items-center gap-2 p-1.5 px-2.5 rounded-lg border bg-muted/30 shrink-0">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por #pedido, rastreio, cliente ou produto..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8 h-7 text-xs bg-background"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+            >
+              ✕
+            </button>
+          )}
+        </div>
 
-            {/* Marketplace Filter */}
-            <Select value={channelFilter} onValueChange={setChannelFilter}>
-              <SelectTrigger className="w-full md:w-[160px] h-9 text-xs">
-                <SelectValue placeholder="Canal / Origem" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os canais</SelectItem>
-                <SelectItem value="mercadolivre">Mercado Livre (ML)</SelectItem>
-                <SelectItem value="shopee">Shopee</SelectItem>
-                <SelectItem value="lojafy">Lojafy / Loja</SelectItem>
-                <SelectItem value="manual">Manual</SelectItem>
-              </SelectContent>
-            </Select>
+        {/* Marketplace Filter */}
+        <Select value={channelFilter} onValueChange={setChannelFilter}>
+          <SelectTrigger className="w-[140px] h-7 text-xs bg-background">
+            <SelectValue placeholder="Canal" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos canais</SelectItem>
+            <SelectItem value="mercadolivre">Mercado Livre</SelectItem>
+            <SelectItem value="shopee">Shopee</SelectItem>
+            <SelectItem value="lojafy">Lojafy / Loja</SelectItem>
+            <SelectItem value="manual">Manual</SelectItem>
+          </SelectContent>
+        </Select>
 
-            {/* Seller Filter if multi-seller */}
-            {uniqueSellers.length > 0 && (
-              <Select value={selectedSeller} onValueChange={setSelectedSeller}>
-                <SelectTrigger className="w-full md:w-[170px] h-9 text-xs">
-                  <SelectValue placeholder="Filtrar por Seller" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os sellers</SelectItem>
-                  {uniqueSellers.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+        {/* Seller Filter */}
+        {uniqueSellers.length > 0 && (
+          <Select value={selectedSeller} onValueChange={setSelectedSeller}>
+            <SelectTrigger className="w-[150px] h-7 text-xs bg-background">
+              <SelectValue placeholder="Seller" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos sellers</SelectItem>
+              {uniqueSellers.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
-            {/* Reset Filters */}
-            {(searchTerm || channelFilter !== "all" || selectedSeller !== "all") && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-9 text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => {
-                  setSearchTerm("");
-                  setChannelFilter("all");
-                  setSelectedSeller("all");
-                }}
-              >
-                Limpar Filtros
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+        {/* Reset Filters */}
+        {(searchTerm || channelFilter !== "all" || selectedSeller !== "all") && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs px-2 text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              setSearchTerm("");
+              setChannelFilter("all");
+              setSelectedSeller("all");
+            }}
+          >
+            Limpar
+          </Button>
+        )}
+      </div>
 
-      {/* Main Content Area */}
-      {viewMode === "pipeline" ? (
-        <div className="w-full">
-          {isLoading || isLoadingPipelines ? (
-            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground space-y-2">
+      {/* Main Content Area (Fills remaining height) */}
+      <div className="flex-1 min-h-0 w-full overflow-hidden flex flex-col">
+        {viewMode === "pipeline" ? (
+          isLoading || isLoadingPipelines ? (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground space-y-2">
               <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm">Carregando pipeline operacional...</p>
+              <p className="text-xs">Carregando pipeline operacional...</p>
             </div>
           ) : activePipeline ? (
             <OrderKanbanBoard
@@ -348,12 +338,14 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
             <div className="p-8 text-center text-muted-foreground">
               Nenhuma pipeline configurada.
             </div>
-          )}
-        </div>
-      ) : (
-        /* List View */
-        <div className="w-full">{listViewContent}</div>
-      )}
+          )
+        ) : (
+          /* List View: Scrolls independently inside the container */
+          <div className="flex-1 min-h-0 overflow-y-auto w-full pr-1">
+            {listViewContent}
+          </div>
+        )}
+      </div>
 
       {/* Order Details Modal (Shared) */}
       {selectedOrderId && (

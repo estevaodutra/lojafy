@@ -634,32 +634,35 @@ const SupplierOrderManagement = () => {
   );
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Gerenciar Pedidos</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-            Todos os fulfillments da sua operação
-            {slaParam === "late" && " — mostrando atrasados"}
-            {slaParam === "due_today" && " — vencendo hoje"}
-          </p>
+    <div className="h-[calc(100vh-3.5rem-2rem)] md:h-[calc(100vh-3.5rem-3rem)] max-h-[calc(100vh-3.5rem-2rem)] md:max-h-[calc(100vh-3.5rem-3rem)] flex flex-col min-h-0 overflow-hidden w-full space-y-1.5">
+      <Tabs defaultValue="orders" className="flex-1 min-h-0 flex flex-col overflow-hidden space-y-1.5">
+        {/* Compact Header Line */}
+        <div className="flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-bold tracking-tight text-foreground">Gerenciar Pedidos</h1>
+            <TabsList className="h-7 bg-muted/60 p-0.5">
+              <TabsTrigger value="orders" className="text-xs h-6 px-2.5">
+                Operação
+              </TabsTrigger>
+              <TabsTrigger value="solicitations" className="text-xs h-6 px-2.5 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                Solicitações
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          <Badge variant="outline" className="text-xs py-0.5 px-2 font-normal hidden sm:inline-flex">
+            <Package className="w-3.5 h-3.5 mr-1 text-primary" />
+            {orders.length} pedidos
+            {slaParam === "late" && " (atrasados)"}
+            {slaParam === "due_today" && " (vencendo hoje)"}
+          </Badge>
         </div>
-        <Badge variant="outline" className="w-fit text-xs px-3 py-1">
-          <Package className="w-3.5 h-3.5 mr-1 text-primary" />
-          {orders.length} pedidos
-        </Badge>
-      </div>
 
-      <Tabs defaultValue="orders" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="orders">Todos os Pedidos</TabsTrigger>
-          <TabsTrigger value="solicitations" className="flex items-center gap-1.5">
-            <AlertCircle className="h-4 w-4" />
-            Solicitações
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="orders" className="space-y-4">
+        <TabsContent
+          value="orders"
+          className="flex-1 min-h-0 flex flex-col overflow-hidden data-[state=active]:flex mt-0"
+        >
           <OrderPipelineView
             orders={pipelineItems}
             isLoading={loading}
@@ -670,7 +673,10 @@ const SupplierOrderManagement = () => {
           />
         </TabsContent>
 
-        <TabsContent value="solicitations">
+        <TabsContent
+          value="solicitations"
+          className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block mt-0"
+        >
           <OrderSolicitations />
         </TabsContent>
       </Tabs>
