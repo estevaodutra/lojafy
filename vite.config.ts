@@ -86,11 +86,12 @@ export default defineConfig(({ mode }) => {
     VitePWA({
       selfDestroying: true,
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "favicon.png", "robots.txt"],
+      includeAssets: ["favicon.ico", "favicon.png", "robots.txt", "apple-touch-icon.png"],
       manifest: {
         name: "Lojafy - Sua Loja Descomplicada",
         short_name: "Lojafy",
         description: "Plataforma de revenda de produtos",
+        lang: "pt-BR",
         theme_color: "#2563EB",
         background_color: "#ffffff",
         display: "standalone",
