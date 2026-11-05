@@ -1,4 +1,16 @@
 import { OrderPipelineItem } from "@/types/orderPipeline";
+import { isOrderLocallyArchived, getLocalArchivedDetails } from "@/services/orderArchivingService";
+
+export function formatTimeInStage(dateStr: string): string {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  if (isNaN(diffMs) || diffMs < 0) return "Recentemente";
+  const minutes = Math.floor(diffMs / (1000 * 60));
+  if (minutes < 60) return `Há ${Math.max(1, minutes)}m na etapa`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Há ${hours}h na etapa`;
+  const days = Math.floor(hours / 24);
+  return `Há ${days}d na etapa`;
+}
 
 export function normalizeOrderToPipelineItem(
   order: any,
@@ -166,13 +178,33 @@ export function normalizeOrderToPipelineItem(
   // Tickets / Occurrences
   const activeTicket = ticketsMap?.get(order.id);
 
+  // Archiving resolution
+  const isArchived = !!(order.is_archived || isOrderLocallyArchived(order.id));
+  const localDetails = isArchived ? getLocalArchivedDetails(order.id) : null;
+  const archivedAt = order.archived_at || localDetails?.archived_at || null;
+  const archivedReason = order.archived_reason || localDetails?.archived_reason || null;
+  const archivedBy = order.archived_by || localDetails?.archived_by || null;
+  const archivedType = order.archived_type || localDetails?.archived_type || "manual";
+
+  // Stage entry tracking
+  const stageEnteredAt = order.stage_entered_at || order.updated_at || order.created_at;
+  const timeInStageDisplay = stageEnteredAt ? formatTimeInStage(stageEnteredAt) : undefined;
+
   return {
     id: order.id,
     order_number: order.order_number ? String(order.order_number).replace(/^#/, "") : "",
     created_at: order.created_at,
+    updated_at: order.updated_at,
     status: order.status || "pendente",
     payment_status: order.payment_status || "pending",
     total_amount: Number(order.total_amount) || 0,
+    is_archived: isArchived,
+    archived_at: archivedAt,
+    archived_reason: archivedReason,
+    archived_by: archivedBy,
+    archived_type: archivedType,
+    stage_entered_at: stageEnteredAt,
+    time_in_stage_display: timeInStageDisplay,
     external_reference: externalRef,
     tracking_number: trackingNumber,
     channel,

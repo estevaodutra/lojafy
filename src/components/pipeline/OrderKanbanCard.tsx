@@ -3,7 +3,7 @@ import { OrderPipelineItem } from "@/types/orderPipeline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Eye, Link2, Truck, Check, QrCode, Printer, FileText, Package } from "lucide-react";
+import { Eye, Link2, Truck, Check, QrCode, Printer, FileText, Package, Clock, Archive } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface OrderKanbanCardProps {
@@ -12,6 +12,7 @@ interface OrderKanbanCardProps {
   onGeneratePix?: (order: OrderPipelineItem) => void;
   onPrintLabel?: (order: OrderPipelineItem) => void;
   onGenerateLabel?: (order: OrderPipelineItem) => void;
+  onArchiveOrder?: (order: OrderPipelineItem) => void;
   isDragging?: boolean;
 }
 
@@ -21,6 +22,7 @@ export const OrderKanbanCard: React.FC<OrderKanbanCardProps> = ({
   onGeneratePix,
   onPrintLabel,
   onGenerateLabel,
+  onArchiveOrder,
   isDragging = false,
 }) => {
   const isPaid = order.payment_status === "paid" || ["pago", "recebido", "embalado", "enviado", "finalizado"].includes(order.status);
@@ -81,6 +83,14 @@ export const OrderKanbanCard: React.FC<OrderKanbanCardProps> = ({
                   <p className="text-xs">Código de rastreio: {order.tracking_number}</p>
                 </TooltipContent>
               </Tooltip>
+            )}
+
+            {/* Time in Stage indicator */}
+            {order.time_in_stage_display && (
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium pt-0.5">
+                <Clock className="w-2.5 h-2.5 text-muted-foreground/80" />
+                <span>{order.time_in_stage_display}</span>
+              </div>
             )}
           </div>
 
@@ -197,7 +207,7 @@ export const OrderKanbanCard: React.FC<OrderKanbanCardProps> = ({
           </span>
         </div>
 
-        {/* Footer Actions: [ 👁 ] [ Gerar Pix / Pago ✓ ] [ Imprimir / Gerar etiqueta ] */}
+        {/* Footer Actions: [ 👁 ] [ Gerar Pix / Pago ✓ ] [ Imprimir / Gerar etiqueta ] [ 📦 Arquivar ] */}
         <div className="flex items-center gap-1.5 pt-2 border-t border-border/60 mt-1">
           {/* 1. Ver Detalhes */}
           <Tooltip>
@@ -218,6 +228,28 @@ export const OrderKanbanCard: React.FC<OrderKanbanCardProps> = ({
               <p className="text-xs">Ver detalhes do pedido</p>
             </TooltipContent>
           </Tooltip>
+
+          {/* 1.5. Arquivar Pedido */}
+          {onArchiveOrder && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2 shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onArchiveOrder(order);
+                  }}
+                >
+                  <Archive className="w-3.5 h-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p className="text-xs">Arquivar pedido</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
 
           {/* 2. Pix Action */}
           <div className="flex-1 min-w-0">

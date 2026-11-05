@@ -15,6 +15,7 @@ interface OrderKanbanColumnProps {
   onGeneratePix?: (order: OrderPipelineItem) => void;
   onPrintLabel?: (order: OrderPipelineItem) => void;
   onGenerateLabel?: (order: OrderPipelineItem) => void;
+  onArchiveOrder?: (order: OrderPipelineItem) => void;
   isDropDisabled?: boolean;
 }
 
@@ -24,7 +25,8 @@ const SortableOrderCard: React.FC<{
   onGeneratePix?: (order: OrderPipelineItem) => void;
   onPrintLabel?: (order: OrderPipelineItem) => void;
   onGenerateLabel?: (order: OrderPipelineItem) => void;
-}> = ({ order, onViewDetails, onGeneratePix, onPrintLabel, onGenerateLabel }) => {
+  onArchiveOrder?: (order: OrderPipelineItem) => void;
+}> = ({ order, onViewDetails, onGeneratePix, onPrintLabel, onGenerateLabel, onArchiveOrder }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: order.id,
     data: { order },
@@ -44,6 +46,7 @@ const SortableOrderCard: React.FC<{
         onGeneratePix={onGeneratePix}
         onPrintLabel={onPrintLabel}
         onGenerateLabel={onGenerateLabel}
+        onArchiveOrder={onArchiveOrder}
         isDragging={isDragging}
       />
     </div>
@@ -57,6 +60,7 @@ export const OrderKanbanColumn: React.FC<OrderKanbanColumnProps> = ({
   onGeneratePix,
   onPrintLabel,
   onGenerateLabel,
+  onArchiveOrder,
   isDropDisabled = false,
 }) => {
   const { setNodeRef, isOver } = useDroppable({
@@ -115,6 +119,7 @@ export const OrderKanbanColumn: React.FC<OrderKanbanColumnProps> = ({
               onGeneratePix={onGeneratePix}
               onPrintLabel={onPrintLabel}
               onGenerateLabel={onGenerateLabel}
+              onArchiveOrder={onArchiveOrder}
             />
           ))}
         </SortableContext>

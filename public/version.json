@@ -1,7 +1,7 @@
 {
-  "hash": "b6465758d3e190f4328137fa30ad43d4c50b69ad",
-  "shortHash": "b646575",
-  "message": "feat(layout): remove desktop main header and embed collapse/expand toggle button inside sidebar header",
+  "hash": "10aab241165137e887118e3dce476cf0fee6a8b8",
+  "shortHash": "10aab24",
+  "message": "fix(orders): hide list scrollbars for 100% card width and expand layout to fill full screen height",
   "author": "Lojafy Developer",
-  "timestamp": 1793915692915
+  "timestamp": 1793916556571
 }

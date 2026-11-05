@@ -3,6 +3,14 @@ import { OrderStatus } from "@/constants/orderStatus";
 
 export type PipelineType = "primary" | "occurrences";
 
+export type OrderSortDirection =
+  | "oldest_first"
+  | "newest_first"
+  | "longest_time_in_stage"
+  | "shortest_time_in_stage";
+
+export type OrderAgeCriteria = "created_at" | "stage_entered_at";
+
 export interface OrderPipeline {
   id: string;
   key: PipelineType | string;
@@ -35,10 +43,22 @@ export interface OrderPipelineItem {
   id: string;
   order_number: string;
   created_at: string;
+  updated_at?: string;
   status: string; // Operational status (ex: 'pendente', 'pago', etc.)
   payment_status: "pending" | "paid" | "failed" | string;
   total_amount: number;
   
+  // Archiving (Gestão de Arquivados)
+  is_archived?: boolean;
+  archived_at?: string | null;
+  archived_reason?: string | null;
+  archived_by?: string | null;
+  archived_type?: "manual" | "auto" | null;
+
+  // Stage Tracking (Controle de Tempo na Etapa)
+  stage_entered_at?: string | null;
+  time_in_stage_display?: string;
+
   // Identifiers & tracking
   external_reference?: string | null;
   tracking_number?: string | null;
@@ -91,4 +111,71 @@ export interface PipelineFilters {
     from?: Date;
     to?: Date;
   };
+  showArchived?: boolean;
+}
+
+export interface OrderPipelinePreferences {
+  sort_direction: OrderSortDirection;
+  age_criteria: OrderAgeCriteria;
+  default_view: "pipeline" | "list";
+}
+
+export interface ArchivingEligibilityResult {
+  isEligible: boolean;
+  reason?: string;
+  canForce?: boolean;
+}
+
+export interface OrderPipelineAutomation {
+  id: string;
+  name: string;
+  description?: string | null;
+  pipeline_key: string;
+  stage_key: string;
+  event_type: "stage_inactivity" | "stage_entered" | "status_changed";
+  time_limit_hours: number;
+  action_type: "archive" | "notify" | "webhook" | "custom";
+  conditions: {
+    require_unpaid?: boolean;
+    block_with_open_ticket?: boolean;
+    block_with_shipping_label?: boolean;
+    min_order_amount?: number;
+    max_order_amount?: number;
+  };
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrderPipelineAutomationLog {
+  id: string;
+  automation_id?: string | null;
+  order_id: string;
+  order_number: string;
+  action_taken: string;
+  status: "success" | "blocked" | "failed";
+  reason?: string | null;
+  metadata?: any;
+  created_at: string;
+}
+
+export interface OrderPipelineWebhook {
+  id: string;
+  name: string;
+  url: string;
+  secret_token?: string | null;
+  events: string[];
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface AutomationSimulationResult {
+  totalEvaluated: number;
+  eligibleCount: number;
+  blockedCount: number;
+  eligibleOrders: OrderPipelineItem[];
+  blockedOrders: Array<{
+    order: OrderPipelineItem;
+    reasons: string[];
+  }>;
 }

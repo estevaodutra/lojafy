@@ -2,6 +2,8 @@ import React, { useState, useMemo } from "react";
 import { OrderPipelineItem, PipelineType } from "@/types/orderPipeline";
 import { OrderKanbanBoard } from "./OrderKanbanBoard";
 import { PipelineConfigDialog } from "./PipelineConfigDialog";
+import { ArchiveOrderDialog } from "./ArchiveOrderDialog";
+import { BatchArchiveDialog } from "./BatchArchiveDialog";
 import { useOrderPipelines } from "@/hooks/useOrderPipelines";
 import { useUserRole } from "@/hooks/useUserRole";
 import OrderDetailsModal from "@/components/OrderDetailsModal";
@@ -26,7 +28,9 @@ import {
   Copy,
   Check,
   RotateCcw,
+  Archive,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -60,10 +64,12 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [channelFilter, setChannelFilter] = useState("all");
   const [selectedSeller, setSelectedSeller] = useState("all");
+  const [showArchivedOnly, setShowArchivedOnly] = useState(false);
 
   // Modals
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [archiveModalOrder, setArchiveModalOrder] = useState<OrderPipelineItem | null>(null);
 
   // Pix modal state
   const [pixModalOrder, setPixModalOrder] = useState<OrderPipelineItem | null>(null);
@@ -89,6 +95,13 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
   // Filtered orders
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
+      // Archiving condition (Section 7 & 11)
+      if (showArchivedOnly) {
+        if (!order.is_archived) return false;
+      } else {
+        if (order.is_archived) return false; // Default: hide archived orders from active operational pipeline
+      }
+
       // Search term
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase();
@@ -299,8 +312,24 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
           </Select>
         )}
 
+        {/* Archived Quick Filter Toggle (Section 11) */}
+        <Button
+          variant={showArchivedOnly ? "default" : "outline"}
+          size="sm"
+          className={cn(
+            "h-7 text-xs px-2.5 gap-1 shrink-0",
+            showArchivedOnly
+              ? "bg-slate-800 hover:bg-slate-900 text-white"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+          onClick={() => setShowArchivedOnly(!showArchivedOnly)}
+        >
+          <Archive className="w-3 h-3" />
+          {showArchivedOnly ? "Exibindo Arquivados" : "Ver Arquivados"}
+        </Button>
+
         {/* Reset Filters */}
-        {(searchTerm || channelFilter !== "all" || selectedSeller !== "all") && (
+        {(searchTerm || channelFilter !== "all" || selectedSeller !== "all" || showArchivedOnly) && (
           <Button
             variant="ghost"
             size="sm"
@@ -309,6 +338,7 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
               setSearchTerm("");
               setChannelFilter("all");
               setSelectedSeller("all");
+              setShowArchivedOnly(false);
             }}
           >
             Limpar
@@ -333,6 +363,7 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
               onGeneratePix={handleGeneratePix}
               onPrintLabel={handlePrintLabel}
               onGenerateLabel={(item) => setSelectedOrderId(item.id)}
+              onArchiveOrder={(item) => setArchiveModalOrder(item)}
             />
           ) : (
             <div className="p-8 text-center text-muted-foreground">
@@ -420,6 +451,17 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Manual Archive Dialog */}
+      <ArchiveOrderDialog
+        order={archiveModalOrder}
+        isOpen={!!archiveModalOrder}
+        onClose={() => setArchiveModalOrder(null)}
+        onSuccess={() => {
+          setArchiveModalOrder(null);
+          onRefreshOrders?.();
+        }}
+      />
     </div>
   );
 };

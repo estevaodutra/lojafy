@@ -16,6 +16,7 @@ import { OrderKanbanColumn } from "./OrderKanbanColumn";
 import { OrderKanbanCard } from "./OrderKanbanCard";
 import { STATUS_TRANSITIONS, SUPPLIER_STATUSES, OrderStatus } from "@/constants/orderStatus";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useOrderPreferences } from "@/hooks/useOrderPreferences";
 import { toast } from "sonner";
 
 interface OrderKanbanBoardProps {
@@ -26,6 +27,7 @@ interface OrderKanbanBoardProps {
   onGeneratePix?: (order: OrderPipelineItem) => void;
   onPrintLabel?: (order: OrderPipelineItem) => void;
   onGenerateLabel?: (order: OrderPipelineItem) => void;
+  onArchiveOrder?: (order: OrderPipelineItem) => void;
 }
 
 export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
@@ -36,8 +38,10 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
   onGeneratePix,
   onPrintLabel,
   onGenerateLabel,
+  onArchiveOrder,
 }) => {
   const { role, isSuperAdmin, isSupplier } = useUserRole();
+  const { sortOrders } = useOrderPreferences();
   const [activeOrder, setActiveOrder] = useState<OrderPipelineItem | null>(null);
 
   const sensors = useSensors(
@@ -102,8 +106,13 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
       }
     });
 
+    // Apply sorting per column: default oldest first (ORDER BY created_at ASC, id ASC)
+    map.forEach((items, key) => {
+      map.set(key, sortOrders(items));
+    });
+
     return map;
-  }, [activeStages, orders, pipeline.key]);
+  }, [activeStages, orders, pipeline.key, sortOrders]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
@@ -195,6 +204,7 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
                 onGeneratePix={onGeneratePix}
                 onPrintLabel={onPrintLabel}
                 onGenerateLabel={onGenerateLabel}
+                onArchiveOrder={onArchiveOrder}
                 isDropDisabled={role === "reseller"}
               />
             );

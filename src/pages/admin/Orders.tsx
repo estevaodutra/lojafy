@@ -1,22 +1,46 @@
 import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import OrderDetailsModal from "@/components/OrderDetailsModal";
-import { OrderSolicitations } from "@/components/admin/OrderSolicitations";
 import { OrderPipelineView } from "@/components/pipeline/OrderPipelineView";
+import { OrdersOverviewSubpage } from "@/components/pipeline/subpages/OrdersOverviewSubpage";
+import { OrdersOccurrencesSubpage } from "@/components/pipeline/subpages/OrdersOccurrencesSubpage";
+import { OrdersSettingsSubpage } from "@/components/pipeline/subpages/OrdersSettingsSubpage";
+import { BatchArchiveDialog } from "@/components/pipeline/BatchArchiveDialog";
+import { ArchiveOrderDialog } from "@/components/pipeline/ArchiveOrderDialog";
 import { normalizeOrderToPipelineItem } from "@/utils/orderPipelineAdapter";
 import { OrderPipelineItem } from "@/types/orderPipeline";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, Package, Search, Filter, AlertCircle } from "lucide-react";
+import {
+  Eye,
+  Package,
+  Search,
+  Filter,
+  AlertCircle,
+  RotateCw,
+  Archive,
+  BarChart3,
+  Settings2,
+  Layers,
+} from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { ALL_STATUSES, ORDER_STATUS_CONFIG, getStatusConfig } from "@/constants/orderStatus";
 
 interface Order {
@@ -26,6 +50,7 @@ interface Order {
   payment_status: string;
   total_amount: number;
   created_at: string;
+  updated_at?: string;
   user_id: string;
   reseller_id?: string | null;
   has_shipping_file: boolean;
@@ -43,6 +68,12 @@ interface Order {
   webhook_paid_error?: string | null;
   shipping_address?: any;
   order_items?: any[];
+  is_archived?: boolean;
+  archived_at?: string | null;
+  archived_reason?: string | null;
+  archived_by?: string | null;
+  archived_type?: "manual" | "auto" | null;
+  stage_entered_at?: string | null;
   profiles: {
     first_name: string;
     last_name: string;
@@ -50,6 +81,9 @@ interface Order {
 }
 
 const AdminOrders = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentTab = searchParams.get("tab") || "pedidos";
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -63,15 +97,25 @@ const AdminOrders = () => {
   const ordersPerPage = 20;
   const { toast } = useToast();
 
+  // Bulk selection in list view
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [isBatchArchiveOpen, setIsBatchArchiveOpen] = useState(false);
+  const [singleArchiveOrder, setSingleArchiveOrder] = useState<OrderPipelineItem | null>(null);
+
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  const handleTabChange = (val: string) => {
+    setSearchParams(val === "pedidos" ? {} : { tab: val });
+  };
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
 
       // 1. Fetch orders with order_items
+      // Default: Oldest first per Section 5 (ORDER BY created_at ASC)
       const { data: ordersData, error: ordersError } = await supabase
         .from("orders")
         .select(`
@@ -94,7 +138,7 @@ const AdminOrders = () => {
             )
           )
         `)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: true });
 
       if (ordersError) throw ordersError;
 
@@ -262,7 +306,11 @@ const AdminOrders = () => {
     try {
       const { error } = await supabase
         .from("orders")
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .update({
+          status: newStatus,
+          stage_entered_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as any)
         .eq("id", orderId);
 
       if (error) throw error;
@@ -301,6 +349,10 @@ const AdminOrders = () => {
     );
   }, [orders, profilesMap, supplierOrgsMap, ticketsMap, productsMap]);
 
+  const activeOrdersCount = useMemo(() => {
+    return pipelineItems.filter((o) => !o.is_archived).length;
+  }, [pipelineItems]);
+
   const getPaymentStatusBadge = (status: string) => {
     const statusConfig = {
       pending: { label: "Pendente", variant: "secondary" as const },
@@ -311,18 +363,24 @@ const AdminOrders = () => {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const filteredOrders = orders.filter((order) => {
-    const matchesSearch =
-      order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      `${order.profiles.first_name} ${order.profiles.last_name}`
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredOrders = useMemo(() => {
+    return orders.filter((order) => {
+      // By default in list view: show non-archived unless specified
+      if (order.is_archived) return false;
+
+      const matchesSearch =
+        order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        `${order.profiles.first_name} ${order.profiles.last_name}`
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [orders, searchTerm, statusFilter]);
 
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedRowIds([]);
   }, [searchTerm, statusFilter]);
 
   const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
@@ -332,158 +390,206 @@ const AdminOrders = () => {
   const showingFrom = filteredOrders.length > 0 ? startIndex + 1 : 0;
   const showingTo = Math.min(endIndex, filteredOrders.length);
 
-  // The existing table view
+  // Checkbox helpers for batch actions
+  const isAllPageSelected =
+    currentOrders.length > 0 &&
+    currentOrders.every((o) => selectedRowIds.includes(o.id));
+
+  const toggleSelectAllPage = () => {
+    if (isAllPageSelected) {
+      setSelectedRowIds((prev) =>
+        prev.filter((id) => !currentOrders.some((o) => o.id === id))
+      );
+    } else {
+      const pageIds = currentOrders.map((o) => o.id);
+      setSelectedRowIds((prev) => Array.from(new Set([...prev, ...pageIds])));
+    }
+  };
+
+  const toggleSelectRow = (id: string) => {
+    setSelectedRowIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const selectedPipelineItems = useMemo(() => {
+    return pipelineItems.filter((p) => selectedRowIds.includes(p.id));
+  }, [pipelineItems, selectedRowIds]);
+
+  // Existing table view with batch actions integrated
   const listViewContent = (
-    <div className="space-y-4">
+    <div className="space-y-3">
+      {/* Batch action bar if items selected */}
+      {selectedRowIds.length > 0 && (
+        <div className="flex items-center justify-between p-2 px-3 rounded-lg border bg-primary/5 text-primary text-xs">
+          <span className="font-semibold">
+            {selectedRowIds.length} pedido(s) selecionado(s)
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1 border-primary/30"
+              onClick={() => setIsBatchArchiveOpen(true)}
+            >
+              <Archive className="w-3.5 h-3.5" />
+              Arquivar Selecionados
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setSelectedRowIds([])}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
+
       {filteredOrders.length > 0 && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Mostrando {showingFrom}-{showingTo} de {filteredOrders.length} pedidos
         </p>
       )}
 
-      <Card>
-        <CardHeader className="py-4">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Filter className="w-4 h-4" />
-            Filtros da Lista
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                <Input
-                  placeholder="Buscar por número do pedido ou cliente..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 h-9 text-xs"
-                />
-              </div>
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-56 h-9 text-xs">
-                <SelectValue placeholder="Status do pedido" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os status</SelectItem>
-                {ALL_STATUSES.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {ORDER_STATUS_CONFIG[s].label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
+      <Card className="shadow-2xs border">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Número do Pedido</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead>Pagamento</TableHead>
-                <TableHead>Webhook</TableHead>
-                <TableHead>Etiqueta</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Ações</TableHead>
-                <TableHead>Status de Envio</TableHead>
+              <TableRow className="text-xs">
+                <TableHead className="w-8 py-2.5 px-3">
+                  <Checkbox
+                    checked={isAllPageSelected}
+                    onCheckedChange={toggleSelectAllPage}
+                  />
+                </TableHead>
+                <TableHead className="py-2.5">Número do Pedido</TableHead>
+                <TableHead className="py-2.5">Cliente</TableHead>
+                <TableHead className="py-2.5">Data</TableHead>
+                <TableHead className="py-2.5">Pagamento</TableHead>
+                <TableHead className="py-2.5">Webhook</TableHead>
+                <TableHead className="py-2.5">Etiqueta</TableHead>
+                <TableHead className="py-2.5">Total</TableHead>
+                <TableHead className="py-2.5">Ações</TableHead>
+                <TableHead className="py-2.5">Status de Envio</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8">
+                  <TableCell colSpan={10} className="text-center py-8 text-xs text-muted-foreground">
                     Carregando pedidos...
                   </TableCell>
                 </TableRow>
               ) : filteredOrders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8">
+                  <TableCell colSpan={10} className="text-center py-8 text-xs text-muted-foreground">
                     Nenhum pedido encontrado
                   </TableCell>
                 </TableRow>
               ) : (
                 currentOrders.map((order) => {
+                  const isChecked = selectedRowIds.includes(order.id);
+                  const pipeItem = pipelineItems.find((p) => p.id === order.id);
+
                   return (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-medium">
+                    <TableRow key={order.id} className={isChecked ? "bg-muted/40 text-xs" : "text-xs"}>
+                      <TableCell className="py-2 px-3">
+                        <Checkbox
+                          checked={isChecked}
+                          onCheckedChange={() => toggleSelectRow(order.id)}
+                        />
+                      </TableCell>
+                      <TableCell className="font-semibold py-2">
                         #{order.order_number}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-2">
                         {order.profiles.first_name} {order.profiles.last_name}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-2 text-muted-foreground whitespace-nowrap">
                         {format(new Date(order.created_at), "dd/MM/yyyy HH:mm", {
                           locale: ptBR,
                         })}
                       </TableCell>
-                      <TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
-                      <TableCell>
+                      <TableCell className="py-2">{getPaymentStatusBadge(order.payment_status)}</TableCell>
+                      <TableCell className="py-2">
                         {order.payment_status === "paid" ? (
                           order.webhook_paid_status === "sent" ? (
-                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">
+                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-[10px]">
                               ✓ Enviado
                             </Badge>
                           ) : order.webhook_paid_status === "failed" ? (
                             <Badge
                               variant="destructive"
-                              className="text-xs"
+                              className="text-[10px]"
                               title={order.webhook_paid_error ?? ""}
                             >
                               ✗ Falhou
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-xs text-muted-foreground">
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground">
                               Não enviado
                             </Badge>
                           )
                         ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
+                          <span className="text-[11px] text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-2">
                         {order.has_shipping_file ? (
                           <Badge
                             variant="default"
-                            className="bg-green-100 text-green-800 hover:bg-green-100"
+                            className="bg-green-100 text-green-800 hover:bg-green-100 text-[10px]"
                           >
                             📄 Enviada
                           </Badge>
                         ) : (
-                          <Badge variant="outline">📄 Pendente</Badge>
+                          <Badge variant="outline" className="text-[10px]">📄 Pendente</Badge>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-2 font-medium">
                         {new Intl.NumberFormat("pt-BR", {
                           style: "currency",
                           currency: "BRL",
                         }).format(order.total_amount)}
                       </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedOrder(order)}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
+                      <TableCell className="py-2">
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={() => setSelectedOrder(order)}
+                            title="Ver detalhes"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </Button>
+
+                          {pipeItem && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                              onClick={() => setSingleArchiveOrder(pipeItem)}
+                              title="Arquivar pedido"
+                            >
+                              <Archive className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-2">
                         <Select
                           value={order.status}
                           onValueChange={(value) => updateOrderStatus(order.id, value)}
                         >
-                          <SelectTrigger className="w-[180px] h-8 text-xs">
+                          <SelectTrigger className="w-[160px] h-7 text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             {ALL_STATUSES.map((s) => (
-                              <SelectItem key={s} value={s}>
+                              <SelectItem key={s} value={s} className="text-xs">
                                 {ORDER_STATUS_CONFIG[s].label}
                               </SelectItem>
                             ))}
@@ -500,13 +606,13 @@ const AdminOrders = () => {
       </Card>
 
       {totalPages > 1 && (
-        <div className="mt-4">
+        <div className="mt-2">
           <Pagination>
             <PaginationContent>
               <PaginationItem>
                 <PaginationPrevious
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50 text-xs" : "cursor-pointer text-xs"}
                 />
               </PaginationItem>
 
@@ -521,7 +627,7 @@ const AdminOrders = () => {
                       <PaginationLink
                         onClick={() => setCurrentPage(page)}
                         isActive={currentPage === page}
-                        className="cursor-pointer"
+                        className="cursor-pointer text-xs h-7 w-7"
                       >
                         {page}
                       </PaginationLink>
@@ -530,7 +636,7 @@ const AdminOrders = () => {
                 } else if (page === currentPage - 2 || page === currentPage + 2) {
                   return (
                     <PaginationItem key={page}>
-                      <span className="px-4">...</span>
+                      <span className="px-2 text-xs">...</span>
                     </PaginationItem>
                   );
                 }
@@ -541,7 +647,7 @@ const AdminOrders = () => {
                 <PaginationNext
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   className={
-                    currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"
+                    currentPage === totalPages ? "pointer-events-none opacity-50 text-xs" : "cursor-pointer text-xs"
                   }
                 />
               </PaginationItem>
@@ -554,30 +660,57 @@ const AdminOrders = () => {
 
   return (
     <div className="flex-1 min-h-0 h-full max-h-full flex flex-col overflow-hidden w-full space-y-1.5">
-      <Tabs defaultValue="pipeline_flow" className="flex-1 min-h-0 flex flex-col overflow-hidden space-y-1.5">
-        {/* Compact Header Line */}
+      <Tabs
+        value={currentTab}
+        onValueChange={handleTabChange}
+        className="flex-1 min-h-0 flex flex-col overflow-hidden space-y-1.5"
+      >
+        {/* Compact Header Line with Definitive Navigation Architecture */}
         <div className="flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold tracking-tight text-foreground">Gestão de Pedidos</h1>
+            
+            {/* The 4 Subpage Tabs */}
             <TabsList className="h-7 bg-muted/60 p-0.5">
-              <TabsTrigger value="pipeline_flow" className="text-xs h-6 px-2.5">
-                Operação
+              <TabsTrigger value="pedidos" className="text-xs h-6 px-2.5">
+                Pedidos
               </TabsTrigger>
-              <TabsTrigger value="solicitations" className="text-xs h-6 px-2.5 flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                Solicitações
+              <TabsTrigger value="visao-geral" className="text-xs h-6 px-2.5 flex items-center gap-1">
+                <BarChart3 className="h-3 w-3" />
+                Visão Geral
+              </TabsTrigger>
+              <TabsTrigger value="ocorrencias" className="text-xs h-6 px-2.5 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3 text-amber-500" />
+                Ocorrências
+              </TabsTrigger>
+              <TabsTrigger value="configuracoes" className="text-xs h-6 px-2.5 flex items-center gap-1">
+                <Settings2 className="h-3 w-3" />
+                Configurações
               </TabsTrigger>
             </TabsList>
           </div>
 
-          <Badge variant="outline" className="text-xs py-0.5 px-2 font-normal hidden sm:inline-flex">
-            <Package className="w-3 h-3 mr-1 text-primary" />
-            {orders.length} pedidos totais
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs py-0.5 px-2 font-normal hidden sm:inline-flex">
+              <Package className="w-3 h-3 mr-1 text-primary" />
+              {activeOrdersCount} pedidos ativos
+            </Badge>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+              onClick={fetchOrders}
+              title="Atualizar lista de pedidos"
+            >
+              <RotateCw className="w-3.5 h-3.5" />
+            </Button>
+          </div>
         </div>
 
+        {/* ── Subpage 01: Pedidos (Kanban Operacional / Lista) ─────────── */}
         <TabsContent
-          value="pipeline_flow"
+          value="pedidos"
           className="flex-1 min-h-0 flex flex-col overflow-hidden data-[state=active]:flex mt-0"
         >
           <OrderPipelineView
@@ -590,14 +723,32 @@ const AdminOrders = () => {
           />
         </TabsContent>
 
+        {/* ── Subpage 02: Visão Geral (Dashboard de Métricas) ─────────── */}
         <TabsContent
-          value="solicitations"
-          className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block mt-0"
+          value="visao-geral"
+          className="flex-1 min-h-0 flex flex-col overflow-hidden data-[state=active]:flex mt-0"
         >
-          <OrderSolicitations />
+          <OrdersOverviewSubpage orders={pipelineItems} />
+        </TabsContent>
+
+        {/* ── Subpage 03: Ocorrências & Pós-Venda ─────────────────────── */}
+        <TabsContent
+          value="ocorrencias"
+          className="flex-1 min-h-0 flex flex-col overflow-hidden data-[state=active]:flex mt-0"
+        >
+          <OrdersOccurrencesSubpage orders={pipelineItems} />
+        </TabsContent>
+
+        {/* ── Subpage 04: Configurações & Automações ──────────────────── */}
+        <TabsContent
+          value="configuracoes"
+          className="flex-1 min-h-0 flex flex-col overflow-hidden data-[state=active]:flex mt-0"
+        >
+          <OrdersSettingsSubpage orders={pipelineItems} onRefreshOrders={fetchOrders} />
         </TabsContent>
       </Tabs>
 
+      {/* Order Details Modal (Shared) */}
       {selectedOrder && (
         <OrderDetailsModal
           orderId={selectedOrder.id}
@@ -608,6 +759,28 @@ const AdminOrders = () => {
           }}
         />
       )}
+
+      {/* Batch Archive Dialog */}
+      <BatchArchiveDialog
+        orders={selectedPipelineItems}
+        isOpen={isBatchArchiveOpen}
+        onClose={() => setIsBatchArchiveOpen(false)}
+        onSuccess={() => {
+          setSelectedRowIds([]);
+          fetchOrders();
+        }}
+      />
+
+      {/* Single Archive Dialog from Table List Action */}
+      <ArchiveOrderDialog
+        order={singleArchiveOrder}
+        isOpen={!!singleArchiveOrder}
+        onClose={() => setSingleArchiveOrder(null)}
+        onSuccess={() => {
+          setSingleArchiveOrder(null);
+          fetchOrders();
+        }}
+      />
     </div>
   );
 };
