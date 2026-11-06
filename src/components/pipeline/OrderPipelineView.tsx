@@ -29,6 +29,8 @@ import {
   Check,
   RotateCcw,
   Archive,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -128,6 +130,44 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
       return true;
     });
   }, [orders, searchTerm, channelFilter, selectedSeller]);
+
+  // Label sync state
+  const [isSyncingLabels, setIsSyncingLabels] = useState(false);
+
+  const handleSyncPendingLabels = async () => {
+    try {
+      setIsSyncingLabels(true);
+      toast.info("Consultando o Mercado Livre para verificar etiquetas liberadas...");
+
+      const { data, error } = await supabase.functions.invoke("ml-order-webhook", {
+        body: { action: "sync_pending_labels" },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      const res = data?.result;
+      if (res?.downloaded > 0) {
+        toast.success(
+          `Sucesso! ${res.downloaded} nova(s) etiqueta(s) baixada(s) e vinculada(s) aos pedidos.`
+        );
+      } else if (res?.checked > 0) {
+        toast.info(
+          `${res.checked} pedido(s) checado(s). Nenhuma nova etiqueta pronta para impressão no Mercado Livre no momento.`
+        );
+      } else {
+        toast.info("Todos os pedidos ativos já possuem etiquetas vinculadas.");
+      }
+
+      onRefreshOrders?.();
+    } catch (err: any) {
+      console.error("Erro ao sincronizar etiquetas:", err);
+      toast.error(err.message || "Erro ao consultar etiquetas no Mercado Livre.");
+    } finally {
+      setIsSyncingLabels(false);
+    }
+  };
 
   // Pix generation handler
   const handleGeneratePix = async (order: OrderPipelineItem) => {
@@ -311,6 +351,23 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
             </SelectContent>
           </Select>
         )}
+
+        {/* Sync ML Pending Labels Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs px-2.5 gap-1.5 border-blue-200 bg-blue-50/60 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-300 shrink-0"
+          onClick={handleSyncPendingLabels}
+          disabled={isSyncingLabels}
+          title="Verificar se etiquetas pendentes foram liberadas pelo Mercado Livre"
+        >
+          {isSyncingLabels ? (
+            <Loader2 className="w-3 h-3 animate-spin text-blue-600" />
+          ) : (
+            <RefreshCw className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+          )}
+          <span>{isSyncingLabels ? "Verificando ML..." : "Sincronizar Etiquetas ML"}</span>
+        </Button>
 
         {/* Archived Quick Filter Toggle (Section 11) */}
         <Button

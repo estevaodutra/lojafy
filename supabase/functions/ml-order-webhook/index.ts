@@ -1156,7 +1156,8 @@ async function processSingleMlOrder(
           ml_shipment_id: String(shipmentId),
           ml_label_url: publicLabelUrl,
           tracking_code: trackingCode,
-          has_shipping_file: true,
+          has_shipping_file: !!publicLabelUrl,
+          shipping_label_status: publicLabelUrl ? 'ready' : 'pending',
         })
         .eq('id', orderId);
 
@@ -1335,6 +1336,205 @@ async function syncAllRecentOrders() {
   };
 }
 
+/**
+ * Sincroniza periodicamente ou sob demanda etiquetas pendentes do Mercado Livre.
+ * Busca pedidos sem etiqueta, consulta a API do ML para saber se a remessa já está liberada (ready_to_print),
+ * baixa o PDF, anexa ao pedido e avança o status operacional se o pedido já estiver pago.
+ */
+async function syncPendingLabels(options?: { resellerUserId?: string; orderId?: string }) {
+  console.log('[ml-order-webhook] Iniciando syncPendingLabels...', options);
+
+  let query = supabase
+    .from('orders')
+    .select('id, order_number, reseller_id, ml_order_id, ml_shipment_id, status, payment_status, created_at, has_shipping_file, ml_label_url, tracking_code, tracking_number')
+    .not('ml_order_id', 'is', null)
+    .not('status', 'in', '("cancelado","finalizado")')
+    .order('created_at', { ascending: false })
+    .limit(60);
+
+  if (options?.orderId) {
+    query = query.eq('id', options.orderId);
+  } else if (options?.resellerUserId) {
+    query = query.eq('reseller_id', options.resellerUserId);
+  } else {
+    // Apenas pedidos que realmente ainda não têm arquivo de etiqueta válido
+    query = query.or('has_shipping_file.eq.false,ml_label_url.is.null');
+  }
+
+  const { data: pendingOrders, error: pError } = await query;
+  if (pError || !pendingOrders) {
+    console.error('[ml-order-webhook] Erro ao buscar pedidos pendentes de etiqueta:', pError);
+    return { success: false, error: pError?.message };
+  }
+
+  console.log(`[ml-order-webhook] Encontrados ${pendingOrders.length} pedidos para checar etiquetas.`);
+
+  // Cache de tokens por reseller
+  const tokenMap = new Map<string, string>();
+  let checked = 0;
+  let downloaded = 0;
+  let advancedToPaid = 0;
+  let notReadyCount = 0;
+  const errors: string[] = [];
+
+  for (const ord of pendingOrders) {
+    checked++;
+    const resellerUserId = ord.reseller_id;
+    if (!resellerUserId) continue;
+
+    let token = tokenMap.get(resellerUserId);
+    if (!token) {
+      const { data: intg } = await supabase
+        .from('mercadolivre_integrations')
+        .select('user_id, ml_user_id, access_token, refresh_token, expires_at')
+        .eq('user_id', resellerUserId)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (intg) {
+        token = await getValidTokenForIntegration(intg);
+        tokenMap.set(resellerUserId, token);
+      }
+    }
+
+    if (!token) {
+      errors.push(`Sem integração ativa para revendedor ${resellerUserId}`);
+      continue;
+    }
+
+    let shipmentId = ord.ml_shipment_id;
+    const mlOrderIdStr = String(ord.ml_order_id);
+
+    // Se não tiver shipment_id gravado, busca no pedido do Mercado Livre
+    if (!shipmentId) {
+      try {
+        const mlOrder = await fetchOrderOrPack(mlOrderIdStr, token);
+        if (mlOrder) {
+          shipmentId = mlOrder.shipping?.id
+            ?? mlOrder.shipping_id
+            ?? mlOrder.shipments?.id
+            ?? mlOrder.order_items?.[0]?.shipping?.id
+            ?? mlOrder.order_items?.[0]?.shipment?.id
+            ?? null;
+
+          if (shipmentId) {
+            await supabase.from('orders').update({ ml_shipment_id: String(shipmentId) }).eq('id', ord.id);
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[ml-order-webhook] Erro ao buscar shipment_id do pedido #${ord.order_number}:`, err);
+      }
+    }
+
+    if (!shipmentId) {
+      notReadyCount++;
+      continue;
+    }
+
+    // Consulta status da remessa no Mercado Livre
+    try {
+      const shRes = await fetch(`https://api.mercadolibre.com/shipments/${shipmentId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!shRes.ok) {
+        notReadyCount++;
+        continue;
+      }
+
+      const shData = await shRes.json();
+      const trackingCode = shData.tracking_number ?? shData.tracking_id ?? ord.tracking_code;
+
+      // Tenta baixar a etiqueta se estiver pronta
+      const labelRes = await fetch(`https://api.mercadolibre.com/shipment_labels?shipment_ids=${shipmentId}&response_type=pdf`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!labelRes.ok) {
+        notReadyCount++;
+        continue; // Etiqueta ainda não foi liberada pelo ML (NOT_PRINTABLE_STATUS)
+      }
+
+      // Etiqueta liberada e baixada com sucesso!
+      const labelBytes = await labelRes.arrayBuffer();
+      const filePath = `labels/${resellerUserId}/${ord.id}/etiqueta-${mlOrderIdStr}.pdf`;
+      let targetBucket = 'shipping-labels';
+
+      const uploadRes = await supabase.storage.from(targetBucket).upload(filePath, labelBytes, {
+        contentType: 'application/pdf',
+        upsert: true,
+      });
+
+      if (uploadRes.error) {
+        const fbRes = await supabase.storage.from('shipping-files').upload(filePath, labelBytes, {
+          contentType: 'application/pdf',
+          upsert: true,
+        });
+        if (!fbRes.error) targetBucket = 'shipping-files';
+      }
+
+      const { data: signedData } = await supabase.storage
+        .from(targetBucket)
+        .createSignedUrl(filePath, 604800);
+
+      const publicLabelUrl = getPublicSignedUrl(signedData?.signedUrl) ?? null;
+
+      await supabase.from('order_shipping_files').upsert({
+        order_id: ord.id,
+        file_name: `etiqueta-${mlOrderIdStr}.pdf`,
+        file_path: filePath,
+        file_size: labelBytes.byteLength,
+        uploaded_at: new Date().toISOString(),
+      }, { onConflict: 'order_id,file_path' });
+
+      // Lógica de avanço de status
+      const isPaid = ord.payment_status === 'paid' || ord.status === 'pago';
+      let nextStatus = ord.status;
+
+      if (isPaid && (ord.status === 'pago' || ord.status === 'pendente')) {
+        nextStatus = 'recebido'; // Pedido Pago > Aguardando Envio
+        advancedToPaid++;
+      }
+
+      await supabase
+        .from('orders')
+        .update({
+          has_shipping_file: true,
+          ml_label_url: publicLabelUrl,
+          ml_shipment_id: String(shipmentId),
+          tracking_code: trackingCode,
+          tracking_number: trackingCode,
+          shipping_label_status: 'ready',
+          status: nextStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', ord.id);
+
+      await supabase.from('order_status_history').insert({
+        order_id: ord.id,
+        status: nextStatus,
+        notes: isPaid
+          ? `Etiqueta sincronizada automaticamente do Mercado Livre. Pedido pago e pronto para separação/envio.`
+          : `Etiqueta sincronizada automaticamente do Mercado Livre. Aguardando confirmação do pagamento Pix do revendedor.`,
+      });
+
+      downloaded++;
+      console.log(`[ml-order-webhook] ✅ Pedido #${ord.order_number} teve etiqueta sincronizada com sucesso!`);
+    } catch (err: any) {
+      console.error(`[ml-order-webhook] Erro ao sincronizar etiqueta do pedido #${ord.order_number}:`, err);
+      errors.push(`Pedido #${ord.order_number}: ${err.message}`);
+    }
+  }
+
+  return {
+    checked,
+    downloaded,
+    advancedToPaid,
+    notReadyCount,
+    errors,
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -1454,6 +1654,23 @@ serve(async (req) => {
         }
 
         return new Response(JSON.stringify({ success: true, repaired }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // Ação 4.5: Sincronização periódica ou sob demanda de etiquetas pendentes do Mercado Livre
+    if (body.action === 'sync_pending_labels' || body.mode === 'sync_pending_labels') {
+      try {
+        const result = await syncPendingLabels({
+          resellerUserId: body.user_id,
+          orderId: body.order_id,
+        });
+        return new Response(JSON.stringify({ success: true, result }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (labelSyncErr: any) {
+        return new Response(JSON.stringify({ success: false, error: labelSyncErr.message }), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }

@@ -46,7 +46,10 @@ import {
   AlertTriangle,
   History,
   Send,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -71,6 +74,7 @@ export const OrdersSettingsSubpage: React.FC<OrdersSettingsSubpageProps> = ({
   const [selectedSimAutomation, setSelectedSimAutomation] =
     useState<OrderPipelineAutomation | null>(null);
   const [isSimOpen, setIsSimOpen] = useState(false);
+  const [isSyncingLabels, setIsSyncingLabels] = useState(false);
 
   // New Rule Modal
   const [isNewRuleOpen, setIsNewRuleOpen] = useState(false);
@@ -113,6 +117,30 @@ export const OrdersSettingsSubpage: React.FC<OrdersSettingsSubpageProps> = ({
     await orderAutomationService.toggleAutomation(id, !current);
     toast.success(`Automação ${!current ? "ativada" : "desativada"} com sucesso.`);
     loadAutomationsData();
+  };
+
+  const handleSyncLabels = async () => {
+    setIsSyncingLabels(true);
+    try {
+      toast.info("Iniciando varredura de etiquetas pendentes no Mercado Livre...");
+      const { data, error } = await supabase.functions.invoke("ml-order-webhook", {
+        body: { action: "sync_pending_labels" },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(
+          `Sincronização concluída: ${data.updated_count ?? 0} etiqueta(s) vinculada(s) de ${data.processed ?? 0} pedido(s) analisado(s).`
+        );
+        onRefreshOrders?.();
+      } else {
+        toast.warning(data?.message || "Nenhuma etiqueta atualizada no momento.");
+      }
+    } catch (err: any) {
+      console.error("Erro ao sincronizar etiquetas ML:", err);
+      toast.error("Erro ao sincronizar etiquetas: " + (err?.message || "Tente novamente"));
+    } finally {
+      setIsSyncingLabels(false);
+    }
   };
 
   const handleCreateRule = async () => {
@@ -254,6 +282,47 @@ export const OrdersSettingsSubpage: React.FC<OrdersSettingsSubpageProps> = ({
               Nova Regra
             </Button>
           </div>
+
+          {/* Rotina Automática de Etiquetas ML */}
+          <Card className="shadow-2xs border bg-linear-to-r from-blue-50/50 to-indigo-50/30 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-200/60 dark:border-blue-800/40">
+            <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
+                    Sincronização Periódica de Etiquetas (Mercado Livre)
+                  </h3>
+                  <Badge className="bg-emerald-600 hover:bg-emerald-600 text-[10px]">
+                    Ativo (De hora em hora)
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Varredura de hora em hora via rotina em segundo plano no Mercado Livre. Quando a etiqueta for liberada pela transportadora (<code>ready_to_print</code>), o PDF é baixado para o sistema e os pedidos com Pix pago são avançados automaticamente para a fila de expedição.
+                </p>
+                <div className="flex items-center gap-2 pt-1 text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    Clientes podem pagar o Pix do pedido imediatamente mesmo antes do Mercado Livre emitir a etiqueta.
+                  </span>
+                </div>
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isSyncingLabels}
+                onClick={handleSyncLabels}
+                className="h-8 text-xs gap-1.5 border-blue-500/30 text-blue-700 dark:text-blue-300 hover:bg-blue-500/10 shrink-0"
+              >
+                {isSyncingLabels ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
+                Verificar Etiquetas Agora
+              </Button>
+            </CardContent>
+          </Card>
 
           <div className="grid grid-cols-1 gap-3">
             {automations.map((auto) => (
