@@ -1,0 +1,60 @@
+name: Deploy Migrations to VPS
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/migrations/**'
+      - '.github/workflows/deploy-migrations.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy-migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install sshpass
+        run: |
+          sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Copiar migrations para a VPS
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -p 22022 -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p /root/lojafy-deploy/migrations"
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" rsync -avz -e "ssh -p 22022 -o StrictHostKeyChecking=no" \
+            supabase/migrations/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/root/lojafy-deploy/migrations/
+
+      - name: Aplicar migrations pendentes e recarregar schema cache do PostgREST
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -p 22022 -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd /root/supabase-lojafy
+          DC="docker compose"; $DC version >/dev/null 2>&1 || DC="docker-compose"
+
+          for f in \
+            20261104160000_order_pipelines_management.sql \
+            20261105210000_order_management_3_0.sql \
+            20261105220000_ml_sync_pending_labels_cron.sql
+          do
+            if [ -f "/root/lojafy-deploy/migrations/$f" ]; then
+              echo "==> aplicando $f"
+              $DC exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+                < "/root/lojafy-deploy/migrations/$f" || true
+            fi
+          done
+
+          echo "==> Recarregando schema cache do PostgREST"
+          $DC exec -T db psql -U postgres -d postgres -c "NOTIFY pgrst, 'reload schema';" || true
+          $DC restart rest || true
+          echo "==> Migrations aplicadas e PostgREST recarregado com sucesso!"
+          REMOTE
+
+      - name: Limpar arquivos temporários da VPS
+        if: always()
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -p 22022 -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "rm -rf /root/lojafy-deploy" || true

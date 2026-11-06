@@ -16,7 +16,7 @@ export const DEFAULT_PIPELINES: OrderPipeline[] = [
       {
         id: "stage-p1",
         pipeline_id: "11111111-1111-1111-1111-111111111111",
-        name: "Pedido Gerado > Aguardando Pagamento",
+        name: "Novo Pedido",
         status_key: "pendente",
         order_index: 1,
         color_class: "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-900/60 dark:text-slate-300 dark:border-slate-800",
@@ -291,7 +291,7 @@ export const orderPipelineService = {
       };
 
       try {
-        await supabase.from("order_pipeline_stages" as any).insert({
+        const { error: insertErr } = await supabase.from("order_pipeline_stages" as any).insert({
           id: savedStage.id,
           pipeline_id: savedStage.pipeline_id,
           name: savedStage.name,
@@ -301,8 +301,11 @@ export const orderPipelineService = {
           icon_name: savedStage.icon_name,
           is_active: savedStage.is_active,
         });
-      } catch {
-        // fallback
+        if (insertErr) {
+          console.warn("order_pipeline_stages insert warning:", insertErr);
+        }
+      } catch (err) {
+        console.warn("order_pipeline_stages insert exception:", err);
       }
     } else {
       savedStage = {
@@ -319,26 +322,37 @@ export const orderPipelineService = {
             .from("orders")
             .update({ status: stageStatus, updated_at: new Date().toISOString() })
             .or(`status.eq.${oldStage.status_key},status.eq.${oldStage.name}`);
-        } catch {
-          // ignore
+        } catch (err) {
+          console.warn("orders status rename error:", err);
         }
       }
 
       try {
-        await supabase
+        const stageUpdatePayload = {
+          name: savedStage.name,
+          status_key: savedStage.status_key,
+          order_index: savedStage.order_index,
+          color_class: savedStage.color_class,
+          icon_name: savedStage.icon_name,
+          is_active: savedStage.is_active,
+          updated_at: new Date().toISOString(),
+        };
+
+        const { error: updateErr } = await supabase
           .from("order_pipeline_stages" as any)
-          .update({
-            name: savedStage.name,
-            status_key: savedStage.status_key,
-            order_index: savedStage.order_index,
-            color_class: savedStage.color_class,
-            icon_name: savedStage.icon_name,
-            is_active: savedStage.is_active,
-            updated_at: new Date().toISOString(),
-          })
+          .update(stageUpdatePayload)
           .eq("id", stage.id);
-      } catch {
-        // fallback
+
+        if (updateErr) {
+          console.warn("order_pipeline_stages update warning, trying upsert:", updateErr);
+          await supabase.from("order_pipeline_stages" as any).upsert({
+            id: stage.id,
+            pipeline_id: stage.pipeline_id,
+            ...stageUpdatePayload,
+          });
+        }
+      } catch (err) {
+        console.warn("order_pipeline_stages update exception:", err);
       }
     }
 

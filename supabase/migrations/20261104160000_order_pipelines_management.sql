@@ -3,7 +3,7 @@
 -- Authenticated users (admin, super_admin, supplier, reseller) can view active pipelines
 
 CREATE TABLE IF NOT EXISTS public.order_pipelines (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   key TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
   description TEXT,
@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS public.order_pipelines (
 );
 
 CREATE TABLE IF NOT EXISTS public.order_pipeline_stages (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  pipeline_id UUID NOT NULL REFERENCES public.order_pipelines(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  pipeline_id TEXT NOT NULL REFERENCES public.order_pipelines(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   status_key TEXT NOT NULL,
   order_index INTEGER NOT NULL DEFAULT 0,
@@ -43,8 +43,8 @@ STABLE
 AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.profiles
-    WHERE profiles.user_id = auth.uid()
-    AND profiles.role = 'super_admin'
+    WHERE (profiles.user_id = auth.uid() OR profiles.id = auth.uid())
+    AND profiles.role IN ('super_admin', 'admin')
   );
 $$;
 
@@ -117,24 +117,26 @@ ON CONFLICT (key) DO UPDATE
 SET name = EXCLUDED.name, description = EXCLUDED.description, order_index = EXCLUDED.order_index;
 
 -- Seed default stages for primary pipeline
-INSERT INTO public.order_pipeline_stages (pipeline_id, name, status_key, order_index, icon_name, color_class)
+INSERT INTO public.order_pipeline_stages (id, pipeline_id, name, status_key, order_index, icon_name, color_class)
 VALUES
-  ('11111111-1111-1111-1111-111111111111', 'Pedido Gerado > Aguardando Pagamento', 'pendente', 1, 'Clock', 'bg-gray-100 text-gray-800 border-gray-300'),
-  ('11111111-1111-1111-1111-111111111111', 'Pedido Pago > Aguardando Recebimento da Expedição', 'pago', 2, 'BadgeCheck', 'bg-emerald-100 text-emerald-800 border-emerald-300'),
-  ('11111111-1111-1111-1111-111111111111', 'Pedido Recebido > Aguardando Envio', 'recebido', 3, 'Inbox', 'bg-blue-100 text-blue-800 border-blue-300'),
-  ('11111111-1111-1111-1111-111111111111', 'Embalado > Aguardando Envio', 'embalado', 4, 'Package', 'bg-orange-100 text-orange-800 border-orange-300'),
-  ('11111111-1111-1111-1111-111111111111', 'Pedido Enviado', 'enviado', 5, 'Send', 'bg-purple-100 text-purple-800 border-purple-300'),
-  ('11111111-1111-1111-1111-111111111111', 'Finalizado', 'finalizado', 6, 'CheckCircle2', 'bg-green-100 text-green-800 border-green-300'),
-  ('11111111-1111-1111-1111-111111111111', 'Cancelado', 'cancelado', 7, 'XCircle', 'bg-gray-200 text-gray-600 border-gray-400'),
-  ('11111111-1111-1111-1111-111111111111', 'Erro | Etiqueta Incorreta', 'etiqueta_incorreta', 8, 'AlertTriangle', 'bg-rose-100 text-rose-800 border-rose-300')
-ON CONFLICT DO NOTHING;
+  ('stage-p1', '11111111-1111-1111-1111-111111111111', 'Novo Pedido', 'pendente', 1, 'Clock', 'bg-gray-100 text-gray-800 border-gray-300'),
+  ('stage-p2', '11111111-1111-1111-1111-111111111111', 'Pedido Pago > Aguardando Recebimento da Expedição', 'pago', 2, 'BadgeCheck', 'bg-emerald-100 text-emerald-800 border-emerald-300'),
+  ('stage-p3', '11111111-1111-1111-1111-111111111111', 'Pedido Recebido > Aguardando Envio', 'recebido', 3, 'Inbox', 'bg-blue-100 text-blue-800 border-blue-300'),
+  ('stage-p4', '11111111-1111-1111-1111-111111111111', 'Embalado > Aguardando Envio', 'embalado', 4, 'Package', 'bg-orange-100 text-orange-800 border-orange-300'),
+  ('stage-p5', '11111111-1111-1111-1111-111111111111', 'Pedido Enviado', 'enviado', 5, 'Send', 'bg-purple-100 text-purple-800 border-purple-300'),
+  ('stage-p6', '11111111-1111-1111-1111-111111111111', 'Finalizado', 'finalizado', 6, 'CheckCircle2', 'bg-green-100 text-green-800 border-green-300'),
+  ('stage-p7', '11111111-1111-1111-1111-111111111111', 'Cancelado', 'cancelado', 7, 'XCircle', 'bg-gray-200 text-gray-600 border-gray-400'),
+  ('stage-p8', '11111111-1111-1111-1111-111111111111', 'Erro | Etiqueta Incorreta', 'etiqueta_incorreta', 8, 'AlertTriangle', 'bg-rose-100 text-rose-800 border-rose-300')
+ON CONFLICT (id) DO UPDATE
+SET name = EXCLUDED.name, status_key = EXCLUDED.status_key, order_index = EXCLUDED.order_index;
 
 -- Seed default stages for occurrences pipeline
-INSERT INTO public.order_pipeline_stages (pipeline_id, name, status_key, order_index, icon_name, color_class)
+INSERT INTO public.order_pipeline_stages (id, pipeline_id, name, status_key, order_index, icon_name, color_class)
 VALUES
-  ('22222222-2222-2222-2222-222222222222', 'Ocorrência Aberta', 'aberto', 1, 'AlertCircle', 'bg-red-100 text-red-800 border-red-300'),
-  ('22222222-2222-2222-2222-222222222222', 'Em Análise', 'em_analise', 2, 'Search', 'bg-amber-100 text-amber-800 border-amber-300'),
-  ('22222222-2222-2222-2222-222222222222', 'Aguardando Cliente', 'aguardando_cliente', 3, 'Clock', 'bg-blue-100 text-blue-800 border-blue-300'),
-  ('22222222-2222-2222-2222-222222222222', 'Resolvido', 'resolvido', 4, 'CheckCircle2', 'bg-green-100 text-green-800 border-green-300'),
-  ('22222222-2222-2222-2222-222222222222', 'Cancelado', 'cancelado', 5, 'XCircle', 'bg-gray-200 text-gray-600 border-gray-300')
-ON CONFLICT DO NOTHING;
+  ('stage-o1', '22222222-2222-2222-2222-222222222222', 'Ocorrência Aberta', 'aberto', 1, 'AlertCircle', 'bg-red-100 text-red-800 border-red-300'),
+  ('stage-o2', '22222222-2222-2222-2222-222222222222', 'Em Análise', 'em_analise', 2, 'Search', 'bg-amber-100 text-amber-800 border-amber-300'),
+  ('stage-o3', '22222222-2222-2222-2222-222222222222', 'Aguardando Cliente', 'aguardando_cliente', 3, 'Clock', 'bg-blue-100 text-blue-800 border-blue-300'),
+  ('stage-o4', '22222222-2222-2222-2222-222222222222', 'Resolvido', 'resolvido', 4, 'CheckCircle2', 'bg-green-100 text-green-800 border-green-300'),
+  ('stage-o5', '22222222-2222-2222-2222-222222222222', 'Cancelado', 'cancelado', 5, 'XCircle', 'bg-gray-200 text-gray-600 border-gray-300')
+ON CONFLICT (id) DO UPDATE
+SET name = EXCLUDED.name, status_key = EXCLUDED.status_key, order_index = EXCLUDED.order_index;
