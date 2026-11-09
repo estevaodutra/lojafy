@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { OrderPipelineItem, PipelineType } from "@/types/orderPipeline";
 import { OrderKanbanBoard } from "./OrderKanbanBoard";
+import { OrderPipelineListView } from "./OrderPipelineListView";
 import { PipelineConfigDialog } from "./PipelineConfigDialog";
 import { ArchiveOrderDialog } from "./ArchiveOrderDialog";
 import { BatchArchiveDialog } from "./BatchArchiveDialog";
@@ -40,7 +41,7 @@ interface OrderPipelineViewProps {
   orders: OrderPipelineItem[];
   isLoading?: boolean;
   onUpdateOrderStatus: (orderId: string, newStatus: string) => Promise<void>;
-  listViewContent: React.ReactNode;
+  listViewContent?: React.ReactNode;
   userScopeLabel?: string;
   onRefreshOrders?: () => void;
 }
@@ -248,29 +249,27 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
             </Button>
           </div>
 
-          {/* Sub-Pipelines Selector (when in Pipeline view) */}
-          {viewMode === "pipeline" && (
-            <div className="flex items-center rounded-md bg-muted/60 p-0.5 border">
-              <Button
-                variant={activePipelineKey === "primary" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-6 px-2 text-[11px] font-medium gap-1"
-                onClick={() => setActivePipelineKey("primary")}
-              >
-                <Package className="w-3 h-3 text-primary" />
-                Principal
-              </Button>
-              <Button
-                variant={activePipelineKey === "occurrences" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-6 px-2 text-[11px] font-medium gap-1"
-                onClick={() => setActivePipelineKey("occurrences")}
-              >
-                <RotateCcw className="w-3 h-3 text-amber-500" />
-                Retornos / Ocorrências
-              </Button>
-            </div>
-          )}
+          {/* Sub-Pipelines Selector (available in both Pipeline and List views) */}
+          <div className="flex items-center rounded-md bg-muted/60 p-0.5 border">
+            <Button
+              variant={activePipelineKey === "primary" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-6 px-2 text-[11px] font-medium gap-1"
+              onClick={() => setActivePipelineKey("primary")}
+            >
+              <Package className="w-3 h-3 text-primary" />
+              Principal
+            </Button>
+            <Button
+              variant={activePipelineKey === "occurrences" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-6 px-2 text-[11px] font-medium gap-1"
+              onClick={() => setActivePipelineKey("occurrences")}
+            >
+              <RotateCcw className="w-3 h-3 text-amber-500" />
+              Retornos / Ocorrências
+            </Button>
+          </div>
         </div>
 
         {/* Right side: Count & Super Admin Settings */}
@@ -428,10 +427,33 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
             </div>
           )
         ) : (
-          /* List View: Scrolls independently inside the container */
-          <div className="flex-1 min-h-0 overflow-y-auto w-full pr-0 scrollbar-none">
-            {listViewContent}
-          </div>
+          /* List View: Full-featured table with complete card parity */
+          isLoading || isLoadingPipelines ? (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground space-y-2">
+              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs">Carregando lista operacional...</p>
+            </div>
+          ) : activePipeline ? (
+            <OrderPipelineListView
+              orders={filteredOrders}
+              pipeline={activePipeline}
+              onUpdateOrderStatus={onUpdateOrderStatus}
+              onViewDetails={(item) => setSelectedOrderId(item.id)}
+              onGeneratePix={handleGeneratePix}
+              onPrintLabel={handlePrintLabel}
+              onGenerateLabel={(item) => setSelectedOrderId(item.id)}
+              onArchiveOrder={(item) => setArchiveModalOrder(item)}
+              onRefreshOrders={onRefreshOrders}
+            />
+          ) : listViewContent ? (
+            <div className="flex-1 min-h-0 overflow-y-auto w-full pr-0 scrollbar-none">
+              {listViewContent}
+            </div>
+          ) : (
+            <div className="p-8 text-center text-muted-foreground">
+              Nenhuma pipeline configurada.
+            </div>
+          )
         )}
       </div>
 

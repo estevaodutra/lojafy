@@ -1,7 +1,7 @@
 {
   "hash": "auto",
   "shortHash": "auto",
-  "message": "fix(pipelines): persistencia centralizada no banco de dados e workflow de aplicacao automatica de migrations",
+  "message": "feat(orders): conversao completa dos cards do Kanban em lista operacional v2.0 (tabela de 7 colunas, paridade total, ordenacao e acoes em massa)",
   "author": "Lojafy Developer",
-  "timestamp": 1793927400000
+  "timestamp": 1794249300000
 }
