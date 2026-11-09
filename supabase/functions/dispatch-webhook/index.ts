@@ -620,51 +620,71 @@ async function fetchInactiveUser(supabase: any, days: number): Promise<Record<st
 async function buildUniversalOrderPayload(
   supabase: any,
   orderId?: string,
-  extraOptions?: { event_reason?: string; changes?: any }
+  extraOptions?: { event_reason?: string; changes?: any; eventType?: string; force_paid?: boolean }
 ): Promise<Record<string, any>> {
-  let orderQuery = supabase
-    .from('orders')
-    .select(`
-      id,
-      order_number,
-      total_amount,
-      payment_method,
-      payment_status,
-      status,
-      user_id,
-      reseller_id,
-      ml_order_id,
-      ml_shipment_id,
-      ml_label_url,
-      tracking_code,
-      tracking_number,
-      pix_qr_code,
-      pix_qr_code_base64,
-      payment_expires_at,
-      shipping_address,
-      customer_name,
-      customer_email,
-      customer_phone,
-      created_at
-    `);
+  console.log('[buildUniversalOrderPayload] Buscando pedido no banco de dados...', { orderId, extraOptions });
+
+  let order: any = null;
 
   if (orderId) {
-    orderQuery = orderQuery.eq('id', orderId);
-  } else {
-    orderQuery = orderQuery.order('created_at', { ascending: false }).limit(1);
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .maybeSingle();
+    if (error) console.error('[buildUniversalOrderPayload] Erro ao buscar order por ID:', error);
+    order = data;
   }
 
-  const { data: order } = await orderQuery.maybeSingle();
+  // Se não foi fornecido orderId ou não encontrou, busca o ÚLTIMO pedido real do sistema
+  if (!order) {
+    // 1. Tentar ordenar por created_at decrescente (nulls last)
+    const { data: latestByDate, error: errDate } = await supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (errDate) {
+      console.warn('[buildUniversalOrderPayload] Erro ao ordenar por created_at:', errDate);
+    } else if (latestByDate) {
+      order = latestByDate;
+      console.log(`[buildUniversalOrderPayload] Pedido mais recente encontrado por created_at: #${order.order_number} (${order.id})`);
+    }
+
+    // 2. Se ainda não achou, ordenar por order_number decrescente
+    if (!order) {
+      const { data: latestByNum, error: errNum } = await supabase
+        .from('orders')
+        .select('*')
+        .order('order_number', { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (errNum) {
+        console.warn('[buildUniversalOrderPayload] Erro ao ordenar por order_number:', errNum);
+      } else if (latestByNum) {
+        order = latestByNum;
+        console.log(`[buildUniversalOrderPayload] Pedido mais recente encontrado por order_number: #${order.order_number} (${order.id})`);
+      }
+    }
+  }
 
   const effectiveOrderId = order?.id || 'ord_demo_10892';
-  const effectiveOrderNum = order?.order_number || '10892';
-  const effectiveStatus = order?.status || 'pendente';
-  const effectiveAmount = Number(order?.total_amount) || 149.90;
+  const rawOrderNum = order?.order_number != null ? String(order.order_number) : '911';
+  const effectiveOrderNum = rawOrderNum.startsWith('LOJ-') ? rawOrderNum : `LOJ-${rawOrderNum}`;
+  let effectiveStatus = order?.status || 'pendente';
+  if (extraOptions?.force_paid) {
+    effectiveStatus = 'pago';
+  } else if (extraOptions?.event_reason === 'shipping_label_attached' && effectiveStatus === 'pendente') {
+    effectiveStatus = 'recebido';
+  }
 
   // 1. Extrair comprador / endereço
-  let customerName = order?.customer_name || 'Cliente';
-  let customerEmail: string | null = order?.customer_email || null;
-  let customerPhone: string | null = order?.customer_phone || null;
+  let customerName = 'Cliente';
+  let customerEmail: string | null = null;
+  let customerPhone: string | null = null;
   let customerDoc: string | null = null;
   let shippingAddr: any = null;
 
@@ -672,26 +692,25 @@ async function buildUniversalOrderPayload(
     try {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('first_name, last_name, phone, document')
+        .select('*')
         .eq('user_id', order.user_id)
         .maybeSingle();
       const { data: authUser } = await supabase.auth.admin.getUserById(order.user_id);
       if (authUser?.user?.email) customerEmail = authUser.user.email;
       if (profile) {
-        customerName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || customerName;
+        customerName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || customerName;
         customerPhone = profile.phone || customerPhone;
-        customerDoc = profile.document || customerDoc;
+        customerDoc = profile.document || profile.cpf || customerDoc;
       }
     } catch {}
   }
 
-  if (order?.shipping_address) {
-    const raw = typeof order.shipping_address === 'string'
-      ? JSON.parse(order.shipping_address)
-      : order.shipping_address;
+  const rawAddr = order?.shipping_address || order?.billing_address;
+  if (rawAddr) {
+    const raw = typeof rawAddr === 'string' ? JSON.parse(rawAddr) : rawAddr;
     if (raw) {
       shippingAddr = {
-        street: raw.street || raw.logradouro || 'Av. Paulista',
+        street: raw.street || raw.logradouro || raw.address || 'Av. Paulista',
         number: raw.number || raw.numero || '1000',
         complement: raw.complement || raw.complemento || 'Apto 42',
         neighborhood: raw.neighborhood || raw.bairro || 'Bela Vista',
@@ -699,11 +718,18 @@ async function buildUniversalOrderPayload(
         state: raw.state || raw.uf || raw.estado || 'SP',
         zipcode: raw.zipcode || raw.zip_code || raw.cep || '01310-100',
       };
-      if (customerName === 'Cliente') customerName = raw.receiver_name || raw.name || customerName;
-      if (!customerDoc) customerDoc = raw.cpf || raw.document || '123.456.789-00';
-      if (!customerPhone) customerPhone = raw.phone || raw.telefone || '(11) 98765-4321';
-      if (!customerEmail) customerEmail = raw.email || 'cliente@exemplo.com';
+      const possibleName = raw.receiver_name || raw.name || raw.full_name || (raw.first_name ? [raw.first_name, raw.last_name].filter(Boolean).join(' ') : null);
+      if (possibleName) customerName = possibleName;
+      if (raw.cpf || raw.document) customerDoc = raw.cpf || raw.document;
+      if (raw.phone || raw.telefone || raw.cellphone) customerPhone = raw.phone || raw.telefone || raw.cellphone;
+      if (raw.email) customerEmail = raw.email;
     }
+  }
+
+  if (order) {
+    if (customerName === 'Cliente' && (order as any).customer_name) customerName = (order as any).customer_name;
+    if (!customerEmail && (order as any).customer_email) customerEmail = (order as any).customer_email;
+    if (!customerPhone && (order as any).customer_phone) customerPhone = (order as any).customer_phone;
   }
 
   if (!shippingAddr) {
@@ -722,80 +748,49 @@ async function buildUniversalOrderPayload(
   let resellerData = null;
   const targetResellerId = order?.reseller_id || order?.user_id;
 
-  // Buscar definições de campos personalizados ativas no recurso
-  let customFieldDefs: any[] = [];
-  try {
-    const { data: defs } = await supabase
-      .from('custom_field_definitions')
-      .select('id, name, key, field_type, display_order')
-      .eq('is_active', true)
-      .order('display_order', { ascending: true });
-    if (defs && defs.length > 0) {
-      customFieldDefs = defs;
-    }
-  } catch {}
-
-  // Buscar valores preenchidos para esse lead/revendedor
-  const leadValuesMap: Record<string, string> = {};
   if (targetResellerId) {
+    let profile: any = null;
+    let store: any = null;
+    let resellerEmail: string | null = null;
+
     try {
-      const { data: vals } = await supabase
-        .from('lead_custom_field_values')
-        .select('field_id, value')
-        .eq('lead_id', targetResellerId);
-      if (vals) {
-        vals.forEach((v: any) => {
-          leadValuesMap[v.field_id] = v.value;
-        });
-      }
+      const { data: p } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', targetResellerId)
+        .maybeSingle();
+      profile = p;
     } catch {}
-  }
 
-  // Montar objeto de campos personalizados com os padrões do recurso
-  const customFields: Record<string, any> = {
-    id_grupo: 'GRP-2048',
-    origem_lead: 'Campanha Meta Ads',
-    etapa_lead: 'Convertido',
-    potencial_compra: 5000,
-  };
-
-  if (customFieldDefs.length > 0) {
-    customFieldDefs.forEach((def: any) => {
-      if (leadValuesMap[def.id] !== undefined && leadValuesMap[def.id] !== null) {
-        customFields[def.key] = leadValuesMap[def.id];
-      } else if (customFields[def.key] === undefined) {
-        customFields[def.key] = null;
-      }
-    });
-  }
-
-  if (order?.reseller_id) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('first_name, last_name, phone, document')
-      .eq('user_id', order.reseller_id)
-      .maybeSingle();
-    const { data: store } = await supabase
-      .from('reseller_stores')
-      .select('store_name, slug')
-      .eq('user_id', order.reseller_id)
-      .maybeSingle();
-    let resellerEmail = null;
     try {
-      const { data: authUser } = await supabase.auth.admin.getUserById(order.reseller_id);
-      resellerEmail = authUser?.user?.email || null;
+      const { data: s } = await supabase
+        .from('reseller_stores')
+        .select('*')
+        .or(`user_id.eq.${targetResellerId},reseller_id.eq.${targetResellerId}`)
+        .maybeSingle();
+      store = s;
     } catch {}
+
+    try {
+      const { data: authUser } = await supabase.auth.admin.getUserById(targetResellerId);
+      if (authUser?.user?.email) resellerEmail = authUser.user.email;
+    } catch {}
+
+    const customFields = await fetchResellerCustomFields(supabase, targetResellerId);
+    const resellerName = profile ? [profile.first_name, profile.last_name].filter(Boolean).join(' ') : null;
+
     resellerData = {
-      user_id: order.reseller_id,
-      name: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 'Revendedor Lojafy',
-      email: resellerEmail,
-      phone: profile?.phone || null,
-      document: profile?.document || '123.456.789-00',
+      user_id: targetResellerId,
+      name: resellerName || store?.store_name || 'Revendedor Lojafy',
+      email: resellerEmail || profile?.email || 'revendedor@lojafy.app',
+      phone: profile?.phone || '(11) 99999-8888',
+      document: profile?.document || profile?.cpf || '123.456.789-00',
       store_name: store?.store_name || 'Minha Loja VIP',
       store_url: store?.slug ? `https://lojafy.app/loja/${store.slug}` : 'https://lojafy.app/loja/minha-loja-vip',
       custom_fields: customFields,
     };
   } else {
+    const customFields = await fetchResellerCustomFields(supabase, null);
     resellerData = {
       user_id: '45d2e091-7b9e-4b68-80f4-526bf764f691',
       name: 'João Vendedor',
@@ -815,20 +810,23 @@ async function buildUniversalOrderPayload(
   const baseUrl = (Deno.env.get('PUBLIC_SITE_URL') || 'https://lojafy.app').replace(/\/$/, '');
 
   if (order?.id) {
-    const { data: dbItems } = await supabase
+    const { data: dbItems, error: itemsErr } = await supabase
       .from('order_items')
-      .select('product_id, quantity, unit_price, total_price, product_snapshot, supplier_id, supplier_unit_cost, supplier_total_cost')
+      .select('*')
       .eq('order_id', order.id);
 
+    if (itemsErr) {
+      console.warn('[buildUniversalOrderPayload] Aviso ao buscar order_items:', itemsErr);
+    }
+
     if (dbItems && dbItems.length > 0) {
-      // Buscar catálogo de produtos para obter imagens principais e slugs
       const productIds = Array.from(new Set(dbItems.map((i: any) => i.product_id).filter(Boolean)));
       const productMap = new Map<string, any>();
       if (productIds.length > 0) {
         try {
           const { data: dbProducts } = await supabase
             .from('products')
-            .select('id, name, sku, image_url, main_image_url, cost_price, slug')
+            .select('*')
             .in('id', productIds);
           if (dbProducts) {
             dbProducts.forEach((p: any) => productMap.set(p.id, p));
@@ -838,38 +836,46 @@ async function buildUniversalOrderPayload(
 
       items = dbItems.map((i: any) => {
         const prod = productMap.get(i.product_id);
-        const cost = Number(i.supplier_unit_cost) || (Number(i.unit_price) * 0.6);
-        const totalCost = Number(i.supplier_total_cost) || (cost * Number(i.quantity));
+        const snap = (typeof i.product_snapshot === 'string' ? JSON.parse(i.product_snapshot) : i.product_snapshot) || {};
+
+        const unitCost = Number(i.supplier_unit_cost || i.unit_cost || i.cost_price || prod?.cost_price || (Number(i.unit_price) * 0.6));
+        const itemQuantity = Number(i.quantity) || 1;
+        const totalCost = Number(i.supplier_total_cost || i.total_cost || (unitCost * itemQuantity));
         totalSupplierCost += totalCost;
-        if (!primarySupplierId && i.supplier_id) primarySupplierId = i.supplier_id;
+
+        if (!primarySupplierId && (i.supplier_id || prod?.supplier_id || prod?.supplier_organization_id)) {
+          primarySupplierId = i.supplier_id || prod?.supplier_id || prod?.supplier_organization_id;
+        }
 
         const imageUrl =
           prod?.main_image_url ||
           prod?.image_url ||
-          i.product_snapshot?.main_image_url ||
-          i.product_snapshot?.image_url ||
-          i.product_snapshot?.image ||
-          (Array.isArray(i.product_snapshot?.images) ? i.product_snapshot.images[0] : null) ||
+          snap?.main_image_url ||
+          snap?.image_url ||
+          snap?.image ||
+          (Array.isArray(snap?.images) ? snap.images[0] : null) ||
           'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=600&q=80';
 
-        const productId = i.product_id || '92ba8745-f09b-4389-bd6b-80fc47849e7b';
+        const productId = i.product_id || prod?.id || '92ba8745-f09b-4389-bd6b-80fc47849e7b';
         const productUrl = `${baseUrl}/produto/${productId}`;
         const catalogUrl = `${baseUrl}/catalogo/produto/${productId}`;
 
         return {
           product_id: productId,
-          sku: i.product_snapshot?.sku || prod?.sku || 'TECH-FONE-BT-PRETO',
-          name: i.product_snapshot?.name || prod?.name || 'Fone Bluetooth TWS Pro',
+          sku: snap?.sku || prod?.sku || i.sku || 'TECH-FONE-BT-PRETO',
+          name: snap?.name || snap?.title || prod?.name || 'Fone Bluetooth TWS Pro',
           image_url: imageUrl,
           product_url: productUrl,
           catalog_url: catalogUrl,
-          quantity: i.quantity,
-          unit_price: Number(i.unit_price),
-          cost_price: Math.round(cost * 100) / 100,
+          quantity: itemQuantity,
+          unit_price: Number(i.unit_price) || Number(prod?.price) || 149.90,
+          cost_price: Math.round(unitCost * 100) / 100,
         };
       });
     }
   }
+
+  const effectiveAmount = Number(order?.total_amount) || (items.length > 0 ? items.reduce((sum, it) => sum + (it.unit_price * it.quantity), 0) : 149.90);
 
   if (items.length === 0) {
     items = [
@@ -893,7 +899,7 @@ async function buildUniversalOrderPayload(
   if (order?.id) {
     const { data: file } = await supabase
       .from('order_shipping_files')
-      .select('file_name, file_path, file_size, uploaded_at')
+      .select('*')
       .eq('order_id', order.id)
       .order('uploaded_at', { ascending: false })
       .limit(1)
@@ -918,7 +924,7 @@ async function buildUniversalOrderPayload(
   }
 
   const tracking = order?.tracking_code || order?.tracking_number || (order?.ml_order_id ? 'BR104920492ML' : null);
-  const carrier = order?.ml_order_id ? 'Mercado Envios' : 'Correios / Transportadora';
+  const carrier = order?.ml_order_id ? 'Mercado Envios' : (order?.carrier || 'Correios / Transportadora');
   const hasLabel = !!signedLabelUrl || extraOptions?.event_reason === 'shipping_label_attached';
 
   // 5. Dados de Pagamento e Pix
@@ -945,16 +951,31 @@ async function buildUniversalOrderPayload(
     };
   }
 
+  // 7. Nome do fornecedor
+  let supplierName = 'Distribuidora Tech Brasil';
+  if (primarySupplierId) {
+    try {
+      const { data: supProfile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, trade_name')
+        .eq('user_id', primarySupplierId)
+        .maybeSingle();
+      if (supProfile) {
+        supplierName = supProfile.trade_name || [supProfile.first_name, supProfile.last_name].filter(Boolean).join(' ') || supplierName;
+      }
+    } catch {}
+  }
+
   return {
     ...(extraOptions?.event_reason ? { event_reason: extraOptions.event_reason } : {}),
     ...(changes ? { changes } : {}),
     order_id: effectiveOrderId,
-    order_number: `LOJ-${effectiveOrderNum}`,
+    order_number: effectiveOrderNum,
     status: isShippingLabelAttached && effectiveStatus === 'pendente' ? 'recebido' : effectiveStatus,
     origin: {
-      channel: order?.ml_order_id ? 'mercadolivre' : 'shopee',
-      channel_order_id: order?.ml_order_id || '2000008492049',
-      channel_pack_id: null,
+      channel: order?.ml_order_id ? 'mercadolivre' : (order?.shopee_order_id ? 'shopee' : (order?.origin_channel || 'loja_propria')),
+      channel_order_id: order?.ml_order_id || order?.shopee_order_id || String(order?.order_number || '2000008492049'),
+      channel_pack_id: order?.ml_pack_id || null,
     },
     customer: {
       name: customerName,
@@ -971,7 +992,7 @@ async function buildUniversalOrderPayload(
     },
     payment: {
       payment_method: order?.payment_method || 'pix',
-      payment_status: order?.payment_status || 'pending',
+      payment_status: extraOptions?.force_paid ? 'paid' : (order?.payment_status || 'pending'),
       payment_url: paymentUrl,
       total_amount: effectiveAmount,
       pix: {
@@ -989,39 +1010,30 @@ async function buildUniversalOrderPayload(
     reseller: resellerData,
     supplier: {
       id: primarySupplierId || 'supplier-uuid',
-      name: 'Distribuidora Tech Brasil',
+      name: supplierName,
     },
     items,
   };
 }
 
 async function fetchRealTestData(supabase: any, eventType: string): Promise<{ data: Record<string, any> | null; error: string | null }> {
+  // Para QUALQUER evento de pedido (order.*), SEMPRE buscar dados reais do ÚLTIMO pedido do banco de dados!
+  if (eventType.startsWith('order.')) {
+    console.log(`[dispatch-webhook] fetchRealTestData: Buscando ÚLTIMO pedido real para o evento ${eventType}...`);
+    const options: any = { eventType };
+    if (eventType === 'order.updated') {
+      options.event_reason = 'shipping_label_attached';
+    } else if (eventType === 'order.paid') {
+      options.force_paid = true;
+    }
+    const realOrderData = await buildUniversalOrderPayload(supabase, undefined, options);
+    return {
+      data: realOrderData,
+      error: realOrderData ? null : 'Nenhum pedido encontrado no banco de dados',
+    };
+  }
+
   switch (eventType) {
-    case 'order.paid':
-      const orderData = await fetchLastPaidOrder(supabase);
-      return {
-        data: orderData,
-        error: orderData ? null : 'Nenhum pedido pago encontrado para teste',
-      };
-
-    case 'order.created':
-    case 'order.automatic_fulfillment': {
-      const orderCreatedData = await buildUniversalOrderPayload(supabase);
-      return {
-        data: orderCreatedData,
-        error: null,
-      };
-    }
-
-    case 'order.updated': {
-      const orderUpdatedData = await buildUniversalOrderPayload(supabase, undefined, {
-        event_reason: 'shipping_label_attached',
-      });
-      return {
-        data: orderUpdatedData,
-        error: null,
-      };
-    }
     
     case 'user.created':
       const userData = await fetchLastCreatedUser(supabase);
