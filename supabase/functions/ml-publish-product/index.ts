@@ -433,6 +433,8 @@ async function handleRequest(req: Request) {
       ...safeValidatedFields
     } = validated;
 
+    const productSku = product.sku || product.internal_sku || null;
+
     const mlPayload: Record<string, unknown> = {
       ...safeValidatedFields, // INJETA o payload pré-validado guardado no BD (incluindo variações, canais, garantia, etc.)
       title: product.name.substring(0, 60), // ML limita título a 60 chars
@@ -444,6 +446,7 @@ async function handleRequest(req: Request) {
       listing_type_id: validated.listing_type_id ?? 'gold_pro',
       condition: validated.condition ?? 'new',
       pictures: sanitizedImageUrls.map((url) => ({ source: url })),
+      ...(productSku ? { seller_custom_field: productSku } : {}),
     };
 
     // Shipping: default to me2 unless verified otherwise. Force me2 if it is me1 to avoid "User has not mode me1" error
@@ -453,7 +456,11 @@ async function handleRequest(req: Request) {
     }
     mlPayload.shipping = shipping;
 
-    // Attributes
+    // Attributes - Injetar SELLER_SKU oficial se não estiver presente
+    if (productSku && !attributes.some((a: any) => a.id === 'SELLER_SKU')) {
+      attributes.push({ id: 'SELLER_SKU', value_name: productSku });
+    }
+
     if (attributes.length > 0) {
       mlPayload.attributes = attributes;
     }

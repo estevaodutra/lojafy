@@ -1944,6 +1944,173 @@ serve(async (req) => {
       });
     }
 
+    // Ação: Limpeza completa das comissões indevidas e reversão de pedidos pagos com saldo fantasma
+    if (body.action === 'cleanup_phantom_commissions') {
+      const resellerUserId = body.reseller_id || '2640edf0-819c-4f2f-89c7-c459dcf00413';
+
+      const { data: wallet } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', resellerUserId)
+        .maybeSingle();
+
+      if (!wallet) {
+        return new Response(JSON.stringify({ error: 'Carteira não encontrada' }), { status: 404, headers: corsHeaders });
+      }
+
+      // 1. Excluir todas as transações fantasmas de comissão, estorno temporário e pagamentos com saldo fantasma
+      const { data: phantomTxs } = await supabase
+        .from('wallet_transactions')
+        .select('id, tipo, valor, descricao')
+        .eq('wallet_id', wallet.id)
+        .or('descricao.ilike.%Comissão de venda%,descricao.ilike.%Reembolso de diferença de custo%,descricao.ilike.%Pagamento integral de pedido Mercado Livre%,descricao.ilike.%Abate parcial via carteira%');
+
+      const phantomCount = phantomTxs?.length || 0;
+      let phantomTotalCredit = 0;
+      let phantomTotalDebit = 0;
+
+      for (const pt of phantomTxs || []) {
+        if (pt.tipo === 'cashback' || pt.tipo === 'estorno' || pt.tipo === 'recarga') {
+          phantomTotalCredit += Number(pt.valor);
+        } else {
+          phantomTotalDebit += Number(pt.valor);
+        }
+      }
+
+      if (phantomCount > 0) {
+        const idsToDelete = phantomTxs!.map(t => t.id);
+        for (let i = 0; i < idsToDelete.length; i += 100) {
+          const slice = idsToDelete.slice(i, i + 100);
+          await supabase.from('wallet_transactions').delete().in('id', slice);
+        }
+      }
+
+      // 2. Calcular saldo real remanescente a partir de transações legítimas
+      const { data: remainingTxs } = await supabase
+        .from('wallet_transactions')
+        .select('tipo, valor')
+        .eq('wallet_id', wallet.id);
+
+      let realBalance = 0;
+      for (const t of remainingTxs || []) {
+        if (t.tipo === 'recarga' || t.tipo === 'estorno') {
+          realBalance += Number(t.valor);
+        } else if (t.tipo === 'debito' || t.tipo === 'saque') {
+          realBalance -= Number(t.valor);
+        }
+      }
+      realBalance = Math.max(0, Math.round(realBalance * 100) / 100);
+
+      await supabase.from('wallets').update({
+        saldo: realBalance,
+        saldo_bloqueado: 0,
+        saldo_reservado_saque: 0,
+        updated_at: new Date().toISOString(),
+      }).eq('id', wallet.id);
+
+      // 3. Buscar perfil e e-mail do revendedor para gerar os Pix
+      const { data: resellerProfile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, cpf, phone')
+        .eq('user_id', resellerUserId)
+        .maybeSingle();
+
+      let resellerEmail: string | null = null;
+      try {
+        const { data: authUser } = await supabase.auth.admin.getUserById(resellerUserId);
+        resellerEmail = authUser?.user?.email ?? null;
+      } catch {}
+
+      // 4. Reverter pedidos que foram marcados como pagos indevidamente (#909, #910, #911)
+      const targetOrderNumbers = ['909', '910', '911'];
+      const revertedOrders: any[] = [];
+
+      for (const ordNum of targetOrderNumbers) {
+        const { data: ord } = await supabase
+          .from('orders')
+          .select('*, items:order_items(*)')
+          .eq('order_number', ordNum)
+          .maybeSingle();
+
+        if (ord) {
+          const items = ord.items || [];
+          let totalSupplierCost = 0;
+          const itemsForPix: any[] = [];
+
+          for (const it of items) {
+            const cost = Number(it.supplier_total_cost ?? (it.supplier_unit_cost * it.quantity) ?? 0);
+            totalSupplierCost += cost;
+            itemsForPix.push({
+              productId: it.product_id,
+              name: it.product_snapshot?.name || 'Item do pedido',
+              quantity: it.quantity,
+              costPrice: Number(it.supplier_unit_cost ?? 0),
+            });
+          }
+
+          totalSupplierCost = Math.round(totalSupplierCost * 100) / 100;
+
+          // Gerar Pix de 24h real
+          let pixData: any = { qrCode: null, qrCodeBase64: null, paymentId: `ml_pay_${ord.order_number}`, expiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString() };
+          try {
+            pixData = await generatePix24h({
+              orderNumber: ord.order_number,
+              amount: totalSupplierCost,
+              description: `Pagamento de fulfillment do Pedido #${ord.order_number}`,
+              resellerUserId: ord.reseller_id,
+              resellerProfile,
+              resellerEmail,
+              items: itemsForPix,
+              mlOrderId: ord.ml_order_id,
+              walletDeducted: 0,
+              totalCost: totalSupplierCost,
+            });
+          } catch (pixErr: any) {
+            console.warn(`[ml-order-webhook] Erro ao gerar Pix no cleanup para #${ord.order_number}:`, pixErr.message);
+          }
+
+          const updatedNotes = `Pedido via Mercado Livre #${ord.ml_order_id}. Custo Fornecedor: R$ ${totalSupplierCost.toFixed(2)} | Abate Carteira: R$ 0.00 | Pix 24h: R$ ${totalSupplierCost.toFixed(2)} (Aguardando pagamento)`;
+
+          await supabase.from('orders').update({
+            payment_status: 'pending',
+            status: 'pendente',
+            pix_qr_code: pixData.qrCode,
+            pix_qr_code_base64: pixData.qrCodeBase64,
+            payment_id: pixData.paymentId,
+            payment_expires_at: pixData.expiresAt,
+            notes: updatedNotes,
+            updated_at: new Date().toISOString(),
+          }).eq('id', ord.id);
+
+          await supabase.from('order_status_history').insert({
+            order_id: ord.id,
+            status: 'pendente',
+            notes: `Status revertido para Pendente — cobrança Pix de R$ ${totalSupplierCost.toFixed(2)} gerada para pagamento de fulfillment`,
+            created_at: new Date().toISOString(),
+          });
+
+          revertedOrders.push({
+            order_number: ord.order_number,
+            status: 'pendente',
+            payment_status: 'pending',
+            total_supplier_cost: totalSupplierCost,
+            has_pix_qr_code: !!pixData.qrCode,
+          });
+        }
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        phantom_transactions_deleted: phantomCount,
+        phantom_credits_removed: phantomTotalCredit,
+        phantom_debits_removed: phantomTotalDebit,
+        real_wallet_balance: realBalance,
+        reverted_orders: revertedOrders,
+      }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Ação 1: Sincronização manual dos pedidos de um revendedor específico
     if (body.action === 'sync_reseller_orders' && body.user_id) {
       try {

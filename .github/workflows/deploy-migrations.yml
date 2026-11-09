@@ -38,7 +38,8 @@ jobs:
           for f in \
             20261104160000_order_pipelines_management.sql \
             20261105210000_order_management_3_0.sql \
-            20261105220000_ml_sync_pending_labels_cron.sql
+            20261105220000_ml_sync_pending_labels_cron.sql \
+            20261109180000_disable_commission_on_marketplace_orders.sql
           do
             if [ -f "/root/lojafy-deploy/migrations/$f" ]; then
               echo "==> aplicando $f"
