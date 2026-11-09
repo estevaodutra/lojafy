@@ -343,6 +343,175 @@ async function generatePix24h(params: {
 }
 
 /**
+ * Localiza com máxima precisão o produto do catálogo da Lojafy correspondente a um item vendido no Mercado Livre.
+ * Valida a coerência semântica entre o SKU retornado e o título do anúncio, prevenindo que
+ * erros de digitação no seller_sku do Mercado Livre vinculem produtos totalmente incorretos.
+ */
+async function resolveMatchedProduct(
+  item: any,
+  mlItemId: string | null,
+  resellerUserId?: string | null
+): Promise<{ product: any; matchedBy: string }> {
+  const itemTitle = (item.item?.title || '').trim();
+  const rawSku = (
+    item.item?.seller_sku ||
+    item.item?.seller_custom_field ||
+    item.item?.variation_attributes?.find((a: any) => a.id === 'SELLER_SKU')?.value_name ||
+    ''
+  ).trim() || null;
+
+  let matchedProduct: any = null;
+  let matchedBy = 'none';
+
+  // 1. Tentar por ml_item_id em mercadolivre_published_products
+  if (mlItemId) {
+    const { data: pub } = await supabase
+      .from('mercadolivre_published_products')
+      .select('product_id')
+      .eq('ml_item_id', mlItemId)
+      .maybeSingle();
+    if (pub?.product_id) {
+      const { data: p } = await supabase.from('products').select('*').eq('id', pub.product_id).maybeSingle();
+      if (p) {
+        matchedProduct = p;
+        matchedBy = 'published_products';
+      }
+    }
+  }
+
+  // 2. Tentar por ml_listing_variants (se tiver product_id vinculado)
+  if (!matchedProduct && mlItemId) {
+    const { data: vItem } = await supabase
+      .from('ml_listing_variants')
+      .select('product_id')
+      .eq('ml_item_id', mlItemId)
+      .not('product_id', 'is', null)
+      .maybeSingle();
+    if (vItem?.product_id) {
+      const { data: p } = await supabase.from('products').select('*').eq('id', vItem.product_id).maybeSingle();
+      if (p) {
+        matchedProduct = p;
+        matchedBy = 'listing_variants';
+      }
+    }
+  }
+
+  // 3. Tentar por SKU exato, validando se o título condiz com o produto
+  if (!matchedProduct && rawSku) {
+    const { data: prodBySku } = await supabase
+      .from('products')
+      .select('*')
+      .eq('sku', rawSku)
+      .maybeSingle();
+
+    if (prodBySku) {
+      if (!itemTitle) {
+        matchedProduct = prodBySku;
+        matchedBy = 'exact_sku';
+      } else {
+        const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s]/g, ' ');
+        const tTokens = new Set(normalize(itemTitle).split(/\s+/).filter(w => w.length > 3));
+        const pTokens = new Set(normalize(prodBySku.name).split(/\s+/).filter(w => w.length > 3));
+
+        let commonWords = 0;
+        for (const tok of tTokens) {
+          if (pTokens.has(tok)) commonWords++;
+        }
+
+        if (commonWords > 0 || tTokens.size === 0) {
+          matchedProduct = prodBySku;
+          matchedBy = 'sku_verified';
+        } else {
+          console.warn(`[ml-order-webhook] ⚠️ SKU ${rawSku} pertence a "${prodBySku.name}", mas o anúncio ML é "${itemTitle}". Títulos incompatíveis (0 palavras em comum)! Buscando produto real por título...`);
+        }
+      }
+    }
+  }
+
+  // 4. Se não casou (ou SKU conflitava com o título), tentar correspondência por título no catálogo
+  if (!matchedProduct && itemTitle) {
+    // 4.1 Busca exata de título
+    const { data: exactTitle } = await supabase
+      .from('products')
+      .select('*')
+      .ilike('name', itemTitle.substring(0, 60))
+      .maybeSingle();
+
+    if (exactTitle) {
+      matchedProduct = exactTitle;
+      matchedBy = 'exact_title';
+    } else {
+      // 4.2 Busca fuzzy por tokens principais
+      const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s]/g, ' ');
+      const words = normalize(itemTitle).split(/\s+/).filter(w => w.length >= 4);
+      if (words.length >= 2) {
+        const queryTerm = words.slice(0, 3).join('%');
+        const { data: candidates } = await supabase
+          .from('products')
+          .select('*')
+          .ilike('name', `%${queryTerm}%`)
+          .limit(10);
+
+        if (candidates && candidates.length > 0) {
+          let bestCandidate = candidates[0];
+          let bestScore = 0;
+          for (const cand of candidates) {
+            const cTokens = new Set(normalize(cand.name).split(/\s+/).filter(w => w.length > 3));
+            let score = 0;
+            for (const w of words) if (cTokens.has(w)) score++;
+            if (score > bestScore) {
+              bestScore = score;
+              bestCandidate = cand;
+            }
+          }
+          if (bestScore >= 2) {
+            matchedProduct = bestCandidate;
+            matchedBy = 'fuzzy_title';
+          }
+        }
+      }
+    }
+  }
+
+  // 5. Fallback final: se não encontrou nada por título, aceita o SKU retornado como último recurso
+  if (!matchedProduct && rawSku) {
+    const { data: prodBySkuFallback } = await supabase
+      .from('products')
+      .select('*')
+      .eq('sku', rawSku)
+      .maybeSingle();
+    if (prodBySkuFallback) {
+      matchedProduct = prodBySkuFallback;
+      matchedBy = 'fallback_sku';
+    }
+  }
+
+  // Se identificamos um produto com sucesso e temos ml_item_id, curar os mapeamentos no banco para próximas chamadas
+  if (matchedProduct && mlItemId && (matchedBy === 'exact_title' || matchedBy === 'fuzzy_title' || matchedBy === 'sku_verified')) {
+    try {
+      if (resellerUserId) {
+        await supabase.from('mercadolivre_published_products').upsert({
+          user_id: resellerUserId,
+          product_id: matchedProduct.id,
+          ml_item_id: mlItemId,
+          status: 'published',
+          published_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,ml_item_id' });
+      }
+
+      await supabase.from('ml_listing_variants').update({
+        product_id: matchedProduct.id,
+        sku: matchedProduct.sku,
+      }).eq('ml_item_id', mlItemId);
+    } catch (healErr) {
+      console.warn('[ml-order-webhook] Aviso ao curar mapeamento de anúncio:', healErr);
+    }
+  }
+
+  return { product: matchedProduct, matchedBy };
+}
+
+/**
  * Repara um pedido existente garantindo que etiqueta, rastreio, itens, custo e cobrança Pix estejam 100% corretos.
  */
 async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
@@ -459,27 +628,15 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
   const compiledItems: any[] = [];
 
   for (const item of orderItems) {
+    const mlItemId = item.item?.id ?? null;
+    const { product: matchedProd } = await resolveMatchedProduct(item, mlItemId, resellerUserId);
+
     const rawSku = (
       item.item?.seller_sku ||
       item.item?.seller_custom_field ||
       item.item?.variation_attributes?.find((a: any) => a.id === 'SELLER_SKU')?.value_name ||
       ''
     ).trim() || null;
-
-    let matchedProd: any = null;
-
-    if (rawSku) {
-      const { data: p } = await supabase.from('products').select('*').eq('sku', rawSku).maybeSingle();
-      matchedProd = p;
-    }
-
-    if (!matchedProd && item.item?.id) {
-      const { data: pub } = await supabase.from('mercadolivre_published_products').select('product_id').eq('ml_item_id', item.item.id).maybeSingle();
-      if (pub?.product_id) {
-        const { data: p } = await supabase.from('products').select('*').eq('id', pub.product_id).maybeSingle();
-        matchedProd = p;
-      }
-    }
 
     const unitPrice = Number(item.unit_price ?? 0);
     const quantity = Number(item.quantity ?? 1);
@@ -791,81 +948,15 @@ async function processSingleMlOrder(
     const unitPrice = Number(item.unit_price ?? 0);
     const quantity = Number(item.quantity ?? 1);
 
+    const { product: dbProduct, matchedBy } = await resolveMatchedProduct(item, mlItemId, resellerUserId);
+    const matchedProductId = dbProduct?.id ?? null;
+
     const rawSku = (
       item.item?.seller_sku ||
       item.item?.seller_custom_field ||
       item.item?.variation_attributes?.find((a: any) => a.id === 'SELLER_SKU')?.value_name ||
       ''
     ).trim() || null;
-
-    let matchedProductId: string | null = null;
-    let dbProduct: any = null;
-
-    // 1. Tentar por SKU exato na tabela products
-    if (rawSku) {
-      const { data: prodBySku } = await supabase
-        .from('products')
-        .select('id, name, cost_price, supplier_id, sku')
-        .eq('sku', rawSku)
-        .maybeSingle();
-
-      if (prodBySku) {
-        matchedProductId = prodBySku.id;
-        dbProduct = prodBySku;
-      }
-    }
-
-    // 2. Tentar por ml_item_id em mercadolivre_published_products
-    if (!matchedProductId && mlItemId) {
-      const { data: published } = await supabase
-        .from('mercadolivre_published_products')
-        .select('product_id')
-        .eq('ml_item_id', mlItemId)
-        .maybeSingle();
-      if (published?.product_id) {
-        const { data: p } = await supabase
-          .from('products')
-          .select('id, name, cost_price, supplier_id, sku, image_url, images')
-          .eq('id', published.product_id)
-          .maybeSingle();
-        if (p) {
-          matchedProductId = p.id;
-          dbProduct = p;
-        }
-      }
-    }
-
-    // 3. Tentar por internal_sku
-    if (!matchedProductId && rawSku) {
-      const { data: prodByIntSku } = await supabase
-        .from('products')
-        .select('id, name, cost_price, supplier_id, sku, image_url, images')
-        .eq('internal_sku', rawSku)
-        .maybeSingle();
-      if (prodByIntSku) {
-        matchedProductId = prodByIntSku.id;
-        dbProduct = prodByIntSku;
-      }
-    }
-
-    // 4. Tentar por ml_listing_variants
-    if (!matchedProductId && (rawSku || mlItemId)) {
-      let vQuery = supabase.from('ml_listing_variants').select('product_id');
-      if (rawSku) vQuery = vQuery.eq('sku', rawSku);
-      else if (mlItemId) vQuery = vQuery.eq('ml_item_id', mlItemId);
-      const { data: vItem } = await vQuery.maybeSingle();
-      if (vItem?.product_id) {
-        const { data: p } = await supabase
-          .from('products')
-          .select('id, name, cost_price, supplier_id, sku, image_url, images')
-          .eq('id', vItem.product_id)
-          .maybeSingle();
-        if (p) {
-          matchedProductId = p.id;
-          dbProduct = p;
-        }
-      }
-    }
 
     let costPrice = 0;
     let productName = item.item?.title || 'Produto Mercado Livre';
@@ -1640,6 +1731,215 @@ serve(async (req) => {
         debug: debugData,
         error: ordersError,
       }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Ação Especial: Correção cirúrgica de pedidos com vinculação incorreta de produtos (909, 910, 911)
+    if (body.action === 'fix_mismatched_orders') {
+      const BASTAO_PROD_ID = 'eade0422-8f3f-41f5-9b25-ab56d64ae8c4'; // Limpador E Desentupidor De Pias Ralos, SKU LJFADM000194, Custo R$ 6.00
+      const SILICONE_PROD_ID = 'db0bcf41-21bb-4cb2-9695-507858797243'; // Forma Airfryer Silicone Redonda, SKU LJFADM000147, Custo R$ 5.00
+      const RESELLER_ID = body.reseller_id || '2640edf0-819c-4f2f-89c7-c459dcf00413';
+
+      const { data: prodBastao } = await supabase.from('products').select('*').eq('id', BASTAO_PROD_ID).single();
+      const { data: prodSilicone } = await supabase.from('products').select('*').eq('id', SILICONE_PROD_ID).single();
+
+      // 1. Atualizar mapeamentos oficiais de MLB7603326488 e MLB5379767281 no banco
+      await supabase.from('mercadolivre_published_products').upsert([
+        {
+          user_id: RESELLER_ID,
+          product_id: BASTAO_PROD_ID,
+          ml_item_id: 'MLB7603326488',
+          status: 'published',
+          published_at: new Date().toISOString()
+        },
+        {
+          user_id: RESELLER_ID,
+          product_id: SILICONE_PROD_ID,
+          ml_item_id: 'MLB5379767281',
+          status: 'published',
+          published_at: new Date().toISOString()
+        }
+      ], { onConflict: 'user_id,ml_item_id' });
+
+      await supabase.from('ml_listing_variants').update({
+        product_id: BASTAO_PROD_ID,
+        sku: 'LJFADM000194'
+      }).eq('ml_item_id', 'MLB7603326488');
+
+      await supabase.from('ml_listing_variants').update({
+        product_id: SILICONE_PROD_ID,
+        sku: 'LJFADM000147'
+      }).eq('ml_item_id', 'MLB5379767281');
+
+      // Tentar atualizar seller_custom_field no Mercado Livre via API
+      let mlUpdateLog: any = {};
+      try {
+        const { data: intg } = await supabase
+          .from('mercadolivre_integrations')
+          .select('user_id, ml_user_id, access_token, refresh_token, expires_at')
+          .eq('user_id', RESELLER_ID)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (intg) {
+          const token = await getValidTokenForIntegration(intg);
+          const r1 = await fetch('https://api.mercadolibre.com/items/MLB7603326488', {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ seller_custom_field: 'LJFADM000194' })
+          });
+          mlUpdateLog.bastao = { status: r1.status, body: await r1.json().catch(() => ({})) };
+
+          const r2 = await fetch('https://api.mercadolibre.com/items/MLB5379767281', {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ seller_custom_field: 'LJFADM000147' })
+          });
+          mlUpdateLog.silicone = { status: r2.status, body: await r2.json().catch(() => ({})) };
+        }
+      } catch (mlErr: any) {
+        mlUpdateLog.error = mlErr.message;
+      }
+
+      const results: any[] = [];
+
+      // 2. Corrigir Pedidos 910 e 911 (Limpador e Desentupidor de Pias Ralos)
+      for (const ordNum of ['910', '911']) {
+        const { data: ord } = await supabase.from('orders').select('*').eq('order_number', ordNum).maybeSingle();
+        if (ord) {
+          // Atualizar item do pedido
+          await supabase.from('order_items').delete().eq('order_id', ord.id);
+          await supabase.from('order_items').insert({
+            order_id: ord.id,
+            product_id: BASTAO_PROD_ID,
+            quantity: 1,
+            unit_price: 39,
+            total_price: 39,
+            supplier_id: prodBastao.supplier_id,
+            supplier_organization_id: prodBastao.supplier_organization_id,
+            supplier_unit_cost: 6,
+            supplier_total_cost: 6,
+            reseller_margin_amount: 33,
+            platform_fee_amount: 0,
+            supplier_net_amount: 6,
+            financials_frozen_at: new Date().toISOString(),
+            product_snapshot: {
+              name: prodBastao.name,
+              sku: prodBastao.sku,
+              ml_item_id: 'MLB7603326488',
+              cost_price: 6,
+              image_url: prodBastao.image_url || prodBastao.images?.[0] || null,
+            }
+          });
+
+          // Verificar se já houve estorno prévio para evitar estorno duplicado
+          const { data: existingRefund } = await supabase
+            .from('wallet_transactions')
+            .select('id')
+            .eq('referencia_id', ord.id)
+            .eq('tipo', 'estorno')
+            .maybeSingle();
+
+          let refundAmount = 0;
+          let newBal = 0;
+          if (!existingRefund) {
+            refundAmount = 19.00; // debitado R$ 25.00, custo real R$ 6.00
+            const { data: w } = await supabase.from('wallets').select('id, saldo').eq('user_id', ord.reseller_id).single();
+            const currentBal = Number(w.saldo);
+            newBal = Math.round((currentBal + refundAmount) * 100) / 100;
+
+            await supabase.from('wallets').update({ saldo: newBal }).eq('user_id', ord.reseller_id);
+
+            await supabase.from('wallet_transactions').insert({
+              wallet_id: w.id,
+              tipo: 'estorno',
+              valor: refundAmount,
+              saldo_anterior: currentBal,
+              saldo_posterior: newBal,
+              descricao: `Reembolso de diferença de custo: Pedido #${ord.order_number} corrigido para "${prodBastao.name}" (Custo corrigido de R$ 25.00 para R$ 6.00)`,
+              referencia_tipo: 'order',
+              referencia_id: ord.id,
+              status: 'completed',
+            });
+          }
+
+          // Atualizar notes do pedido
+          const updatedNotes = ord.notes
+            ? ord.notes.replace(/Custo Fornecedor: R\$ [0-9.]+/g, 'Custo Fornecedor: R$ 6.00').replace(/Abate Carteira: R\$ [0-9.]+/g, 'Abate Carteira: R$ 6.00')
+            : `Pedido via Mercado Livre. Custo Fornecedor: R$ 6.00 | Abate Carteira: R$ 6.00 | Pix 24h: R$ 0.00`;
+
+          await supabase.from('orders').update({ notes: updatedNotes }).eq('id', ord.id);
+          results.push({ order_number: ordNum, product: prodBastao.name, refunded: refundAmount, new_balance: newBal });
+        }
+      }
+
+      // 3. Corrigir Pedido 909 (Forma Airfryer Silicone Redonda)
+      const { data: ord909 } = await supabase.from('orders').select('*').eq('order_number', '909').maybeSingle();
+      if (ord909) {
+        await supabase.from('order_items').delete().eq('order_id', ord909.id);
+        await supabase.from('order_items').insert({
+          order_id: ord909.id,
+          product_id: SILICONE_PROD_ID,
+          quantity: 2,
+          unit_price: 21.99,
+          total_price: 43.98,
+          supplier_id: prodSilicone.supplier_id,
+          supplier_organization_id: prodSilicone.supplier_organization_id,
+          supplier_unit_cost: 5,
+          supplier_total_cost: 10,
+          reseller_margin_amount: 33.98,
+          platform_fee_amount: 0,
+          supplier_net_amount: 10,
+          financials_frozen_at: new Date().toISOString(),
+          product_snapshot: {
+            name: prodSilicone.name,
+            sku: prodSilicone.sku,
+            ml_item_id: 'MLB5379767281',
+            cost_price: 5,
+            image_url: prodSilicone.image_url || prodSilicone.images?.[0] || null,
+          }
+        });
+
+        const { data: existingRefund909 } = await supabase
+          .from('wallet_transactions')
+          .select('id')
+          .eq('referencia_id', ord909.id)
+          .eq('tipo', 'estorno')
+          .maybeSingle();
+
+        let refundAmount909 = 0;
+        let newBal909 = 0;
+        if (!existingRefund909) {
+          refundAmount909 = 56.00; // debitado R$ 66.00, custo real R$ 10.00
+          const { data: w } = await supabase.from('wallets').select('id, saldo').eq('user_id', ord909.reseller_id).single();
+          const currentBal = Number(w.saldo);
+          newBal909 = Math.round((currentBal + refundAmount909) * 100) / 100;
+
+          await supabase.from('wallets').update({ saldo: newBal909 }).eq('user_id', ord909.reseller_id);
+
+          await supabase.from('wallet_transactions').insert({
+            wallet_id: w.id,
+            tipo: 'estorno',
+            valor: refundAmount909,
+            saldo_anterior: currentBal,
+            saldo_posterior: newBal909,
+            descricao: `Reembolso de diferença de custo: Pedido #909 corrigido para "${prodSilicone.name}" (Custo corrigido de R$ 66.00 para R$ 10.00)`,
+            referencia_tipo: 'order',
+            referencia_id: ord909.id,
+            status: 'completed',
+          });
+        }
+
+        const updatedNotes909 = ord909.notes
+          ? ord909.notes.replace(/Custo Fornecedor: R\$ [0-9.]+/g, 'Custo Fornecedor: R$ 10.00').replace(/Abate Carteira: R\$ [0-9.]+/g, 'Abate Carteira: R$ 10.00')
+          : `Pedido via Mercado Livre. Custo Fornecedor: R$ 10.00 | Abate Carteira: R$ 10.00 | Pix 24h: R$ 0.00`;
+
+        await supabase.from('orders').update({ notes: updatedNotes909 }).eq('id', ord909.id);
+        results.push({ order_number: '909', product: prodSilicone.name, refunded: refundAmount909, new_balance: newBal909 });
+      }
+
+      return new Response(JSON.stringify({ success: true, results, ml_update: mlUpdateLog }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
