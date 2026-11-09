@@ -102,8 +102,8 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
   onArchiveOrder,
   onRefreshOrders,
 }) => {
-  // 1. Sorting State (Default mandatory: oldest_first)
-  const [sortOption, setSortOption] = useState<OrderListSortOption>("oldest_first");
+  // 1. Sorting State (Default: newest_first)
+  const [sortOption, setSortOption] = useState<OrderListSortOption>("newest_first");
 
   // 2. Selection & Batch Actions State
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -281,11 +281,11 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="oldest_first" className="text-xs">
-                  Mais antigos primeiro
-                </SelectItem>
                 <SelectItem value="newest_first" className="text-xs">
                   Mais recentes primeiro
+                </SelectItem>
+                <SelectItem value="oldest_first" className="text-xs">
+                  Mais antigos primeiro
                 </SelectItem>
                 <SelectItem value="longest_time_in_stage" className="text-xs">
                   Maior tempo na etapa

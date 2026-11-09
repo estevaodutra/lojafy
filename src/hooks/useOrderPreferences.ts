@@ -9,7 +9,7 @@ import {
 const PREFS_STORAGE_KEY = "lojafy_order_pipeline_preferences_v1";
 
 const DEFAULT_PREFERENCES: OrderPipelinePreferences = {
-  sort_direction: "oldest_first", // Mais antigos primeiro (padrão absoluto per master prompt)
+  sort_direction: "newest_first", // Mais recentes primeiro por padrão
   age_criteria: "created_at", // Data de criação
   default_view: "pipeline",
 };
