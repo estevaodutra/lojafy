@@ -334,6 +334,12 @@ export const useRegisteredWebhooks = () => {
         timestamp: new Date().toISOString()
       };
 
+      let clientCustomFields: any[] = [];
+      try {
+        const raw = localStorage.getItem('lojafy_lead_custom_field_values');
+        if (raw) clientCustomFields = JSON.parse(raw);
+      } catch {}
+
       const { data, error } = await supabase.functions.invoke('dispatch-webhook', {
         body: {
           event_type: eventType,
@@ -342,6 +348,7 @@ export const useRegisteredWebhooks = () => {
           use_real_data: true,
           webhook_url: url,
           secret_token: secretToken || 'whsec_test',
+          client_custom_field_values: clientCustomFields,
         }
       });
 

@@ -32,39 +32,69 @@ async function generateHmacSignature(secret: string, payload: string): Promise<s
 }
 
 // Fetch reseller custom fields defined in Recursos > Campos Personalizados
-async function fetchResellerCustomFields(supabase: any, resellerId?: string | null): Promise<Record<string, any>> {
-  const customFields: Record<string, any> = {
-    id_grupo: 'GRP-2048',
-    origem_lead: 'Campanha Meta Ads',
-    etapa_lead: 'Convertido',
-    potencial_compra: 5000,
-  };
+async function fetchResellerCustomFields(
+  supabase: any,
+  resellerId?: string | null,
+  clientCustomFieldValues?: any[]
+): Promise<Record<string, any>> {
+  const customFields: Record<string, any> = {};
+  const allFieldValues: any[] = [];
 
+  // 1. Valores enviados diretamente pelo cliente via frontend
+  if (Array.isArray(clientCustomFieldValues) && clientCustomFieldValues.length > 0) {
+    allFieldValues.push(...clientCustomFieldValues);
+  }
+
+  // 2. Registro persistido em webhook_settings (custom_fields_registry)
   try {
-    const { data: defs } = await supabase
-      .from('custom_field_definitions')
-      .select('id, key')
-      .eq('is_active', true)
-      .order('display_order', { ascending: true });
+    const { data: registryRow } = await supabase
+      .from('webhook_settings')
+      .select('last_error_message')
+      .eq('event_type', 'custom_fields_registry')
+      .maybeSingle();
 
-    if (resellerId) {
-      const { data: vals } = await supabase
-        .from('lead_custom_field_values')
-        .select('field_id, value')
-        .eq('lead_id', resellerId);
-
-      if (defs && vals) {
-        const valMap = new Map(vals.map((v: any) => [v.field_id, v.value]));
-        defs.forEach((d: any) => {
-          if (valMap.has(d.id)) {
-            customFields[d.key] = valMap.get(d.id);
-          } else if (customFields[d.key] === undefined) {
-            customFields[d.key] = null;
-          }
-        });
-      }
+    if (registryRow?.last_error_message) {
+      try {
+        const parsed = JSON.parse(registryRow.last_error_message);
+        if (Array.isArray(parsed)) {
+          allFieldValues.push(...parsed);
+        }
+      } catch {}
     }
   } catch {}
+
+  // 3. Tabela lead_custom_field_values (caso venha a existir)
+  try {
+    const { data: tableVals } = await supabase
+      .from('lead_custom_field_values')
+      .select('*');
+    if (Array.isArray(tableVals)) {
+      allFieldValues.push(...tableVals);
+    }
+  } catch {}
+
+  // Filtrar valores correspondentes ao revendedor
+  let matchedVals = resellerId 
+    ? allFieldValues.filter((v: any) => v.lead_id === resellerId)
+    : [];
+
+  // Se não encontrou pelo ID exato, usa os valores cadastrados disponíveis
+  if (matchedVals.length === 0 && allFieldValues.length > 0) {
+    matchedVals = allFieldValues;
+  }
+
+  matchedVals.forEach((item: any) => {
+    const key =
+      item.field?.key ||
+      item.key ||
+      (item.field_id === 'cf-grupo-id-001' ? 'id_grupo' : null) ||
+      (item.field?.name?.toLowerCase().includes('grupo') ? 'id_grupo' : null) ||
+      item.field_name?.toLowerCase().replace(/\s+/g, '_');
+
+    if (key && item.value) {
+      customFields[key] = item.value;
+    }
+  });
 
   return customFields;
 }
@@ -776,7 +806,7 @@ async function buildUniversalOrderPayload(
       if (authUser?.user?.email) resellerEmail = authUser.user.email;
     } catch {}
 
-    const customFields = await fetchResellerCustomFields(supabase, targetResellerId);
+    const customFields = await fetchResellerCustomFields(supabase, targetResellerId, extraOptions?.clientCustomFieldValues);
     const resellerName = profile ? [profile.first_name, profile.last_name].filter(Boolean).join(' ') : null;
 
     resellerData = {
@@ -790,7 +820,7 @@ async function buildUniversalOrderPayload(
       custom_fields: customFields,
     };
   } else {
-    const customFields = await fetchResellerCustomFields(supabase, null);
+    const customFields = await fetchResellerCustomFields(supabase, null, extraOptions?.clientCustomFieldValues);
     resellerData = {
       user_id: '45d2e091-7b9e-4b68-80f4-526bf764f691',
       name: 'João Vendedor',
@@ -1020,7 +1050,7 @@ async function fetchRealTestData(supabase: any, eventType: string): Promise<{ da
   // Para QUALQUER evento de pedido (order.*), SEMPRE buscar dados reais do ÚLTIMO pedido do banco de dados!
   if (eventType.startsWith('order.')) {
     console.log(`[dispatch-webhook] fetchRealTestData: Buscando ÚLTIMO pedido real para o evento ${eventType}...`);
-    const options: any = { eventType };
+    const options: any = { eventType, clientCustomFieldValues };
     if (eventType === 'order.updated') {
       options.event_reason = 'shipping_label_attached';
     } else if (eventType === 'order.paid') {
@@ -1089,7 +1119,8 @@ Deno.serve(async (req) => {
       use_real_data = false, 
       ignore_deduplication = false,
       webhook_url: overrideUrl,
-      secret_token: overrideToken
+      secret_token: overrideToken,
+      client_custom_field_values: clientCustomFieldValues
     } = body;
 
     if (!event_type) {

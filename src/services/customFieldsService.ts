@@ -330,6 +330,43 @@ export async function fetchLeadFieldValues(leadId: string): Promise<LeadCustomFi
     }));
 }
 
+
+export async function syncCustomFieldsToDatabase(vals?: LeadCustomFieldValue[]) {
+  try {
+    const list = vals || getLocalValues();
+    const payload = JSON.stringify(list);
+
+    const { data: existing } = await (supabase as any)
+      .from('webhook_settings')
+      .select('id')
+      .eq('event_type', 'custom_fields_registry')
+      .maybeSingle();
+
+    if (existing) {
+      await (supabase as any)
+        .from('webhook_settings')
+        .update({
+          last_error_message: payload,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('event_type', 'custom_fields_registry');
+    } else {
+      await (supabase as any)
+        .from('webhook_settings')
+        .insert({
+          event_type: 'custom_fields_registry',
+          webhook_url: 'https://lojafy.app/custom-fields',
+          active: true,
+          last_error_message: payload,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+    }
+  } catch (err) {
+    console.warn('Erro ao sincronizar custom fields para webhook_settings:', err);
+  }
+}
+
 export async function saveLeadFieldValue(
   leadId: string,
   fieldId: string,
@@ -380,6 +417,7 @@ export async function saveLeadFieldValue(
     allVals.push(item);
   }
   saveLocalValues(allVals);
+  syncCustomFieldsToDatabase(allVals).catch(() => {});
 
   return item;
 }
