@@ -1257,6 +1257,19 @@ async function processSingleMlOrder(
     }
   }
 
+  // Disparar webhook de novo pedido criado (order.created)
+  try {
+    console.log(`[ml-order-webhook] Disparando webhook order.created para pedido ${orderId}`);
+    await supabase.functions.invoke('dispatch-webhook', {
+      body: {
+        event_type: 'order.created',
+        order_id: orderId,
+      },
+    });
+  } catch (whErr) {
+    console.warn('[ml-order-webhook] Falha não bloqueante ao disparar webhook order.created:', whErr);
+  }
+
   // Notificação in-app para o revendedor
   if (resellerUserId) {
     const title = isFullyPaid
@@ -1611,6 +1624,31 @@ async function syncPendingLabels(options?: { resellerUserId?: string; orderId?: 
 
       downloaded++;
       console.log(`[ml-order-webhook] ✅ Pedido #${ord.order_number} teve etiqueta sincronizada com sucesso!`);
+
+      // Disparar webhook order.updated com event_reason: 'shipping_label_attached'
+      try {
+        console.log(`[ml-order-webhook] Disparando webhook order.updated (shipping_label_attached) para pedido ${ord.id}`);
+        await supabase.functions.invoke('dispatch-webhook', {
+          body: {
+            event_type: 'order.updated',
+            order_id: ord.id,
+            event_reason: 'shipping_label_attached',
+            changes: {
+              shipping_label: {
+                attached: true,
+                file_name: `etiqueta-${mlOrderIdStr}.pdf`,
+                download_url: publicLabelUrl,
+                tracking_code: trackingCode,
+                carrier: 'Mercado Envios',
+              },
+              previous_status: ord.status,
+              current_status: nextStatus,
+            },
+          },
+        });
+      } catch (whErr) {
+        console.warn('[ml-order-webhook] Falha não bloqueante ao disparar webhook order.updated:', whErr);
+      }
     } catch (err: any) {
       console.error(`[ml-order-webhook] Erro ao sincronizar etiqueta do pedido #${ord.order_number}:`, err);
       errors.push(`Pedido #${ord.order_number}: ${err.message}`);

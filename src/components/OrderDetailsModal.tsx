@@ -649,6 +649,21 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         description: "Arquivo enviado com sucesso."
       });
 
+      // Disparar webhook order.updated com event_reason: shipping_label_attached
+      supabase.functions.invoke('dispatch-webhook', {
+        body: {
+          event_type: 'order.updated',
+          order_id: orderId,
+          event_reason: 'shipping_label_attached',
+          changes: {
+            shipping_label: {
+              attached: true,
+              file_name: file.name,
+            }
+          }
+        }
+      }).catch(err => console.warn('[OrderDetailsModal] Aviso ao disparar webhook order.updated:', err));
+
       // Refresh shipping files
       fetchShippingFiles();
       setUploadFile(null);

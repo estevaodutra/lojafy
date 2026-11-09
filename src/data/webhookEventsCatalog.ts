@@ -218,48 +218,29 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
 
   // ── 2. Eventos de Pedido ────────────────────────────────────────────────────
   {
-    eventType: 'order.automatic_fulfillment',
+    eventType: 'order.created',
     group: 'order',
-    title: 'Pedido automático (Mercado Livre)',
-    description: 'Disparado assim que uma venda do Mercado Livre é capturada, calculando o custo do fornecedor, abatendo saldo da carteira, gerando cobrança Pix (24h) e disponibilizando a etiqueta oficial de envio.',
+    title: 'Novo pedido gerado',
+    description: 'Disparado imediatamente quando um novo pedido é gerado na plataforma (Mercado Livre, Shopee, Loja própria ou API), contendo comprador, itens, link direto de pagamento e código/QR Code Pix.',
     status: 'production',
     samplePayload: {
-      event: 'order.automatic_fulfillment',
-      timestamp: '2026-10-22T01:00:00.000Z',
+      event: 'order.created',
+      timestamp: '2026-11-09T18:00:00.000Z',
       data: {
-        order: {
-          id: 'b6e82845-f09b-4389-bd6b-80fc47849e7b',
-          order_number: 'LOJ-ML-10492',
-          ml_order_id: '2000008492049',
-          status: 'pending_cost_payment',
-          total_order_amount: 149.90,
-          created_at: '2026-10-22T01:00:00.000Z'
+        order_id: 'b6e82845-f09b-4389-bd6b-80fc47849e7b',
+        order_number: 'LOJ-10892',
+        status: 'pendente',
+        origin: {
+          channel: 'mercadolivre',
+          channel_order_id: '2000008492049',
+          channel_pack_id: null
         },
-        payment_split: {
-          total_cost: 85.00,
-          wallet_balance_used: 20.00,
-          remaining_pix_amount: 65.00,
-          gateway_fee: 0.00,
-          payment_method: 'wallet_and_pix',
-          pix: {
-            copy_paste_code: '00020101021226840014br.gov.bcb.pix2562...',
-            qr_code_base64: 'data:image/png;base64,iVBORw0KGgo...',
-            expires_at: '2026-10-23T01:00:00.000Z',
-            expires_in_hours: 24
-          }
-        },
-        shipping: {
-          carrier: 'Mercado Envios',
-          ml_shipment_id: '439201940',
-          tracking_code: 'BR104920492ML',
-          label_url: 'https://lojafy-supabase.d2x.site/storage/v1/object/sign/shipping-labels/etiqueta-10492.pdf?token=...'
-        },
-        buyer: {
+        customer: {
           name: 'Maria Silva',
+          document: '123.456.789-00',
           email: 'maria.silva@exemplo.com',
           phone: '(11) 98765-4321',
-          document: '123.456.789-00',
-          address: {
+          shipping_address: {
             street: 'Av. Paulista',
             number: '1000',
             complement: 'Apto 42',
@@ -268,6 +249,29 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
             state: 'SP',
             zipcode: '01310-100'
           }
+        },
+        shipping: {
+          carrier: 'Mercado Envios',
+          tracking_code: null,
+          shipping_label_status: 'pending',
+          label_url: null
+        },
+        payment: {
+          payment_method: 'pix',
+          payment_status: 'pending',
+          payment_url: 'https://lojafy.app/pagamento/b6e82845-f09b-4389-bd6b-80fc47849e7b',
+          total_amount: 149.90,
+          pix: {
+            copy_paste_code: '00020101021226840014br.gov.bcb.pix2562...',
+            qr_code_base64: 'data:image/png;base64,iVBORw0KGgo...',
+            qr_code_image_url: 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=00020101021226840014br.gov.bcb.pix2562...',
+            expires_at: '2026-11-10T18:00:00.000Z'
+          }
+        },
+        financial: {
+          total_order_amount: 149.90,
+          supplier_cost: 85.00,
+          reseller_profit: 64.90
         },
         reseller: {
           user_id: '45d2e091-7b9e-4b68-80f4-526bf764f691',
@@ -278,9 +282,7 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
         },
         supplier: {
           id: 'supplier-uuid',
-          name: 'Distribuidora Tech Brasil',
-          email: 'contato@techbrasil.com.br',
-          phone: '(11) 3333-4444'
+          name: 'Distribuidora Tech Brasil'
         },
         items: [
           {
@@ -288,7 +290,7 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
             sku: 'TECH-FONE-BT-PRETO',
             name: 'Fone Bluetooth TWS Pro',
             quantity: 1,
-            unit_price_ml: 149.90,
+            unit_price: 149.90,
             cost_price: 85.00
           }
         ]
@@ -395,17 +397,92 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
   {
     eventType: 'order.updated',
     group: 'order',
-    title: 'Pedido atualizado',
-    description: 'Disparado quando ocorrem alterações cadastrais, de itens ou status no pedido.',
-    status: 'ready',
+    title: 'Pedido atualizado (Status ou Etiqueta anexada)',
+    description: 'Disparado quando ocorrem atualizações no pedido (mudança de status ou quando a etiqueta de frete oficial é anexada/gerada). Inclui a flag event_reason (shipping_label_attached ou status_changed) e o objeto changes com os dados da etiqueta.',
+    status: 'production',
     samplePayload: {
       event: 'order.updated',
-      timestamp: '2026-09-29T10:00:00.000Z',
+      timestamp: '2026-11-09T18:00:00.000Z',
       data: {
+        event_reason: 'shipping_label_attached',
+        changes: {
+          shipping_label: {
+            attached: true,
+            file_name: 'etiqueta-10892.pdf',
+            download_url: 'https://lojafy.app/storage/v1/object/sign/shipping-labels/etiqueta-10892.pdf?token=...',
+            tracking_code: 'BR104920492ML',
+            carrier: 'Mercado Envios'
+          },
+          previous_status: 'pendente',
+          current_status: 'recebido'
+        },
         order_id: 'b6e82845-f09b-4389-bd6b-80fc47849e7b',
         order_number: 'LOJ-10892',
-        status: 'em_separacao',
-        previous_status: 'pago'
+        status: 'recebido',
+        origin: {
+          channel: 'mercadolivre',
+          channel_order_id: '2000008492049',
+          channel_pack_id: null
+        },
+        customer: {
+          name: 'Maria Silva',
+          document: '123.456.789-00',
+          email: 'maria.silva@exemplo.com',
+          phone: '(11) 98765-4321',
+          shipping_address: {
+            street: 'Av. Paulista',
+            number: '1000',
+            complement: 'Apto 42',
+            neighborhood: 'Bela Vista',
+            city: 'São Paulo',
+            state: 'SP',
+            zipcode: '01310-100'
+          }
+        },
+        shipping: {
+          carrier: 'Mercado Envios',
+          tracking_code: 'BR104920492ML',
+          shipping_label_status: 'ready',
+          label_url: 'https://lojafy.app/storage/v1/object/sign/shipping-labels/etiqueta-10892.pdf?token=...'
+        },
+        payment: {
+          payment_method: 'pix',
+          payment_status: 'pending',
+          payment_url: 'https://lojafy.app/pagamento/b6e82845-f09b-4389-bd6b-80fc47849e7b',
+          total_amount: 149.90,
+          pix: {
+            copy_paste_code: '00020101021226840014br.gov.bcb.pix2562...',
+            qr_code_base64: 'data:image/png;base64,iVBORw0KGgo...',
+            qr_code_image_url: 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=00020101021226840014br.gov.bcb.pix2562...',
+            expires_at: '2026-11-10T18:00:00.000Z'
+          }
+        },
+        financial: {
+          total_order_amount: 149.90,
+          supplier_cost: 85.00,
+          reseller_profit: 64.90
+        },
+        reseller: {
+          user_id: '45d2e091-7b9e-4b68-80f4-526bf764f691',
+          name: 'João Vendedor',
+          email: 'joao.vendedor@exemplo.com',
+          phone: '(11) 99999-8888',
+          store_name: 'Minha Loja VIP'
+        },
+        supplier: {
+          id: 'supplier-uuid',
+          name: 'Distribuidora Tech Brasil'
+        },
+        items: [
+          {
+            product_id: '92ba8745-f09b-4389-bd6b-80fc47849e7b',
+            sku: 'TECH-FONE-BT-PRETO',
+            name: 'Fone Bluetooth TWS Pro',
+            quantity: 1,
+            unit_price: 149.90,
+            cost_price: 85.00
+          }
+        ]
       }
     }
   },

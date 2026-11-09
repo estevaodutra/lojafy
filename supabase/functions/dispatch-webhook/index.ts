@@ -539,6 +539,294 @@ async function fetchInactiveUser(supabase: any, days: number): Promise<Record<st
 }
 
 // Main function to fetch real test data based on event type
+
+// Universal Order Payload Builder (for order.created, order.updated, etc.)
+async function buildUniversalOrderPayload(
+  supabase: any,
+  orderId?: string,
+  extraOptions?: { event_reason?: string; changes?: any }
+): Promise<Record<string, any>> {
+  let orderQuery = supabase
+    .from('orders')
+    .select(`
+      id,
+      order_number,
+      total_amount,
+      payment_method,
+      payment_status,
+      status,
+      user_id,
+      reseller_id,
+      ml_order_id,
+      ml_shipment_id,
+      ml_label_url,
+      tracking_code,
+      tracking_number,
+      pix_qr_code,
+      pix_qr_code_base64,
+      payment_expires_at,
+      shipping_address,
+      customer_name,
+      customer_email,
+      customer_phone,
+      created_at
+    `);
+
+  if (orderId) {
+    orderQuery = orderQuery.eq('id', orderId);
+  } else {
+    orderQuery = orderQuery.order('created_at', { ascending: false }).limit(1);
+  }
+
+  const { data: order } = await orderQuery.maybeSingle();
+
+  const effectiveOrderId = order?.id || 'ord_demo_10892';
+  const effectiveOrderNum = order?.order_number || '10892';
+  const effectiveStatus = order?.status || 'pendente';
+  const effectiveAmount = Number(order?.total_amount) || 149.90;
+
+  // 1. Extrair comprador / endereço
+  let customerName = order?.customer_name || 'Cliente';
+  let customerEmail: string | null = order?.customer_email || null;
+  let customerPhone: string | null = order?.customer_phone || null;
+  let customerDoc: string | null = null;
+  let shippingAddr: any = null;
+
+  if (order?.user_id) {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, phone, document')
+        .eq('user_id', order.user_id)
+        .maybeSingle();
+      const { data: authUser } = await supabase.auth.admin.getUserById(order.user_id);
+      if (authUser?.user?.email) customerEmail = authUser.user.email;
+      if (profile) {
+        customerName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || customerName;
+        customerPhone = profile.phone || customerPhone;
+        customerDoc = profile.document || customerDoc;
+      }
+    } catch {}
+  }
+
+  if (order?.shipping_address) {
+    const raw = typeof order.shipping_address === 'string'
+      ? JSON.parse(order.shipping_address)
+      : order.shipping_address;
+    if (raw) {
+      shippingAddr = {
+        street: raw.street || raw.logradouro || 'Av. Paulista',
+        number: raw.number || raw.numero || '1000',
+        complement: raw.complement || raw.complemento || 'Apto 42',
+        neighborhood: raw.neighborhood || raw.bairro || 'Bela Vista',
+        city: raw.city || raw.cidade || 'São Paulo',
+        state: raw.state || raw.uf || raw.estado || 'SP',
+        zipcode: raw.zipcode || raw.zip_code || raw.cep || '01310-100',
+      };
+      if (customerName === 'Cliente') customerName = raw.receiver_name || raw.name || customerName;
+      if (!customerDoc) customerDoc = raw.cpf || raw.document || '123.456.789-00';
+      if (!customerPhone) customerPhone = raw.phone || raw.telefone || '(11) 98765-4321';
+      if (!customerEmail) customerEmail = raw.email || 'cliente@exemplo.com';
+    }
+  }
+
+  if (!shippingAddr) {
+    shippingAddr = {
+      street: 'Av. Paulista',
+      number: '1000',
+      complement: 'Apto 42',
+      neighborhood: 'Bela Vista',
+      city: 'São Paulo',
+      state: 'SP',
+      zipcode: '01310-100',
+    };
+  }
+
+  // 2. Extrair revendedor
+  let resellerData = null;
+  if (order?.reseller_id) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('first_name, last_name, phone')
+      .eq('user_id', order.reseller_id)
+      .maybeSingle();
+    const { data: store } = await supabase
+      .from('reseller_stores')
+      .select('store_name')
+      .eq('user_id', order.reseller_id)
+      .maybeSingle();
+    let resellerEmail = null;
+    try {
+      const { data: authUser } = await supabase.auth.admin.getUserById(order.reseller_id);
+      resellerEmail = authUser?.user?.email || null;
+    } catch {}
+    resellerData = {
+      user_id: order.reseller_id,
+      name: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 'Revendedor Lojafy',
+      email: resellerEmail,
+      phone: profile?.phone || null,
+      store_name: store?.store_name || 'Minha Loja VIP',
+    };
+  } else {
+    resellerData = {
+      user_id: 'usr_reseller_demo',
+      name: 'João Vendedor',
+      email: 'joao.vendedor@exemplo.com',
+      phone: '(11) 99999-8888',
+      store_name: 'Minha Loja VIP',
+    };
+  }
+
+  // 3. Extrair itens e custos de fornecedor
+  let items: any[] = [];
+  let totalSupplierCost = 0;
+  let primarySupplierId: string | null = null;
+
+  if (order?.id) {
+    const { data: dbItems } = await supabase
+      .from('order_items')
+      .select('product_id, quantity, unit_price, total_price, product_snapshot, supplier_id, supplier_unit_cost, supplier_total_cost')
+      .eq('order_id', order.id);
+
+    if (dbItems && dbItems.length > 0) {
+      items = dbItems.map((i: any) => {
+        const cost = Number(i.supplier_unit_cost) || (Number(i.unit_price) * 0.6);
+        const totalCost = Number(i.supplier_total_cost) || (cost * Number(i.quantity));
+        totalSupplierCost += totalCost;
+        if (!primarySupplierId && i.supplier_id) primarySupplierId = i.supplier_id;
+        return {
+          product_id: i.product_id,
+          sku: i.product_snapshot?.sku || 'TECH-FONE-BT-PRETO',
+          name: i.product_snapshot?.name || 'Fone Bluetooth TWS Pro',
+          quantity: i.quantity,
+          unit_price: Number(i.unit_price),
+          cost_price: Math.round(cost * 100) / 100,
+        };
+      });
+    }
+  }
+
+  if (items.length === 0) {
+    items = [
+      {
+        product_id: '92ba8745-f09b-4389-bd6b-80fc47849e7b',
+        sku: 'TECH-FONE-BT-PRETO',
+        name: 'Fone Bluetooth TWS Pro',
+        quantity: 1,
+        unit_price: effectiveAmount,
+        cost_price: 85.00,
+      }
+    ];
+    totalSupplierCost = 85.00;
+  }
+
+  // 4. Etiqueta de Envio
+  let shippingFileRecord = null;
+  if (order?.id) {
+    const { data: file } = await supabase
+      .from('order_shipping_files')
+      .select('file_name, file_path, file_size, uploaded_at')
+      .eq('order_id', order.id)
+      .order('uploaded_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    shippingFileRecord = file;
+  }
+
+  let signedLabelUrl: string | null = null;
+  const fileName = shippingFileRecord?.file_name || (order?.ml_order_id ? `etiqueta-${order.ml_order_id}.pdf` : `etiqueta-${effectiveOrderNum}.pdf`);
+
+  if (shippingFileRecord?.file_path) {
+    let { data: signedUrlData } = await supabase.storage
+      .from('shipping-files')
+      .createSignedUrl(shippingFileRecord.file_path, 604800);
+    if (!signedUrlData?.signedUrl) {
+      const fb = await supabase.storage.from('shipping-labels').createSignedUrl(shippingFileRecord.file_path, 604800);
+      signedUrlData = fb.data;
+    }
+    signedLabelUrl = getPublicSignedUrl(signedUrlData?.signedUrl) || null;
+  } else if (order?.ml_label_url) {
+    signedLabelUrl = order.ml_label_url;
+  }
+
+  const tracking = order?.tracking_code || order?.tracking_number || (order?.ml_order_id ? 'BR104920492ML' : null);
+  const carrier = order?.ml_order_id ? 'Mercado Envios' : 'Correios / Transportadora';
+  const hasLabel = !!signedLabelUrl || extraOptions?.event_reason === 'shipping_label_attached';
+
+  // 5. Dados de Pagamento e Pix
+  const pixCode = order?.pix_qr_code || '00020101021226840014br.gov.bcb.pix2562pagamentos.lojafy.app/pix/qr/demo5204000053039865802BR5915LOJAFY TECNOLOGIA6009SAO PAULO62070503***6304ABCD';
+  const pixBase64 = order?.pix_qr_code_base64 || 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  const qrCodeImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(pixCode)}`;
+  const paymentUrl = `https://lojafy.app/pagamento/${effectiveOrderId}`;
+
+  // 6. Configurar event_reason e changes se for order.updated
+  const isShippingLabelAttached = extraOptions?.event_reason === 'shipping_label_attached' || !!extraOptions?.changes?.shipping_label;
+
+  let changes = extraOptions?.changes;
+  if (!changes && isShippingLabelAttached) {
+    changes = {
+      shipping_label: {
+        attached: true,
+        file_name: fileName,
+        download_url: signedLabelUrl || `https://lojafy.app/storage/v1/object/sign/shipping-labels/${fileName}?token=demo`,
+        tracking_code: tracking || 'BR104920492ML',
+        carrier: carrier,
+      },
+      previous_status: 'pendente',
+      current_status: effectiveStatus === 'pendente' ? 'recebido' : effectiveStatus,
+    };
+  }
+
+  return {
+    ...(extraOptions?.event_reason ? { event_reason: extraOptions.event_reason } : {}),
+    ...(changes ? { changes } : {}),
+    order_id: effectiveOrderId,
+    order_number: `LOJ-${effectiveOrderNum}`,
+    status: isShippingLabelAttached && effectiveStatus === 'pendente' ? 'recebido' : effectiveStatus,
+    origin: {
+      channel: order?.ml_order_id ? 'mercadolivre' : 'shopee',
+      channel_order_id: order?.ml_order_id || '2000008492049',
+      channel_pack_id: null,
+    },
+    customer: {
+      name: customerName,
+      document: customerDoc || '123.456.789-00',
+      email: customerEmail || 'maria.silva@exemplo.com',
+      phone: customerPhone || '(11) 98765-4321',
+      shipping_address: shippingAddr,
+    },
+    shipping: {
+      carrier: carrier,
+      tracking_code: tracking || (isShippingLabelAttached ? 'BR104920492ML' : null),
+      shipping_label_status: hasLabel ? 'ready' : 'pending',
+      label_url: signedLabelUrl || (isShippingLabelAttached ? `https://lojafy.app/storage/v1/object/sign/shipping-labels/${fileName}?token=demo` : null),
+    },
+    payment: {
+      payment_method: order?.payment_method || 'pix',
+      payment_status: order?.payment_status || 'pending',
+      payment_url: paymentUrl,
+      total_amount: effectiveAmount,
+      pix: {
+        copy_paste_code: pixCode,
+        qr_code_base64: pixBase64,
+        qr_code_image_url: qrCodeImageUrl,
+        expires_at: order?.payment_expires_at || new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+      },
+    },
+    financial: {
+      total_order_amount: effectiveAmount,
+      supplier_cost: Math.round(totalSupplierCost * 100) / 100,
+      reseller_profit: Math.round(Math.max(0, effectiveAmount - totalSupplierCost) * 100) / 100,
+    },
+    reseller: resellerData,
+    supplier: {
+      id: primarySupplierId || 'supplier-uuid',
+      name: 'Distribuidora Tech Brasil',
+    },
+    items,
+  };
+}
+
 async function fetchRealTestData(supabase: any, eventType: string): Promise<{ data: Record<string, any> | null; error: string | null }> {
   switch (eventType) {
     case 'order.paid':
@@ -548,12 +836,24 @@ async function fetchRealTestData(supabase: any, eventType: string): Promise<{ da
         error: orderData ? null : 'Nenhum pedido pago encontrado para teste',
       };
 
-    case 'order.automatic_fulfillment':
-      const mlData = await fetchLastMlFulfillmentOrder(supabase);
+    case 'order.created':
+    case 'order.automatic_fulfillment': {
+      const orderCreatedData = await buildUniversalOrderPayload(supabase);
       return {
-        data: mlData,
-        error: mlData ? null : 'Nenhum pedido do Mercado Livre encontrado para teste',
+        data: orderCreatedData,
+        error: null,
       };
+    }
+
+    case 'order.updated': {
+      const orderUpdatedData = await buildUniversalOrderPayload(supabase, undefined, {
+        event_reason: 'shipping_label_attached',
+      });
+      return {
+        data: orderUpdatedData,
+        error: null,
+      };
+    }
     
     case 'user.created':
       const userData = await fetchLastCreatedUser(supabase);
@@ -621,13 +921,24 @@ Deno.serve(async (req) => {
 
     console.log(`[dispatch-webhook] Disparando evento: ${event_type}, is_test: ${is_test}, use_real_data: ${use_real_data}, overrideUrl: ${overrideUrl || 'none'}`);
 
-    // Auto-enrich order.paid payload sempre em producao para garantir dados consistentes e reais do cliente
+    // Auto-enrich universal payloads (order.created, order.updated, order.paid)
     let payload = providedPayload;
+    const targetOrderId = payload?.order_id || body.order_id;
+
     if (event_type === 'order.paid' && !is_test && !ignore_deduplication && payload?.order_id) {
-      console.log(`[dispatch-webhook] Enriquecendo payload para order ${payload.order_id}`);
+      console.log(`[dispatch-webhook] Enriquecendo payload para order.paid ${payload.order_id}`);
       const enriched = await fetchOrderById(supabase, payload.order_id);
       if (enriched) {
         payload = { ...payload, ...enriched }; 
+      }
+    } else if ((event_type === 'order.created' || event_type === 'order.updated') && targetOrderId) {
+      console.log(`[dispatch-webhook] Enriquecendo payload universal para ${event_type} (order: ${targetOrderId})`);
+      const enriched = await buildUniversalOrderPayload(supabase, targetOrderId, {
+        event_reason: body.event_reason || payload?.event_reason,
+        changes: body.changes || payload?.changes,
+      });
+      if (enriched) {
+        payload = { ...enriched, ...(payload || {}) };
       }
     }
 

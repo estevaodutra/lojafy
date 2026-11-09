@@ -339,7 +339,7 @@ export const useRegisteredWebhooks = () => {
           event_type: eventType,
           payload: sample,
           is_test: true,
-          use_real_data: eventType === 'user.created' || eventType === 'order.paid',
+          use_real_data: true,
           webhook_url: url,
           secret_token: secretToken || 'whsec_test',
         }

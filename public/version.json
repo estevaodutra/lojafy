@@ -1,7 +1,7 @@
 {
-  "hash": "auto",
-  "shortHash": "auto",
-  "message": "fix(orders): ordenacao padrao definida para mais recentes primeiro",
+  "hash": "c55846cdd7c57aaa17fcb2ea3ec9c50d25b128f8",
+  "shortHash": "c55846c",
+  "message": "fix(wallet): desativar comissao em pedidos de marketplace e adicionar limpeza de comissoes fantasmas",
   "author": "Lojafy Developer",
-  "timestamp": 1794249800000
+  "timestamp": 1794259509574
 }

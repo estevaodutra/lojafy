@@ -43,6 +43,7 @@ const FAQ = lazy(() => import("./pages/FAQ"));
 const RastrearPedido = lazy(() => import("./pages/RastrearPedido"));
 const RankingProdutos = lazy(() => import("./pages/RankingProdutos"));
 const CentralAjuda = lazy(() => import("./pages/CentralAjuda"));
+const PublicOrderPayment = lazy(() => import("./pages/PublicOrderPayment"));
 const Carrinho = lazy(() => import("./pages/Carrinho"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Auth = lazy(() => import("./pages/Auth"));
@@ -270,6 +271,9 @@ const App = () => {
                 <Route path="/termos-uso" element={<TermosUso />} />
                 <Route path="/faq" element={<FAQ />} />
                 <Route path="/rastrear-pedido" element={<RastrearPedido />} />
+                <Route path="/pagamento/:orderId" element={<PublicOrderPayment />} />
+                <Route path="/p/:orderId" element={<PublicOrderPayment />} />
+                <Route path="/pagar/:orderId" element={<PublicOrderPayment />} />
                 <Route path="/ranking-produtos" element={<RankingProdutos />} />
                 <Route path="/central-ajuda" element={<CentralAjuda />} />
                 <Route path="/carrinho" element={<Carrinho />} />
