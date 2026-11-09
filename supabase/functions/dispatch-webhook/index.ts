@@ -31,6 +31,44 @@ async function generateHmacSignature(secret: string, payload: string): Promise<s
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// Fetch reseller custom fields defined in Recursos > Campos Personalizados
+async function fetchResellerCustomFields(supabase: any, resellerId?: string | null): Promise<Record<string, any>> {
+  const customFields: Record<string, any> = {
+    id_grupo: 'GRP-2048',
+    origem_lead: 'Campanha Meta Ads',
+    etapa_lead: 'Convertido',
+    potencial_compra: 5000,
+  };
+
+  try {
+    const { data: defs } = await supabase
+      .from('custom_field_definitions')
+      .select('id, key')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true });
+
+    if (resellerId) {
+      const { data: vals } = await supabase
+        .from('lead_custom_field_values')
+        .select('field_id, value')
+        .eq('lead_id', resellerId);
+
+      if (defs && vals) {
+        const valMap = new Map(vals.map((v: any) => [v.field_id, v.value]));
+        defs.forEach((d: any) => {
+          if (valMap.has(d.id)) {
+            customFields[d.key] = valMap.get(d.id);
+          } else if (customFields[d.key] === undefined) {
+            customFields[d.key] = null;
+          }
+        });
+      }
+    }
+  } catch {}
+
+  return customFields;
+}
+
 // Fetch last paid order with customer, reseller, items and shipping label
 async function fetchLastPaidOrder(supabase: any): Promise<Record<string, any> | null> {
   console.log('[dispatch-webhook] Buscando último pedido pago...');
@@ -74,21 +112,37 @@ async function fetchLastPaidOrder(supabase: any): Promise<Record<string, any> | 
     }
   }
   
-  // Get reseller store info
+  // Get reseller store info with custom fields
   let resellerData = null;
   if (order.reseller_id) {
     const { data: store } = await supabase
       .from('reseller_stores')
-      .select('store_name')
+      .select('store_name, slug')
       .eq('user_id', order.reseller_id)
-      .single();
-    
-    if (store) {
-      resellerData = {
-        user_id: order.reseller_id,
-        store_name: store.store_name,
-      };
-    }
+      .maybeSingle();
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('first_name, last_name, phone, document')
+      .eq('user_id', order.reseller_id)
+      .maybeSingle();
+    let resellerEmail = null;
+    try {
+      const { data: authUser } = await supabase.auth.admin.getUserById(order.reseller_id);
+      resellerEmail = authUser?.user?.email || null;
+    } catch {}
+
+    const customFields = await fetchResellerCustomFields(supabase, order.reseller_id);
+
+    resellerData = {
+      user_id: order.reseller_id,
+      name: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 'Revendedor Lojafy',
+      email: resellerEmail,
+      phone: profile?.phone || null,
+      document: profile?.document || '123.456.789-00',
+      store_name: store?.store_name || 'Minha Loja VIP',
+      store_url: store?.slug ? `https://lojafy.app/loja/${store.slug}` : 'https://lojafy.app/loja/minha-loja-vip',
+      custom_fields: customFields,
+    };
   }
 
   // Get order items with product_snapshot (JSONB)
@@ -187,10 +241,32 @@ async function fetchOrderById(supabase: any, orderId: string): Promise<Record<st
   if (order.reseller_id) {
     const { data: store } = await supabase
       .from('reseller_stores')
-      .select('store_name')
+      .select('store_name, slug')
       .eq('user_id', order.reseller_id)
-      .single();
-    if (store) resellerData = { user_id: order.reseller_id, store_name: store.store_name };
+      .maybeSingle();
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('first_name, last_name, phone, document')
+      .eq('user_id', order.reseller_id)
+      .maybeSingle();
+    let resellerEmail = null;
+    try {
+      const { data: authUser } = await supabase.auth.admin.getUserById(order.reseller_id);
+      resellerEmail = authUser?.user?.email || null;
+    } catch {}
+
+    const customFields = await fetchResellerCustomFields(supabase, order.reseller_id);
+
+    resellerData = {
+      user_id: order.reseller_id,
+      name: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 'Revendedor Lojafy',
+      email: resellerEmail,
+      phone: profile?.phone || null,
+      document: profile?.document || '123.456.789-00',
+      store_name: store?.store_name || 'Minha Loja VIP',
+      store_url: store?.slug ? `https://lojafy.app/loja/${store.slug}` : 'https://lojafy.app/loja/minha-loja-vip',
+      custom_fields: customFields,
+    };
   }
 
   const { data: items } = await supabase
@@ -642,17 +718,66 @@ async function buildUniversalOrderPayload(
     };
   }
 
-  // 2. Extrair revendedor
+  // 2. Extrair revendedor e campos personalizados (Recurso: Campos Personalizados)
   let resellerData = null;
+  const targetResellerId = order?.reseller_id || order?.user_id;
+
+  // Buscar definições de campos personalizados ativas no recurso
+  let customFieldDefs: any[] = [];
+  try {
+    const { data: defs } = await supabase
+      .from('custom_field_definitions')
+      .select('id, name, key, field_type, display_order')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true });
+    if (defs && defs.length > 0) {
+      customFieldDefs = defs;
+    }
+  } catch {}
+
+  // Buscar valores preenchidos para esse lead/revendedor
+  const leadValuesMap: Record<string, string> = {};
+  if (targetResellerId) {
+    try {
+      const { data: vals } = await supabase
+        .from('lead_custom_field_values')
+        .select('field_id, value')
+        .eq('lead_id', targetResellerId);
+      if (vals) {
+        vals.forEach((v: any) => {
+          leadValuesMap[v.field_id] = v.value;
+        });
+      }
+    } catch {}
+  }
+
+  // Montar objeto de campos personalizados com os padrões do recurso
+  const customFields: Record<string, any> = {
+    id_grupo: 'GRP-2048',
+    origem_lead: 'Campanha Meta Ads',
+    etapa_lead: 'Convertido',
+    potencial_compra: 5000,
+  };
+
+  if (customFieldDefs.length > 0) {
+    customFieldDefs.forEach((def: any) => {
+      if (leadValuesMap[def.id] !== undefined && leadValuesMap[def.id] !== null) {
+        customFields[def.key] = leadValuesMap[def.id];
+      } else if (customFields[def.key] === undefined) {
+        customFields[def.key] = null;
+      }
+    });
+  }
+
   if (order?.reseller_id) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('first_name, last_name, phone')
+      .select('first_name, last_name, phone, document')
       .eq('user_id', order.reseller_id)
       .maybeSingle();
     const { data: store } = await supabase
       .from('reseller_stores')
-      .select('store_name')
+      .select('store_name, slug')
       .eq('user_id', order.reseller_id)
       .maybeSingle();
     let resellerEmail = null;
@@ -665,22 +790,29 @@ async function buildUniversalOrderPayload(
       name: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : 'Revendedor Lojafy',
       email: resellerEmail,
       phone: profile?.phone || null,
+      document: profile?.document || '123.456.789-00',
       store_name: store?.store_name || 'Minha Loja VIP',
+      store_url: store?.slug ? `https://lojafy.app/loja/${store.slug}` : 'https://lojafy.app/loja/minha-loja-vip',
+      custom_fields: customFields,
     };
   } else {
     resellerData = {
-      user_id: 'usr_reseller_demo',
+      user_id: '45d2e091-7b9e-4b68-80f4-526bf764f691',
       name: 'João Vendedor',
       email: 'joao.vendedor@exemplo.com',
       phone: '(11) 99999-8888',
+      document: '123.456.789-00',
       store_name: 'Minha Loja VIP',
+      store_url: 'https://lojafy.app/loja/minha-loja-vip',
+      custom_fields: customFields,
     };
   }
 
-  // 3. Extrair itens e custos de fornecedor
+  // 3. Extrair itens, fotos e custos de fornecedor
   let items: any[] = [];
   let totalSupplierCost = 0;
   let primarySupplierId: string | null = null;
+  const baseUrl = (Deno.env.get('PUBLIC_SITE_URL') || 'https://lojafy.app').replace(/\/$/, '');
 
   if (order?.id) {
     const { data: dbItems } = await supabase
@@ -689,15 +821,48 @@ async function buildUniversalOrderPayload(
       .eq('order_id', order.id);
 
     if (dbItems && dbItems.length > 0) {
+      // Buscar catálogo de produtos para obter imagens principais e slugs
+      const productIds = Array.from(new Set(dbItems.map((i: any) => i.product_id).filter(Boolean)));
+      const productMap = new Map<string, any>();
+      if (productIds.length > 0) {
+        try {
+          const { data: dbProducts } = await supabase
+            .from('products')
+            .select('id, name, sku, image_url, main_image_url, cost_price, slug')
+            .in('id', productIds);
+          if (dbProducts) {
+            dbProducts.forEach((p: any) => productMap.set(p.id, p));
+          }
+        } catch {}
+      }
+
       items = dbItems.map((i: any) => {
+        const prod = productMap.get(i.product_id);
         const cost = Number(i.supplier_unit_cost) || (Number(i.unit_price) * 0.6);
         const totalCost = Number(i.supplier_total_cost) || (cost * Number(i.quantity));
         totalSupplierCost += totalCost;
         if (!primarySupplierId && i.supplier_id) primarySupplierId = i.supplier_id;
+
+        const imageUrl =
+          prod?.main_image_url ||
+          prod?.image_url ||
+          i.product_snapshot?.main_image_url ||
+          i.product_snapshot?.image_url ||
+          i.product_snapshot?.image ||
+          (Array.isArray(i.product_snapshot?.images) ? i.product_snapshot.images[0] : null) ||
+          'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=600&q=80';
+
+        const productId = i.product_id || '92ba8745-f09b-4389-bd6b-80fc47849e7b';
+        const productUrl = `${baseUrl}/produto/${productId}`;
+        const catalogUrl = `${baseUrl}/catalogo/produto/${productId}`;
+
         return {
-          product_id: i.product_id,
-          sku: i.product_snapshot?.sku || 'TECH-FONE-BT-PRETO',
-          name: i.product_snapshot?.name || 'Fone Bluetooth TWS Pro',
+          product_id: productId,
+          sku: i.product_snapshot?.sku || prod?.sku || 'TECH-FONE-BT-PRETO',
+          name: i.product_snapshot?.name || prod?.name || 'Fone Bluetooth TWS Pro',
+          image_url: imageUrl,
+          product_url: productUrl,
+          catalog_url: catalogUrl,
           quantity: i.quantity,
           unit_price: Number(i.unit_price),
           cost_price: Math.round(cost * 100) / 100,
@@ -712,6 +877,9 @@ async function buildUniversalOrderPayload(
         product_id: '92ba8745-f09b-4389-bd6b-80fc47849e7b',
         sku: 'TECH-FONE-BT-PRETO',
         name: 'Fone Bluetooth TWS Pro',
+        image_url: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=600&q=80',
+        product_url: `${baseUrl}/produto/92ba8745-f09b-4389-bd6b-80fc47849e7b`,
+        catalog_url: `${baseUrl}/catalogo/produto/92ba8745-f09b-4389-bd6b-80fc47849e7b`,
         quantity: 1,
         unit_price: effectiveAmount,
         cost_price: 85.00,

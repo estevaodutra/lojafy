@@ -192,6 +192,7 @@ export async function buildOrderItemsPayload(
     return {
       product_id: item.product_id,
       product_url: `${baseUrl}/produto/${item.product_id}`,
+      catalog_url: `${baseUrl}/catalogo/produto/${item.product_id}`,
       name: snapshot?.name || product?.name || 'Produto',
       sku: snapshot?.sku || product?.sku || null,
       image_url: imageUrl,

@@ -278,7 +278,15 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
           name: 'João Vendedor',
           email: 'joao.vendedor@exemplo.com',
           phone: '(11) 99999-8888',
-          store_name: 'Minha Loja VIP'
+          document: '123.456.789-00',
+          store_name: 'Minha Loja VIP',
+          store_url: 'https://lojafy.app/loja/minha-loja-vip',
+          custom_fields: {
+            id_grupo: 'GRP-2048',
+            origem_lead: 'Campanha Meta Ads',
+            etapa_lead: 'Convertido',
+            potencial_compra: 5000
+          }
         },
         supplier: {
           id: 'supplier-uuid',
@@ -289,6 +297,9 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
             product_id: '92ba8745-f09b-4389-bd6b-80fc47849e7b',
             sku: 'TECH-FONE-BT-PRETO',
             name: 'Fone Bluetooth TWS Pro',
+            image_url: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=600&q=80',
+            product_url: 'https://lojafy.app/produto/92ba8745-f09b-4389-bd6b-80fc47849e7b',
+            catalog_url: 'https://lojafy.app/catalogo/produto/92ba8745-f09b-4389-bd6b-80fc47849e7b',
             quantity: 1,
             unit_price: 149.90,
             cost_price: 85.00
@@ -467,7 +478,15 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
           name: 'João Vendedor',
           email: 'joao.vendedor@exemplo.com',
           phone: '(11) 99999-8888',
-          store_name: 'Minha Loja VIP'
+          document: '123.456.789-00',
+          store_name: 'Minha Loja VIP',
+          store_url: 'https://lojafy.app/loja/minha-loja-vip',
+          custom_fields: {
+            id_grupo: 'GRP-2048',
+            origem_lead: 'Campanha Meta Ads',
+            etapa_lead: 'Convertido',
+            potencial_compra: 5000
+          }
         },
         supplier: {
           id: 'supplier-uuid',
@@ -478,6 +497,9 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
             product_id: '92ba8745-f09b-4389-bd6b-80fc47849e7b',
             sku: 'TECH-FONE-BT-PRETO',
             name: 'Fone Bluetooth TWS Pro',
+            image_url: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=600&q=80',
+            product_url: 'https://lojafy.app/produto/92ba8745-f09b-4389-bd6b-80fc47849e7b',
+            catalog_url: 'https://lojafy.app/catalogo/produto/92ba8745-f09b-4389-bd6b-80fc47849e7b',
             quantity: 1,
             unit_price: 149.90,
             cost_price: 85.00

@@ -1,7 +1,7 @@
 {
-  "hash": "c55846cdd7c57aaa17fcb2ea3ec9c50d25b128f8",
-  "shortHash": "c55846c",
-  "message": "fix(wallet): desativar comissao em pedidos de marketplace e adicionar limpeza de comissoes fantasmas",
+  "hash": "af6f987645197a8808824ac814001c8bb983075b",
+  "shortHash": "af6f987",
+  "message": "feat(webhooks): standardize order.created and order.updated with shipping_label_attached flag and public pix payment page",
   "author": "Lojafy Developer",
-  "timestamp": 1794259509574
+  "timestamp": 1794261289308
 }

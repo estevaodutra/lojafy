@@ -107,9 +107,31 @@ serve(async (req) => {
 
     if (!customerName) customerName = 'Cliente';
 
+    // Buscar imagens do catálogo caso não estejam presentes no snapshot
+    const productIds = ((order.order_items as any[]) || []).map((it) => it.product_id).filter(Boolean);
+    const productMap = new Map<string, any>();
+    if (productIds.length > 0) {
+      try {
+        const { data: dbProds } = await supabase
+          .from('products')
+          .select('id, image_url, main_image_url')
+          .in('id', productIds);
+        if (dbProds) {
+          dbProds.forEach((p: any) => productMap.set(p.id, p));
+        }
+      } catch {}
+    }
+
     // Itens sanitizados - NENHUM dado de fornecedor ou custos internos
     const items = ((order.order_items as any[]) || []).map((it) => {
       const snap = it.product_snapshot || {};
+      const prod = productMap.get(it.product_id);
+      const img = snap.image_url || 
+        (Array.isArray(snap.images) ? snap.images[0] : null) || 
+        prod?.main_image_url || 
+        prod?.image_url || 
+        null;
+
       return {
         id: it.id,
         product_id: it.product_id,
@@ -118,7 +140,9 @@ serve(async (req) => {
         quantity: it.quantity,
         unit_price: it.unit_price,
         total_price: it.total_price || (it.unit_price * it.quantity),
-        image_url: snap.image_url || (Array.isArray(snap.images) ? snap.images[0] : null) || null,
+        image_url: img,
+        product_url: `https://lojafy.app/produto/${it.product_id}`,
+        catalog_url: `https://lojafy.app/catalogo/produto/${it.product_id}`,
       };
     });
 
