@@ -1574,11 +1574,70 @@ serve(async (req) => {
         walletData = w;
       }
 
+      let debugData: any = {};
+      if (body.debug_investigate) {
+        // 1. Published products for relevant MLB item IDs
+        const { data: pubData } = await supabase
+          .from('mercadolivre_published_products')
+          .select('*, product:products(id, name, sku, cost_price)')
+          .in('ml_item_id', ['MLB7603326488', 'MLB5379767281', '7603326488', '5379767281']);
+        debugData.published = pubData;
+
+        // 2. Listing variants
+        const { data: variantsData } = await supabase
+          .from('ml_listing_variants')
+          .select('*')
+          .in('ml_item_id', ['MLB7603326488', 'MLB5379767281', '7603326488', '5379767281']);
+        debugData.variants = variantsData;
+
+        // 3. Search products by keywords
+        const { data: bastaoProds } = await supabase
+          .from('products')
+          .select('id, name, sku, cost_price, supplier_id, supplier_cost_price')
+          .or('name.ilike.%bastão%,name.ilike.%bastao%,name.ilike.%desentup%,name.ilike.%silicone%,name.ilike.%air fryer%')
+          .limit(20);
+        debugData.matching_products = bastaoProds;
+
+        // 4. Products by SKUs
+        const { data: skuProds } = await supabase
+          .from('products')
+          .select('id, name, sku, cost_price, supplier_id')
+          .in('sku', ['LJFADM000197', 'LJFADM000140']);
+        debugData.sku_products = skuProds;
+
+        // 5. ML API check for orders
+        const testOrders = ['2000019411133852', '2000019409877076', '2000015928621835', '2000015927574317'];
+        const mlOrdersFound: any[] = [];
+        for (const tOrd of testOrders) {
+          const sInfo = await findSellerForOrder(tOrd, body.reseller_id || '2640edf0-819c-4f2f-89c7-c459dcf00413');
+          if (sInfo && sInfo.mlOrder) {
+            mlOrdersFound.push({
+              searched_id: tOrd,
+              found_order_id: sInfo.mlOrder.id,
+              pack_id: sInfo.mlOrder.pack_id,
+              status: sInfo.mlOrder.status,
+              total_amount: sInfo.mlOrder.total_amount,
+              order_items: (sInfo.mlOrder.order_items || []).map((oi: any) => ({
+                item_id: oi.item?.id,
+                title: oi.item?.title,
+                seller_sku: oi.item?.seller_sku,
+                seller_custom_field: oi.item?.seller_custom_field,
+                variation_attributes: oi.item?.variation_attributes,
+                quantity: oi.quantity,
+                unit_price: oi.unit_price,
+              }))
+            });
+          }
+        }
+        debugData.ml_orders = mlOrdersFound;
+      }
+
       return new Response(JSON.stringify({
         success: true,
         orders: ordersData,
         items: itemsData,
         wallet: walletData,
+        debug: debugData,
         error: ordersError,
       }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
