@@ -1,7 +1,7 @@
 {
-  "hash": "b9084fef4f6ddfe0c8adad650d2527d4e621f265",
-  "shortHash": "b9084fe",
-  "message": "fix(webhooks): always fetch the real latest order from database in webhook test execution",
+  "hash": "aba6f39a75daee5fa7969ff6494d912c9f44926b",
+  "shortHash": "aba6f39",
+  "message": "fix(webhooks): inform real group ID and custom fields from user details into webhook payload",
   "author": "Lojafy Developer",
-  "timestamp": 1794265506350
+  "timestamp": 1794266526063
 }

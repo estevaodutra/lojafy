@@ -1046,7 +1046,7 @@ async function buildUniversalOrderPayload(
   };
 }
 
-async function fetchRealTestData(supabase: any, eventType: string): Promise<{ data: Record<string, any> | null; error: string | null }> {
+async function fetchRealTestData(supabase: any, eventType: string, clientCustomFieldValues?: any[]): Promise<{ data: Record<string, any> | null; error: string | null }> {
   // Para QUALQUER evento de pedido (order.*), SEMPRE buscar dados reais do ÚLTIMO pedido do banco de dados!
   if (eventType.startsWith('order.')) {
     console.log(`[dispatch-webhook] fetchRealTestData: Buscando ÚLTIMO pedido real para o evento ${eventType}...`);
@@ -1132,56 +1132,50 @@ Deno.serve(async (req) => {
 
     console.log(`[dispatch-webhook] Disparando evento: ${event_type}, is_test: ${is_test}, use_real_data: ${use_real_data}, overrideUrl: ${overrideUrl || 'none'}`);
 
-    // Auto-enrich universal payloads (order.created, order.updated, order.paid)
+    // Processamento do payload (Teste com dados reais vs Produção)
     let payload = providedPayload;
-    const targetOrderId = payload?.order_id || body.order_id;
 
-    if (event_type === 'order.paid' && !is_test && !ignore_deduplication && payload?.order_id) {
-      console.log(`[dispatch-webhook] Enriquecendo payload para order.paid ${payload.order_id}`);
-      const enriched = await fetchOrderById(supabase, payload.order_id);
-      if (enriched) {
-        payload = { ...payload, ...enriched }; 
+    if (is_test && use_real_data) {
+      console.log(`[dispatch-webhook] Modo TESTE: Buscando dados reais do banco para ${event_type}...`);
+      try {
+        const { data: realData, error: realErr } = await fetchRealTestData(supabase, event_type, clientCustomFieldValues);
+        if (realData) {
+          payload = realData;
+          console.log(`[dispatch-webhook] ✅ Dados reais encontrados para ${event_type}: Pedido ${payload.order_number || payload.order_id}`);
+        } else {
+          console.warn(`[dispatch-webhook] Dados reais não encontrados para ${event_type}: ${realErr}`);
+        }
+      } catch (err) {
+        console.error(`[dispatch-webhook] Erro ao buscar dados reais para ${event_type}:`, err);
       }
-    } else if ((event_type === 'order.created' || event_type === 'order.updated') && targetOrderId) {
-      console.log(`[dispatch-webhook] Enriquecendo payload universal para ${event_type} (order: ${targetOrderId})`);
-      const enriched = await buildUniversalOrderPayload(supabase, targetOrderId, {
-        event_reason: body.event_reason || payload?.event_reason,
-        changes: body.changes || payload?.changes,
-      });
-      if (enriched) {
-        payload = { ...enriched, ...(payload || {}) };
+    } else if (!is_test) {
+      // Produção: Auto-enriquecimento do pedido real
+      const targetOrderId = payload?.order_id || body.order_id;
+      if (event_type === 'order.paid' && !ignore_deduplication && targetOrderId) {
+        console.log(`[dispatch-webhook] Enriquecendo payload para order.paid ${targetOrderId}`);
+        const enriched = await fetchOrderById(supabase, targetOrderId);
+        if (enriched) {
+          payload = { ...enriched, ...(payload || {}) };
+        }
+      } else if ((event_type === 'order.created' || event_type === 'order.updated') && targetOrderId) {
+        console.log(`[dispatch-webhook] Enriquecendo payload universal para ${event_type} (order: ${targetOrderId})`);
+        const enriched = await buildUniversalOrderPayload(supabase, targetOrderId, {
+          event_reason: body.event_reason || payload?.event_reason,
+          changes: body.changes || payload?.changes,
+          clientCustomFieldValues,
+        });
+        if (enriched) {
+          payload = { ...enriched, ...(payload || {}) };
+        }
       }
     }
 
-    // Fetch real data if requested for test
-    if (is_test) {
-      if (use_real_data) {
-        console.log(`[dispatch-webhook] Buscando dados reais para teste de ${event_type}...`);
-        try {
-          const { data: realData } = await fetchRealTestData(supabase, event_type);
-          if (realData) {
-            payload = realData;
-            console.log(`[dispatch-webhook] Dados reais encontrados para ${event_type}`);
-          } else {
-            console.log(`[dispatch-webhook] Dados reais não encontrados para ${event_type}, usando payload simulado`);
-            if (!payload) {
-              payload = providedPayload;
-            }
-          }
-        } catch (err) {
-          console.warn(`[dispatch-webhook] Falha ao obter dados reais para ${event_type}:`, err);
-          if (!payload) {
-            payload = providedPayload;
-          }
-        }
-      }
-      if (!payload) {
-        payload = providedPayload || {
-          _test: true,
-          event: event_type,
-          timestamp: new Date().toISOString(),
-        };
-      }
+    if (!payload) {
+      payload = providedPayload || {
+        _test: true,
+        event: event_type,
+        timestamp: new Date().toISOString(),
+      };
     }
 
     // Identificar URLs de destino: overrideUrl direto ou busca em registered_webhooks / webhook_settings

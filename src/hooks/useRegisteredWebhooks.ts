@@ -343,7 +343,7 @@ export const useRegisteredWebhooks = () => {
       const { data, error } = await supabase.functions.invoke('dispatch-webhook', {
         body: {
           event_type: eventType,
-          payload: sample,
+          payload: undefined, // Sempre buscar os dados reais do banco de dados
           is_test: true,
           use_real_data: true,
           webhook_url: url,
