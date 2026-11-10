@@ -1,7 +1,7 @@
 {
-  "hash": "82abf3d12e4241a6e180d90b00f28c129f98269e",
-  "shortHash": "82abf3d",
-  "message": "feat(kanban): ultra-fast dnd with column collision feedback and advance stage split-button",
+  "hash": "7ebd3df7e2a0389d7165c99ce97e095df679878b",
+  "shortHash": "7ebd3df",
+  "message": "fix(payment): use only existing columns in public-order-payment query",
   "author": "Lojafy Developer",
-  "timestamp": 1794321603453
+  "timestamp": 1794322507670
 }

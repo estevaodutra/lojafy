@@ -8,20 +8,29 @@ import {
   ShieldCheck, 
   Package, 
   QrCode, 
-  ExternalLink,
-  AlertCircle,
-  RefreshCw,
-  ShoppingBag,
-  Link2,
-  Truck,
-  Info,
-  FileText
+  ExternalLink, 
+  AlertCircle, 
+  RefreshCw, 
+  ShoppingBag, 
+  Link2, 
+  Truck, 
+  Info, 
+  FileText 
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useStoreConfig } from '@/hooks/useStoreConfig';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
@@ -81,12 +90,20 @@ interface PublicOrderPaymentData {
 export const PublicOrderPayment: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
   const { toast } = useToast();
+  const { config } = useStoreConfig();
 
   const [order, setOrder] = useState<PublicOrderPaymentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
+  const [hasSeenLabelModal, setHasSeenLabelModal] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem(`seen_label_modal_${orderId}`) === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   const fetchOrder = useCallback(async () => {
     if (!orderId) return;
@@ -173,6 +190,15 @@ export const PublicOrderPayment: React.FC = () => {
     setTimeout(() => setCopied(false), 3000);
   };
 
+  const handleAcknowledgeLabelModal = () => {
+    setHasSeenLabelModal(true);
+    if (orderId) {
+      try {
+        sessionStorage.setItem(`seen_label_modal_${orderId}`, 'true');
+      } catch {}
+    }
+  };
+
   const formatBRL = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
 
@@ -223,24 +249,40 @@ export const PublicOrderPayment: React.FC = () => {
   const profitVal = order.seller_profit !== undefined ? order.seller_profit : Math.max(0, saleVal - feeVal - costVal);
   const marginPct = order.seller_margin_pct !== undefined ? order.seller_margin_pct : (saleVal > 0 ? (profitVal / saleVal) * 100 : 0);
 
+  const hasShippingLabel = !!(order.has_shipping_label || order.shipping_label_status === 'ready');
+  const showLabelPendingModal = !hasShippingLabel && !isPaid && !hasSeenLabelModal;
+
+  const storeLogo = config?.logo_url || 'https://lojafy-supabase.d2x.site/storage/v1/object/public/product-images/store/1785768679169-r54a7kd16za.png';
+  const storeName = config?.store_name || 'Fornecedor Nacional';
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-slate-100/70 to-slate-200/50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 py-8 px-4 sm:px-6">
       <div className="max-w-xl mx-auto space-y-5">
 
-        {/* Top Branding Header */}
-        <div className="flex items-center justify-between">
+        {/* Top Branding Header com a Logo do Fornecedor Nacional */}
+        <div className="flex items-center justify-between py-1">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-[#5B47FB] text-white shadow-sm">
-              <ShoppingBag className="h-5 w-5" />
-            </div>
-            <div>
-              <span className="font-bold text-lg tracking-tight text-foreground">Lojafy</span>
-              <span className="text-xs text-muted-foreground block -mt-1">Pagamento Seguro</span>
-            </div>
+            {storeLogo ? (
+              <img
+                src={storeLogo}
+                alt={storeName}
+                className="h-10 sm:h-12 w-auto object-contain drop-shadow-xs"
+              />
+            ) : (
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-[#5B47FB] text-white shadow-sm">
+                  <ShoppingBag className="h-5 w-5" />
+                </div>
+                <div>
+                  <span className="font-bold text-lg tracking-tight text-foreground">{storeName}</span>
+                  <span className="text-xs text-muted-foreground block -mt-1">Pagamento Seguro</span>
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-1 rounded-full border border-emerald-500/20 font-medium">
-            <ShieldCheck className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-full border border-emerald-500/20 font-medium shrink-0">
+            <ShieldCheck className="h-4 w-4" />
             <span>Ambiente Seguro</span>
           </div>
         </div>
@@ -306,16 +348,14 @@ export const PublicOrderPayment: React.FC = () => {
                   variant="outline"
                   className={cn(
                     "text-[10px] px-2 py-0.5 font-medium flex items-center gap-1",
-                    order.has_shipping_label || order.shipping_label_status === 'ready'
+                    hasShippingLabel
                       ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900"
-                      : "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
+                      : "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
                   )}
                 >
                   <FileText className="w-3 h-3" />
                   <span>
-                    {order.has_shipping_label || order.shipping_label_status === 'ready'
-                      ? 'Etiqueta Liberada'
-                      : 'Aguardando Etiqueta'}
+                    {hasShippingLabel ? 'Etiqueta Liberada' : 'Aguardando Etiqueta'}
                   </span>
                 </Badge>
               </div>
@@ -347,7 +387,7 @@ export const PublicOrderPayment: React.FC = () => {
               ))}
             </div>
 
-            {/* Partes Operacionais: Seller e Cliente (SEM dados Lojafy e SEM Fornecedor) */}
+            {/* Partes Operacionais: Seller e Cliente */}
             <div className="grid grid-cols-1 gap-1.5 text-xs py-2.5 border-y border-border/40">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground font-medium">Seller:</span>
@@ -366,6 +406,21 @@ export const PublicOrderPayment: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Observação Explicativa caso a Etiqueta ainda esteja Aguardando Liberação */}
+            {!hasShippingLabel && (
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2.5">
+                <Info className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                <div className="space-y-0.5">
+                  <p className="font-semibold text-amber-950 dark:text-amber-100">
+                    Aguardando liberação da etiqueta
+                  </p>
+                  <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
+                    Você vai fazer o pagamento do produto. O nosso sistema vai ficar verificando continuamente se a etiqueta foi disponibilizada pelo Mercado Livre e, assim que for liberada, nós processaremos o envio automaticamente.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Detalhamento Financeiro dos Valores (Idêntico ao Card Contábil) */}
             <div className="pt-1 space-y-1.5">
@@ -578,6 +633,64 @@ export const PublicOrderPayment: React.FC = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* POP-UP AUTOMÁTICO: Aguardando Liberação de Etiqueta */}
+        <Dialog open={showLabelPendingModal} onOpenChange={(open) => { if (!open) handleAcknowledgeLabelModal(); }}>
+          <DialogContent className="max-w-md p-6 bg-card border shadow-xl rounded-2xl">
+            <DialogHeader className="text-center space-y-2.5">
+              <div className="w-14 h-14 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 flex items-center justify-center mx-auto shadow-inner">
+                <Clock className="w-7 h-7 animate-pulse" />
+              </div>
+              <DialogTitle className="text-lg font-bold text-center text-foreground">
+                Aguardando Liberação da Etiqueta
+              </DialogTitle>
+              <DialogDescription className="text-xs text-center text-muted-foreground">
+                Informação importante sobre o processamento do pedido #{order.order_number}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3.5 py-2 text-xs">
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 leading-relaxed space-y-2">
+                <p className="font-medium text-[13px] text-amber-950 dark:text-amber-100">
+                  Você vai fazer o pagamento do produto.
+                </p>
+                <p className="text-amber-800/90 dark:text-amber-300/90">
+                  O nosso sistema vai ficar verificando continuamente se a etiqueta foi disponibilizada pelo Mercado Livre e, assim que for liberada, nós vamos processar o envio automaticamente!
+                </p>
+              </div>
+
+              <div className="p-3 rounded-lg bg-muted/50 border text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Pedido:</span>
+                  <span className="font-semibold text-foreground">
+                    #{order.order_number} {order.ml_order_id ? `(ML #${order.ml_order_id})` : ''}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Custo a pagar:</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                    {formatBRL(costVal)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Etiqueta no Mercado Livre:</span>
+                  <span className="font-medium text-amber-600 dark:text-amber-400">
+                    Aguardando liberação automática
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="sm:justify-center pt-2">
+              <Button
+                onClick={handleAcknowledgeLabelModal}
+                className="w-full bg-[#5B47FB] hover:bg-[#4C39EC] text-white font-semibold py-2.5 rounded-xl shadow-sm"
+              >
+                OK, prosseguir para o pagamento
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
       </div>
     </div>
