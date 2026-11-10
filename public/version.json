@@ -1,7 +1,7 @@
 {
-  "hash": "86cfe43af2a7e0d323f0cded16140dbbe0e3f5aa",
-  "shortHash": "86cfe43",
-  "message": "fix(webhook): remove stray closing brace in repairExistingOrder",
+  "hash": "82abf3d12e4241a6e180d90b00f28c129f98269e",
+  "shortHash": "82abf3d",
+  "message": "feat(kanban): ultra-fast dnd with column collision feedback and advance stage split-button",
   "author": "Lojafy Developer",
-  "timestamp": 1794319561186
+  "timestamp": 1794321603453
 }

@@ -52,6 +52,15 @@ serve(async (req) => {
         status,
         payment_status,
         payment_method,
+        payment_id,
+        external_reference,
+        tracking_code,
+        ml_shipment_id,
+        ml_label_url,
+        has_shipping_file,
+        tax_amount,
+        channel,
+        origin_type,
         total_amount,
         created_at,
         payment_expires_at,
@@ -219,18 +228,96 @@ serve(async (req) => {
 
     const isPaid = order.payment_status === 'paid' || order.status === 'pago' || order.status === 'recebido' || order.status === 'enviado';
 
+    // Buscar nome do revendedor (seller)
+    let sellerName = 'Revendedor';
+    if (order.reseller_id) {
+      try {
+        const { data: resProfile } = await supabase
+          .from('profiles')
+          .select('business_name, first_name, last_name')
+          .eq('user_id', order.reseller_id)
+          .maybeSingle();
+        if (resProfile) {
+          sellerName = resProfile.business_name || [resProfile.first_name, resProfile.last_name].filter(Boolean).join(' ') || 'Revendedor';
+        }
+      } catch {}
+    }
+
+    // Métricas financeiras da venda
+    const saleAmount = Number(order.total_amount || 0);
+    let marketplaceFee = Number(order.tax_amount || 0);
+
+    if (marketplaceFee <= 0 && typeof order.notes === 'string') {
+      const feeMatch = order.notes.match(/Taxas ML:\s*R\$\s*([0-9.,]+)/i) || order.notes.match(/Taxas:\s*R\$\s*([0-9.,]+)/i);
+      if (feeMatch) {
+        const parsed = parseFloat(feeMatch[1].replace(',', '.'));
+        if (!isNaN(parsed) && parsed > 0) marketplaceFee = parsed;
+      }
+    }
+
+    if (marketplaceFee <= 0 && isMarketplaceOrder && saleAmount > 0) {
+      if (saleAmount < 79) {
+        marketplaceFee = Math.round((6.00 + (saleAmount * 0.11)) * 100) / 100;
+      } else {
+        marketplaceFee = Math.round((saleAmount * 0.13) * 100) / 100;
+      }
+    }
+    marketplaceFee = Math.round(marketplaceFee * 100) / 100;
+
+    const sellerCost = totalPayableAmount; // R$ 6,90
+    const sellerProfit = isMarketplaceOrder
+      ? Math.max(0, Math.round((saleAmount - marketplaceFee - sellerCost) * 100) / 100)
+      : Math.max(0, Math.round((saleAmount - sellerCost) * 100) / 100);
+
+    const sellerMarginPct = saleAmount > 0 ? (sellerProfit / saleAmount) * 100 : 0;
+
+    // Formatar tempo na etapa
+    const diffMs = Date.now() - new Date(order.created_at).getTime();
+    let timeInStageDisplay = "Recentemente";
+    if (!isNaN(diffMs) && diffMs >= 0) {
+      const minutes = Math.floor(diffMs / (1000 * 60));
+      if (minutes < 60) {
+        timeInStageDisplay = `Há ${Math.max(1, minutes)}m na etapa`;
+      } else {
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) {
+          timeInStageDisplay = `Há ${hours}h na etapa`;
+        } else {
+          const days = Math.floor(hours / 24);
+          timeInStageDisplay = `Há ${days}d na etapa`;
+        }
+      }
+    }
+
+    const orderNumStr = String(order.order_number || '').replace(/^#/, '');
+
     return new Response(
       JSON.stringify({
         success: true,
         order: {
           id: order.id,
-          order_number: order.order_number,
+          order_number: orderNumStr,
           status: order.status,
           payment_status: isPaid ? 'paid' : (order.payment_status || 'pending'),
           payment_method: order.payment_method || 'pix',
           total_amount: isMarketplaceOrder ? totalPayableAmount : order.total_amount,
-          retail_sale_amount: order.total_amount,
+          retail_sale_amount: saleAmount,
+          sale_amount: saleAmount,
+          marketplace_fee: marketplaceFee,
+          seller_cost: sellerCost,
+          seller_profit: sellerProfit,
+          seller_margin_pct: sellerMarginPct,
           is_marketplace: isMarketplaceOrder,
+          ml_order_id: order.ml_order_id || null,
+          external_reference: order.external_reference || order.payment_id || (order.ml_order_id ? `m1_pay_${orderNumStr}` : null),
+          channel: order.channel || (order.ml_order_id ? 'mercadolivre' : 'lojafy'),
+          channel_label: (order.channel === 'mercadolivre' || order.ml_order_id) ? 'ML' : 'LOJAFY',
+          origin_type: (order.ml_order_id || order.external_reference) ? 'AUTO' : 'MANUAL',
+          tracking_number: order.tracking_code || null,
+          has_shipping_label: !!(order.has_shipping_file || order.ml_label_url),
+          shipping_label_status: (order.has_shipping_file || order.ml_label_url) ? 'ready' : 'pending',
+          seller_name: sellerName,
+          time_in_stage_display: timeInStageDisplay,
           created_at: order.created_at,
           payment_expires_at: order.payment_expires_at || null,
           customer: {
