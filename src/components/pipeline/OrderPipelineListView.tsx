@@ -113,6 +113,12 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
       currency: "BRL",
     }).format(val || 0);
 
+  const formatAmountOnly = (val: number) =>
+    Math.abs(val || 0).toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
   const formatPercent = (val: number) =>
     `${(val || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 
@@ -411,7 +417,7 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                   <TableHead className="min-w-[220px] py-2.5">Produto</TableHead>
                   <TableHead className="w-[200px] py-2.5">Operação</TableHead>
                   <TableHead className="w-[180px] py-2.5">Status</TableHead>
-                  <TableHead className="w-[110px] py-2.5 text-right">Total</TableHead>
+                  <TableHead className="w-[145px] py-2.5 text-right">Total</TableHead>
                   <TableHead className="w-[190px] py-2.5 text-center">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -713,14 +719,18 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                         */}
                         <TableCell className="py-2.5 align-middle text-right">
                           {order.is_marketplace ? (
-                            <div className="space-y-0.5 inline-flex flex-col items-end text-xs">
-                              {/* Venda, Taxas e Custo */}
-                              <div className="text-[11px] text-muted-foreground">
-                                Venda: <span className="font-semibold text-foreground">{formatBRL(order.sale_amount)}</span>
-                              </div>
-                              <div className="text-[11px] text-muted-foreground flex items-center gap-1 justify-end">
-                                <span className="inline-flex items-center gap-0.5">
-                                  <span>Taxas:</span>
+                            <div className="inline-block text-left w-[145px]">
+                              <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-1.5 gap-y-0.5 text-xs">
+                                {/* Venda */}
+                                <span className="text-[11px] text-muted-foreground">Venda</span>
+                                <span className="font-mono text-muted-foreground text-right text-[10px]">R$</span>
+                                <span className="font-mono font-semibold text-foreground text-right tabular-nums text-[11px]">
+                                  {formatAmountOnly(order.sale_amount)}
+                                </span>
+
+                                {/* Taxas */}
+                                <span className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground">
+                                  <span>Taxas</span>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <span className="cursor-help inline-flex items-center">
@@ -753,61 +763,68 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                                     </TooltipContent>
                                   </Tooltip>
                                 </span>
-                                <span className="font-medium text-rose-600 dark:text-rose-400">-{formatBRL(order.marketplace_fee)}</span>
-                              </div>
-                              <div className="text-[11px] text-muted-foreground">
-                                Custo: <span className="font-semibold text-foreground">{formatBRL(order.seller_cost)}</span>
-                              </div>
-
-                              {/* Lucro Revendedor */}
-                              <div className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold justify-end">
-                                <span>Lucro: {formatBRL(order.seller_profit)}</span>
-                                <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
-                                  {formatPercent(order.seller_margin_pct)}
+                                <span className="font-mono text-rose-600 dark:text-rose-400 text-right text-[10px] font-medium">-R$</span>
+                                <span className="font-mono font-medium text-rose-600 dark:text-rose-400 text-right tabular-nums text-[11px]">
+                                  {formatAmountOnly(order.marketplace_fee)}
                                 </span>
-                              </div>
 
-                              {/* Bloco Lojafy (SuperAdmin) */}
-                              {showAdminMetrics && (
-                                <div className="text-[10px] text-muted-foreground/90 pt-0.5 border-t border-dashed border-border/70 flex items-center gap-1 justify-end">
-                                  <span className="inline-flex items-center gap-0.5">
-                                    <span className="font-bold text-primary">Lojafy:</span>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <span className="cursor-help inline-flex items-center">
-                                          <Info className="w-2.5 h-2.5 text-muted-foreground/70 hover:text-foreground transition-colors" />
-                                        </span>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top" className="max-w-[240px] p-2 space-y-1 text-xs text-left bg-popover text-popover-foreground shadow-md border">
-                                        <p className="font-semibold text-foreground text-[11px]">Composição Lojafy:</p>
-                                        <div className="flex justify-between text-[11px]">
-                                          <span className="text-muted-foreground">Venda:</span>
-                                          <span className="font-mono">{formatBRL(order.lojafy_sale)}</span>
-                                        </div>
-                                        <div className="flex justify-between text-[11px]">
-                                          <span className="text-muted-foreground">Taxas (4,5% + 1%):</span>
-                                          <span className="font-mono text-rose-500">-{formatBRL(order.lojafy_fee)}</span>
-                                        </div>
-                                        <div className="flex justify-between text-[11px]">
-                                          <span className="text-muted-foreground">Custo Fornecedor:</span>
-                                          <span className="font-mono">{formatBRL(order.lojafy_cost)}</span>
-                                        </div>
-                                        <div className="border-t border-border/60 pt-0.5 flex justify-between font-semibold text-[11px] text-emerald-600">
-                                          <span>Lucro Líquido:</span>
-                                          <span className="font-mono">+{formatBRL(order.lojafy_profit)} ({formatPercent(order.lojafy_margin_pct)})</span>
-                                        </div>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </span>
-                                  <span className="font-semibold text-foreground">+{formatBRL(order.lojafy_profit)}</span>
-                                  <span className="font-mono text-[9px] text-emerald-600 dark:text-emerald-400">
-                                    ({formatPercent(order.lojafy_margin_pct)})
-                                  </span>
-                                </div>
-                              )}
+                                {/* Custo */}
+                                <span className="text-[11px] text-muted-foreground">Custo</span>
+                                <span className="font-mono text-muted-foreground text-right text-[10px]">R$</span>
+                                <span className="font-mono font-semibold text-foreground text-right tabular-nums text-[11px]">
+                                  {formatAmountOnly(order.seller_cost)}
+                                </span>
+
+                                {/* Lucro Líquido (sem percentual no formato lista) */}
+                                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">Lucro</span>
+                                <span className="font-mono text-emerald-600 dark:text-emerald-400 text-right text-[10px] font-medium">R$</span>
+                                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-right tabular-nums text-[11px]">
+                                  {formatAmountOnly(order.seller_profit)}
+                                </span>
+
+                                {/* Bloco Lojafy (SuperAdmin) */}
+                                {showAdminMetrics && (
+                                  <>
+                                    <div className="col-span-3 border-t border-dashed border-border/70 my-0.5" />
+                                    <span className="inline-flex items-center gap-0.5 text-primary font-bold text-[10px]">
+                                      <span>Lojafy</span>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="cursor-help inline-flex items-center">
+                                            <Info className="w-2.5 h-2.5 text-muted-foreground/70 hover:text-foreground transition-colors" />
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="max-w-[240px] p-2 space-y-1 text-xs text-left bg-popover text-popover-foreground shadow-md border">
+                                          <p className="font-semibold text-foreground text-[11px]">Composição Lojafy:</p>
+                                          <div className="flex justify-between text-[11px]">
+                                            <span className="text-muted-foreground">Venda:</span>
+                                            <span className="font-mono">{formatBRL(order.lojafy_sale)}</span>
+                                          </div>
+                                          <div className="flex justify-between text-[11px]">
+                                            <span className="text-muted-foreground">Taxas (4,5% + 1%):</span>
+                                            <span className="font-mono text-rose-500">-{formatBRL(order.lojafy_fee)}</span>
+                                          </div>
+                                          <div className="flex justify-between text-[11px]">
+                                            <span className="text-muted-foreground">Custo Fornecedor:</span>
+                                            <span className="font-mono">{formatBRL(order.lojafy_cost)}</span>
+                                          </div>
+                                          <div className="border-t border-border/60 pt-0.5 flex justify-between font-semibold text-[11px] text-emerald-600">
+                                            <span>Lucro Líquido:</span>
+                                            <span className="font-mono">+{formatBRL(order.lojafy_profit)} ({formatPercent(order.lojafy_margin_pct)})</span>
+                                          </div>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </span>
+                                    <span className="font-mono text-emerald-600 dark:text-emerald-400 text-right text-[10px] font-medium">R$</span>
+                                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-right tabular-nums text-[10px]">
+                                      {formatAmountOnly(order.lojafy_profit)}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
 
                               {/* Status do Pagamento */}
-                              <div className="pt-0.5">
+                              <div className="pt-1 text-right">
                                 {isPaid ? (
                                   <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
                                     <Check className="w-3 h-3 stroke-[2.5]" />
@@ -821,20 +838,26 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                               </div>
                             </div>
                           ) : (
-                            <div className="space-y-0.5">
-                              <span className="text-sm font-bold text-foreground tracking-tight block">
-                                {formattedAmount}
-                              </span>
-                              {isPaid ? (
-                                <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                                  <Check className="w-3 h-3 stroke-[2.5]" />
-                                  Pago
+                            <div className="inline-block text-left w-[145px]">
+                              <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-1.5 gap-y-0.5 text-xs">
+                                <span className="text-[11px] text-muted-foreground">Total</span>
+                                <span className="font-mono text-muted-foreground text-right text-[10px]">R$</span>
+                                <span className="font-mono font-bold text-foreground text-right tabular-nums text-sm">
+                                  {formatAmountOnly(order.total_amount)}
                                 </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                                  Pix pendente
-                                </span>
-                              )}
+                              </div>
+                              <div className="pt-1 text-right">
+                                {isPaid ? (
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                    <Check className="w-3 h-3 stroke-[2.5]" />
+                                    Pago
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                                    Pix pendente
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           )}
                         </TableCell>
@@ -1067,25 +1090,40 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
 
                     <div className="text-right shrink-0">
                       {order.is_marketplace ? (
-                        <div className="flex flex-col items-end text-xs">
-                          <div className="text-[10px] text-muted-foreground">
-                            Venda: <span className="font-semibold text-foreground">{formatBRL(order.sale_amount)}</span>
-                          </div>
-                          <div className="text-[10px] text-muted-foreground">
-                            Taxas: <span className="font-medium text-rose-600 dark:text-rose-400">-{formatBRL(order.marketplace_fee)}</span>
-                          </div>
-                          <div className="text-[10px] text-muted-foreground">
-                            Custo: <span className="font-semibold text-foreground">{formatBRL(order.seller_cost)}</span>
-                          </div>
-                          <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                            Lucro: {formatBRL(order.seller_profit)}{" "}
-                            <span className="font-mono text-[9px]">({formatPercent(order.seller_margin_pct)})</span>
-                          </div>
+                        <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-1 gap-y-0.5 text-[10px] w-[130px] text-left">
+                          <span className="text-muted-foreground">Venda</span>
+                          <span className="font-mono text-muted-foreground text-right text-[9px]">R$</span>
+                          <span className="font-mono font-semibold text-foreground text-right tabular-nums text-[10px]">
+                            {formatAmountOnly(order.sale_amount)}
+                          </span>
+
+                          <span className="text-muted-foreground">Taxas</span>
+                          <span className="font-mono text-rose-600 dark:text-rose-400 text-right text-[9px] font-medium">-R$</span>
+                          <span className="font-mono font-medium text-rose-600 dark:text-rose-400 text-right tabular-nums text-[10px]">
+                            {formatAmountOnly(order.marketplace_fee)}
+                          </span>
+
+                          <span className="text-muted-foreground">Custo</span>
+                          <span className="font-mono text-muted-foreground text-right text-[9px]">R$</span>
+                          <span className="font-mono font-semibold text-foreground text-right tabular-nums text-[10px]">
+                            {formatAmountOnly(order.seller_cost)}
+                          </span>
+
+                          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Lucro</span>
+                          <span className="font-mono text-emerald-600 dark:text-emerald-400 text-right text-[9px] font-medium">R$</span>
+                          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-right tabular-nums text-[10px]">
+                            {formatAmountOnly(order.seller_profit)}
+                          </span>
+
                           {showAdminMetrics && (
-                            <div className="text-[9px] text-primary font-medium pt-0.5">
-                              Lojafy: +{formatBRL(order.lojafy_profit)}{" "}
-                              <span className="font-mono">({formatPercent(order.lojafy_margin_pct)})</span>
-                            </div>
+                            <>
+                              <div className="col-span-3 border-t border-dashed border-border/70 my-0.5" />
+                              <span className="text-primary font-bold text-[9px]">Lojafy</span>
+                              <span className="font-mono text-emerald-600 dark:text-emerald-400 text-right text-[9px] font-medium">R$</span>
+                              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-right tabular-nums text-[9px]">
+                                {formatAmountOnly(order.lojafy_profit)}
+                              </span>
+                            </>
                           )}
                         </div>
                       ) : (
