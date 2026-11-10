@@ -48,10 +48,19 @@ export interface OrderPipelineItem {
   payment_status: "pending" | "paid" | "failed" | string;
   total_amount: number;
 
-  // Financial fields (Custo vs Venda vs Lucro)
-  supplier_cost: number; // Custo de fulfillment / fornecedor (valor real do Pix)
-  sale_amount: number; // Valor vendido no canal/marketplace
-  profit_amount: number; // Lucro estimado (venda - custo)
+  // Financial fields (Custo vs Venda vs Lucro - Vendedor & Lojafy)
+  sale_amount: number; // Valor vendido no canal/marketplace (ex: R$ 24,83)
+  seller_cost: number; // Preço que o revendedor paga à Lojafy (ex: R$ 6,90)
+  seller_profit: number; // Lucro bruto do revendedor (ex: R$ 17,93)
+  seller_margin_pct: number; // Margem percentual do revendedor (ex: 72.21%)
+
+  lojafy_sale: number; // Preço de venda da Lojafy ao revendedor (ex: R$ 6,90)
+  lojafy_cost: number; // Custo do fornecedor pago pela Lojafy (ex: R$ 6,00)
+  lojafy_profit: number; // Lucro da Lojafy (ex: R$ 0,90)
+  lojafy_margin_pct: number; // Margem percentual da Lojafy (ex: 13.04%)
+
+  supplier_cost: number; // Custo de fulfillment / fornecedor (valor a pagar via Pix)
+  profit_amount: number; // Lucro estimado
   is_marketplace: boolean; // Indica se é pedido de canal externo (ML, Shopee)
   
   // Archiving (Gestão de Arquivados)

@@ -1,5 +1,6 @@
 import React from "react";
 import { OrderPipelineItem } from "@/types/orderPipeline";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -25,13 +26,22 @@ export const OrderKanbanCard: React.FC<OrderKanbanCardProps> = ({
   onArchiveOrder,
   isDragging = false,
 }) => {
+  const { isSuperAdmin } = useUserRole();
+  const showAdminMetrics = isSuperAdmin();
+
   const isPaid = order.payment_status === "paid" || ["pago", "recebido", "embalado", "enviado", "finalizado"].includes(order.status);
   const hasLabel = order.has_shipping_file || !!order.ml_label_url || order.shipping_label_status === "ready";
 
-  const formattedAmount = new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(order.total_amount);
+  const formatBRL = (val: number) =>
+    new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(val || 0);
+
+  const formatPercent = (val: number) =>
+    `${(val || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+
+  const formattedAmount = formatBRL(order.total_amount);
 
   return (
     <div
@@ -199,47 +209,93 @@ export const OrderKanbanCard: React.FC<OrderKanbanCardProps> = ({
           </div>
         </div>
 
-        {/* Informações Financeiras: Custo Fulfillment vs Venda ML vs Lucro */}
+        {/* Informações Financeiras: Venda, Custo, Lucro (Revendedor e Lojafy) */}
         {order.is_marketplace ? (
-          <div className="pt-1.5 border-t border-border/40 my-1.5 space-y-1">
-            <div className="flex items-baseline justify-between">
-              <span className="text-[11px] text-muted-foreground font-medium">
-                {isPaid ? "Custo Fornecedor" : "A Pagar (Custo)"}
-              </span>
-              <span className="text-sm font-bold text-foreground tracking-tight">
-                {new Intl.NumberFormat("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                }).format(order.supplier_cost || 0)}
-              </span>
+          <div className="pt-2 border-t border-border/50 my-1.5 space-y-1 text-xs">
+            {/* Venda Revendedor */}
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Venda</span>
+              <span className="font-semibold text-foreground">{formatBRL(order.sale_amount)}</span>
             </div>
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-              <span>
-                Venda:{" "}
-                {new Intl.NumberFormat("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                }).format(order.sale_amount || order.total_amount || 0)}
-              </span>
-              {order.profit_amount > 0 && (
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 text-[10px]">
-                  Lucro: +
-                  {new Intl.NumberFormat("pt-BR", {
-                    style: "currency",
-                    currency: "BRL",
-                  }).format(order.profit_amount)}
+
+            {/* Custo Revendedor (preço da Lojafy) */}
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Custo</span>
+              <span className="font-semibold text-foreground">{formatBRL(order.seller_cost)}</span>
+            </div>
+
+            {/* Lucro Revendedor com percentual */}
+            <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
+              <span className="font-medium">Lucro</span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold">{formatBRL(order.seller_profit)}</span>
+                <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
+                  {formatPercent(order.seller_margin_pct)}
                 </span>
-              )}
+              </div>
             </div>
+
+            {/* Bloco Lojafy (Exclusivo para SuperAdmin) */}
+            {showAdminMetrics && (
+              <div className="pt-2 mt-2 border-t border-dashed border-border/70 space-y-1 text-xs bg-muted/20 -mx-3.5 px-3.5 py-1.5 rounded-b-none">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-primary flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                    Lojafy
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                  <span>Venda</span>
+                  <span className="font-medium text-foreground">{formatBRL(order.lojafy_sale)}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                  <span>Custo</span>
+                  <span className="font-medium text-foreground">{formatBRL(order.lojafy_cost)}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400">
+                  <span className="font-medium">Lucro</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold">{formatBRL(order.lojafy_profit)}</span>
+                    <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
+                      {formatPercent(order.lojafy_margin_pct)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
-          <div className="flex items-baseline justify-between pt-1 border-t border-border/40 my-1.5">
-            <span className="text-[11px] text-muted-foreground font-medium">Total</span>
-            <span className="text-sm font-bold text-foreground tracking-tight">
-              {formattedAmount}
-            </span>
+          <div className="pt-2 border-t border-border/50 my-1.5 space-y-1 text-xs">
+            <div className="flex items-baseline justify-between">
+              <span className="text-muted-foreground font-medium">Total</span>
+              <span className="text-sm font-bold text-foreground tracking-tight">
+                {formattedAmount}
+              </span>
+            </div>
+            {showAdminMetrics && order.lojafy_profit > 0 && (
+              <div className="pt-1.5 border-t border-dashed border-border/60 text-[11px] flex items-center justify-between text-muted-foreground">
+                <span>Lucro Lojafy</span>
+                <span className="font-semibold text-emerald-600">
+                  {formatBRL(order.lojafy_profit)} ({formatPercent(order.lojafy_margin_pct)})
+                </span>
+              </div>
+            )}
           </div>
         )}
+
+        {/* Indicador de Status do Pagamento */}
+        <div className="pt-1 pb-0.5 flex items-center justify-between text-xs">
+          {isPaid ? (
+            <span className="inline-flex items-center gap-1 font-semibold text-[11px] text-emerald-600 dark:text-emerald-400">
+              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+              Pago
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 font-semibold text-[11px] text-amber-600 dark:text-amber-400">
+              Pix pendente
+            </span>
+          )}
+        </div>
 
         {/* Footer Actions: [ 👁 ] [ Gerar Pix / Pago ✓ ] [ Imprimir / Gerar etiqueta ] [ 📦 Arquivar ] */}
         <div className="flex items-center gap-1.5 pt-2 border-t border-border/60 mt-1">

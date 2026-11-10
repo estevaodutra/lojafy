@@ -154,7 +154,8 @@ const AdminOrders = () => {
               image_url,
               images,
               original_images,
-              cost_price
+              cost_price,
+              price
             )
           )
         `)
@@ -277,7 +278,7 @@ const AdminOrders = () => {
         try {
           const { data: prods } = await supabase
             .from("products")
-            .select("id, name, image_url, images, original_images, cost_price")
+            .select("id, name, image_url, images, original_images, cost_price, price")
             .in("id", Array.from(allProductIds));
           if (prods) {
             prods.forEach((p) => prodMap.set(p.id, p));

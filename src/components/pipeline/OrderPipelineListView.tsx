@@ -4,6 +4,7 @@ import {
   OrderPipeline,
   OrderPipelineStage,
 } from "@/types/orderPipeline";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   Table,
   TableBody,
@@ -102,6 +103,18 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
   onArchiveOrder,
   onRefreshOrders,
 }) => {
+  const { isSuperAdmin } = useUserRole();
+  const showAdminMetrics = isSuperAdmin();
+
+  const formatBRL = (val: number) =>
+    new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(val || 0);
+
+  const formatPercent = (val: number) =>
+    `${(val || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+
   // 1. Sorting State (Default: newest_first)
   const [sortOption, setSortOption] = useState<OrderListSortOption>("newest_first");
 
@@ -695,42 +708,37 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                         </TableCell>
 
                         {/* 6. TOTAL:
-                            Custo de Fulfillment (a pagar) vs Venda Externa vs Lucro
+                            Venda, Custo, Lucro (Revendedor e Lojafy)
                         */}
                         <TableCell className="py-2.5 align-middle text-right">
                           {order.is_marketplace ? (
-                            <div className="space-y-0.5 inline-flex flex-col items-end">
-                              {/* Custo Real a Pagar via Pix */}
-                              <div className="flex items-baseline gap-1 justify-end">
-                                <span className="text-[10px] font-medium text-muted-foreground">
-                                  {isPaid ? "Custo:" : "A Pagar:"}
-                                </span>
-                                <span className="text-sm font-bold text-foreground tracking-tight">
-                                  {new Intl.NumberFormat("pt-BR", {
-                                    style: "currency",
-                                    currency: "BRL",
-                                  }).format(order.supplier_cost || 0)}
+                            <div className="space-y-0.5 inline-flex flex-col items-end text-xs">
+                              {/* Venda e Custo */}
+                              <div className="text-[11px] text-muted-foreground">
+                                Venda: <span className="font-semibold text-foreground">{formatBRL(order.sale_amount)}</span>
+                              </div>
+                              <div className="text-[11px] text-muted-foreground">
+                                Custo: <span className="font-semibold text-foreground">{formatBRL(order.seller_cost)}</span>
+                              </div>
+
+                              {/* Lucro Revendedor */}
+                              <div className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold justify-end">
+                                <span>Lucro: {formatBRL(order.seller_profit)}</span>
+                                <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
+                                  {formatPercent(order.seller_margin_pct)}
                                 </span>
                               </div>
 
-                              {/* Venda e Lucro */}
-                              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground justify-end">
-                                <span>
-                                  Venda:{" "}
-                                  {new Intl.NumberFormat("pt-BR", {
-                                    style: "currency",
-                                    currency: "BRL",
-                                  }).format(order.sale_amount || order.total_amount || 0)}
-                                </span>
-                                {order.profit_amount > 0 && (
-                                  <span className="font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1 py-0.2 rounded border border-emerald-200 dark:border-emerald-800">
-                                    +{new Intl.NumberFormat("pt-BR", {
-                                      style: "currency",
-                                      currency: "BRL",
-                                    }).format(order.profit_amount)}
+                              {/* Bloco Lojafy (SuperAdmin) */}
+                              {showAdminMetrics && (
+                                <div className="text-[10px] text-muted-foreground/90 pt-0.5 border-t border-dashed border-border/70 flex items-center gap-1 justify-end">
+                                  <span className="font-bold text-primary">Lojafy:</span>
+                                  <span className="font-semibold text-foreground">+{formatBRL(order.lojafy_profit)}</span>
+                                  <span className="font-mono text-[9px] text-emerald-600 dark:text-emerald-400">
+                                    ({formatPercent(order.lojafy_margin_pct)})
                                   </span>
-                                )}
-                              </div>
+                                </div>
+                              )}
 
                               {/* Status do Pagamento */}
                               <div className="pt-0.5">
@@ -741,7 +749,7 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                                    Pix Pendente
+                                    Pix pendente
                                   </span>
                                 )}
                               </div>
@@ -758,7 +766,7 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                                  Pix Pendente
+                                  Pix pendente
                                 </span>
                               )}
                             </div>
@@ -993,35 +1001,23 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
 
                     <div className="text-right shrink-0">
                       {order.is_marketplace ? (
-                        <div className="flex flex-col items-end">
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-[10px] text-muted-foreground">
-                              {isPaid ? "Custo:" : "A Pagar:"}
-                            </span>
-                            <span className="text-sm font-bold text-foreground">
-                              {new Intl.NumberFormat("pt-BR", {
-                                style: "currency",
-                                currency: "BRL",
-                              }).format(order.supplier_cost || 0)}
-                            </span>
+                        <div className="flex flex-col items-end text-xs">
+                          <div className="text-[10px] text-muted-foreground">
+                            Venda: <span className="font-semibold text-foreground">{formatBRL(order.sale_amount)}</span>
                           </div>
                           <div className="text-[10px] text-muted-foreground">
-                            Venda:{" "}
-                            {new Intl.NumberFormat("pt-BR", {
-                              style: "currency",
-                              currency: "BRL",
-                            }).format(order.sale_amount || order.total_amount || 0)}
-                            {order.profit_amount > 0 && (
-                              <span className="text-emerald-600 dark:text-emerald-400 font-semibold ml-1">
-                                (+
-                                {new Intl.NumberFormat("pt-BR", {
-                                  style: "currency",
-                                  currency: "BRL",
-                                }).format(order.profit_amount)}
-                                )
-                              </span>
-                            )}
+                            Custo: <span className="font-semibold text-foreground">{formatBRL(order.seller_cost)}</span>
                           </div>
+                          <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                            Lucro: {formatBRL(order.seller_profit)}{" "}
+                            <span className="font-mono text-[9px]">({formatPercent(order.seller_margin_pct)})</span>
+                          </div>
+                          {showAdminMetrics && (
+                            <div className="text-[9px] text-primary font-medium pt-0.5">
+                              Lojafy: +{formatBRL(order.lojafy_profit)}{" "}
+                              <span className="font-mono">({formatPercent(order.lojafy_margin_pct)})</span>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <span className="text-sm font-bold text-foreground">

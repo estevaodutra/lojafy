@@ -1,7 +1,7 @@
 {
-  "hash": "4219cd49ef39b76122bacf4858121e98b03a3b49",
-  "shortHash": "4219cd4",
-  "message": "fix(webhooks): remove LOJ- prefix from order_number in webhook payloads",
+  "hash": "8d6a33837e0143d0ffca05dcd1ddabdbf3ee29d7",
+  "shortHash": "8d6a338",
+  "message": "feat(orders): align list rows to middle and display cost, sale and profit",
   "author": "Lojafy Developer",
-  "timestamp": 1794277695485
+  "timestamp": 1794282126040
 }

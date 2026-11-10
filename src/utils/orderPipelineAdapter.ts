@@ -203,60 +203,93 @@ export function normalizeOrderToPipelineItem(
   // sale_amount = total vendido ao cliente final no ML/canal
   const saleAmount = Number(order.total_amount) || 0;
 
-  // supplier_cost = custo real de fulfillment / fornecedor (valor que o reseller paga via Pix)
-  let calculatedSupplierCost = 0;
+  // 1. Seller cost (o que o revendedor paga à Lojafy pelo produto)
+  let calculatedSellerCost = 0;
+  // 2. Lojafy cost (o que a Lojafy paga ao fornecedor)
+  let calculatedLojafyCost = 0;
+
   if (items.length > 0) {
     for (const it of items) {
       const qty = Number(it.quantity) || 1;
-      const explicitTotal = Number(it.supplier_total_cost);
-      if (explicitTotal > 0) {
-        calculatedSupplierCost += explicitTotal;
-        continue;
-      }
+      const prod = it.product || (it.product_id && productsMap?.get(it.product_id)) || {};
+      const snapshot = it.product_snapshot || {};
 
-      const unitCost = Number(
+      // Preço de venda da Lojafy para o revendedor (ex: R$ 6,90)
+      const unitResellerPrice = Number(
+        prod.price ||
+        snapshot.price ||
+        it.unit_price_reseller ||
+        0
+      );
+
+      // Custo do fornecedor (ex: R$ 6,00)
+      const unitSupplierCost = Number(
         it.supplier_unit_cost ||
-        it.product_snapshot?.cost_price ||
-        it.product?.cost_price ||
+        prod.cost_price ||
+        snapshot.cost_price ||
         (it.product_id && productsMap?.get(it.product_id)?.cost_price) ||
         0
       );
 
-      if (unitCost > 0) {
-        calculatedSupplierCost += unitCost * qty;
+      if (unitResellerPrice > 0) {
+        calculatedSellerCost += unitResellerPrice * qty;
+      }
+
+      if (unitSupplierCost > 0) {
+        calculatedLojafyCost += unitSupplierCost * qty;
+      } else if (it.supplier_total_cost) {
+        calculatedLojafyCost += Number(it.supplier_total_cost);
       }
     }
   }
 
   // Fallback 1: Extrair "Custo Fornecedor: R$ XX.XX" das notas do pedido
-  if (calculatedSupplierCost <= 0 && typeof order.notes === "string") {
+  if (calculatedLojafyCost <= 0 && typeof order.notes === "string") {
     const costMatch = order.notes.match(/Custo Fornecedor:\s*R\$\s*([0-9.,]+)/i);
     if (costMatch) {
       const parsed = parseFloat(costMatch[1].replace(",", "."));
       if (!isNaN(parsed) && parsed > 0) {
-        calculatedSupplierCost = parsed;
+        calculatedLojafyCost = parsed;
       }
     }
   }
 
-  // Fallback 2: Extrair "Pix 24h: R$ XX.XX" das notas do pedido
-  if (calculatedSupplierCost <= 0 && typeof order.notes === "string") {
+  // Fallback 2: Extrair "Pix 24h: R$ XX.XX" das notas do pedido se seller cost não veio de produto
+  if (calculatedSellerCost <= 0 && typeof order.notes === "string") {
     const pixMatch = order.notes.match(/Pix 24h:\s*R\$\s*([0-9.,]+)/i);
     if (pixMatch) {
       const parsed = parseFloat(pixMatch[1].replace(",", "."));
       if (!isNaN(parsed) && parsed > 0) {
-        calculatedSupplierCost = parsed;
+        calculatedSellerCost = parsed;
       }
     }
   }
 
-  // Fallback 3: Se não encontrou custo específico, para pedidos diretos ou sem custo especificado, iguala a saleAmount
-  if (calculatedSupplierCost <= 0) {
-    calculatedSupplierCost = saleAmount;
+  // Se seller cost ainda não foi obtido:
+  if (calculatedSellerCost <= 0) {
+    if (calculatedLojafyCost > 0) {
+      calculatedSellerCost = calculatedLojafyCost;
+    } else {
+      calculatedSellerCost = saleAmount;
+    }
   }
 
-  // Lucro do revendedor (apenas se for marketplace)
-  const profitAmount = isMarketplace ? Math.max(0, saleAmount - calculatedSupplierCost) : 0;
+  if (calculatedLojafyCost <= 0) {
+    calculatedLojafyCost = calculatedSellerCost;
+  }
+
+  calculatedSellerCost = Math.round(calculatedSellerCost * 100) / 100;
+  calculatedLojafyCost = Math.round(calculatedLojafyCost * 100) / 100;
+
+  // Métricas do Revendedor:
+  const sellerProfit = isMarketplace ? Math.max(0, Math.round((saleAmount - calculatedSellerCost) * 100) / 100) : 0;
+  const sellerMarginPct = saleAmount > 0 ? (sellerProfit / saleAmount) * 100 : 0;
+
+  // Métricas da Lojafy (SuperAdmin):
+  const lojafySale = calculatedSellerCost;
+  const lojafyCost = calculatedLojafyCost;
+  const lojafyProfit = Math.max(0, Math.round((lojafySale - lojafyCost) * 100) / 100);
+  const lojafyMarginPct = lojafySale > 0 ? (lojafyProfit / lojafySale) * 100 : 0;
 
   return {
     id: order.id,
@@ -266,9 +299,16 @@ export function normalizeOrderToPipelineItem(
     status: order.status || "pendente",
     payment_status: order.payment_status || "pending",
     total_amount: saleAmount,
-    supplier_cost: calculatedSupplierCost,
     sale_amount: saleAmount,
-    profit_amount: profitAmount,
+    seller_cost: calculatedSellerCost,
+    seller_profit: sellerProfit,
+    seller_margin_pct: sellerMarginPct,
+    lojafy_sale: lojafySale,
+    lojafy_cost: lojafyCost,
+    lojafy_profit: lojafyProfit,
+    lojafy_margin_pct: lojafyMarginPct,
+    supplier_cost: calculatedSellerCost,
+    profit_amount: sellerProfit,
     is_marketplace: isMarketplace,
     is_archived: isArchived,
     archived_at: archivedAt,

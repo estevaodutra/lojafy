@@ -61,7 +61,8 @@ export const useResellerOrders = (statusFilter?: string, searchTerm?: string) =>
               image_url,
               images,
               original_images,
-              cost_price
+              cost_price,
+              price
             )
           )
         `)
@@ -105,7 +106,7 @@ export const useResellerOrders = (statusFilter?: string, searchTerm?: string) =>
       if (productIds.size > 0) {
         const { data: prods } = await supabase
           .from("products")
-          .select("id, name, image_url, images, original_images, cost_price")
+          .select("id, name, image_url, images, original_images, cost_price, price")
           .in("id", Array.from(productIds));
         prods?.forEach((p) => prodsMap.set(p.id, p));
       }
