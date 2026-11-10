@@ -1,7 +1,7 @@
 {
-  "hash": "aba6f39a75daee5fa7969ff6494d912c9f44926b",
-  "shortHash": "aba6f39",
-  "message": "fix(webhooks): inform real group ID and custom fields from user details into webhook payload",
+  "hash": "b94882f10c2ffaf7a3fbbd37fc3f8393c23ae591",
+  "shortHash": "b94882f",
+  "message": "fix(webhooks): remove LOJ- prefix from order_number in webhook payloads",
   "author": "Lojafy Developer",
-  "timestamp": 1794266526063
+  "timestamp": 1794275345769
 }

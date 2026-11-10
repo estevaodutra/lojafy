@@ -703,7 +703,7 @@ async function buildUniversalOrderPayload(
 
   const effectiveOrderId = order?.id || 'ord_demo_10892';
   const rawOrderNum = order?.order_number != null ? String(order.order_number) : '911';
-  const effectiveOrderNum = rawOrderNum.startsWith('LOJ-') ? rawOrderNum : `LOJ-${rawOrderNum}`;
+  const effectiveOrderNum = rawOrderNum.replace(/^LOJ-/, '');
   let effectiveStatus = order?.status || 'pendente';
   if (extraOptions?.force_paid) {
     effectiveStatus = 'pago';

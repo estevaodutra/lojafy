@@ -228,7 +228,7 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
       timestamp: '2026-11-09T18:00:00.000Z',
       data: {
         order_id: 'b6e82845-f09b-4389-bd6b-80fc47849e7b',
-        order_number: 'LOJ-10892',
+        order_number: '10892',
         status: 'pendente',
         origin: {
           channel: 'mercadolivre',
@@ -319,7 +319,7 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
       timestamp: '2026-09-29T10:00:00.000Z',
       data: {
         order_id: 'b6e82845-f09b-4389-bd6b-80fc47849e7b',
-        order_number: 'LOJ-10892',
+        order_number: '10892',
         total_amount: 199.90,
         payment_method: 'pix',
         customer: {
@@ -354,7 +354,7 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
       timestamp: '2026-09-29T10:00:00.000Z',
       data: {
         order_id: 'b6e82845-f09b-4389-bd6b-80fc47849e7b',
-        order_number: 'LOJ-10892',
+        order_number: '10892',
         total_amount: 199.90,
         pix_qr_code: '00020101021226870014br.gov.bcb.pix2565...',
         expires_at: '2026-09-29T10:30:00.000Z',
@@ -376,7 +376,7 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
       timestamp: '2026-09-29T10:00:00.000Z',
       data: {
         order_id: 'b6e82845-f09b-4389-bd6b-80fc47849e7b',
-        order_number: 'LOJ-10892',
+        order_number: '10892',
         total_amount: 199.90,
         boleto_url: 'https://bank.com/boleto/123456',
         boleto_barcode: '34191.79001 01043.510047 91020.150008 1 90000000019990',
@@ -399,7 +399,7 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
       timestamp: '2026-09-29T10:00:00.000Z',
       data: {
         order_id: 'b6e82845-f09b-4389-bd6b-80fc47849e7b',
-        order_number: 'LOJ-10892',
+        order_number: '10892',
         reason: 'Transação não autorizada pela emissora do cartão',
         total_amount: 199.90
       }
@@ -428,7 +428,7 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
           current_status: 'recebido'
         },
         order_id: 'b6e82845-f09b-4389-bd6b-80fc47849e7b',
-        order_number: 'LOJ-10892',
+        order_number: '10892',
         status: 'recebido',
         origin: {
           channel: 'mercadolivre',
@@ -519,7 +519,7 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
       timestamp: '2026-09-29T10:00:00.000Z',
       data: {
         order_id: 'b6e82845-f09b-4389-bd6b-80fc47849e7b',
-        order_number: 'LOJ-10892',
+        order_number: '10892',
         reason: 'Cancelado pelo comprador'
       }
     }
@@ -535,7 +535,7 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
       timestamp: '2026-09-29T10:00:00.000Z',
       data: {
         order_id: 'b6e82845-f09b-4389-bd6b-80fc47849e7b',
-        order_number: 'LOJ-10892',
+        order_number: '10892',
         refund_amount: 199.90,
         refund_type: 'total'
       }
@@ -552,7 +552,7 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
       timestamp: '2026-09-29T10:00:00.000Z',
       data: {
         order_id: 'b6e82845-f09b-4389-bd6b-80fc47849e7b',
-        order_number: 'LOJ-10892',
+        order_number: '10892',
         chargeback_amount: 199.90,
         status: 'em_disputa'
       }
@@ -574,7 +574,7 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
         sku: 'CAM-POLO-AZUL-G',
         previous_quantity: 45,
         new_quantity: 44,
-        change_reason: 'Venda de pedido LOJ-10892'
+        change_reason: 'Venda de pedido 10892'
       }
     }
   },
@@ -660,7 +660,7 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
       timestamp: '2026-09-29T10:00:00.000Z',
       data: {
         order_id: 'b6e82845-f09b-4389-bd6b-80fc47849e7b',
-        order_number: 'LOJ-10892',
+        order_number: '10892',
         tracking_number: 'BR123456789BR',
         carrier: 'Correios Sedex',
         customer_email: 'joao.silva@exemplo.com'
@@ -678,7 +678,7 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
       timestamp: '2026-09-29T10:00:00.000Z',
       data: {
         order_id: 'b6e82845-f09b-4389-bd6b-80fc47849e7b',
-        order_number: 'LOJ-10892',
+        order_number: '10892',
         delivered_at: '2026-09-29T10:00:00.000Z'
       }
     }
@@ -694,7 +694,7 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
       timestamp: '2026-09-29T10:00:00.000Z',
       data: {
         order_id: 'b6e82845-f09b-4389-bd6b-80fc47849e7b',
-        order_number: 'LOJ-10892',
+        order_number: '10892',
         error_detail: 'CEP divergente no arquivo PLP da transportadora'
       }
     }
