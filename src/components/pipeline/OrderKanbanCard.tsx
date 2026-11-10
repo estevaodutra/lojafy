@@ -1,33 +1,132 @@
-import React from "react";
-import { OrderPipelineItem } from "@/types/orderPipeline";
+import React, { useState, useMemo } from "react";
+import { OrderPipelineItem, OrderPipelineStage } from "@/types/orderPipeline";
 import { useUserRole } from "@/hooks/useUserRole";
+import { SUPPLIER_STATUSES } from "@/constants/orderStatus";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Eye, Link2, Truck, Check, QrCode, Printer, FileText, Package, Clock, Archive, Info } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Eye,
+  Link2,
+  Truck,
+  Check,
+  QrCode,
+  Printer,
+  FileText,
+  Package,
+  Clock,
+  Archive,
+  Info,
+  ArrowRight,
+  ChevronDown,
+  Loader2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
-interface OrderKanbanCardProps {
+export interface OrderKanbanCardProps {
   order: OrderPipelineItem;
+  activeStages?: OrderPipelineStage[];
   onViewDetails: (order: OrderPipelineItem) => void;
   onGeneratePix?: (order: OrderPipelineItem) => void;
   onPrintLabel?: (order: OrderPipelineItem) => void;
   onGenerateLabel?: (order: OrderPipelineItem) => void;
   onArchiveOrder?: (order: OrderPipelineItem) => void;
+  onAdvanceStage?: (order: OrderPipelineItem, targetStatus: string) => Promise<void>;
   isDragging?: boolean;
 }
 
-export const OrderKanbanCard: React.FC<OrderKanbanCardProps> = ({
+export const OrderKanbanCard = React.memo<OrderKanbanCardProps>(({
   order,
+  activeStages = [],
   onViewDetails,
   onGeneratePix,
   onPrintLabel,
   onGenerateLabel,
   onArchiveOrder,
+  onAdvanceStage,
   isDragging = false,
 }) => {
-  const { isSuperAdmin } = useUserRole();
+  const { isSuperAdmin, isSupplier } = useUserRole();
   const showAdminMetrics = isSuperAdmin();
+
+  const [isAdvancing, setIsAdvancing] = useState(false);
+
+  // Determinar a etapa atual do pedido na pipeline ativa
+  const currentStageIndex = useMemo(() => {
+    if (!activeStages || activeStages.length === 0) return -1;
+    const orderStatus = (order.status || "").toLowerCase().trim();
+    const ticketStatus = (order.active_ticket_status || "").toLowerCase().trim();
+
+    const idx = activeStages.findIndex((stage) => {
+      const sKey = (stage.status_key || "").toLowerCase().trim();
+      const sName = stage.name.toLowerCase().trim();
+
+      if (ticketStatus && (ticketStatus === sKey || ticketStatus === sName)) return true;
+      if (orderStatus === sKey || orderStatus === sName) return true;
+
+      if (orderStatus === "pendente" && (sKey === "pendente" || sName.includes("pagamento") || sName.includes("gerado") || sName.includes("novo"))) return true;
+      if (orderStatus === "pago" && (sKey === "pago" || sName.includes("recebimento") || sName.includes("pago"))) return true;
+      if (orderStatus === "recebido" && (sKey === "recebido" || sName.includes("recebido"))) return true;
+      if (orderStatus === "embalado" && (sKey === "embalado" || sName.includes("embalado"))) return true;
+      if (orderStatus === "enviado" && (sKey === "enviado" || sName.includes("enviado"))) return true;
+      if (orderStatus === "finalizado" && (sKey === "finalizado" || sName.includes("finalizado") || sName.includes("entregue"))) return true;
+      if (orderStatus === "cancelado" && (sKey === "cancelado" || sName.includes("cancelado"))) return true;
+      if (orderStatus === "etiqueta_incorreta" && (sKey === "etiqueta_incorreta" || sName.includes("incorreta"))) return true;
+
+      return false;
+    });
+
+    return idx >= 0 ? idx : 0;
+  }, [activeStages, order.status, order.active_ticket_status]);
+
+  // Etapas para frente (caminho para frente)
+  const forwardStages = useMemo(() => {
+    if (!activeStages || currentStageIndex < 0) return [];
+    const rawForward = activeStages.slice(currentStageIndex + 1);
+
+    if (isSupplier()) {
+      const allowed = SUPPLIER_STATUSES as string[];
+      return rawForward.filter((st) => {
+        const key = (st.status_key || "").toLowerCase();
+        const name = st.name.toLowerCase();
+        return (
+          allowed.includes(key) ||
+          name.includes("recebido") ||
+          name.includes("embalado") ||
+          name.includes("enviado") ||
+          name.includes("incorreta") ||
+          name.includes("finalizado")
+        );
+      });
+    }
+
+    return rawForward;
+  }, [activeStages, currentStageIndex, isSupplier]);
+
+  const nextStage = forwardStages[0] || null;
+  const canAdvanceStage = (isSuperAdmin() || isSupplier()) && !!nextStage && !!onAdvanceStage;
+
+  const handleAdvanceTo = async (targetStatus: string) => {
+    if (!onAdvanceStage || isAdvancing) return;
+    try {
+      setIsAdvancing(true);
+      await onAdvanceStage(order, targetStatus);
+      toast.success(`Pedido #${order.order_number} avançado para "${targetStatus}".`);
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao avançar etapa do pedido.");
+    } finally {
+      setIsAdvancing(false);
+    }
+  };
 
   const isPaid = order.payment_status === "paid" || ["pago", "recebido", "embalado", "enviado", "finalizado"].includes(order.status);
   const hasLabel = order.has_shipping_file || !!order.ml_label_url || order.shipping_label_status === "ready";
@@ -518,7 +617,83 @@ export const OrderKanbanCard: React.FC<OrderKanbanCardProps> = ({
             )}
           </div>
         </div>
+
+        {/* 4. Linha de Avançar Etapa (Super Admin e Fornecedor) */}
+        {canAdvanceStage && nextStage && (
+          <div className="pt-2 border-t border-border/50 flex items-stretch gap-1 mt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 h-8 text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50 border-emerald-300 dark:border-emerald-800 gap-1.5 justify-center transition-colors shadow-2xs"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAdvanceTo(nextStage.name);
+              }}
+              disabled={isAdvancing}
+              title={`Avançar para "${nextStage.name}"`}
+            >
+              {isAdvancing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+              ) : (
+                <ArrowRight className="w-3.5 h-3.5 stroke-[2.5] shrink-0 text-emerald-600 dark:text-emerald-400" />
+              )}
+              <span className="truncate">Avançar para {nextStage.name}</span>
+            </Button>
+
+            {forwardStages.length > 1 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 shrink-0 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50 border-emerald-300 dark:border-emerald-800 shadow-2xs"
+                    disabled={isAdvancing}
+                    title="Escolher para qual etapa avançar"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-60 bg-popover shadow-xl border">
+                  <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    Avançar para etapa:
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {forwardStages.map((stage, idx) => (
+                    <DropdownMenuItem
+                      key={stage.id || stage.name}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAdvanceTo(stage.name);
+                      }}
+                      className="text-xs cursor-pointer flex items-center justify-between py-2"
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <span
+                          className={cn(
+                            "w-2 h-2 rounded-full shrink-0",
+                            idx === 0 ? "bg-emerald-500 ring-2 ring-emerald-200" : "bg-muted-foreground/40"
+                          )}
+                        />
+                        <span className={cn("truncate", idx === 0 ? "font-semibold text-foreground" : "text-foreground/80")}>
+                          {stage.name}
+                        </span>
+                      </div>
+                      {idx === 0 && (
+                        <Badge variant="outline" className="text-[9px] px-1 py-0 bg-emerald-50 text-emerald-700 border-emerald-300 shrink-0 font-medium">
+                          Próxima
+                        </Badge>
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        )}
       </TooltipProvider>
     </div>
   );
-};
+});
+
+OrderKanbanCard.displayName = "OrderKanbanCard";

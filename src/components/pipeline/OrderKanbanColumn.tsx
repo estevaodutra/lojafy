@@ -1,7 +1,5 @@
 import React from "react";
-import { useDroppable } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { OrderPipelineStage, OrderPipelineItem } from "@/types/orderPipeline";
 import { OrderKanbanCard } from "./OrderKanbanCard";
 import { Badge } from "@/components/ui/badge";
@@ -11,56 +9,77 @@ import * as Icons from "lucide-react";
 interface OrderKanbanColumnProps {
   stage: OrderPipelineStage;
   orders: OrderPipelineItem[];
+  activeStages: OrderPipelineStage[];
   onViewDetails: (order: OrderPipelineItem) => void;
   onGeneratePix?: (order: OrderPipelineItem) => void;
   onPrintLabel?: (order: OrderPipelineItem) => void;
   onGenerateLabel?: (order: OrderPipelineItem) => void;
   onArchiveOrder?: (order: OrderPipelineItem) => void;
+  onAdvanceStage?: (order: OrderPipelineItem, targetStatus: string) => Promise<void>;
   isDropDisabled?: boolean;
 }
 
-const SortableOrderCard: React.FC<{
+const DraggableOrderCard = React.memo<{
   order: OrderPipelineItem;
+  activeStages: OrderPipelineStage[];
   onViewDetails: (order: OrderPipelineItem) => void;
   onGeneratePix?: (order: OrderPipelineItem) => void;
   onPrintLabel?: (order: OrderPipelineItem) => void;
   onGenerateLabel?: (order: OrderPipelineItem) => void;
   onArchiveOrder?: (order: OrderPipelineItem) => void;
-}> = ({ order, onViewDetails, onGeneratePix, onPrintLabel, onGenerateLabel, onArchiveOrder }) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: order.id,
-    data: { order },
-  });
-
-  const style: React.CSSProperties = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-    zIndex: isDragging ? 50 : undefined,
-  };
-
-  return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <OrderKanbanCard
-        order={order}
-        onViewDetails={onViewDetails}
-        onGeneratePix={onGeneratePix}
-        onPrintLabel={onPrintLabel}
-        onGenerateLabel={onGenerateLabel}
-        onArchiveOrder={onArchiveOrder}
-        isDragging={isDragging}
-      />
-    </div>
-  );
-};
-
-export const OrderKanbanColumn: React.FC<OrderKanbanColumnProps> = ({
-  stage,
-  orders,
+  onAdvanceStage?: (order: OrderPipelineItem, targetStatus: string) => Promise<void>;
+}>(({
+  order,
+  activeStages,
   onViewDetails,
   onGeneratePix,
   onPrintLabel,
   onGenerateLabel,
   onArchiveOrder,
+  onAdvanceStage,
+}) => {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: order.id,
+    data: { order },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className={cn(
+        "touch-none transition-opacity",
+        isDragging && "opacity-30 pointer-events-none"
+      )}
+    >
+      <OrderKanbanCard
+        order={order}
+        activeStages={activeStages}
+        onViewDetails={onViewDetails}
+        onGeneratePix={onGeneratePix}
+        onPrintLabel={onPrintLabel}
+        onGenerateLabel={onGenerateLabel}
+        onArchiveOrder={onArchiveOrder}
+        onAdvanceStage={onAdvanceStage}
+        isDragging={isDragging}
+      />
+    </div>
+  );
+});
+
+DraggableOrderCard.displayName = "DraggableOrderCard";
+
+export const OrderKanbanColumn = React.memo<OrderKanbanColumnProps>(({
+  stage,
+  orders,
+  activeStages,
+  onViewDetails,
+  onGeneratePix,
+  onPrintLabel,
+  onGenerateLabel,
+  onArchiveOrder,
+  onAdvanceStage,
   isDropDisabled = false,
 }) => {
   const { setNodeRef, isOver } = useDroppable({
@@ -75,8 +94,8 @@ export const OrderKanbanColumn: React.FC<OrderKanbanColumnProps> = ({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex flex-col h-full min-h-0 w-[300px] sm:w-[320px] shrink-0 rounded-xl border bg-muted/20 p-2 transition-colors duration-200 select-none shadow-2xs",
-        isOver && "border-primary/80 bg-primary/5 ring-2 ring-primary/20",
+        "flex flex-col h-full min-h-0 w-[300px] sm:w-[320px] shrink-0 rounded-xl border bg-muted/20 p-2 transition-all duration-150 select-none shadow-2xs",
+        isOver && "border-primary bg-primary/10 ring-2 ring-primary/40 shadow-md",
         !stage.is_active && "opacity-50"
       )}
     >
@@ -108,23 +127,31 @@ export const OrderKanbanColumn: React.FC<OrderKanbanColumnProps> = ({
         </Badge>
       </div>
 
+      {/* Drop Zone Feedback Banner */}
+      {isOver && (
+        <div className="flex items-center justify-center gap-1.5 py-2 px-3 mb-2 rounded-lg border-2 border-dashed border-primary bg-primary/20 text-primary text-xs font-semibold animate-pulse shrink-0 shadow-xs">
+          <Icons.ArrowDown className="w-4 h-4 animate-bounce" />
+          <span>Solte para mover para {stage.name}</span>
+        </div>
+      )}
+
       {/* Cards Scroll Area (Independent Vertical Scroll per Column) */}
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-0 pb-2 space-y-2 scrollbar-none">
-        <SortableContext items={orders.map((o) => o.id)} strategy={verticalListSortingStrategy}>
-          {orders.map((order) => (
-            <SortableOrderCard
-              key={order.id}
-              order={order}
-              onViewDetails={onViewDetails}
-              onGeneratePix={onGeneratePix}
-              onPrintLabel={onPrintLabel}
-              onGenerateLabel={onGenerateLabel}
-              onArchiveOrder={onArchiveOrder}
-            />
-          ))}
-        </SortableContext>
+        {orders.map((order) => (
+          <DraggableOrderCard
+            key={order.id}
+            order={order}
+            activeStages={activeStages}
+            onViewDetails={onViewDetails}
+            onGeneratePix={onGeneratePix}
+            onPrintLabel={onPrintLabel}
+            onGenerateLabel={onGenerateLabel}
+            onArchiveOrder={onArchiveOrder}
+            onAdvanceStage={onAdvanceStage}
+          />
+        ))}
 
-        {orders.length === 0 && (
+        {orders.length === 0 && !isOver && (
           <div className="flex flex-col items-center justify-center h-28 rounded-lg border border-dashed border-border/60 p-3 text-center">
             <p className="text-[11px] text-muted-foreground">Nenhum pedido nesta etapa</p>
           </div>
@@ -132,4 +159,6 @@ export const OrderKanbanColumn: React.FC<OrderKanbanColumnProps> = ({
       </div>
     </div>
   );
-};
+});
+
+OrderKanbanColumn.displayName = "OrderKanbanColumn";

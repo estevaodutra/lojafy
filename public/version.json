@@ -1,7 +1,7 @@
 {
-  "hash": "5644686b9d4fcdd4ca303ec9e7be3f259690738d",
-  "shortHash": "5644686",
-  "message": "feat(webhooks): refactor order payload into detailed structured sections (order, product, seller, customer, supplier, financial with profit % and payment)",
+  "hash": "86cfe43af2a7e0d323f0cded16140dbbe0e3f5aa",
+  "shortHash": "86cfe43",
+  "message": "fix(webhook): remove stray closing brace in repairExistingOrder",
   "author": "Lojafy Developer",
-  "timestamp": 1794288827377
+  "timestamp": 1794319561186
 }

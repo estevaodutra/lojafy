@@ -1,16 +1,18 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
-  KeyboardSensor,
-  PointerSensor,
+  closestCenter,
+  pointerWithin,
+  rectIntersection,
+  CollisionDetection,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragStartEvent,
   DragEndEvent,
 } from "@dnd-kit/core";
-import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { OrderPipeline, OrderPipelineItem } from "@/types/orderPipeline";
 import { OrderKanbanColumn } from "./OrderKanbanColumn";
 import { OrderKanbanCard } from "./OrderKanbanCard";
@@ -44,18 +46,42 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
   const { sortOrders } = useOrderPreferences();
   const [activeOrder, setActiveOrder] = useState<OrderPipelineItem | null>(null);
 
+  // Sensores rápidos e sem conflitos com cliques internos
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 5,
       },
     }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 150,
+        tolerance: 5,
+      },
     })
   );
 
-  const activeStages = (pipeline.stages || []).filter((s) => s.is_active);
+  const activeStages = useMemo(() => {
+    return (pipeline.stages || []).filter((s) => s.is_active);
+  }, [pipeline.stages]);
+
+  // Detecção de colisão dedicada para colunas: identifica a coluna alvo imediatamente ao passar o mouse por cima
+  const kanbanCollisionDetection: CollisionDetection = useCallback((args) => {
+    // 1. Ponteiro dentro do droppable da coluna
+    const pointerCollisions = pointerWithin(args);
+    if (pointerCollisions.length > 0) {
+      return pointerCollisions;
+    }
+
+    // 2. Interseção de retângulo do card com as colunas
+    const rectCollisions = rectIntersection(args);
+    if (rectCollisions.length > 0) {
+      return rectCollisions;
+    }
+
+    // 3. Fallback
+    return closestCenter(args);
+  }, []);
 
   // Map orders by stage: o status do pedido é o nome da etapa
   const ordersByStage = React.useMemo(() => {
@@ -167,6 +193,7 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
       const isAllowed =
         allowed.includes(targetStage.status_key) ||
         targetStage.name.toLowerCase().includes("recebido") ||
+        targetStage.name.toLowerCase().includes("embalado") ||
         targetStage.name.toLowerCase().includes("enviado") ||
         targetStage.name.toLowerCase().includes("incorreta");
 
@@ -187,7 +214,7 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={kanbanCollisionDetection}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
@@ -200,11 +227,13 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
                 key={stage.id}
                 stage={stage}
                 orders={stageOrders}
+                activeStages={activeStages}
                 onViewDetails={onViewDetails}
                 onGeneratePix={onGeneratePix}
                 onPrintLabel={onPrintLabel}
                 onGenerateLabel={onGenerateLabel}
                 onArchiveOrder={onArchiveOrder}
+                onAdvanceStage={onUpdateOrderStatus}
                 isDropDisabled={role === "reseller"}
               />
             );
@@ -214,9 +243,10 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
 
       <DragOverlay dropAnimation={null}>
         {activeOrder ? (
-          <div className="w-[320px] md:w-[340px] pointer-events-none">
+          <div className="w-[300px] sm:w-[320px] pointer-events-none opacity-90 shadow-2xl rotate-1 scale-[1.02]">
             <OrderKanbanCard
               order={activeOrder}
+              activeStages={activeStages}
               onViewDetails={() => {}}
               isDragging
             />
