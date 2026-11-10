@@ -752,9 +752,6 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
     pixPaymentId = pixRes.paymentId;
     pixExpiresAt = pixRes.expiresAt;
   }
-    pixPaymentId = pixRes.paymentId;
-    pixExpiresAt = pixRes.expiresAt;
-  }
 
   // Extrair tarifas reais do Mercado Livre/Mercado Pago
   let totalMarketplaceFee = 0;
