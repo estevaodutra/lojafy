@@ -209,7 +209,7 @@ export const OrderKanbanCard: React.FC<OrderKanbanCardProps> = ({
           </div>
         </div>
 
-        {/* Informações Financeiras: Venda, Custo, Lucro (Revendedor e Lojafy) */}
+        {/* Informações Financeiras: Venda, Taxas, Custo, Lucro (Revendedor e Lojafy) */}
         {order.is_marketplace ? (
           <div className="pt-2 border-t border-border/50 my-1.5 space-y-1 text-xs">
             {/* Venda Revendedor */}
@@ -218,15 +218,23 @@ export const OrderKanbanCard: React.FC<OrderKanbanCardProps> = ({
               <span className="font-semibold text-foreground">{formatBRL(order.sale_amount)}</span>
             </div>
 
+            {/* Taxas Marketplace (Mercado Livre / Canal) */}
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Taxas</span>
+              <span className="font-medium text-rose-600 dark:text-rose-400">
+                -{formatBRL(order.marketplace_fee)}
+              </span>
+            </div>
+
             {/* Custo Revendedor (preço da Lojafy) */}
             <div className="flex items-center justify-between text-muted-foreground">
               <span>Custo</span>
               <span className="font-semibold text-foreground">{formatBRL(order.seller_cost)}</span>
             </div>
 
-            {/* Lucro Revendedor com percentual */}
+            {/* Lucro Líquido Revendedor com percentual */}
             <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
-              <span className="font-medium">Lucro</span>
+              <span className="font-medium">Lucro Líquido</span>
               <div className="flex items-center gap-1.5">
                 <span className="font-bold">{formatBRL(order.seller_profit)}</span>
                 <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
@@ -249,11 +257,15 @@ export const OrderKanbanCard: React.FC<OrderKanbanCardProps> = ({
                   <span className="font-medium text-foreground">{formatBRL(order.lojafy_sale)}</span>
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                  <span>Taxas</span>
+                  <span className="font-medium text-rose-600 dark:text-rose-400">-{formatBRL(order.lojafy_fee)}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                   <span>Custo</span>
                   <span className="font-medium text-foreground">{formatBRL(order.lojafy_cost)}</span>
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400">
-                  <span className="font-medium">Lucro</span>
+                  <span className="font-medium">Lucro Líquido</span>
                   <div className="flex items-center gap-1.5">
                     <span className="font-bold">{formatBRL(order.lojafy_profit)}</span>
                     <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
@@ -267,17 +279,30 @@ export const OrderKanbanCard: React.FC<OrderKanbanCardProps> = ({
         ) : (
           <div className="pt-2 border-t border-border/50 my-1.5 space-y-1 text-xs">
             <div className="flex items-baseline justify-between">
-              <span className="text-muted-foreground font-medium">Total</span>
+              <span className="text-muted-foreground font-medium">Venda</span>
               <span className="text-sm font-bold text-foreground tracking-tight">
                 {formattedAmount}
               </span>
             </div>
-            {showAdminMetrics && order.lojafy_profit > 0 && (
-              <div className="pt-1.5 border-t border-dashed border-border/60 text-[11px] flex items-center justify-between text-muted-foreground">
-                <span>Lucro Lojafy</span>
-                <span className="font-semibold text-emerald-600">
-                  {formatBRL(order.lojafy_profit)} ({formatPercent(order.lojafy_margin_pct)})
-                </span>
+            {order.lojafy_fee > 0 && (
+              <div className="flex items-center justify-between text-muted-foreground text-[11px]">
+                <span>Taxas</span>
+                <span className="font-medium text-rose-600 dark:text-rose-400">-{formatBRL(order.lojafy_fee)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-muted-foreground text-[11px]">
+              <span>Custo</span>
+              <span className="font-semibold text-foreground">{formatBRL(order.seller_cost)}</span>
+            </div>
+            {showAdminMetrics && (
+              <div className="pt-1.5 border-t border-dashed border-border/60 text-[11px] flex items-center justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
+                <span>Lucro Líquido</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold">{formatBRL(order.lojafy_profit)}</span>
+                  <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
+                    {formatPercent(order.lojafy_margin_pct)}
+                  </span>
+                </div>
               </div>
             )}
           </div>

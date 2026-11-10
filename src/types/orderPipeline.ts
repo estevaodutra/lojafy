@@ -48,19 +48,21 @@ export interface OrderPipelineItem {
   payment_status: "pending" | "paid" | "failed" | string;
   total_amount: number;
 
-  // Financial fields (Custo vs Venda vs Lucro - Vendedor & Lojafy)
+  // Financial fields (Custo vs Venda vs Taxas vs Lucro Líquido - Vendedor & Lojafy)
   sale_amount: number; // Valor vendido no canal/marketplace (ex: R$ 24,83)
+  marketplace_fee: number; // Taxas do marketplace (ex: comissão ML + taxa fixa R$ 6)
   seller_cost: number; // Preço que o revendedor paga à Lojafy (ex: R$ 6,90)
-  seller_profit: number; // Lucro bruto do revendedor (ex: R$ 17,93)
-  seller_margin_pct: number; // Margem percentual do revendedor (ex: 72.21%)
+  seller_profit: number; // Lucro líquido do revendedor = venda - taxas - custo (ex: R$ 9,20)
+  seller_margin_pct: number; // Margem líquida percentual do revendedor (ex: 37.05%)
 
   lojafy_sale: number; // Preço de venda da Lojafy ao revendedor (ex: R$ 6,90)
+  lojafy_fee: number; // Taxas da Lojafy (gateway de pagamento 4.5% + contingência 1% = R$ 0,38)
   lojafy_cost: number; // Custo do fornecedor pago pela Lojafy (ex: R$ 6,00)
-  lojafy_profit: number; // Lucro da Lojafy (ex: R$ 0,90)
-  lojafy_margin_pct: number; // Margem percentual da Lojafy (ex: 13.04%)
+  lojafy_profit: number; // Lucro líquido real da Lojafy (ex: R$ 0,52)
+  lojafy_margin_pct: number; // Margem líquida real da Lojafy (ex: 7.59%)
 
   supplier_cost: number; // Custo de fulfillment / fornecedor (valor a pagar via Pix)
-  profit_amount: number; // Lucro estimado
+  profit_amount: number; // Lucro líquido estimado
   is_marketplace: boolean; // Indica se é pedido de canal externo (ML, Shopee)
   
   // Archiving (Gestão de Arquivados)

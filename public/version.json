@@ -1,7 +1,7 @@
 {
-  "hash": "8d6a33837e0143d0ffca05dcd1ddabdbf3ee29d7",
-  "shortHash": "8d6a338",
-  "message": "feat(orders): align list rows to middle and display cost, sale and profit",
+  "hash": "f3f299eb4942009bf08e3dc212520415f0bb0faf",
+  "shortHash": "f3f299e",
+  "message": "feat(kanban): reorganize card financials with seller and lojafy margins",
   "author": "Lojafy Developer",
-  "timestamp": 1794282126040
+  "timestamp": 1794282979568
 }

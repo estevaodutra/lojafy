@@ -713,9 +713,12 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                         <TableCell className="py-2.5 align-middle text-right">
                           {order.is_marketplace ? (
                             <div className="space-y-0.5 inline-flex flex-col items-end text-xs">
-                              {/* Venda e Custo */}
+                              {/* Venda, Taxas e Custo */}
                               <div className="text-[11px] text-muted-foreground">
                                 Venda: <span className="font-semibold text-foreground">{formatBRL(order.sale_amount)}</span>
+                              </div>
+                              <div className="text-[11px] text-muted-foreground">
+                                Taxas: <span className="font-medium text-rose-600 dark:text-rose-400">-{formatBRL(order.marketplace_fee)}</span>
                               </div>
                               <div className="text-[11px] text-muted-foreground">
                                 Custo: <span className="font-semibold text-foreground">{formatBRL(order.seller_cost)}</span>
@@ -1004,6 +1007,9 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                         <div className="flex flex-col items-end text-xs">
                           <div className="text-[10px] text-muted-foreground">
                             Venda: <span className="font-semibold text-foreground">{formatBRL(order.sale_amount)}</span>
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            Taxas: <span className="font-medium text-rose-600 dark:text-rose-400">-{formatBRL(order.marketplace_fee)}</span>
                           </div>
                           <div className="text-[10px] text-muted-foreground">
                             Custo: <span className="font-semibold text-foreground">{formatBRL(order.seller_cost)}</span>

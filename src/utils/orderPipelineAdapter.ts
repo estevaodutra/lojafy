@@ -281,14 +281,48 @@ export function normalizeOrderToPipelineItem(
   calculatedSellerCost = Math.round(calculatedSellerCost * 100) / 100;
   calculatedLojafyCost = Math.round(calculatedLojafyCost * 100) / 100;
 
+  // 1. Taxas do Marketplace (Mercado Livre, etc.)
+  let calculatedMarketplaceFee = 0;
+  if (order.tax_amount && Number(order.tax_amount) > 0) {
+    calculatedMarketplaceFee = Number(order.tax_amount);
+  } else if (order.marketplace_fee && Number(order.marketplace_fee) > 0) {
+    calculatedMarketplaceFee = Number(order.marketplace_fee);
+  } else if (typeof order.notes === "string") {
+    const feeMatch = order.notes.match(/Taxas ML:\s*R\$\s*([0-9.,]+)/i) || order.notes.match(/Taxas:\s*R\$\s*([0-9.,]+)/i);
+    if (feeMatch) {
+      const parsed = parseFloat(feeMatch[1].replace(",", "."));
+      if (!isNaN(parsed) && parsed > 0) calculatedMarketplaceFee = parsed;
+    }
+  }
+
+  // Estimativa real se taxa ainda não estiver persistida da API ML:
+  // No Mercado Livre: abaixo de R$ 79 tem R$ 6,00 fixo + ~11% de comissão. Acima de R$ 79 tem ~13%.
+  if (calculatedMarketplaceFee <= 0 && isMarketplace && saleAmount > 0) {
+    if (saleAmount < 79) {
+      calculatedMarketplaceFee = Math.round((6.00 + (saleAmount * 0.11)) * 100) / 100;
+    } else {
+      calculatedMarketplaceFee = Math.round((saleAmount * 0.13) * 100) / 100;
+    }
+  }
+  calculatedMarketplaceFee = Math.round(calculatedMarketplaceFee * 100) / 100;
+
   // Métricas do Revendedor:
-  const sellerProfit = isMarketplace ? Math.max(0, Math.round((saleAmount - calculatedSellerCost) * 100) / 100) : 0;
+  // Lucro Líquido Real = Venda - Taxas Marketplace - Custo Lojafy
+  const sellerProfit = isMarketplace
+    ? Math.max(0, Math.round((saleAmount - calculatedMarketplaceFee - calculatedSellerCost) * 100) / 100)
+    : Math.max(0, Math.round((saleAmount - calculatedSellerCost) * 100) / 100);
+
   const sellerMarginPct = saleAmount > 0 ? (sellerProfit / saleAmount) * 100 : 0;
 
   // Métricas da Lojafy (SuperAdmin):
+  // Decomposição real Lojafy: Taxa de Transação (4.5%) + Contingenciamento (1%)
   const lojafySale = calculatedSellerCost;
+  const lojafyTransactionAmount = Math.round(lojafySale * 0.045 * 100) / 100;
+  const lojafyContingencyAmount = Math.round((lojafySale - lojafyTransactionAmount) * 0.01 * 100) / 100;
+  const lojafyFee = Math.round((lojafyTransactionAmount + lojafyContingencyAmount) * 100) / 100;
+
   const lojafyCost = calculatedLojafyCost;
-  const lojafyProfit = Math.max(0, Math.round((lojafySale - lojafyCost) * 100) / 100);
+  const lojafyProfit = Math.max(0, Math.round((lojafySale - lojafyFee - lojafyCost) * 100) / 100);
   const lojafyMarginPct = lojafySale > 0 ? (lojafyProfit / lojafySale) * 100 : 0;
 
   return {
@@ -300,10 +334,12 @@ export function normalizeOrderToPipelineItem(
     payment_status: order.payment_status || "pending",
     total_amount: saleAmount,
     sale_amount: saleAmount,
+    marketplace_fee: calculatedMarketplaceFee,
     seller_cost: calculatedSellerCost,
     seller_profit: sellerProfit,
     seller_margin_pct: sellerMarginPct,
     lojafy_sale: lojafySale,
+    lojafy_fee: lojafyFee,
     lojafy_cost: lojafyCost,
     lojafy_profit: lojafyProfit,
     lojafy_margin_pct: lojafyMarginPct,

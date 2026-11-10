@@ -742,7 +742,21 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
     pixExpiresAt = pixRes.expiresAt;
   }
 
-  const notesSummary = `Pedido via Mercado Livre #${mlOrderIdStr}. Custo Fornecedor: R$ ${totalSupplierCost.toFixed(2)} | Abate Carteira: R$ ${walletDeducted.toFixed(2)} | Pix 24h: R$ ${remainingPixAmount.toFixed(2)}`;
+  // Extrair tarifas reais do Mercado Livre/Mercado Pago
+  let totalMarketplaceFee = 0;
+  for (const p of mlOrder.payments || []) {
+    if (p.status === 'approved' || p.status === 'accredited') {
+      totalMarketplaceFee += Number(p.marketplace_fee || 0);
+    }
+  }
+  if (totalMarketplaceFee <= 0 && Array.isArray(mlOrder.order_items)) {
+    for (const it of mlOrder.order_items) {
+      totalMarketplaceFee += Number(it.sale_fee || 0) * Number(it.quantity || 1);
+    }
+  }
+  totalMarketplaceFee = Math.round(totalMarketplaceFee * 100) / 100;
+
+  const notesSummary = `Pedido via Mercado Livre #${mlOrderIdStr}. Taxas ML: R$ ${totalMarketplaceFee.toFixed(2)} | Custo Fornecedor: R$ ${totalSupplierCost.toFixed(2)} | Abate Carteira: R$ ${walletDeducted.toFixed(2)} | Pix 24h: R$ ${remainingPixAmount.toFixed(2)}`;
 
   let finalStatus = 'pendente';
   let finalPaymentStatus = 'pending';
@@ -768,6 +782,7 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
       status: finalStatus,
       payment_status: finalPaymentStatus,
       payment_method: finalPaymentMethod,
+      tax_amount: totalMarketplaceFee,
       pix_qr_code: isFullyPaid || isDelivered || isShipped ? null : qrCode,
       pix_qr_code_base64: isFullyPaid || isDelivered || isShipped ? null : qrCodeBase64,
       payment_expires_at: isFullyPaid || isDelivered || isShipped ? null : pixExpiresAt,
@@ -1090,7 +1105,21 @@ async function processSingleMlOrder(
     comment: receiverAddress?.comment || null,
   };
 
-  const notesSummary = `Pedido via Mercado Livre #${displayRef} (ML Order #${realOrderIdStr}). Custo Fornecedor: R$ ${totalSupplierCost.toFixed(2)} | Abate Carteira: R$ ${walletDeducted.toFixed(2)} | Pix 24h: R$ ${remainingPixAmount.toFixed(2)}`;
+  // Extrair tarifas reais do Mercado Livre/Mercado Pago
+  let totalMarketplaceFee = 0;
+  for (const p of mlOrder.payments || []) {
+    if (p.status === 'approved' || p.status === 'accredited') {
+      totalMarketplaceFee += Number(p.marketplace_fee || 0);
+    }
+  }
+  if (totalMarketplaceFee <= 0 && Array.isArray(mlOrder.order_items)) {
+    for (const it of mlOrder.order_items) {
+      totalMarketplaceFee += Number(it.sale_fee || 0) * Number(it.quantity || 1);
+    }
+  }
+  totalMarketplaceFee = Math.round(totalMarketplaceFee * 100) / 100;
+
+  const notesSummary = `Pedido via Mercado Livre #${displayRef} (ML Order #${realOrderIdStr}). Taxas ML: R$ ${totalMarketplaceFee.toFixed(2)} | Custo Fornecedor: R$ ${totalSupplierCost.toFixed(2)} | Abate Carteira: R$ ${walletDeducted.toFixed(2)} | Pix 24h: R$ ${remainingPixAmount.toFixed(2)}`;
 
   const { data: newOrder, error: orderError } = await supabase
     .from('orders')
@@ -1099,6 +1128,7 @@ async function processSingleMlOrder(
       reseller_id: resellerUserId,
       order_number: orderNumber,
       total_amount: totalOrderAmount,
+      tax_amount: totalMarketplaceFee,
       payment_method: isFullyPaid ? 'wallet' : 'pix',
       payment_status: isFullyPaid ? 'paid' : 'pending',
       status: isFullyPaid ? 'recebido' : 'pendente',
