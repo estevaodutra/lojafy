@@ -54,13 +54,9 @@ serve(async (req) => {
         payment_method,
         payment_id,
         external_reference,
-        tracking_code,
-        ml_shipment_id,
-        ml_label_url,
+        tracking_number,
         has_shipping_file,
         tax_amount,
-        channel,
-        origin_type,
         total_amount,
         created_at,
         payment_expires_at,
@@ -70,7 +66,6 @@ serve(async (req) => {
         user_id,
         reseller_id,
         notes,
-        ml_order_id,
         order_items (
           id,
           product_id,
@@ -291,6 +286,15 @@ serve(async (req) => {
 
     const orderNumStr = String(order.order_number || '').replace(/^#/, '');
 
+    const mlMatch = typeof order.notes === 'string' ? order.notes.match(/Mercado Livre #([0-9]+)/i) : null;
+    const mlOrderId = order.ml_order_id || (mlMatch ? mlMatch[1] : null);
+    const trackingNumber = order.tracking_number || null;
+    const externalRef = order.external_reference || order.payment_id || (mlOrderId ? `m1_pay_${orderNumStr}` : null);
+    const isMl = isMarketplaceOrder || !!mlOrderId || order.payment_method === 'mercadolivre';
+    const channel = isMl ? 'mercadolivre' : (order.payment_method || 'lojafy');
+    const channelLabel = isMl ? 'ML' : 'LOJAFY';
+    const originType = (mlOrderId || externalRef) ? 'AUTO' : 'MANUAL';
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -308,14 +312,14 @@ serve(async (req) => {
           seller_profit: sellerProfit,
           seller_margin_pct: sellerMarginPct,
           is_marketplace: isMarketplaceOrder,
-          ml_order_id: order.ml_order_id || null,
-          external_reference: order.external_reference || order.payment_id || (order.ml_order_id ? `m1_pay_${orderNumStr}` : null),
-          channel: order.channel || (order.ml_order_id ? 'mercadolivre' : 'lojafy'),
-          channel_label: (order.channel === 'mercadolivre' || order.ml_order_id) ? 'ML' : 'LOJAFY',
-          origin_type: (order.ml_order_id || order.external_reference) ? 'AUTO' : 'MANUAL',
-          tracking_number: order.tracking_code || null,
-          has_shipping_label: !!(order.has_shipping_file || order.ml_label_url),
-          shipping_label_status: (order.has_shipping_file || order.ml_label_url) ? 'ready' : 'pending',
+          ml_order_id: mlOrderId,
+          external_reference: externalRef,
+          channel: channel,
+          channel_label: channelLabel,
+          origin_type: originType,
+          tracking_number: trackingNumber,
+          has_shipping_label: !!order.has_shipping_file,
+          shipping_label_status: order.has_shipping_file ? 'ready' : 'pending',
           seller_name: sellerName,
           time_in_stage_display: timeInStageDisplay,
           created_at: order.created_at,
