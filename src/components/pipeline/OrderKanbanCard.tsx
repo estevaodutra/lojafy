@@ -199,13 +199,47 @@ export const OrderKanbanCard: React.FC<OrderKanbanCardProps> = ({
           </div>
         </div>
 
-        {/* Valor Final em destaque */}
-        <div className="flex items-baseline justify-between pt-1 border-t border-border/40 my-1.5">
-          <span className="text-[11px] text-muted-foreground font-medium">Total</span>
-          <span className="text-sm font-bold text-foreground tracking-tight">
-            {formattedAmount}
-          </span>
-        </div>
+        {/* Informações Financeiras: Custo Fulfillment vs Venda ML vs Lucro */}
+        {order.is_marketplace ? (
+          <div className="pt-1.5 border-t border-border/40 my-1.5 space-y-1">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[11px] text-muted-foreground font-medium">
+                {isPaid ? "Custo Fornecedor" : "A Pagar (Custo)"}
+              </span>
+              <span className="text-sm font-bold text-foreground tracking-tight">
+                {new Intl.NumberFormat("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                }).format(order.supplier_cost || 0)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>
+                Venda:{" "}
+                {new Intl.NumberFormat("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                }).format(order.sale_amount || order.total_amount || 0)}
+              </span>
+              {order.profit_amount > 0 && (
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 text-[10px]">
+                  Lucro: +
+                  {new Intl.NumberFormat("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  }).format(order.profit_amount)}
+                </span>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-baseline justify-between pt-1 border-t border-border/40 my-1.5">
+            <span className="text-[11px] text-muted-foreground font-medium">Total</span>
+            <span className="text-sm font-bold text-foreground tracking-tight">
+              {formattedAmount}
+            </span>
+          </div>
+        )}
 
         {/* Footer Actions: [ 👁 ] [ Gerar Pix / Pago ✓ ] [ Imprimir / Gerar etiqueta ] [ 📦 Arquivar ] */}
         <div className="flex items-center gap-1.5 pt-2 border-t border-border/60 mt-1">

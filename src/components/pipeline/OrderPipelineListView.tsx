@@ -464,7 +464,7 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                             Linha 2: Rastreamento (ou external ref)
                             Linha 3: Canal (OTHER, ML, etc.) + Origem (AUTO / MANUAL)
                         */}
-                        <TableCell className="py-2.5 align-top">
+                        <TableCell className="py-2.5 align-middle">
                           <div className="space-y-1">
                             {/* Linha 1 */}
                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -569,7 +569,7 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                         {/* 3. PRODUTO:
                             Miniatura à esquerda + Nome (até 2 linhas) + Quantidade (+X outros)
                         */}
-                        <TableCell className="py-2.5 align-top">
+                        <TableCell className="py-2.5 align-middle">
                           <div className="flex items-center gap-2.5">
                             <div className="relative w-11 h-11 shrink-0 rounded bg-muted/50 border overflow-hidden flex items-center justify-center">
                               {order.main_product?.imageUrl ? (
@@ -615,7 +615,7 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                         {/* 4. OPERAÇÃO:
                             Seller, Cliente, Fornecedor e Destino verticalmente
                         */}
-                        <TableCell className="py-2.5 align-top">
+                        <TableCell className="py-2.5 align-middle">
                           <div className="space-y-0.5 text-xs">
                             <div className="flex items-center gap-1.5 text-[11px]">
                               <span className="text-muted-foreground w-16 shrink-0">Seller:</span>
@@ -663,7 +663,7 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                         {/* 5. STATUS:
                             Etapa do Kanban + Tempo na etapa + Alerta de ocorrência
                         */}
-                        <TableCell className="py-2.5 align-top">
+                        <TableCell className="py-2.5 align-middle">
                           <div className="space-y-1">
                             <Badge
                               variant="outline"
@@ -695,24 +695,74 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                         </TableCell>
 
                         {/* 6. TOTAL:
-                            Valor formatado em destaque + status financeiro
+                            Custo de Fulfillment (a pagar) vs Venda Externa vs Lucro
                         */}
-                        <TableCell className="py-2.5 align-top text-right">
-                          <div className="space-y-0.5">
-                            <span className="text-sm font-bold text-foreground tracking-tight block">
-                              {formattedAmount}
-                            </span>
-                            {isPaid ? (
-                              <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                                <Check className="w-3 h-3 stroke-[2.5]" />
-                                Pago
+                        <TableCell className="py-2.5 align-middle text-right">
+                          {order.is_marketplace ? (
+                            <div className="space-y-0.5 inline-flex flex-col items-end">
+                              {/* Custo Real a Pagar via Pix */}
+                              <div className="flex items-baseline gap-1 justify-end">
+                                <span className="text-[10px] font-medium text-muted-foreground">
+                                  {isPaid ? "Custo:" : "A Pagar:"}
+                                </span>
+                                <span className="text-sm font-bold text-foreground tracking-tight">
+                                  {new Intl.NumberFormat("pt-BR", {
+                                    style: "currency",
+                                    currency: "BRL",
+                                  }).format(order.supplier_cost || 0)}
+                                </span>
+                              </div>
+
+                              {/* Venda e Lucro */}
+                              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground justify-end">
+                                <span>
+                                  Venda:{" "}
+                                  {new Intl.NumberFormat("pt-BR", {
+                                    style: "currency",
+                                    currency: "BRL",
+                                  }).format(order.sale_amount || order.total_amount || 0)}
+                                </span>
+                                {order.profit_amount > 0 && (
+                                  <span className="font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1 py-0.2 rounded border border-emerald-200 dark:border-emerald-800">
+                                    +{new Intl.NumberFormat("pt-BR", {
+                                      style: "currency",
+                                      currency: "BRL",
+                                    }).format(order.profit_amount)}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Status do Pagamento */}
+                              <div className="pt-0.5">
+                                {isPaid ? (
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                    <Check className="w-3 h-3 stroke-[2.5]" />
+                                    Pago
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                                    Pix Pendente
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-0.5">
+                              <span className="text-sm font-bold text-foreground tracking-tight block">
+                                {formattedAmount}
                               </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                                Pix Pendente
-                              </span>
-                            )}
-                          </div>
+                              {isPaid ? (
+                                <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                  <Check className="w-3 h-3 stroke-[2.5]" />
+                                  Pago
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                                  Pix Pendente
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </TableCell>
 
                         {/* 7. AÇÕES (Paridade Completa com o Card) */}
@@ -941,9 +991,44 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                       </Badge>
                     </div>
 
-                    <span className="text-sm font-bold text-foreground">
-                      {formattedAmount}
-                    </span>
+                    <div className="text-right shrink-0">
+                      {order.is_marketplace ? (
+                        <div className="flex flex-col items-end">
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-[10px] text-muted-foreground">
+                              {isPaid ? "Custo:" : "A Pagar:"}
+                            </span>
+                            <span className="text-sm font-bold text-foreground">
+                              {new Intl.NumberFormat("pt-BR", {
+                                style: "currency",
+                                currency: "BRL",
+                              }).format(order.supplier_cost || 0)}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            Venda:{" "}
+                            {new Intl.NumberFormat("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            }).format(order.sale_amount || order.total_amount || 0)}
+                            {order.profit_amount > 0 && (
+                              <span className="text-emerald-600 dark:text-emerald-400 font-semibold ml-1">
+                                (+
+                                {new Intl.NumberFormat("pt-BR", {
+                                  style: "currency",
+                                  currency: "BRL",
+                                }).format(order.profit_amount)}
+                                )
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-sm font-bold text-foreground">
+                          {formattedAmount}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Mobile Product Thumbnail + Name */}

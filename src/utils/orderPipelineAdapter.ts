@@ -190,6 +190,74 @@ export function normalizeOrderToPipelineItem(
   const stageEnteredAt = order.stage_entered_at || order.updated_at || order.created_at;
   const timeInStageDisplay = stageEnteredAt ? formatTimeInStage(stageEnteredAt) : undefined;
 
+  // Marketplace detection
+  const isMarketplace =
+    channel === "mercadolivre" ||
+    channel === "shopee" ||
+    !!order.ml_order_id ||
+    !!order.ml_shipment_id ||
+    !!order.marketplace_order_id ||
+    originType === "AUTO";
+
+  // Financial resolution:
+  // sale_amount = total vendido ao cliente final no ML/canal
+  const saleAmount = Number(order.total_amount) || 0;
+
+  // supplier_cost = custo real de fulfillment / fornecedor (valor que o reseller paga via Pix)
+  let calculatedSupplierCost = 0;
+  if (items.length > 0) {
+    for (const it of items) {
+      const qty = Number(it.quantity) || 1;
+      const explicitTotal = Number(it.supplier_total_cost);
+      if (explicitTotal > 0) {
+        calculatedSupplierCost += explicitTotal;
+        continue;
+      }
+
+      const unitCost = Number(
+        it.supplier_unit_cost ||
+        it.product_snapshot?.cost_price ||
+        it.product?.cost_price ||
+        (it.product_id && productsMap?.get(it.product_id)?.cost_price) ||
+        0
+      );
+
+      if (unitCost > 0) {
+        calculatedSupplierCost += unitCost * qty;
+      }
+    }
+  }
+
+  // Fallback 1: Extrair "Custo Fornecedor: R$ XX.XX" das notas do pedido
+  if (calculatedSupplierCost <= 0 && typeof order.notes === "string") {
+    const costMatch = order.notes.match(/Custo Fornecedor:\s*R\$\s*([0-9.,]+)/i);
+    if (costMatch) {
+      const parsed = parseFloat(costMatch[1].replace(",", "."));
+      if (!isNaN(parsed) && parsed > 0) {
+        calculatedSupplierCost = parsed;
+      }
+    }
+  }
+
+  // Fallback 2: Extrair "Pix 24h: R$ XX.XX" das notas do pedido
+  if (calculatedSupplierCost <= 0 && typeof order.notes === "string") {
+    const pixMatch = order.notes.match(/Pix 24h:\s*R\$\s*([0-9.,]+)/i);
+    if (pixMatch) {
+      const parsed = parseFloat(pixMatch[1].replace(",", "."));
+      if (!isNaN(parsed) && parsed > 0) {
+        calculatedSupplierCost = parsed;
+      }
+    }
+  }
+
+  // Fallback 3: Se não encontrou custo específico, para pedidos diretos ou sem custo especificado, iguala a saleAmount
+  if (calculatedSupplierCost <= 0) {
+    calculatedSupplierCost = saleAmount;
+  }
+
+  // Lucro do revendedor (apenas se for marketplace)
+  const profitAmount = isMarketplace ? Math.max(0, saleAmount - calculatedSupplierCost) : 0;
+
   return {
     id: order.id,
     order_number: order.order_number ? String(order.order_number).replace(/^#/, "") : "",
@@ -197,7 +265,11 @@ export function normalizeOrderToPipelineItem(
     updated_at: order.updated_at,
     status: order.status || "pendente",
     payment_status: order.payment_status || "pending",
-    total_amount: Number(order.total_amount) || 0,
+    total_amount: saleAmount,
+    supplier_cost: calculatedSupplierCost,
+    sale_amount: saleAmount,
+    profit_amount: profitAmount,
+    is_marketplace: isMarketplace,
     is_archived: isArchived,
     archived_at: archivedAt,
     archived_reason: archivedReason,

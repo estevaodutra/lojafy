@@ -501,13 +501,34 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
               ) : null}
 
               <div className="text-center">
-                <p className="text-xs text-muted-foreground">Valor a pagar</p>
+                <p className="text-xs text-muted-foreground">
+                  {pixModalOrder.is_marketplace
+                    ? "Valor a pagar (Custo Fornecedor / Fulfillment)"
+                    : "Valor a pagar"}
+                </p>
                 <p className="text-2xl font-bold text-foreground">
                   {new Intl.NumberFormat("pt-BR", {
                     style: "currency",
                     currency: "BRL",
-                  }).format(pixModalOrder.total_amount)}
+                  }).format(pixModalOrder.supplier_cost || pixModalOrder.total_amount)}
                 </p>
+                {pixModalOrder.is_marketplace && pixModalOrder.profit_amount > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Venda:{" "}
+                    {new Intl.NumberFormat("pt-BR", {
+                      style: "currency",
+                      currency: "BRL",
+                    }).format(pixModalOrder.sale_amount || pixModalOrder.total_amount)}{" "}
+                    • Lucro estimado:{" "}
+                    <strong className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                      +
+                      {new Intl.NumberFormat("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      }).format(pixModalOrder.profit_amount)}
+                    </strong>
+                  </p>
+                )}
               </div>
 
               {pixModalOrder.pix_qr_code && (

@@ -132,7 +132,7 @@ const AdminOrders = () => {
       setLoading(true);
 
       // 1. Fetch orders with order_items
-      // Default: Oldest first per Section 5 (ORDER BY created_at ASC)
+      // Default: Newest first (ORDER BY created_at DESC)
       const { data: ordersData, error: ordersError } = await supabase
         .from("orders")
         .select(`
@@ -143,6 +143,8 @@ const AdminOrders = () => {
             quantity,
             unit_price,
             total_price,
+            supplier_unit_cost,
+            supplier_total_cost,
             product_snapshot,
             supplier_id,
             supplier_organization_id,
@@ -151,11 +153,12 @@ const AdminOrders = () => {
               name,
               image_url,
               images,
-              original_images
+              original_images,
+              cost_price
             )
           )
         `)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false });
 
       if (ordersError) throw ordersError;
 
@@ -274,7 +277,7 @@ const AdminOrders = () => {
         try {
           const { data: prods } = await supabase
             .from("products")
-            .select("id, name, image_url, images, original_images")
+            .select("id, name, image_url, images, original_images, cost_price")
             .in("id", Array.from(allProductIds));
           if (prods) {
             prods.forEach((p) => prodMap.set(p.id, p));

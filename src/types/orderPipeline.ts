@@ -47,6 +47,12 @@ export interface OrderPipelineItem {
   status: string; // Operational status (ex: 'pendente', 'pago', etc.)
   payment_status: "pending" | "paid" | "failed" | string;
   total_amount: number;
+
+  // Financial fields (Custo vs Venda vs Lucro)
+  supplier_cost: number; // Custo de fulfillment / fornecedor (valor real do Pix)
+  sale_amount: number; // Valor vendido no canal/marketplace
+  profit_amount: number; // Lucro estimado (venda - custo)
+  is_marketplace: boolean; // Indica se é pedido de canal externo (ML, Shopee)
   
   // Archiving (Gestão de Arquivados)
   is_archived?: boolean;
