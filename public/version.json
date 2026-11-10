@@ -1,7 +1,7 @@
 {
-  "hash": "d1b51803743ea5aae2e546deac8d32660d4c8524",
-  "shortHash": "d1b5180",
-  "message": "feat(pipeline): add fee breakdown hover tooltip on order cards and list view",
+  "hash": "48c81e09c13aa13631a796b6f345d2392f52f47c",
+  "shortHash": "48c81e0",
+  "message": "feat(pipeline): format financial figures with accounting alignment and inline profit percent",
   "author": "Lojafy Developer",
-  "timestamp": 1794283906261
+  "timestamp": 1794285262310
 }

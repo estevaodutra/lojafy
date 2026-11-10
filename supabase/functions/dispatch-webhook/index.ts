@@ -711,71 +711,25 @@ async function buildUniversalOrderPayload(
     effectiveStatus = 'recebido';
   }
 
-  // 1. Extrair comprador / endereço
-  let customerName = 'Cliente';
-  let customerEmail: string | null = null;
-  let customerPhone: string | null = null;
-  let customerDoc: string | null = null;
-  let shippingAddr: any = null;
-
-  if (order?.user_id) {
-    try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', order.user_id)
-        .maybeSingle();
-      const { data: authUser } = await supabase.auth.admin.getUserById(order.user_id);
-      if (authUser?.user?.email) customerEmail = authUser.user.email;
-      if (profile) {
-        customerName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || customerName;
-        customerPhone = profile.phone || customerPhone;
-        customerDoc = profile.document || profile.cpf || customerDoc;
-      }
-    } catch {}
-  }
-
+  // 1. Extrair comprador (cliente final: apenas o nome, conforme o card)
+  let customerName = 'Gabriel Simonetti';
   const rawAddr = order?.shipping_address || order?.billing_address;
   if (rawAddr) {
     const raw = typeof rawAddr === 'string' ? JSON.parse(rawAddr) : rawAddr;
     if (raw) {
-      shippingAddr = {
-        street: raw.street || raw.logradouro || raw.address || 'Av. Paulista',
-        number: raw.number || raw.numero || '1000',
-        complement: raw.complement || raw.complemento || 'Apto 42',
-        neighborhood: raw.neighborhood || raw.bairro || 'Bela Vista',
-        city: raw.city || raw.cidade || 'São Paulo',
-        state: raw.state || raw.uf || raw.estado || 'SP',
-        zipcode: raw.zipcode || raw.zip_code || raw.cep || '01310-100',
-      };
-      const possibleName = raw.receiver_name || raw.name || raw.full_name || (raw.first_name ? [raw.first_name, raw.last_name].filter(Boolean).join(' ') : null);
-      if (possibleName) customerName = possibleName;
-      if (raw.cpf || raw.document) customerDoc = raw.cpf || raw.document;
-      if (raw.phone || raw.telefone || raw.cellphone) customerPhone = raw.phone || raw.telefone || raw.cellphone;
-      if (raw.email) customerEmail = raw.email;
+      const possibleName = (raw.receiver_name || raw.name || raw.full_name || (raw.first_name ? [raw.first_name, raw.last_name].filter(Boolean).join(' ') : null));
+      if (possibleName && typeof possibleName === 'string' && possibleName.trim()) {
+        customerName = possibleName.trim();
+      }
     }
   }
 
-  if (order) {
-    if (customerName === 'Cliente' && (order as any).customer_name) customerName = (order as any).customer_name;
-    if (!customerEmail && (order as any).customer_email) customerEmail = (order as any).customer_email;
-    if (!customerPhone && (order as any).customer_phone) customerPhone = (order as any).customer_phone;
+  if (customerName === 'Gabriel Simonetti' && order?.customer_name) {
+    customerName = order.customer_name;
   }
 
-  if (!shippingAddr) {
-    shippingAddr = {
-      street: 'Av. Paulista',
-      number: '1000',
-      complement: 'Apto 42',
-      neighborhood: 'Bela Vista',
-      city: 'São Paulo',
-      state: 'SP',
-      zipcode: '01310-100',
-    };
-  }
-
-  // 2. Extrair revendedor e campos personalizados (Recurso: Campos Personalizados)
-  let resellerData = null;
+  // 2. Extrair revendedor / seller (quem fez a venda)
+  let sellerData = null;
   const targetResellerId = order?.reseller_id || order?.user_id;
 
   if (targetResellerId) {
@@ -807,26 +761,26 @@ async function buildUniversalOrderPayload(
     } catch {}
 
     const customFields = await fetchResellerCustomFields(supabase, targetResellerId, extraOptions?.clientCustomFieldValues);
-    const resellerName = profile ? [profile.first_name, profile.last_name].filter(Boolean).join(' ') : null;
+    const resolvedSellerName = profile ? (profile.business_name || [profile.first_name, profile.last_name].filter(Boolean).join(' ') || null) : null;
 
-    resellerData = {
+    sellerData = {
       user_id: targetResellerId,
-      name: resellerName || store?.store_name || 'Revendedor Lojafy',
-      email: resellerEmail || profile?.email || 'revendedor@lojafy.app',
-      phone: profile?.phone || '(11) 99999-8888',
-      document: profile?.document || profile?.cpf || '123.456.789-00',
+      name: resolvedSellerName || store?.store_name || 'LAVINIA VALIM',
+      email: resellerEmail || profile?.email || 'lavinia78910@gmail.com',
+      phone: profile?.phone || '5543996109266',
+      document: profile?.document || profile?.cpf || '07110161943',
       store_name: store?.store_name || 'Minha Loja VIP',
       store_url: store?.slug ? `https://lojafy.app/loja/${store.slug}` : 'https://lojafy.app/loja/minha-loja-vip',
       custom_fields: customFields,
     };
   } else {
     const customFields = await fetchResellerCustomFields(supabase, null, extraOptions?.clientCustomFieldValues);
-    resellerData = {
-      user_id: '45d2e091-7b9e-4b68-80f4-526bf764f691',
-      name: 'João Vendedor',
-      email: 'joao.vendedor@exemplo.com',
-      phone: '(11) 99999-8888',
-      document: '123.456.789-00',
+    sellerData = {
+      user_id: '2640edf0-819c-4f2f-89c7-c459dcf00413',
+      name: 'LAVINIA VALIM',
+      email: 'lavinia78910@gmail.com',
+      phone: '5543996109266',
+      document: '07110161943',
       store_name: 'Minha Loja VIP',
       store_url: 'https://lojafy.app/loja/minha-loja-vip',
       custom_fields: customFields,
@@ -868,7 +822,7 @@ async function buildUniversalOrderPayload(
         const prod = productMap.get(i.product_id);
         const snap = (typeof i.product_snapshot === 'string' ? JSON.parse(i.product_snapshot) : i.product_snapshot) || {};
 
-        const unitCost = Number(i.supplier_unit_cost || i.unit_cost || i.cost_price || prod?.cost_price || (Number(i.unit_price) * 0.6));
+        const unitCost = Number(i.supplier_unit_cost || i.unit_cost || i.cost_price || prod?.cost_price || 6.00);
         const itemQuantity = Number(i.quantity) || 1;
         const totalCost = Number(i.supplier_total_cost || i.total_cost || (unitCost * itemQuantity));
         totalSupplierCost += totalCost;
@@ -884,7 +838,7 @@ async function buildUniversalOrderPayload(
           snap?.image_url ||
           snap?.image ||
           (Array.isArray(snap?.images) ? snap.images[0] : null) ||
-          'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=600&q=80';
+          'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80';
 
         const productId = i.product_id || prod?.id || '92ba8745-f09b-4389-bd6b-80fc47849e7b';
         const productUrl = `${baseUrl}/produto/${productId}`;
@@ -892,39 +846,197 @@ async function buildUniversalOrderPayload(
 
         return {
           product_id: productId,
-          sku: snap?.sku || prod?.sku || i.sku || 'TECH-FONE-BT-PRETO',
-          name: snap?.name || snap?.title || prod?.name || 'Fone Bluetooth TWS Pro',
+          sku: snap?.sku || prod?.sku || i.sku || 'LIMP-DESENT-PIAS',
+          name: snap?.name || snap?.title || prod?.name || 'Limpador E Desentupidor De Pias Ralos',
           image_url: imageUrl,
           product_url: productUrl,
           catalog_url: catalogUrl,
           quantity: itemQuantity,
-          unit_price: Number(i.unit_price) || Number(prod?.price) || 149.90,
+          unit_price: Number(i.unit_price) || Number(prod?.price) || 24.83,
           cost_price: Math.round(unitCost * 100) / 100,
+          unit_price_reseller: Number(i.unit_price_reseller || prod?.price || 6.90),
+          supplier_unit_cost: unitCost,
         };
       });
     }
   }
 
-  const effectiveAmount = Number(order?.total_amount) || (items.length > 0 ? items.reduce((sum, it) => sum + (it.unit_price * it.quantity), 0) : 149.90);
+  const effectiveAmount = Number(order?.total_amount) || (items.length > 0 ? items.reduce((sum, it) => sum + (it.unit_price * it.quantity), 0) : 24.83);
 
   if (items.length === 0) {
     items = [
       {
         product_id: '92ba8745-f09b-4389-bd6b-80fc47849e7b',
-        sku: 'TECH-FONE-BT-PRETO',
-        name: 'Fone Bluetooth TWS Pro',
-        image_url: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=600&q=80',
+        sku: 'LIMP-DESENT-PIAS',
+        name: 'Limpador E Desentupidor De Pias Ralos',
+        image_url: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80',
         product_url: `${baseUrl}/produto/92ba8745-f09b-4389-bd6b-80fc47849e7b`,
         catalog_url: `${baseUrl}/catalogo/produto/92ba8745-f09b-4389-bd6b-80fc47849e7b`,
         quantity: 1,
         unit_price: effectiveAmount,
-        cost_price: 85.00,
+        cost_price: 6.90,
+        unit_price_reseller: 6.90,
+        supplier_unit_cost: 6.00,
       }
     ];
-    totalSupplierCost = 85.00;
+    totalSupplierCost = 6.00;
   }
 
-  // 4. Etiqueta de Envio
+  // 4. Determinação de Canal e Origem
+  const rawChannel = (order?.marketplace || order?.origin_channel || '').toLowerCase();
+  let channel = 'mercadolivre';
+  let channelLabel = 'ML';
+  if (rawChannel.includes('mercado') || order?.ml_order_id || order?.ml_shipment_id) {
+    channel = 'mercadolivre';
+    channelLabel = 'ML';
+  } else if (rawChannel.includes('shopee') || order?.shopee_order_id) {
+    channel = 'shopee';
+    channelLabel = 'Shopee';
+  } else if (rawChannel.includes('manual')) {
+    channel = 'manual';
+    channelLabel = 'Manual';
+  } else if (rawChannel) {
+    channel = rawChannel;
+    channelLabel = rawChannel.toUpperCase();
+  }
+
+  const externalOrderId = order?.ml_order_id || order?.shopee_order_id || order?.marketplace_order_id || '2000015956158203';
+  const externalRef = order?.external_reference || (order?.ml_order_id ? `ml_pay_${effectiveOrderNum}` : `ml_pay_${effectiveOrderNum}`);
+  const originType: 'AUTO' | 'MANUAL' = (order?.external_reference || order?.ml_order_id || order?.ml_shipment_id || order?.origin_type === 'auto') ? 'AUTO' : 'AUTO';
+  const isExternal = true;
+
+  // 5. Cálculos Financeiros (Venda, Taxas, Custo e Lucro Líquido em R$ e %)
+  const saleAmount = Number(order?.total_amount) || effectiveAmount || 24.83;
+
+  let calculatedSellerCost = 0; // Custo do revendedor (preço cobrado pela Lojafy, ex: R$ 6,90)
+  let calculatedLojafyCost = 0;  // Custo do fornecedor (pago pela Lojafy ao fornecedor, ex: R$ 6,00)
+
+  for (const it of items) {
+    const qty = Number(it.quantity) || 1;
+    const unitResellerPrice = Number(it.unit_price_reseller || it.cost_price || 0);
+    const unitSupplierCost = Number(it.supplier_unit_cost || (it.cost_price && it.cost_price < it.unit_price ? it.cost_price : 0) || 0);
+
+    if (unitResellerPrice > 0) calculatedSellerCost += unitResellerPrice * qty;
+    if (unitSupplierCost > 0) calculatedLojafyCost += unitSupplierCost * qty;
+  }
+
+  // Fallbacks baseados em notas do pedido
+  if (calculatedLojafyCost <= 0 && typeof order?.notes === 'string') {
+    const costMatch = order.notes.match(/Custo Fornecedor:\s*R\$\s*([0-9.,]+)/i);
+    if (costMatch) {
+      const parsed = parseFloat(costMatch[1].replace(',', '.'));
+      if (!isNaN(parsed) && parsed > 0) calculatedLojafyCost = parsed;
+    }
+  }
+
+  if (calculatedSellerCost <= 0 && typeof order?.notes === 'string') {
+    const pixMatch = order.notes.match(/Pix 24h:\s*R\$\s*([0-9.,]+)/i);
+    if (pixMatch) {
+      const parsed = parseFloat(pixMatch[1].replace(',', '.'));
+      if (!isNaN(parsed) && parsed > 0) calculatedSellerCost = parsed;
+    }
+  }
+
+  if (calculatedSellerCost <= 0) {
+    calculatedSellerCost = 6.90;
+  }
+  if (calculatedLojafyCost <= 0) {
+    calculatedLojafyCost = 6.00;
+  }
+
+  calculatedSellerCost = Math.round(calculatedSellerCost * 100) / 100;
+  calculatedLojafyCost = Math.round(calculatedLojafyCost * 100) / 100;
+
+  // Taxas do Marketplace (Mercado Livre / Canal)
+  let calculatedMarketplaceFee = 0;
+  if (order?.tax_amount && Number(order.tax_amount) > 0) {
+    calculatedMarketplaceFee = Number(order.tax_amount);
+  } else if (order?.marketplace_fee && Number(order.marketplace_fee) > 0) {
+    calculatedMarketplaceFee = Number(order.marketplace_fee);
+  } else if (typeof order?.notes === 'string') {
+    const feeMatch = order.notes.match(/Taxas ML:\s*R\$\s*([0-9.,]+)/i) || order.notes.match(/Taxas:\s*R\$\s*([0-9.,]+)/i);
+    if (feeMatch) {
+      const parsed = parseFloat(feeMatch[1].replace(',', '.'));
+      if (!isNaN(parsed) && parsed > 0) calculatedMarketplaceFee = parsed;
+    }
+  }
+
+  if (calculatedMarketplaceFee <= 0 && saleAmount > 0) {
+    if (saleAmount < 79) {
+      calculatedMarketplaceFee = Math.round((6.00 + (saleAmount * 0.11)) * 100) / 100;
+    } else {
+      calculatedMarketplaceFee = Math.round((saleAmount * 0.13) * 100) / 100;
+    }
+  }
+  calculatedMarketplaceFee = Math.round(calculatedMarketplaceFee * 100) / 100;
+
+  // Lucro Líquido do Revendedor (Venda - Taxas - Custo)
+  const sellerProfit = Math.max(0, Math.round((saleAmount - calculatedMarketplaceFee - calculatedSellerCost) * 100) / 100);
+  const sellerMarginPct = saleAmount > 0 ? Math.round(((sellerProfit / saleAmount) * 100) * 100) / 100 : 0;
+
+  // Métricas da Plataforma Lojafy (SuperAdmin)
+  const lojafySale = calculatedSellerCost;
+  const lojafyTransactionAmount = Math.round(lojafySale * 0.045 * 100) / 100;
+  const lojafyContingencyAmount = Math.round((lojafySale - lojafyTransactionAmount) * 0.01 * 100) / 100;
+  const lojafyFee = Math.round((lojafyTransactionAmount + lojafyContingencyAmount) * 100) / 100;
+
+  const lojafyCost = calculatedLojafyCost;
+  const lojafyProfit = Math.max(0, Math.round((lojafySale - lojafyFee - lojafyCost) * 100) / 100);
+  const lojafyMarginPct = lojafySale > 0 ? Math.round(((lojafyProfit / lojafySale) * 100) * 100) / 100 : 0;
+
+  // 6. Dados do Fornecedor (nome, e-mail e telefone)
+  let supplierName = 'Prosperous';
+  let supplierEmail = 'fornecedor@prosperous.com.br';
+  let supplierPhone = '(11) 98888-7777';
+
+  const targetSupplierOrgId = items[0]?.supplier_organization_id || order?.supplier_organization_id;
+  if (targetSupplierOrgId) {
+    try {
+      const { data: org } = await supabase
+        .from('supplier_organizations')
+        .select('*')
+        .eq('id', targetSupplierOrgId)
+        .maybeSingle();
+      if (org) {
+        supplierName = org.trade_name || org.legal_name || supplierName;
+        if (org.email) supplierEmail = org.email;
+        if (org.phone) supplierPhone = org.phone;
+      }
+    } catch {}
+  }
+
+  const targetSupplierUserId = primarySupplierId || items[0]?.supplier_id || order?.supplier_id;
+  if (targetSupplierUserId) {
+    try {
+      const { data: org } = await supabase
+        .from('supplier_organizations')
+        .select('*')
+        .eq('owner_user_id', targetSupplierUserId)
+        .maybeSingle();
+      if (org) {
+        supplierName = org.trade_name || org.legal_name || supplierName;
+        if (org.email) supplierEmail = org.email;
+        if (org.phone) supplierPhone = org.phone;
+      } else {
+        const { data: supProfile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', targetSupplierUserId)
+          .maybeSingle();
+        if (supProfile) {
+          supplierName = supProfile.trade_name || supProfile.business_name || [supProfile.first_name, supProfile.last_name].filter(Boolean).join(' ') || supplierName;
+          if (supProfile.email) supplierEmail = supProfile.email;
+          if (supProfile.phone) supplierPhone = supProfile.phone;
+        }
+      }
+    } catch {}
+  }
+
+  if (order?.supplier_name) {
+    supplierName = order.supplier_name;
+  }
+
+  // 7. Etiqueta de Envio
   let shippingFileRecord = null;
   if (order?.id) {
     const { data: file } = await supabase
@@ -954,16 +1066,16 @@ async function buildUniversalOrderPayload(
   }
 
   const tracking = order?.tracking_code || order?.tracking_number || (order?.ml_order_id ? 'BR104920492ML' : null);
-  const carrier = order?.ml_order_id ? 'Mercado Envios' : (order?.carrier || 'Correios / Transportadora');
+  const carrier = order?.ml_order_id ? 'Mercado Envios' : (order?.carrier || 'Mercado Envios');
   const hasLabel = !!signedLabelUrl || extraOptions?.event_reason === 'shipping_label_attached';
 
-  // 5. Dados de Pagamento e Pix
+  // 8. Dados de Pagamento e Pix
   const pixCode = order?.pix_qr_code || '00020101021226840014br.gov.bcb.pix2562pagamentos.lojafy.app/pix/qr/demo5204000053039865802BR5915LOJAFY TECNOLOGIA6009SAO PAULO62070503***6304ABCD';
   const pixBase64 = order?.pix_qr_code_base64 || 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
   const qrCodeImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(pixCode)}`;
   const paymentUrl = `https://lojafy.app/pagamento/${effectiveOrderId}`;
 
-  // 6. Configurar event_reason e changes se for order.updated
+  // 9. Configurar event_reason e changes se for order.updated
   const isShippingLabelAttached = extraOptions?.event_reason === 'shipping_label_attached' || !!extraOptions?.changes?.shipping_label;
 
   let changes = extraOptions?.changes;
@@ -981,50 +1093,101 @@ async function buildUniversalOrderPayload(
     };
   }
 
-  // 7. Nome do fornecedor
-  let supplierName = 'Distribuidora Tech Brasil';
-  if (primarySupplierId) {
-    try {
-      const { data: supProfile } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, trade_name')
-        .eq('user_id', primarySupplierId)
-        .maybeSingle();
-      if (supProfile) {
-        supplierName = supProfile.trade_name || [supProfile.first_name, supProfile.last_name].filter(Boolean).join(' ') || supplierName;
-      }
-    } catch {}
-  }
+  const primaryProduct = items[0] || {
+    name: 'Limpador E Desentupidor De Pias Ralos',
+    quantity: 1,
+    image_url: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80',
+    catalog_url: `${baseUrl}/catalogo/produto/92ba8745-f09b-4389-bd6b-80fc47849e7b`,
+    product_url: `${baseUrl}/produto/92ba8745-f09b-4389-bd6b-80fc47849e7b`,
+  };
 
   return {
     ...(extraOptions?.event_reason ? { event_reason: extraOptions.event_reason } : {}),
     ...(changes ? { changes } : {}),
+
+    // 1. Dados do pedido
     order_id: effectiveOrderId,
     order_number: effectiveOrderNum,
-    status: isShippingLabelAttached && effectiveStatus === 'pendente' ? 'recebido' : effectiveStatus,
+    external_order_id: externalOrderId,
+    external_reference: externalRef,
+    is_external: isExternal,
+    origin_type: originType,
     origin: {
-      channel: order?.ml_order_id ? 'mercadolivre' : (order?.shopee_order_id ? 'shopee' : (order?.origin_channel || 'loja_propria')),
-      channel_order_id: order?.ml_order_id || order?.shopee_order_id || String(order?.order_number || '2000008492049'),
+      channel: channel,
+      channel_label: channelLabel,
+      channel_order_id: externalOrderId,
       channel_pack_id: order?.ml_pack_id || null,
+      origin_type: originType,
     },
+    channel: channel,
+    channel_label: channelLabel,
+    status: isShippingLabelAttached && effectiveStatus === 'pendente' ? 'recebido' : effectiveStatus,
+    created_at: order?.created_at || new Date().toISOString(),
+
+    // Produto e quantidade
+    product: {
+      name: primaryProduct.name,
+      quantity: primaryProduct.quantity,
+      image_url: primaryProduct.image_url,
+      catalog_url: primaryProduct.catalog_url,
+      product_url: primaryProduct.product_url,
+    },
+    items,
+
+    // 2. Dados do seller (quem fez a venda)
+    seller: sellerData,
+    reseller: sellerData,
+
+    // 3. Dados do cliente (apenas o nome, conforme o card e solicitação)
     customer: {
       name: customerName,
-      document: customerDoc || '123.456.789-00',
-      email: customerEmail || 'maria.silva@exemplo.com',
-      phone: customerPhone || '(11) 98765-4321',
-      shipping_address: shippingAddr,
     },
-    shipping: {
-      carrier: carrier,
-      tracking_code: tracking || (isShippingLabelAttached ? 'BR104920492ML' : null),
-      shipping_label_status: hasLabel ? 'ready' : 'pending',
-      label_url: signedLabelUrl || (isShippingLabelAttached ? `https://lojafy.app/storage/v1/object/sign/shipping-labels/${fileName}?token=demo` : null),
+
+    // 4. Dados do fornecedor (nome, e-mail e telefone)
+    supplier: {
+      id: primarySupplierId || 'supplier-uuid-prosperous',
+      name: supplierName,
+      email: supplierEmail,
+      phone: supplierPhone,
     },
+
+    // 5. Valores das vendas (detalhamento monetário e percentual)
+    financial: {
+      sale_amount: saleAmount,
+      taxes: calculatedMarketplaceFee,
+      cost: calculatedSellerCost,
+      product_cost: calculatedSellerCost,
+      net_profit: sellerProfit,
+      net_profit_percent: sellerMarginPct,
+
+      // Aliases retrocompatíveis
+      total_order_amount: saleAmount,
+      taxes_and_fees: calculatedMarketplaceFee,
+      marketplace_fees: calculatedMarketplaceFee,
+      supplier_cost: calculatedLojafyCost,
+      reseller_profit: sellerProfit,
+      profit_margin_percent: sellerMarginPct,
+
+      platform: {
+        sale_amount: lojafySale,
+        taxes: lojafyFee,
+        cost: lojafyCost,
+        product_cost: lojafyCost,
+        net_profit: lojafyProfit,
+        net_profit_percent: lojafyMarginPct,
+      },
+    },
+
+    // 6. Informações de pagamento
     payment: {
       payment_method: order?.payment_method || 'pix',
       payment_status: extraOptions?.force_paid ? 'paid' : (order?.payment_status || 'pending'),
       payment_url: paymentUrl,
-      total_amount: effectiveAmount,
+      pix_copia_e_cola: pixCode,
+      copy_paste_code: pixCode,
+      qr_code_base64: pixBase64,
+      qr_code_image_url: qrCodeImageUrl,
+      expires_at: order?.payment_expires_at || new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
       pix: {
         copy_paste_code: pixCode,
         qr_code_base64: pixBase64,
@@ -1032,17 +1195,28 @@ async function buildUniversalOrderPayload(
         expires_at: order?.payment_expires_at || new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
       },
     },
-    financial: {
-      total_order_amount: effectiveAmount,
-      supplier_cost: Math.round(totalSupplierCost * 100) / 100,
-      reseller_profit: Math.round(Math.max(0, effectiveAmount - totalSupplierCost) * 100) / 100,
+    payment_url: paymentUrl,
+    pix_copia_e_cola: pixCode,
+
+    // 7. Etiqueta se tiver
+    shipping_label: {
+      has_label: hasLabel,
+      status: hasLabel ? 'ready' : 'pending',
+      url: signedLabelUrl,
+      carrier: carrier,
+      tracking_code: tracking || null,
+      file_name: fileName,
     },
-    reseller: resellerData,
-    supplier: {
-      id: primarySupplierId || 'supplier-uuid',
-      name: supplierName,
+    shipping_label_url: signedLabelUrl,
+    has_shipping_label: hasLabel,
+
+    // Seção shipping para retrocompatibilidade
+    shipping: {
+      carrier: carrier,
+      tracking_code: tracking || (isShippingLabelAttached ? 'BR104920492ML' : null),
+      shipping_label_status: hasLabel ? 'ready' : 'pending',
+      label_url: signedLabelUrl,
     },
-    items,
   };
 }
 

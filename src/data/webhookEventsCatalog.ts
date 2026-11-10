@@ -221,90 +221,120 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
     eventType: 'order.created',
     group: 'order',
     title: 'Novo pedido gerado',
-    description: 'Disparado imediatamente quando um novo pedido é gerado na plataforma (Mercado Livre, Shopee, Loja própria ou API), contendo comprador, itens, link direto de pagamento e código/QR Code Pix.',
+    description: 'Disparado imediatamente quando um novo pedido é gerado na plataforma (Mercado Livre, Shopee, Loja própria ou API), com relatório separado de pedido, vendedor, cliente, fornecedor, valores/lucro detalhados e link de pagamento.',
     status: 'production',
     samplePayload: {
       event: 'order.created',
-      timestamp: '2026-11-09T18:00:00.000Z',
+      timestamp: '2026-11-10T01:28:00.000Z',
       data: {
-        order_id: 'b6e82845-f09b-4389-bd6b-80fc47849e7b',
-        order_number: '10892',
-        status: 'pendente',
+        order_id: 'a8a3832c-4f21-41d8-bd58-233d5627792e',
+        order_number: '913',
+        external_order_id: '2000015956158203',
+        external_reference: 'ml_pay_913',
+        is_external: true,
+        origin_type: 'AUTO',
         origin: {
           channel: 'mercadolivre',
-          channel_order_id: '2000008492049',
-          channel_pack_id: null
+          channel_label: 'ML',
+          channel_order_id: '2000015956158203',
+          channel_pack_id: null,
+          origin_type: 'AUTO'
         },
-        customer: {
-          name: 'Maria Silva',
-          document: '123.456.789-00',
-          email: 'maria.silva@exemplo.com',
-          phone: '(11) 98765-4321',
-          shipping_address: {
-            street: 'Av. Paulista',
-            number: '1000',
-            complement: 'Apto 42',
-            neighborhood: 'Bela Vista',
-            city: 'São Paulo',
-            state: 'SP',
-            zipcode: '01310-100'
-          }
-        },
-        shipping: {
-          carrier: 'Mercado Envios',
-          tracking_code: null,
-          shipping_label_status: 'pending',
-          label_url: null
-        },
-        payment: {
-          payment_method: 'pix',
-          payment_status: 'pending',
-          payment_url: 'https://lojafy.app/pagamento/b6e82845-f09b-4389-bd6b-80fc47849e7b',
-          total_amount: 149.90,
-          pix: {
-            copy_paste_code: '00020101021226840014br.gov.bcb.pix2562...',
-            qr_code_base64: 'data:image/png;base64,iVBORw0KGgo...',
-            qr_code_image_url: 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=00020101021226840014br.gov.bcb.pix2562...',
-            expires_at: '2026-11-10T18:00:00.000Z'
-          }
-        },
-        financial: {
-          total_order_amount: 149.90,
-          supplier_cost: 85.00,
-          reseller_profit: 64.90
-        },
-        reseller: {
-          user_id: '45d2e091-7b9e-4b68-80f4-526bf764f691',
-          name: 'João Vendedor',
-          email: 'joao.vendedor@exemplo.com',
-          phone: '(11) 99999-8888',
-          document: '123.456.789-00',
-          store_name: 'Minha Loja VIP',
-          store_url: 'https://lojafy.app/loja/minha-loja-vip',
-          custom_fields: {
-            id_grupo: 'GRP-2048',
-            origem_lead: 'Campanha Meta Ads',
-            etapa_lead: 'Convertido',
-            potencial_compra: 5000
-          }
-        },
-        supplier: {
-          id: 'supplier-uuid',
-          name: 'Distribuidora Tech Brasil'
+        channel: 'mercadolivre',
+        channel_label: 'ML',
+        status: 'pendente',
+        created_at: '2026-11-09T23:26:44.721Z',
+        product: {
+          name: 'Limpador E Desentupidor De Pias Ralos',
+          quantity: 1,
+          image_url: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80',
+          catalog_url: 'https://lojafy.app/catalogo/produto/92ba8745-f09b-4389-bd6b-80fc47849e7b',
+          product_url: 'https://lojafy.app/produto/92ba8745-f09b-4389-bd6b-80fc47849e7b'
         },
         items: [
           {
             product_id: '92ba8745-f09b-4389-bd6b-80fc47849e7b',
-            sku: 'TECH-FONE-BT-PRETO',
-            name: 'Fone Bluetooth TWS Pro',
-            image_url: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=600&q=80',
+            sku: 'LIMP-DESENT-PIAS',
+            name: 'Limpador E Desentupidor De Pias Ralos',
+            image_url: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80',
             product_url: 'https://lojafy.app/produto/92ba8745-f09b-4389-bd6b-80fc47849e7b',
             catalog_url: 'https://lojafy.app/catalogo/produto/92ba8745-f09b-4389-bd6b-80fc47849e7b',
             quantity: 1,
-            unit_price: 149.90,
-            cost_price: 85.00
+            unit_price: 24.83,
+            cost_price: 6.90
           }
-        ]
+        ],
+        seller: {
+          user_id: '2640edf0-819c-4f2f-89c7-c459dcf00413',
+          name: 'LAVINIA VALIM',
+          email: 'lavinia78910@gmail.com',
+          phone: '5543996109266',
+          document: '07110161943',
+          store_name: 'Minha Loja VIP',
+          store_url: 'https://lojafy.app/loja/minha-loja-vip',
+          custom_fields: {
+            id_grupo: '120363431946257991@g.us'
+          }
+        },
+        customer: {
+          name: 'Gabriel Simonetti'
+        },
+        supplier: {
+          id: 'supplier-uuid-prosperous',
+          name: 'Prosperous',
+          email: 'fornecedor@prosperous.com.br',
+          phone: '(11) 98888-7777'
+        },
+        financial: {
+          sale_amount: 24.83,
+          taxes: 8.73,
+          cost: 6.90,
+          product_cost: 6.90,
+          net_profit: 9.20,
+          net_profit_percent: 37.05,
+          total_order_amount: 24.83,
+          taxes_and_fees: 8.73,
+          marketplace_fees: 8.73,
+          supplier_cost: 6.00,
+          reseller_profit: 9.20,
+          profit_margin_percent: 37.05,
+          platform: {
+            sale_amount: 6.90,
+            taxes: 0.38,
+            cost: 6.00,
+            product_cost: 6.00,
+            net_profit: 0.52,
+            net_profit_percent: 7.54
+          }
+        },
+        payment: {
+          payment_method: 'pix',
+          payment_status: 'pending',
+          payment_url: 'https://lojafy.app/pagamento/a8a3832c-4f21-41d8-bd58-233d5627792e',
+          pix_copia_e_cola: '00020101021226840014br.gov.bcb.pix2562pagamentos.lojafy.app/pix/qr/demo5204000053039865802BR5915LOJAFY TECNOLOGIA6009SAO PAULO62070503***6304ABCD',
+          copy_paste_code: '00020101021226840014br.gov.bcb.pix2562pagamentos.lojafy.app/pix/qr/demo5204000053039865802BR5915LOJAFY TECNOLOGIA6009SAO PAULO62070503***6304ABCD',
+          qr_code_base64: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          qr_code_image_url: 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=00020101021226840014br.gov.bcb.pix2562...',
+          expires_at: '2026-11-11T01:28:00.000Z',
+          pix: {
+            copy_paste_code: '00020101021226840014br.gov.bcb.pix2562pagamentos.lojafy.app/pix/qr/demo5204000053039865802BR5915LOJAFY TECNOLOGIA6009SAO PAULO62070503***6304ABCD',
+            qr_code_base64: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+            qr_code_image_url: 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=00020101021226840014br.gov.bcb.pix2562...',
+            expires_at: '2026-11-11T01:28:00.000Z'
+          }
+        },
+        payment_url: 'https://lojafy.app/pagamento/a8a3832c-4f21-41d8-bd58-233d5627792e',
+        pix_copia_e_cola: '00020101021226840014br.gov.bcb.pix2562pagamentos.lojafy.app/pix/qr/demo5204000053039865802BR5915LOJAFY TECNOLOGIA6009SAO PAULO62070503***6304ABCD',
+        shipping_label: {
+          has_label: false,
+          status: 'pending',
+          url: null,
+          carrier: 'Mercado Envios',
+          tracking_code: null,
+          file_name: 'etiqueta-2000015956158203.pdf'
+        },
+        shipping_label_url: null,
+        has_shipping_label: false
       }
     }
   },
@@ -408,103 +438,135 @@ export const WEBHOOK_EVENTS_CATALOG: WebhookEventMeta[] = [
   {
     eventType: 'order.updated',
     group: 'order',
-    title: 'Pedido atualizado (Status ou Etiqueta anexada)',
-    description: 'Disparado quando ocorrem atualizações no pedido (mudança de status ou quando a etiqueta de frete oficial é anexada/gerada). Inclui a flag event_reason (shipping_label_attached ou status_changed) e o objeto changes com os dados da etiqueta.',
+    title: 'Pedido atualizado (Status / Etiqueta anexada)',
+    description: 'Disparado quando ocorrem atualizações em um pedido existente — incluindo a anexação posterior da etiqueta de envio (event_reason: shipping_label_attached), mudança de rastreio ou alteração de status operacional.',
     status: 'production',
     samplePayload: {
       event: 'order.updated',
-      timestamp: '2026-11-09T18:00:00.000Z',
+      timestamp: '2026-11-10T02:00:00.000Z',
       data: {
         event_reason: 'shipping_label_attached',
         changes: {
           shipping_label: {
             attached: true,
-            file_name: 'etiqueta-10892.pdf',
-            download_url: 'https://lojafy.app/storage/v1/object/sign/shipping-labels/etiqueta-10892.pdf?token=...',
+            file_name: 'etiqueta-2000015956158203.pdf',
+            download_url: 'https://lojafy.app/storage/v1/object/sign/shipping-labels/etiqueta-2000015956158203.pdf?token=demo',
             tracking_code: 'BR104920492ML',
             carrier: 'Mercado Envios'
           },
           previous_status: 'pendente',
           current_status: 'recebido'
         },
-        order_id: 'b6e82845-f09b-4389-bd6b-80fc47849e7b',
-        order_number: '10892',
-        status: 'recebido',
+        order_id: 'a8a3832c-4f21-41d8-bd58-233d5627792e',
+        order_number: '913',
+        external_order_id: '2000015956158203',
+        external_reference: 'ml_pay_913',
+        is_external: true,
+        origin_type: 'AUTO',
         origin: {
           channel: 'mercadolivre',
-          channel_order_id: '2000008492049',
-          channel_pack_id: null
+          channel_label: 'ML',
+          channel_order_id: '2000015956158203',
+          channel_pack_id: null,
+          origin_type: 'AUTO'
         },
-        customer: {
-          name: 'Maria Silva',
-          document: '123.456.789-00',
-          email: 'maria.silva@exemplo.com',
-          phone: '(11) 98765-4321',
-          shipping_address: {
-            street: 'Av. Paulista',
-            number: '1000',
-            complement: 'Apto 42',
-            neighborhood: 'Bela Vista',
-            city: 'São Paulo',
-            state: 'SP',
-            zipcode: '01310-100'
-          }
-        },
-        shipping: {
-          carrier: 'Mercado Envios',
-          tracking_code: 'BR104920492ML',
-          shipping_label_status: 'ready',
-          label_url: 'https://lojafy.app/storage/v1/object/sign/shipping-labels/etiqueta-10892.pdf?token=...'
-        },
-        payment: {
-          payment_method: 'pix',
-          payment_status: 'pending',
-          payment_url: 'https://lojafy.app/pagamento/b6e82845-f09b-4389-bd6b-80fc47849e7b',
-          total_amount: 149.90,
-          pix: {
-            copy_paste_code: '00020101021226840014br.gov.bcb.pix2562...',
-            qr_code_base64: 'data:image/png;base64,iVBORw0KGgo...',
-            qr_code_image_url: 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=00020101021226840014br.gov.bcb.pix2562...',
-            expires_at: '2026-11-10T18:00:00.000Z'
-          }
-        },
-        financial: {
-          total_order_amount: 149.90,
-          supplier_cost: 85.00,
-          reseller_profit: 64.90
-        },
-        reseller: {
-          user_id: '45d2e091-7b9e-4b68-80f4-526bf764f691',
-          name: 'João Vendedor',
-          email: 'joao.vendedor@exemplo.com',
-          phone: '(11) 99999-8888',
-          document: '123.456.789-00',
-          store_name: 'Minha Loja VIP',
-          store_url: 'https://lojafy.app/loja/minha-loja-vip',
-          custom_fields: {
-            id_grupo: 'GRP-2048',
-            origem_lead: 'Campanha Meta Ads',
-            etapa_lead: 'Convertido',
-            potencial_compra: 5000
-          }
-        },
-        supplier: {
-          id: 'supplier-uuid',
-          name: 'Distribuidora Tech Brasil'
+        channel: 'mercadolivre',
+        channel_label: 'ML',
+        status: 'recebido',
+        created_at: '2026-11-09T23:26:44.721Z',
+        product: {
+          name: 'Limpador E Desentupidor De Pias Ralos',
+          quantity: 1,
+          image_url: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80',
+          catalog_url: 'https://lojafy.app/catalogo/produto/92ba8745-f09b-4389-bd6b-80fc47849e7b',
+          product_url: 'https://lojafy.app/produto/92ba8745-f09b-4389-bd6b-80fc47849e7b'
         },
         items: [
           {
             product_id: '92ba8745-f09b-4389-bd6b-80fc47849e7b',
-            sku: 'TECH-FONE-BT-PRETO',
-            name: 'Fone Bluetooth TWS Pro',
-            image_url: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=600&q=80',
+            sku: 'LIMP-DESENT-PIAS',
+            name: 'Limpador E Desentupidor De Pias Ralos',
+            image_url: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80',
             product_url: 'https://lojafy.app/produto/92ba8745-f09b-4389-bd6b-80fc47849e7b',
             catalog_url: 'https://lojafy.app/catalogo/produto/92ba8745-f09b-4389-bd6b-80fc47849e7b',
             quantity: 1,
-            unit_price: 149.90,
-            cost_price: 85.00
+            unit_price: 24.83,
+            cost_price: 6.90
           }
-        ]
+        ],
+        seller: {
+          user_id: '2640edf0-819c-4f2f-89c7-c459dcf00413',
+          name: 'LAVINIA VALIM',
+          email: 'lavinia78910@gmail.com',
+          phone: '5543996109266',
+          document: '07110161943',
+          store_name: 'Minha Loja VIP',
+          store_url: 'https://lojafy.app/loja/minha-loja-vip',
+          custom_fields: {
+            id_grupo: '120363431946257991@g.us'
+          }
+        },
+        customer: {
+          name: 'Gabriel Simonetti'
+        },
+        supplier: {
+          id: 'supplier-uuid-prosperous',
+          name: 'Prosperous',
+          email: 'fornecedor@prosperous.com.br',
+          phone: '(11) 98888-7777'
+        },
+        financial: {
+          sale_amount: 24.83,
+          taxes: 8.73,
+          cost: 6.90,
+          product_cost: 6.90,
+          net_profit: 9.20,
+          net_profit_percent: 37.05,
+          total_order_amount: 24.83,
+          taxes_and_fees: 8.73,
+          marketplace_fees: 8.73,
+          supplier_cost: 6.00,
+          reseller_profit: 9.20,
+          profit_margin_percent: 37.05,
+          platform: {
+            sale_amount: 6.90,
+            taxes: 0.38,
+            cost: 6.00,
+            product_cost: 6.00,
+            net_profit: 0.52,
+            net_profit_percent: 7.54
+          }
+        },
+        payment: {
+          payment_method: 'pix',
+          payment_status: 'pending',
+          payment_url: 'https://lojafy.app/pagamento/a8a3832c-4f21-41d8-bd58-233d5627792e',
+          pix_copia_e_cola: '00020101021226840014br.gov.bcb.pix2562pagamentos.lojafy.app/pix/qr/demo5204000053039865802BR5915LOJAFY TECNOLOGIA6009SAO PAULO62070503***6304ABCD',
+          copy_paste_code: '00020101021226840014br.gov.bcb.pix2562pagamentos.lojafy.app/pix/qr/demo5204000053039865802BR5915LOJAFY TECNOLOGIA6009SAO PAULO62070503***6304ABCD',
+          qr_code_base64: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          qr_code_image_url: 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=00020101021226840014br.gov.bcb.pix2562...',
+          expires_at: '2026-11-11T01:28:00.000Z',
+          pix: {
+            copy_paste_code: '00020101021226840014br.gov.bcb.pix2562pagamentos.lojafy.app/pix/qr/demo5204000053039865802BR5915LOJAFY TECNOLOGIA6009SAO PAULO62070503***6304ABCD',
+            qr_code_base64: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+            qr_code_image_url: 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=00020101021226840014br.gov.bcb.pix2562...',
+            expires_at: '2026-11-11T01:28:00.000Z'
+          }
+        },
+        payment_url: 'https://lojafy.app/pagamento/a8a3832c-4f21-41d8-bd58-233d5627792e',
+        pix_copia_e_cola: '00020101021226840014br.gov.bcb.pix2562pagamentos.lojafy.app/pix/qr/demo5204000053039865802BR5915LOJAFY TECNOLOGIA6009SAO PAULO62070503***6304ABCD',
+        shipping_label: {
+          attached: true,
+          has_label: true,
+          status: 'ready',
+          url: 'https://lojafy.app/storage/v1/object/sign/shipping-labels/etiqueta-2000015956158203.pdf?token=demo',
+          download_url: 'https://lojafy.app/storage/v1/object/sign/shipping-labels/etiqueta-2000015956158203.pdf?token=demo',
+          carrier: 'Mercado Envios',
+          tracking_code: 'BR104920492ML',
+          file_name: 'etiqueta-2000015956158203.pdf'
+        },
+        shipping_label_url: 'https://lojafy.app/storage/v1/object/sign/shipping-labels/etiqueta-2000015956158203.pdf?token=demo',
+        has_shipping_label: true
       }
     }
   },
