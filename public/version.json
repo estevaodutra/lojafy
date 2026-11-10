@@ -1,7 +1,7 @@
 {
-  "hash": "f3f299eb4942009bf08e3dc212520415f0bb0faf",
-  "shortHash": "f3f299e",
-  "message": "feat(kanban): reorganize card financials with seller and lojafy margins",
+  "hash": "93b93efc46182d5cda4e6d563a5dffeae2e8ebe9",
+  "shortHash": "93b93ef",
+  "message": "feat(financials): add marketplace fees breakdown and calculate real net profit",
   "author": "Lojafy Developer",
-  "timestamp": 1794282979568
+  "timestamp": 1794283391608
 }

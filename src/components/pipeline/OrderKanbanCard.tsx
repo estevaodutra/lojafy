@@ -4,7 +4,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Eye, Link2, Truck, Check, QrCode, Printer, FileText, Package, Clock, Archive } from "lucide-react";
+import { Eye, Link2, Truck, Check, QrCode, Printer, FileText, Package, Clock, Archive, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface OrderKanbanCardProps {
@@ -218,9 +218,50 @@ export const OrderKanbanCard: React.FC<OrderKanbanCardProps> = ({
               <span className="font-semibold text-foreground">{formatBRL(order.sale_amount)}</span>
             </div>
 
-            {/* Taxas Marketplace (Mercado Livre / Canal) */}
+            {/* Taxas Marketplace (Mercado Livre / Canal) com Tooltip Informativo */}
             <div className="flex items-center justify-between text-muted-foreground">
-              <span>Taxas</span>
+              <span className="inline-flex items-center gap-1">
+                <span>Taxas</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-help inline-flex items-center">
+                      <Info className="w-3 h-3 text-muted-foreground/70 hover:text-foreground transition-colors" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[240px] p-2.5 space-y-1.5 text-xs bg-popover text-popover-foreground shadow-md border">
+                    <p className="font-semibold text-foreground text-[11px]">Composição das Taxas (Mercado Livre):</p>
+                    {order.sale_amount < 79 ? (
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-muted-foreground">Tarifa fixa unitária (&lt; R$ 79):</span>
+                          <span className="font-mono text-rose-500 font-medium">R$ 6,00</span>
+                        </div>
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-muted-foreground">
+                            Comissão anúncio ({order.sale_amount > 0 ? (((order.marketplace_fee - 6) / order.sale_amount) * 100).toFixed(2) : "11,00"}%):
+                          </span>
+                          <span className="font-mono text-rose-500 font-medium">
+                            {formatBRL(Math.max(0, order.marketplace_fee - 6))}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-muted-foreground">
+                          Comissão de categoria ({order.sale_amount > 0 ? ((order.marketplace_fee / order.sale_amount) * 100).toFixed(2) : "13,00"}%):
+                        </span>
+                        <span className="font-mono text-rose-500 font-medium">
+                          {formatBRL(order.marketplace_fee)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="border-t border-border/60 pt-1 mt-1 flex justify-between font-semibold text-[11px]">
+                      <span>Total retido pelo ML:</span>
+                      <span className="font-mono text-rose-600 dark:text-rose-400">-{formatBRL(order.marketplace_fee)}</span>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </span>
               <span className="font-medium text-rose-600 dark:text-rose-400">
                 -{formatBRL(order.marketplace_fee)}
               </span>
@@ -257,7 +298,37 @@ export const OrderKanbanCard: React.FC<OrderKanbanCardProps> = ({
                   <span className="font-medium text-foreground">{formatBRL(order.lojafy_sale)}</span>
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                  <span>Taxas</span>
+                  <span className="inline-flex items-center gap-1">
+                    <span>Taxas</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-help inline-flex items-center">
+                          <Info className="w-2.5 h-2.5 text-muted-foreground/70 hover:text-foreground transition-colors" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[240px] p-2.5 space-y-1.5 text-xs bg-popover text-popover-foreground shadow-md border">
+                        <p className="font-semibold text-foreground text-[11px]">Composição das Taxas (Lojafy):</p>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[11px]">
+                            <span className="text-muted-foreground">Taxa de transação (4,50%):</span>
+                            <span className="font-mono text-rose-500 font-medium">
+                              {formatBRL(order.lojafy_sale * 0.045)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-[11px]">
+                            <span className="text-muted-foreground">Contingenciamento (1,00%):</span>
+                            <span className="font-mono text-rose-500 font-medium">
+                              {formatBRL((order.lojafy_sale - (order.lojafy_sale * 0.045)) * 0.01)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="border-t border-border/60 pt-1 mt-1 flex justify-between font-semibold text-[11px]">
+                          <span>Total retido Lojafy:</span>
+                          <span className="font-mono text-rose-600 dark:text-rose-400">-{formatBRL(order.lojafy_fee)}</span>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </span>
                   <span className="font-medium text-rose-600 dark:text-rose-400">-{formatBRL(order.lojafy_fee)}</span>
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground">
