@@ -1,7 +1,7 @@
 {
-  "hash": "48c81e09c13aa13631a796b6f345d2392f52f47c",
-  "shortHash": "48c81e0",
-  "message": "feat(pipeline): format financial figures with accounting alignment and inline profit percent",
+  "hash": "5644686b9d4fcdd4ca303ec9e7be3f259690738d",
+  "shortHash": "5644686",
+  "message": "feat(webhooks): refactor order payload into detailed structured sections (order, product, seller, customer, supplier, financial with profit % and payment)",
   "author": "Lojafy Developer",
-  "timestamp": 1794285262310
+  "timestamp": 1794288827377
 }

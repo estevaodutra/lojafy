@@ -32,6 +32,7 @@ import {
   Archive,
   RefreshCw,
   Loader2,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -77,6 +78,7 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
   // Pix modal state
   const [pixModalOrder, setPixModalOrder] = useState<OrderPipelineItem | null>(null);
   const [pixCopied, setPixCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [isGeneratingPix, setIsGeneratingPix] = useState(false);
 
   // Active pipeline object
@@ -172,16 +174,22 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
 
   // Pix generation handler
   const handleGeneratePix = async (order: OrderPipelineItem) => {
-    if (order.pix_qr_code) {
+    // Verificar se o Pix existente corresponde ao valor devido pelo revendedor (custo Lojafy)
+    const expectedAmount = order.seller_cost || order.supplier_cost || order.total_amount || 0;
+    const expectedAmountStr = expectedAmount.toFixed(2);
+    const expectedAmountTag = `540${expectedAmountStr.length}${expectedAmountStr}`;
+    const pixHasWrongAmount = order.pix_qr_code && !order.pix_qr_code.includes(expectedAmountTag);
+
+    if (order.pix_qr_code && !pixHasWrongAmount) {
       setPixModalOrder(order);
       return;
     }
 
     setIsGeneratingPix(true);
-    toast.info(`Gerando cobrança Pix para o pedido #${order.order_number}...`);
+    toast.info(`Gerando cobrança Pix (R$ ${expectedAmountStr.replace(".", ",")}) para o pedido #${order.order_number}...`);
     try {
       const { data, error } = await supabase.functions.invoke("ml-order-webhook", {
-        body: { action: "generate_pix_for_order", order_id: order.id },
+        body: { action: "generate_pix_for_order", order_id: order.id, force_regenerate: true },
       });
 
       if (error || !data?.success) {
@@ -220,6 +228,15 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
     setPixCopied(true);
     toast.success("Código Pix copiado!");
     setTimeout(() => setPixCopied(false), 2000);
+  };
+
+  const copyPaymentLink = () => {
+    if (!pixModalOrder) return;
+    const link = `https://lojafy.app/pagamento/${pixModalOrder.id}`;
+    navigator.clipboard.writeText(link);
+    setLinkCopied(true);
+    toast.success("Link de pagamento copiado!");
+    setTimeout(() => setLinkCopied(false), 2000);
   };
 
   return (
@@ -549,6 +566,31 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Link de Pagamento Público */}
+              <div className="w-full space-y-2 pt-2 border-t">
+                <p className="text-xs font-medium text-foreground">Link de Pagamento:</p>
+                <div className="flex items-center gap-2">
+                  <Input
+                    readOnly
+                    value={`https://lojafy.app/pagamento/${pixModalOrder.id}`}
+                    className="text-xs font-mono select-all bg-muted"
+                  />
+                  <Button size="sm" variant="outline" onClick={copyPaymentLink} className="gap-1 shrink-0">
+                    {linkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    {linkCopied ? "Copiado!" : "Copiar Link"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-9 px-2 text-primary hover:text-primary"
+                    onClick={() => window.open(`https://lojafy.app/pagamento/${pixModalOrder.id}`, "_blank")}
+                    title="Abrir página de pagamento"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
         </DialogContent>

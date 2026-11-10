@@ -59,12 +59,18 @@ serve(async (req) => {
         pix_qr_code_base64,
         shipping_address,
         user_id,
+        reseller_id,
+        notes,
+        ml_order_id,
         order_items (
           id,
           product_id,
           quantity,
           unit_price,
           total_price,
+          supplier_id,
+          supplier_unit_cost,
+          supplier_total_cost,
           product_snapshot
         )
       `);
@@ -107,14 +113,14 @@ serve(async (req) => {
 
     if (!customerName) customerName = 'Cliente';
 
-    // Buscar imagens do catálogo caso não estejam presentes no snapshot
+    // Buscar imagens e preços do catálogo caso não estejam presentes no snapshot
     const productIds = ((order.order_items as any[]) || []).map((it) => it.product_id).filter(Boolean);
     const productMap = new Map<string, any>();
     if (productIds.length > 0) {
       try {
         const { data: dbProds } = await supabase
           .from('products')
-          .select('id, image_url, main_image_url')
+          .select('id, image_url, main_image_url, price, cost_price, name, sku')
           .in('id', productIds);
         if (dbProds) {
           dbProds.forEach((p: any) => productMap.set(p.id, p));
@@ -122,7 +128,15 @@ serve(async (req) => {
       } catch {}
     }
 
-    // Itens sanitizados - NENHUM dado de fornecedor ou custos internos
+    // Se o pedido é de marketplace ou dropshipping, o valor a pagar pelo revendedor é o preço de custo na Lojafy (preço de revenda)
+    const isMarketplaceOrder = !!order.ml_order_id || 
+      order.payment_method === 'mercadolivre' || 
+      (typeof order.notes === 'string' && (order.notes.includes('Mercado Livre') || order.notes.includes('Taxas ML'))) ||
+      ((order.order_items as any[]) || []).some((it: any) => !!it.supplier_id || !!it.supplier_unit_cost);
+
+    let totalPayableAmount = 0;
+
+    // Itens sanitizados - Preço unitário e total ajustados ao custo da Lojafy se for marketplace
     const items = ((order.order_items as any[]) || []).map((it) => {
       const snap = it.product_snapshot || {};
       const prod = productMap.get(it.product_id);
@@ -132,22 +146,73 @@ serve(async (req) => {
         prod?.image_url || 
         null;
 
+      let unitPrice = Number(it.unit_price || 0);
+      if (isMarketplaceOrder) {
+        const resellerPrice = Number(prod?.price || snap?.price || snap?.reseller_price || 0);
+        if (resellerPrice > 0) {
+          unitPrice = resellerPrice;
+        } else if (Number(prod?.cost_price || snap?.cost_price || it.supplier_unit_cost || 0) > 0) {
+          unitPrice = Number(prod?.cost_price || snap?.cost_price || it.supplier_unit_cost);
+        }
+      }
+      const totalPrice = Math.round(unitPrice * it.quantity * 100) / 100;
+      totalPayableAmount += totalPrice;
+
       return {
         id: it.id,
         product_id: it.product_id,
-        name: snap.name || snap.title || 'Produto',
-        sku: snap.sku || null,
+        name: snap.name || snap.title || prod?.name || 'Produto',
+        sku: snap.sku || prod?.sku || null,
         quantity: it.quantity,
-        unit_price: it.unit_price,
-        total_price: it.total_price || (it.unit_price * it.quantity),
+        unit_price: unitPrice,
+        total_price: totalPrice,
         image_url: img,
         product_url: `https://lojafy.app/produto/${it.product_id}`,
         catalog_url: `https://lojafy.app/catalogo/produto/${it.product_id}`,
       };
     });
 
-    const copyPaste = order.pix_qr_code || null;
-    const base64 = order.pix_qr_code_base64 || null;
+    totalPayableAmount = Math.round(totalPayableAmount * 100) / 100;
+
+    if (totalPayableAmount <= 0) {
+      if (typeof order.notes === 'string') {
+        const costMatch = order.notes.match(/Custo Lojafy:\s*R\$\s*([0-9.,]+)/i) || 
+                          order.notes.match(/Custo:\s*R\$\s*([0-9.,]+)/i) ||
+                          order.notes.match(/Pix 24h:\s*R\$\s*([0-9.,]+)/i);
+        if (costMatch) {
+          totalPayableAmount = parseFloat(costMatch[1].replace(',', '.'));
+        }
+      }
+    }
+    if (totalPayableAmount <= 0) {
+      totalPayableAmount = Number(order.total_amount || 0);
+    }
+
+    let copyPaste = order.pix_qr_code || null;
+    let base64 = order.pix_qr_code_base64 || null;
+
+    // Verificar se o Pix existente corresponde ao valor devido (tag 54 do Pix EMV)
+    if (isMarketplaceOrder && totalPayableAmount > 0) {
+      const expectedAmountStr = totalPayableAmount.toFixed(2);
+      const expectedAmountTag = `540${expectedAmountStr.length}${expectedAmountStr}`;
+      const isMismatched = copyPaste && !copyPaste.includes(expectedAmountTag);
+
+      if (!copyPaste || isMismatched) {
+        console.log(`[public-order-payment] Pix desatualizado ou divergente (esperado R$ ${expectedAmountStr}). Re-gerando...`);
+        try {
+          const { data: pixData } = await supabase.functions.invoke('ml-order-webhook', {
+            body: { action: 'generate_pix_for_order', order_id: order.id, force_regenerate: true },
+          });
+          if (pixData?.pix_qr_code) {
+            copyPaste = pixData.pix_qr_code;
+            base64 = pixData.pix_qr_code_base64 || null;
+          }
+        } catch (pixErr) {
+          console.error('[public-order-payment] Erro ao re-gerar Pix:', pixErr);
+        }
+      }
+    }
+
     const qrImageUrl = copyPaste
       ? `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(copyPaste)}`
       : (base64 ? `data:image/png;base64,${base64}` : null);
@@ -163,7 +228,9 @@ serve(async (req) => {
           status: order.status,
           payment_status: isPaid ? 'paid' : (order.payment_status || 'pending'),
           payment_method: order.payment_method || 'pix',
-          total_amount: order.total_amount,
+          total_amount: isMarketplaceOrder ? totalPayableAmount : order.total_amount,
+          retail_sale_amount: order.total_amount,
+          is_marketplace: isMarketplaceOrder,
           created_at: order.created_at,
           payment_expires_at: order.payment_expires_at || null,
           customer: {

@@ -621,9 +621,10 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
     comment: receiverAddress?.comment || orderRecord.shipping_address?.comment || null,
   };
 
-  // 2. Recalcular itens e custo real do fornecedor
+  // 2. Recalcular itens e custo real do fornecedor e da Lojafy
   const orderItems = mlOrder.order_items ?? [];
   let totalSupplierCost = 0;
+  let totalResellerCost = 0;
   let primarySupplierId: string | null = null;
   const compiledItems: any[] = [];
 
@@ -641,8 +642,11 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
     const unitPrice = Number(item.unit_price ?? 0);
     const quantity = Number(item.quantity ?? 1);
     const costPrice = Number(matchedProd?.cost_price ?? 0);
+    const resellerPrice = Number(matchedProd?.price ?? costPrice);
     const itemTotalCost = Math.round(costPrice * quantity * 100) / 100;
+    const itemTotalResellerCost = Math.round(resellerPrice * quantity * 100) / 100;
     totalSupplierCost += itemTotalCost;
+    totalResellerCost += itemTotalResellerCost;
     if (matchedProd?.supplier_id && !primarySupplierId) primarySupplierId = matchedProd.supplier_id;
 
     compiledItems.push({
@@ -652,7 +656,9 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
       quantity,
       unitPrice,
       costPrice,
+      resellerPrice,
       totalCost: itemTotalCost,
+      totalResellerCost: itemTotalResellerCost,
       supplierId: matchedProd?.supplier_id ?? null,
       mlItemId: item.item?.id ?? null,
       imageUrl: matchedProd?.image_url || matchedProd?.images?.[0] || null,
@@ -660,6 +666,7 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
   }
 
   totalSupplierCost = Math.round(totalSupplierCost * 100) / 100;
+  totalResellerCost = Math.round(totalResellerCost * 100) / 100;
 
   // Atualizar itens do pedido no banco
   if (compiledItems.length > 0 && compiledItems[0].productId) {
@@ -679,6 +686,7 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
           sku: ci.sku,
           ml_item_id: ci.mlItemId,
           cost_price: ci.costPrice,
+          price: ci.resellerPrice,
           image_url: ci.imageUrl,
         },
       });
@@ -692,22 +700,25 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
   let remainingPixAmount = 0;
   let isFullyPaid = false;
 
+  // O valor devido pelo vendedor é o custo do produto na Lojafy (totalResellerCost, ex: R$ 6,90)
+  const amountToCharge = totalResellerCost > 0 ? totalResellerCost : totalSupplierCost;
+
   if (isDelivered || isShipped) {
     isFullyPaid = true;
     remainingPixAmount = 0;
-  } else if (totalSupplierCost <= 0) {
+  } else if (amountToCharge <= 0) {
     isFullyPaid = false;
     remainingPixAmount = 0;
-  } else if (currentWalletBalance >= totalSupplierCost) {
-    walletDeducted = totalSupplierCost;
+  } else if (currentWalletBalance >= amountToCharge) {
+    walletDeducted = amountToCharge;
     remainingPixAmount = 0;
     isFullyPaid = true;
   } else if (currentWalletBalance > 0) {
     walletDeducted = currentWalletBalance;
-    remainingPixAmount = Math.round((totalSupplierCost - currentWalletBalance) * 100) / 100;
+    remainingPixAmount = Math.round((amountToCharge - currentWalletBalance) * 100) / 100;
     isFullyPaid = false;
   } else {
-    remainingPixAmount = totalSupplierCost;
+    remainingPixAmount = amountToCharge;
     isFullyPaid = false;
   }
 
@@ -734,10 +745,13 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
       items: compiledItems,
       mlOrderId: mlOrderIdStr,
       walletDeducted,
-      totalCost: totalSupplierCost,
+      totalCost: amountToCharge,
     });
     qrCode = pixRes.qrCode;
     qrCodeBase64 = pixRes.qrCodeBase64;
+    pixPaymentId = pixRes.paymentId;
+    pixExpiresAt = pixRes.expiresAt;
+  }
     pixPaymentId = pixRes.paymentId;
     pixExpiresAt = pixRes.expiresAt;
   }
@@ -941,7 +955,7 @@ async function processSingleMlOrder(
     resellerEmail = authUser?.user?.email ?? null;
   } catch {}
 
-  // Identificar produtos catalogados e custos de fornecedor
+  // Identificar produtos catalogados e custos de fornecedor e Lojafy
   interface CompiledItem {
     productId: string | null;
     name: string;
@@ -949,13 +963,17 @@ async function processSingleMlOrder(
     quantity: number;
     unitPrice: number;
     costPrice: number;
+    resellerPrice: number;
     totalCost: number;
+    totalResellerCost: number;
     supplierId: string | null;
     mlItemId: string | null;
+    imageUrl?: string | null;
   }
 
   const compiledItems: CompiledItem[] = [];
   let totalSupplierCost = 0;
+  let totalResellerCost = 0;
   let primarySupplierId: string | null = null;
 
   for (const item of orderItems) {
@@ -974,6 +992,7 @@ async function processSingleMlOrder(
     ).trim() || null;
 
     let costPrice = 0;
+    let resellerPrice = 0;
     let productName = item.item?.title || 'Produto Mercado Livre';
     let sku: string | null = rawSku;
     let supplierId: string | null = null;
@@ -982,12 +1001,15 @@ async function processSingleMlOrder(
       productName = dbProduct.name;
       sku = dbProduct.sku || sku;
       costPrice = Number(dbProduct.cost_price ?? 0);
+      resellerPrice = Number(dbProduct.price ?? costPrice);
       supplierId = dbProduct.supplier_id;
       if (supplierId && !primarySupplierId) primarySupplierId = supplierId;
     }
 
     const itemTotalCost = Math.round(costPrice * quantity * 100) / 100;
+    const itemTotalResellerCost = Math.round(resellerPrice * quantity * 100) / 100;
     totalSupplierCost += itemTotalCost;
+    totalResellerCost += itemTotalResellerCost;
 
     compiledItems.push({
       productId: matchedProductId,
@@ -996,7 +1018,9 @@ async function processSingleMlOrder(
       quantity,
       unitPrice,
       costPrice,
+      resellerPrice,
       totalCost: itemTotalCost,
+      totalResellerCost: itemTotalResellerCost,
       supplierId,
       mlItemId,
       imageUrl: dbProduct?.image_url || dbProduct?.images?.[0] || null,
@@ -1004,6 +1028,7 @@ async function processSingleMlOrder(
   }
 
   totalSupplierCost = Math.round(totalSupplierCost * 100) / 100;
+  totalResellerCost = Math.round(totalResellerCost * 100) / 100;
 
   let supplierName: string | null = null;
   if (primarySupplierId) {
@@ -1039,26 +1064,31 @@ async function processSingleMlOrder(
   let remainingPixAmount = 0;
   let isFullyPaid = false;
 
-  if (totalSupplierCost <= 0) {
+  // O valor devido pelo vendedor é o custo do produto na Lojafy (totalResellerCost, ex: R$ 6,90)
+  const amountToCharge = totalResellerCost > 0 ? totalResellerCost : totalSupplierCost;
+
+  if (amountToCharge <= 0) {
     isFullyPaid = false;
     remainingPixAmount = 0;
     walletDeducted = 0;
-  } else if (currentWalletBalance >= totalSupplierCost) {
-    walletDeducted = totalSupplierCost;
+  } else if (currentWalletBalance >= amountToCharge) {
+    walletDeducted = amountToCharge;
     remainingPixAmount = 0;
     isFullyPaid = true;
-  } else if (currentWalletBalance > 0 && currentWalletBalance < totalSupplierCost) {
+  } else if (currentWalletBalance > 0 && currentWalletBalance < amountToCharge) {
     walletDeducted = currentWalletBalance;
-    remainingPixAmount = Math.round((totalSupplierCost - currentWalletBalance) * 100) / 100;
+    remainingPixAmount = Math.round((amountToCharge - currentWalletBalance) * 100) / 100;
     isFullyPaid = false;
   } else {
     walletDeducted = 0;
-    remainingPixAmount = totalSupplierCost;
+    remainingPixAmount = amountToCharge;
     isFullyPaid = false;
   }
 
   console.log('[ml-order-webhook] Finanças do Fulfillment:', {
+    totalResellerCost,
     totalSupplierCost,
+    amountToCharge,
     currentWalletBalance,
     walletDeducted,
     remainingPixAmount,
@@ -1081,7 +1111,7 @@ async function processSingleMlOrder(
       items: compiledItems,
       mlOrderId: mlOrderIdStr,
       walletDeducted,
-      totalCost: totalSupplierCost,
+      totalCost: amountToCharge,
     });
 
     qrCode = pixResult.qrCode;
@@ -1119,7 +1149,7 @@ async function processSingleMlOrder(
   }
   totalMarketplaceFee = Math.round(totalMarketplaceFee * 100) / 100;
 
-  const notesSummary = `Pedido via Mercado Livre #${displayRef} (ML Order #${realOrderIdStr}). Taxas ML: R$ ${totalMarketplaceFee.toFixed(2)} | Custo Fornecedor: R$ ${totalSupplierCost.toFixed(2)} | Abate Carteira: R$ ${walletDeducted.toFixed(2)} | Pix 24h: R$ ${remainingPixAmount.toFixed(2)}`;
+  const notesSummary = `Pedido via Mercado Livre #${displayRef} (ML Order #${realOrderIdStr}). Taxas ML: R$ ${totalMarketplaceFee.toFixed(2)} | Custo Lojafy: R$ ${totalResellerCost.toFixed(2)} | Custo Fornecedor: R$ ${totalSupplierCost.toFixed(2)} | Abate Carteira: R$ ${walletDeducted.toFixed(2)} | Pix 24h: R$ ${remainingPixAmount.toFixed(2)}`;
 
   const { data: newOrder, error: orderError } = await supabase
     .from('orders')
@@ -1202,6 +1232,7 @@ async function processSingleMlOrder(
         sku: item.sku,
         ml_item_id: item.mlItemId,
         cost_price: item.costPrice,
+        price: item.resellerPrice,
         image_url: item.imageUrl,
       },
     });
@@ -2284,27 +2315,60 @@ serve(async (req) => {
         });
       }
 
-      if (orderToPix.pix_qr_code) {
-        return new Response(JSON.stringify({
-          success: true,
-          pix_qr_code: orderToPix.pix_qr_code,
-          pix_qr_code_base64: orderToPix.pix_qr_code_base64,
-          payment_expires_at: orderToPix.payment_expires_at,
-        }), {
-          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
       const { data: orderItems } = await supabase
         .from('order_items')
         .select('*')
         .eq('order_id', orderToPix.id);
 
-      let totalCost = 0;
+      // Calcular o custo de revenda da Lojafy (o valor que o revendedor paga à Lojafy, ex: R$ 6,90)
+      let totalResellerCost = 0;
       for (const it of orderItems || []) {
-        totalCost += Number(it.supplier_total_cost || it.total_price || 0);
+        let itemPrice = 0;
+        if (it.product_id) {
+          const { data: p } = await supabase.from('products').select('price, cost_price').eq('id', it.product_id).maybeSingle();
+          if (p?.price && Number(p.price) > 0) itemPrice = Number(p.price);
+          else if (p?.cost_price && Number(p.cost_price) > 0) itemPrice = Number(p.cost_price);
+        }
+        if (itemPrice <= 0) {
+          const snap = it.product_snapshot || {};
+          itemPrice = Number(snap.price || snap.reseller_price || it.supplier_unit_cost || snap.cost_price || 0);
+        }
+        totalResellerCost += Math.round(itemPrice * Number(it.quantity || 1) * 100) / 100;
       }
-      if (totalCost <= 0) totalCost = Number(orderToPix.total_amount || 0);
+      totalResellerCost = Math.round(totalResellerCost * 100) / 100;
+
+      if (totalResellerCost <= 0 && typeof orderToPix.notes === 'string') {
+        const costMatch = orderToPix.notes.match(/Custo Lojafy:\s*R\$\s*([0-9.,]+)/i) || 
+                          orderToPix.notes.match(/Custo:\s*R\$\s*([0-9.,]+)/i) ||
+                          orderToPix.notes.match(/Pix 24h:\s*R\$\s*([0-9.,]+)/i);
+        if (costMatch) {
+          totalResellerCost = parseFloat(costMatch[1].replace(',', '.'));
+        }
+      }
+
+      if (totalResellerCost <= 0) {
+        totalResellerCost = Number(orderToPix.total_amount || 0);
+      }
+
+      const forceRegenerate = !!body.force_regenerate;
+      const isExpired = orderToPix.payment_expires_at && new Date(orderToPix.payment_expires_at).getTime() <= Date.now();
+
+      // Verificar se o Pix existente bate com o valor exato (tag 54 do Pix EMV)
+      const expectedAmountStr = totalResellerCost.toFixed(2);
+      const expectedAmountTag = `540${expectedAmountStr.length}${expectedAmountStr}`;
+      const pixHasWrongAmount = orderToPix.pix_qr_code && !orderToPix.pix_qr_code.includes(expectedAmountTag);
+
+      if (orderToPix.pix_qr_code && !forceRegenerate && !isExpired && !pixHasWrongAmount) {
+        return new Response(JSON.stringify({
+          success: true,
+          pix_qr_code: orderToPix.pix_qr_code,
+          pix_qr_code_base64: orderToPix.pix_qr_code_base64,
+          payment_expires_at: orderToPix.payment_expires_at,
+          amount: totalResellerCost,
+        }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       const { data: resellerProfile } = await supabase.from('profiles').select('first_name, last_name, cpf, phone').eq('user_id', orderToPix.reseller_id).maybeSingle();
       let resellerEmail = null;
@@ -2315,7 +2379,7 @@ serve(async (req) => {
 
       const pixRes = await generatePix24h({
         orderNumber: orderToPix.order_number,
-        amount: totalCost,
+        amount: totalResellerCost,
         description: `Fulfillment Pedido #${orderToPix.order_number}`,
         resellerUserId: orderToPix.reseller_id,
         resellerProfile,
@@ -2323,7 +2387,7 @@ serve(async (req) => {
         items: orderItems || [],
         mlOrderId: orderToPix.ml_order_id || orderToPix.order_number,
         walletDeducted: 0,
-        totalCost,
+        totalCost: totalResellerCost,
       });
 
       await supabase.from('orders').update({
@@ -2339,6 +2403,7 @@ serve(async (req) => {
         pix_qr_code: pixRes.qrCode,
         pix_qr_code_base64: pixRes.qrCodeBase64,
         payment_expires_at: pixRes.expiresAt,
+        amount: totalResellerCost,
       }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

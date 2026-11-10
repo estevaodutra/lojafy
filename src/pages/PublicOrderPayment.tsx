@@ -38,6 +38,8 @@ interface PublicOrderPaymentData {
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
   payment_method: string;
   total_amount: number;
+  retail_sale_amount?: number;
+  is_marketplace?: boolean;
   created_at: string;
   payment_expires_at?: string | null;
   customer: {
@@ -243,7 +245,9 @@ export const PublicOrderPayment: React.FC = () => {
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs text-slate-400 block">Total a pagar</span>
+                  <span className="text-xs text-slate-400 block">
+                    {order.is_marketplace ? "Custo do produto" : "Total a pagar"}
+                  </span>
                   <span className="text-2xl font-extrabold text-emerald-400">
                     {formatCurrency(order.total_amount)}
                   </span>
@@ -426,11 +430,18 @@ export const PublicOrderPayment: React.FC = () => {
             {/* Total Row */}
             <Separator />
             <div className="flex items-center justify-between pt-1">
-              <span className="font-bold text-sm text-foreground">Total:</span>
-              <span className="font-extrabold text-lg text-foreground">
+              <span className="font-bold text-sm text-foreground">
+                {order.is_marketplace ? "Custo do Pedido (Lojafy):" : "Total:"}
+              </span>
+              <span className="font-extrabold text-lg text-emerald-600 dark:text-emerald-400">
                 {formatCurrency(order.total_amount)}
               </span>
             </div>
+            {order.is_marketplace && !!order.retail_sale_amount && (
+              <p className="text-[11px] text-muted-foreground text-right pt-0.5">
+                Venda no Marketplace: {formatCurrency(order.retail_sale_amount)} • Cobrança de fulfillment pelo custo do produto
+              </p>
+            )}
 
           </CardContent>
         </Card>
