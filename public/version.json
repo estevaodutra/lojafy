@@ -1,7 +1,7 @@
 {
-  "hash": "d059e5b9cbf03cfd1f7182e0669242997fe80d81",
-  "shortHash": "d059e5b",
-  "message": "feat(payment): add Fornecedor Nacional store header logo and auto popup explaining pending shipping label verification",
+  "hash": "db49ac49e47bcd2985aa736bc5ef83074b456327",
+  "shortHash": "db49ac4",
+  "message": "fix(admin): simplificar coluna marketplace para exibir apenas se produto estiver validado/publicado sem duplicacao",
   "author": "Lojafy Developer",
-  "timestamp": 1794363377355
+  "timestamp": 1794364832669
 }

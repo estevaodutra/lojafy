@@ -14,6 +14,7 @@ import { useFeatures, Feature } from '@/hooks/useFeatures';
 import { FeatureCard } from '@/components/admin/FeatureCard';
 import { FeatureFormModal } from '@/components/admin/FeatureFormModal';
 import { FeatureProductsModal } from '@/components/admin/FeatureProductsModal';
+import { useTopProductsScheduler } from '@/hooks/useTopProductsScheduler';
 
 const categoryLabels: Record<string, string> = {
   loja: '🏪 Loja',
@@ -23,6 +24,7 @@ const categoryLabels: Record<string, string> = {
 };
 
 const Features: React.FC = () => {
+  useTopProductsScheduler();
   const {
     features,
     featuresByCategory,

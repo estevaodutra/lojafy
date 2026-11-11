@@ -118,6 +118,11 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
           <Badge variant={feature.ativo ? 'default' : 'secondary'} className="text-xs">
             {feature.ativo ? 'Ativa' : 'Inativa'}
           </Badge>
+          {feature.metadata?.top_ranking_config?.auto_update_weekly && (
+            <Badge variant="outline" className="text-xs text-primary border-primary/30">
+              Auto Semanal
+            </Badge>
+          )}
           {feature.trial_dias > 0 && (
             <Badge variant="outline" className="text-xs">
               {feature.trial_dias}d trial

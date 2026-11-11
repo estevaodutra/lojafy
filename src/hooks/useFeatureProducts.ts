@@ -20,7 +20,7 @@ export const useFeatureProducts = (featureId: string | null) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: products, isLoading } = useQuery({
+  const { data: products, isLoading, refetch } = useQuery({
     queryKey: ['feature-products', featureId],
     queryFn: async () => {
       if (!featureId) return [];
@@ -38,7 +38,7 @@ export const useFeatureProducts = (featureId: string | null) => {
 
       const { data: productsData, error: pError } = await supabase
         .from('products')
-        .select('id, name, sku, price, image_url')
+        .select('id, name, sku, price, image_url, main_image_url')
         .in('id', productIds);
 
       if (pError) throw pError;
@@ -57,7 +57,7 @@ export const useFeatureProducts = (featureId: string | null) => {
           product_name: (p as any).name || 'Produto não encontrado',
           product_sku: (p as any).sku || '',
           product_price: (p as any).price || 0,
-          product_image: (p as any).image_url || null,
+          product_image: (p as any).image_url || (p as any).main_image_url || null,
           reference_link: fp.reference_link || null,
         } as FeatureProduct;
       });
@@ -130,6 +130,7 @@ export const useFeatureProducts = (featureId: string | null) => {
   return {
     products: products || [],
     isLoading,
+    refetch,
     addProducts,
     removeProduct,
     reorderProducts,
