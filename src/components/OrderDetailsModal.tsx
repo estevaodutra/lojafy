@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -39,6 +39,7 @@ import {
   ShieldCheck,
   Receipt,
   History,
+  Plus,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -68,16 +69,6 @@ interface OrderItem {
   supplier_unit_cost?: number;
   supplier_id?: string;
   supplier_organization_id?: string;
-}
-
-interface OrderFinancials {
-  totalCost: number;
-  subtotal: number;
-  shippingAmount: number;
-  taxAmount: number;
-  totalRevenue: number;
-  netProfit: number;
-  profitMargin: number;
 }
 
 interface OrderStatusHistory {
@@ -159,7 +150,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   onClose,
   initialOrder,
 }) => {
-  const [activeTab, setActiveTab] = useState<'geral' | 'financeiro' | 'historico'>('geral');
   const [order, setOrder] = useState<Order | null>(null);
   const [pipelineItem, setPipelineItem] = useState<OrderPipelineItem | null>(initialOrder || null);
   const [customer, setCustomer] = useState<CustomerProfile | null>(null);
@@ -171,7 +161,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const [refundUploadFile, setRefundUploadFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isRefundUploading, setIsRefundUploading] = useState(false);
-  const [currentProductCosts, setCurrentProductCosts] = useState<Record<string, number>>({});
   const [existingTicketId, setExistingTicketId] = useState<string | null>(null);
   const [deliveredAt, setDeliveredAt] = useState<string | null>(null);
   const [webhookLog, setWebhookLog] = useState<WebhookLogInfo | null>(null);
@@ -180,17 +169,26 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const [copiedOrderId, setCopiedOrderId] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
+  // Quick note state
+  const [quickNote, setQuickNote] = useState('');
+  const [isAddingNote, setIsAddingNote] = useState(false);
+
   const { toast } = useToast();
   const { profile } = useAuth();
-  const { role, isSuperAdmin, isSupplier, isReseller, isCustomer } = useUserRole();
+  const { isSuperAdmin, isSupplier } = useUserRole();
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
   const showAdminMetrics = isSuperAdmin() || isAdmin;
   const canManageShippingFiles = isAdmin || isSupplier();
 
   useEffect(() => {
+    if (initialOrder) {
+      setPipelineItem(initialOrder);
+    }
+  }, [initialOrder]);
+
+  useEffect(() => {
     if (orderId && isOpen) {
-      setActiveTab('geral');
       fetchOrderDetails();
       fetchStatusHistory();
       fetchShippingFiles();
@@ -205,7 +203,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       setDeliveredAt(null);
       setWebhookLog(null);
       setOrder(null);
-      setPipelineItem(null);
+      if (!initialOrder) {
+        setPipelineItem(null);
+      }
     }
   }, [orderId, isOpen, isAdmin]);
 
@@ -299,7 +299,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             }
           }
         } catch {
-          // ignore json parse error
+          // ignore
         }
         throw new Error(errorDetail);
       }
@@ -328,7 +328,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
   const fetchOrderDetails = async () => {
     if (!orderId) return;
-    setLoading(true);
+    // Don't show full-screen spinner if we already have initialOrder
+    if (!initialOrder) setLoading(true);
+
     try {
       const { data, error } = await supabase
         .from('orders')
@@ -352,7 +354,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       if (error) throw error;
       setOrder(data);
 
-      // Customer resolution
+      // Resolve Customer Profile
       let resolvedCustomer: any = null;
       if (data?.user_id) {
         const { data: profileData } = await supabase
@@ -397,58 +399,28 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
       setCustomer(resolvedCustomer);
 
-      // Costs map
-      const costsMap: Record<string, number> = {};
-      data.order_items?.forEach((item: any) => {
-        if (item.supplier_unit_cost != null) {
-          costsMap[item.product_id] = Number(item.supplier_unit_cost);
-        }
+      // Normalize into pipeline item to guarantee parity, while preserving initialOrder attributes
+      const normalized = normalizeOrderToPipelineItem(data);
+      setPipelineItem((prev) => {
+        const base = initialOrder || prev;
+        return {
+          ...normalized,
+          ...(base || {}),
+          seller_name: base?.seller_name || normalized.seller_name,
+          customer_name: base?.customer_name || normalized.customer_name,
+          supplier_name: base?.supplier_name || normalized.supplier_name,
+          sale_amount: base?.sale_amount ?? normalized.sale_amount,
+          marketplace_fee: base?.marketplace_fee ?? normalized.marketplace_fee,
+          seller_cost: base?.seller_cost ?? normalized.seller_cost,
+          seller_profit: base?.seller_profit ?? normalized.seller_profit,
+          seller_margin_pct: base?.seller_margin_pct ?? normalized.seller_margin_pct,
+          lojafy_sale: base?.lojafy_sale ?? normalized.lojafy_sale,
+          lojafy_fee: base?.lojafy_fee ?? normalized.lojafy_fee,
+          lojafy_cost: base?.lojafy_cost ?? normalized.lojafy_cost,
+          lojafy_profit: base?.lojafy_profit ?? normalized.lojafy_profit,
+          lojafy_margin_pct: base?.lojafy_margin_pct ?? normalized.lojafy_margin_pct,
+        };
       });
-      setCurrentProductCosts(costsMap);
-
-      // Resolve Seller Name
-      let resolvedSellerName = "Lojafy";
-      if (data?.reseller_id) {
-        const { data: rProfile } = await supabase
-          .from('profiles')
-          .select('business_name, first_name, last_name')
-          .eq('user_id', data.reseller_id)
-          .maybeSingle();
-        if (rProfile) {
-          resolvedSellerName = rProfile.business_name || `${rProfile.first_name || ''} ${rProfile.last_name || ''}`.trim() || "Revendedor";
-        }
-      }
-
-      // Resolve Supplier Name
-      let resolvedSupplierName = "Fornecedor Nacional";
-      const supplierOrgId = (data as any)?.order_items?.[0]?.supplier_organization_id || (data as any)?.supplier_organization_id;
-      if (supplierOrgId) {
-        try {
-          const { data: orgData } = await (supabase
-            .from('supplier_organizations' as any)
-            .select('trade_name')
-            .eq('id', supplierOrgId)
-            .maybeSingle() as any);
-          if (orgData) {
-            resolvedSupplierName = orgData.trade_name || "Fornecedor";
-          }
-        } catch {
-          // ignore
-        }
-      } else if ((data as any)?.supplier_name) {
-        resolvedSupplierName = (data as any).supplier_name;
-      }
-
-      // Normalize into pipeline item to guarantee 100% calculation and visual parity with Kanban Card
-      const orderToNormalize = {
-        ...data,
-        seller_name: resolvedSellerName,
-        supplier_name: resolvedSupplierName,
-        customer_name: resolvedCustomer ? `${resolvedCustomer.first_name || ''} ${resolvedCustomer.last_name || ''}`.trim() : undefined,
-      };
-
-      const normalized = normalizeOrderToPipelineItem(orderToNormalize);
-      setPipelineItem(normalized);
     } catch (error) {
       console.error('Erro ao buscar detalhes do pedido:', error);
     } finally {
@@ -849,6 +821,26 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     }
   };
 
+  const handleAddQuickNote = async () => {
+    if (!quickNote.trim() || !orderId) return;
+    setIsAddingNote(true);
+    try {
+      const { error } = await supabase.from('order_status_history').insert({
+        order_id: orderId,
+        status: order?.status || pipelineItem?.status || 'pendente',
+        notes: `[Observação] ${quickNote.trim()}`,
+      });
+      if (error) throw error;
+      sonnerToast.success('Observação registrada com sucesso!');
+      setQuickNote('');
+      fetchStatusHistory();
+    } catch (err: any) {
+      sonnerToast.error(err.message || 'Erro ao registrar observação.');
+    } finally {
+      setIsAddingNote(false);
+    }
+  };
+
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -900,8 +892,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
   const handleCopyPaymentLink = (e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (!order?.id) return;
-    const paymentUrl = `https://lojafy.app/pagamento/${order.id}`;
+    const id = order?.id || pipelineItem?.id || orderId;
+    if (!id) return;
+    const paymentUrl = `https://lojafy.app/pagamento/${id}`;
     navigator.clipboard.writeText(paymentUrl);
     setCopiedLink(true);
     sonnerToast.success("Link de pagamento copiado!");
@@ -909,18 +902,15 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   };
 
   const handleCopyOrderNumber = () => {
-    if (!order?.order_number) return;
-    navigator.clipboard.writeText(order.order_number);
+    const num = order?.order_number || pipelineItem?.order_number;
+    if (!num) return;
+    navigator.clipboard.writeText(num);
     setCopiedOrderId(true);
     sonnerToast.success("Número do pedido copiado!");
     setTimeout(() => setCopiedOrderId(false), 2000);
   };
 
   // Regra de identificação do fornecedor conforme o perfil:
-  // - Cliente: Exibir Lojafy
-  // - Revendedor / Seller: Exibir Lojafy
-  // - Super Admin / Admin: Exibir o nome real do fornecedor vinculado ao pedido
-  // - Fornecedor: Exibir o nome do próprio fornecedor
   const displayedSupplierName = useMemo(() => {
     if (isSuperAdmin() || isAdmin) {
       return pipelineItem?.supplier_name || order?.supplier_name || 'Fornecedor';
@@ -937,8 +927,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     return 'Lojafy';
   }, [isSuperAdmin, isAdmin, isSupplier, profile, pipelineItem, order]);
 
-  // Fallback data if pipelineItem is still preparing
-  const isPaid = order?.payment_status === 'paid' || order?.status === 'pago';
+  const isPaid = order?.payment_status === 'paid' || order?.status === 'pago' || pipelineItem?.is_paid;
   const displayOrderNumber = order?.order_number || pipelineItem?.order_number || orderId?.slice(0, 8);
   const displayTracking = order?.tracking_number || pipelineItem?.tracking_number;
   const displayExternalRef =
@@ -946,26 +935,48 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     order?.ml_order_id ||
     pipelineItem?.external_reference;
 
+  // Products list to render
+  const itemsToRender = order?.order_items && order.order_items.length > 0
+    ? order.order_items
+    : pipelineItem?.main_product
+    ? [
+        {
+          id: pipelineItem.id,
+          product_id: pipelineItem.main_product.id || '',
+          quantity: pipelineItem.main_product.quantity || 1,
+          unit_price: pipelineItem.sale_amount,
+          total_price: pipelineItem.sale_amount,
+          product_snapshot: {
+            name: pipelineItem.main_product.name,
+            imageUrl: pipelineItem.main_product.imageUrl,
+            image_url: pipelineItem.main_product.imageUrl,
+          },
+        },
+      ]
+    : [];
+
   if (!order && !pipelineItem && !loading) {
     return null;
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl sm:max-w-4xl max-h-[92vh] flex flex-col p-0 gap-0 overflow-hidden bg-background">
+      <DialogContent className="max-w-2xl sm:max-w-3xl max-h-[92vh] flex flex-col p-0 gap-0 overflow-hidden bg-background shadow-2xl border">
         <TooltipProvider>
-          {/* 1. Header Compacto e Limpo */}
-          <DialogHeader className="p-4 sm:p-5 pb-3 border-b bg-muted/20 shrink-0">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              {/* Identificação Principal & Badges */}
-              <div className="space-y-1.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <DialogTitle className="text-base sm:text-lg font-bold tracking-tight text-foreground flex items-center gap-1.5">
+          {/* ============================================================== */}
+          {/* HEADER SLIM (Linha Única & Informações Essenciais)              */}
+          {/* ============================================================== */}
+          <DialogHeader className="p-3.5 sm:p-4 pb-2.5 border-b bg-muted/20 shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              {/* Esquerda: Identificação + Badges em linha */}
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <DialogTitle className="text-base font-bold tracking-tight text-foreground flex items-center gap-1">
                     <span>Pedido #{displayOrderNumber}</span>
                     <button
                       onClick={handleCopyOrderNumber}
                       title="Copiar número do pedido"
-                      className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded"
+                      className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded cursor-pointer"
                     >
                       {copiedOrderId ? (
                         <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -976,10 +987,10 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   </DialogTitle>
 
                   {/* Status Operacional */}
-                  {order && (
-                    <Badge variant={getStatusVariant(order.status)} className="gap-1 text-[11px] font-medium h-6">
-                      {getStatusIcon(order.status)}
-                      <span>{getStatusLabel(order.status)}</span>
+                  {(order?.status || pipelineItem?.status) && (
+                    <Badge variant={getStatusVariant(order?.status || pipelineItem?.status || 'pendente')} className="gap-1 text-[10px] font-semibold h-5 px-1.5">
+                      {getStatusIcon(order?.status || pipelineItem?.status || 'pendente')}
+                      <span>{getStatusLabel(order?.status || pipelineItem?.status || 'pendente')}</span>
                     </Badge>
                   )}
 
@@ -987,7 +998,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   <Badge
                     variant="outline"
                     className={cn(
-                      "text-[10px] px-2 py-0 font-semibold uppercase tracking-wider h-5",
+                      "text-[9px] px-1.5 py-0 font-semibold uppercase tracking-wider h-5",
                       pipelineItem?.channel === "mercadolivre"
                         ? "bg-yellow-50 text-yellow-800 border-yellow-300 dark:bg-yellow-950/40 dark:text-yellow-300 dark:border-yellow-800"
                         : pipelineItem?.channel === "shopee"
@@ -995,14 +1006,14 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                         : "bg-muted text-muted-foreground"
                     )}
                   >
-                    {pipelineItem?.channel_label || order?.marketplace?.toUpperCase() || "LOJAFY"}
+                    {pipelineItem?.channel_label || "LOJAFY"}
                   </Badge>
 
                   {/* Origem AUTO / MANUAL */}
                   <Badge
                     variant="secondary"
                     className={cn(
-                      "text-[10px] px-1.5 py-0 font-semibold tracking-wider h-5",
+                      "text-[9px] px-1.5 py-0 font-semibold tracking-wider h-5",
                       pipelineItem?.origin_type === "AUTO"
                         ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300"
                         : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
@@ -1013,31 +1024,31 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
                   {/* Tempo na etapa */}
                   {pipelineItem?.time_in_stage_display && (
-                    <span className="text-[11px] text-muted-foreground flex items-center gap-1 font-medium">
-                      <Clock className="w-3 h-3 text-muted-foreground/80" />
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-medium">
+                      <Clock className="w-2.5 h-2.5 text-muted-foreground/80" />
                       {pipelineItem.time_in_stage_display}
                     </span>
                   )}
                 </div>
 
                 {/* Sublinha de identificadores secundários */}
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-muted-foreground">
                   {displayExternalRef && (
-                    <span className="inline-flex items-center gap-1 font-mono text-[11px] bg-background/80 px-1.5 py-0.5 rounded border border-border/50">
+                    <span className="inline-flex items-center gap-1 font-mono text-[10px] bg-background/80 px-1.5 py-0.2 rounded border border-border/50">
                       <span className="text-muted-foreground">Ref:</span>
                       <strong className="text-foreground">{displayExternalRef}</strong>
                     </span>
                   )}
 
                   {displayTracking && (
-                    <span className="inline-flex items-center gap-1 font-mono text-[11px] bg-background/80 px-1.5 py-0.5 rounded border border-border/50">
+                    <span className="inline-flex items-center gap-1 font-mono text-[10px] bg-background/80 px-1.5 py-0.2 rounded border border-border/50">
                       <Truck className="w-3 h-3 text-blue-500" />
                       <span>{displayTracking}</span>
                     </span>
                   )}
 
                   {order?.created_at && (
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-[10px] text-muted-foreground">
                       Criado em {formatDate(order.created_at)}
                     </span>
                   )}
@@ -1049,27 +1060,27 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                 {isPaid ? (
                   <Badge
                     variant="default"
-                    className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-600 text-white font-medium gap-1.5 pointer-events-none select-none shadow-none"
+                    className="h-7 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-600 text-white font-medium gap-1 pointer-events-none select-none shadow-none"
                   >
-                    <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <Check className="w-3 h-3 stroke-[2.5]" />
                     <span>Pago ✓</span>
                   </Badge>
                 ) : isSuperAdmin() || isSupplier() ? (
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="h-8 px-3 text-xs font-medium gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 shadow-2xs transition-colors"
+                    className="h-7 px-2.5 text-xs font-medium gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 shadow-2xs transition-colors cursor-pointer"
                     onClick={handleCopyPaymentLink}
-                    title="Copiar link da página de checkout/pagamento"
+                    title="Copiar link da página de pagamento"
                   >
                     {copiedLink ? (
                       <>
-                        <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
+                        <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
                         <span className="font-semibold">Copiado!</span>
                       </>
                     ) : (
                       <>
-                        <Link2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                        <Link2 className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
                         <span>Copiar Link</span>
                       </>
                     )}
@@ -1078,19 +1089,19 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="h-8 px-3 text-xs font-medium gap-1.5 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-400 border border-amber-500/20"
+                    className="h-7 px-2.5 text-xs font-medium gap-1 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-400 border border-amber-500/20 cursor-pointer"
                     onClick={handleCopyPaymentLink}
                   >
-                    <QrCode className="w-3.5 h-3.5" />
+                    <QrCode className="w-3 h-3" />
                     <span>Gerar Pix</span>
                   </Button>
                 )}
               </div>
             </div>
 
-            {/* Barra de Ações Operacionais (Integrada e Compacta) */}
+            {/* Ações Operacionais (Inline, compactas) */}
             {order && profile && (
-              <div className="pt-2.5 mt-2 border-t border-border/40">
+              <div className="pt-2 mt-1.5 border-t border-border/40">
                 <OrderActionBar
                   order={order}
                   userRole={profile.role || 'customer'}
@@ -1107,840 +1118,527 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             )}
           </DialogHeader>
 
-          {/* 2. Loading State ou Corpo com Abas */}
-          {loading && !order ? (
-            <div className="text-center py-16">
-              <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
-              <p className="text-muted-foreground text-xs mt-3">Carregando detalhes do pedido...</p>
-            </div>
-          ) : order ? (
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
-              <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="w-full">
-                {/* Navegação entre as 3 abas */}
-                <TabsList className="grid w-full grid-cols-3 h-9 bg-muted/50 p-1 mb-4">
-                  <TabsTrigger value="geral" className="text-xs font-semibold gap-1.5 data-[state=active]:bg-background">
-                    <Package className="w-3.5 h-3.5" />
-                    <span>Geral</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="financeiro" className="text-xs font-semibold gap-1.5 data-[state=active]:bg-background">
-                    <TrendingUp className="w-3.5 h-3.5" />
-                    <span>Financeiro</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="historico" className="text-xs font-semibold gap-1.5 data-[state=active]:bg-background">
-                    <History className="w-3.5 h-3.5" />
-                    <span>Histórico</span>
-                    {statusHistory.length > 0 && (
-                      <span className="ml-1 text-[10px] px-1.5 py-0 rounded-full bg-muted-foreground/15 font-mono">
-                        {statusHistory.length}
-                      </span>
-                    )}
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* ============================================================== */}
-                {/* ABA 1 — GERAL (Aba inicial padrão)                             */}
-                {/* ============================================================== */}
-                <TabsContent value="geral" className="space-y-4 mt-0">
-                  {/* Seção Produto(s) — Compacta */}
-                  <div className="space-y-1.5">
-                    <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
-                      {order.order_items.length > 1 ? `Produtos do Pedido (${order.order_items.length})` : "Produto"}
-                    </span>
-                    <div className="divide-y divide-border/50 rounded-lg border border-border/60 bg-muted/15 overflow-hidden">
-                      {order.order_items.map((item, idx) => {
-                        const prod = item.product_snapshot || {};
-                        const img = prod.image_url || prod.imageUrl || prod.images?.[0] || prod.image;
-                        return (
-                          <div key={item.id || idx} className="p-2.5 sm:p-3 flex items-center gap-3 hover:bg-muted/30 transition-colors">
-                            {/* Miniatura 48px */}
-                            <div className="w-12 h-12 rounded border bg-background overflow-hidden shrink-0 flex items-center justify-center">
-                              {img ? (
-                                <img
-                                  src={img}
-                                  alt={prod.name || "Produto"}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    (e.target as HTMLElement).style.display = 'none';
-                                  }}
-                                />
-                              ) : (
-                                <Package className="w-5 h-5 text-muted-foreground" />
-                              )}
-                            </div>
-
-                            {/* Informações do Produto */}
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-medium text-foreground line-clamp-2 leading-snug">
-                                {prod.name || "Produto"}
-                              </p>
-                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground mt-0.5">
-                                <span>
-                                  Quantidade: <strong className="text-foreground font-semibold">{item.quantity} un.</strong>
-                                </span>
-                                {prod.sku && (
-                                  <span>• SKU: <span className="font-mono">{prod.sku}</span></span>
-                                )}
-                                {item.unit_price > 0 && (
-                                  <span>• Preço un.: {formatPrice(Number(item.unit_price))}</span>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Ação: Ver Produto */}
-                            {item.product_id && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 shrink-0 text-muted-foreground hover:text-foreground"
-                                onClick={() => window.open(`/produto/${item.product_id}`, '_blank')}
-                                title="Ver página do produto"
-                              >
-                                <ExternalLink className="w-3.5 h-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Informações da Operação (Seller, Cliente, Fornecedor) */}
-                  <div className="rounded-lg border border-border/60 bg-muted/15 p-3 space-y-2">
-                    <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
-                      Participantes da Operação
-                    </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-0.5 text-xs">
-                      <div>
-                        <span className="text-[11px] text-muted-foreground block">Seller / Revendedor:</span>
-                        <span className="font-semibold text-foreground truncate block mt-0.5" title={pipelineItem?.seller_name}>
-                          {pipelineItem?.seller_name || "Lojafy"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[11px] text-muted-foreground block">Cliente Final:</span>
-                        <span className="font-semibold text-foreground truncate block mt-0.5" title={pipelineItem?.customer_name}>
-                          {pipelineItem?.customer_name || "Cliente"}
-                        </span>
-                        {(pipelineItem?.customer_city || pipelineItem?.customer_state) && (
-                          <span className="text-[10px] text-muted-foreground block truncate">
-                            {[pipelineItem.customer_city, pipelineItem.customer_state].filter(Boolean).join(" / ")}
-                          </span>
-                        )}
-                      </div>
-                      <div>
-                        <span className="text-[11px] text-muted-foreground block">Fornecedor:</span>
-                        <span className="font-semibold text-foreground truncate block mt-0.5" title={displayedSupplierName}>
-                          {displayedSupplierName}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Resumo Financeiro Compacto (Aba Geral) */}
-                  <div className="rounded-lg border border-border/60 bg-muted/15 p-3 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                        Resumo Financeiro
-                      </span>
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="h-auto p-0 text-xs text-primary font-medium hover:underline gap-1 cursor-pointer"
-                        onClick={() => setActiveTab('financeiro')}
-                      >
-                        <span>Ver detalhamento completo</span>
-                        <ArrowRight className="w-3 h-3" />
-                      </Button>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-0.5 text-xs">
-                      <div className="p-2.5 rounded bg-background border border-border/50">
-                        <span className="text-[11px] text-muted-foreground block">Venda:</span>
-                        <span className="font-mono font-bold text-foreground text-sm block mt-0.5">
-                          {formatBRL(pipelineItem?.sale_amount || order.total_amount)}
-                        </span>
-                      </div>
-
-                      <div className="p-2.5 rounded bg-background border border-border/50">
-                        <span className="text-[11px] text-muted-foreground block">Lucro Líquido:</span>
-                        <span className={cn(
-                          "font-mono font-bold text-sm block mt-0.5",
-                          (pipelineItem?.seller_profit || 0) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-                        )}>
-                          {formatBRL(pipelineItem?.seller_profit || 0)}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground block font-mono">
-                          Margem: {formatPercent(pipelineItem?.seller_margin_pct || 0)}
-                        </span>
-                      </div>
-
-                      {showAdminMetrics && (
-                        <>
-                          <div className="p-2.5 rounded bg-background border border-border/50">
-                            <span className="text-[11px] text-muted-foreground block">Venda Lojafy:</span>
-                            <span className="font-mono font-bold text-foreground text-sm block mt-0.5">
-                              {formatBRL(pipelineItem?.lojafy_sale || pipelineItem?.seller_cost || 0)}
-                            </span>
-                          </div>
-
-                          <div className="p-2.5 rounded bg-background border border-border/50">
-                            <span className="text-[11px] text-muted-foreground block">Lucro Lojafy:</span>
-                            <span className={cn(
-                              "font-mono font-bold text-sm block mt-0.5",
-                              (pipelineItem?.lojafy_profit || 0) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-                            )}>
-                              {formatBRL(pipelineItem?.lojafy_profit || 0)}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground block font-mono">
-                              Margem: {formatPercent(pipelineItem?.lojafy_margin_pct || 0)}
-                            </span>
-                          </div>
-                        </>
+          {/* ============================================================== */}
+          {/* CORPO COMPACTO — ZERO SCROLL (Tudo Visível no Primeiro Plano)   */}
+          {/* ============================================================== */}
+          <div className="flex-1 overflow-y-auto p-3.5 sm:p-4 space-y-3">
+            {/* 1. Grade Superior: Produto (Esquerda) e Participantes (Direita) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {/* Coluna Produto */}
+              <div className="rounded-lg border border-border/60 bg-muted/15 p-2.5 flex items-center gap-3">
+                {itemsToRender.length > 0 && (
+                  <>
+                    <div className="w-11 h-11 rounded border bg-background overflow-hidden shrink-0 flex items-center justify-center">
+                      {itemsToRender[0]?.product_snapshot?.image_url ||
+                      itemsToRender[0]?.product_snapshot?.imageUrl ||
+                      itemsToRender[0]?.product_snapshot?.images?.[0] ? (
+                        <img
+                          src={
+                            itemsToRender[0]?.product_snapshot?.image_url ||
+                            itemsToRender[0]?.product_snapshot?.imageUrl ||
+                            itemsToRender[0]?.product_snapshot?.images?.[0]
+                          }
+                          alt="Produto"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <Package className="w-4 h-4 text-muted-foreground" />
                       )}
                     </div>
-                  </div>
 
-                  {/* Informações Complementares Recolhíveis (Accordion) */}
-                  <Accordion type="multiple" className="w-full space-y-2 pt-1">
-                    {/* 1. Documentos (Etiquetas & Comprovantes) */}
-                    <AccordionItem value="documents" className="border border-border/60 rounded-lg px-3 bg-muted/10">
-                      <AccordionTrigger className="py-2.5 text-xs font-semibold hover:no-underline">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-3.5 h-3.5 text-primary" />
-                          <span>Documentos & Etiquetas</span>
-                          {(shippingFiles.length > 0 || refundDocuments.length > 0) && (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
-                              {shippingFiles.length + refundDocuments.length}
-                            </Badge>
-                          )}
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent className="pt-2 pb-3 space-y-3">
-                        {/* Etiquetas de Envio */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-semibold text-muted-foreground uppercase">Etiquetas de Envio</span>
-                            {canManageShippingFiles && (
-                              <div>
-                                <Input
-                                  type="file"
-                                  accept=".pdf,.jpg,.jpeg,.png"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) setUploadFile(file);
-                                  }}
-                                  className="hidden"
-                                  id="modal-shipping-upload"
-                                />
-                                <Label
-                                  htmlFor="modal-shipping-upload"
-                                  className="cursor-pointer inline-flex items-center rounded text-xs font-medium border border-input bg-background hover:bg-accent px-2 py-1 gap-1"
-                                >
-                                  <Upload className="w-3 h-3" />
-                                  <span>Enviar Etiqueta</span>
-                                </Label>
-                              </div>
-                            )}
-                          </div>
-
-                          {uploadFile && canManageShippingFiles && (
-                            <div className="p-2 border rounded bg-muted/40 flex items-center justify-between text-xs">
-                              <span className="truncate max-w-[200px] font-medium">{uploadFile.name}</span>
-                              <div className="flex items-center gap-1.5">
-                                <Button size="sm" className="h-7 text-xs" onClick={() => handleFileUpload(uploadFile)} disabled={isUploading}>
-                                  {isUploading ? "Enviando..." : "Confirmar"}
-                                </Button>
-                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setUploadFile(null)}>
-                                  Cancelar
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-
-                          {shippingFiles.length > 0 ? (
-                            <div className="space-y-1.5">
-                              {shippingFiles.map((file) => (
-                                <div key={file.id} className="flex flex-wrap items-center justify-between gap-2 p-2 border border-border/50 rounded bg-background text-xs">
-                                  <div className="min-w-0 flex-1">
-                                    <p className="font-medium truncate">{file.file_name}</p>
-                                    <p className="text-[10px] text-muted-foreground">
-                                      {formatFileSize(file.file_size)} • {formatDate(file.uploaded_at)}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => viewShippingFile(file.file_path, file.file_name)}>
-                                      <Eye className="w-3 h-3 mr-1" />
-                                      Ver
-                                    </Button>
-                                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => downloadShippingFile(file.file_path, file.file_name)}>
-                                      <Download className="w-3 h-3 mr-1" />
-                                      Baixar
-                                    </Button>
-                                    <Button size="sm" className="h-7 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white" onClick={() => printShippingFile(file.file_path, file.file_name)}>
-                                      <Printer className="w-3 h-3 mr-1" />
-                                      Imprimir
-                                    </Button>
-                                    {canManageShippingFiles && (
-                                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-rose-500 hover:text-rose-600 hover:bg-rose-50" onClick={() => deleteShippingFile(file.id, file.file_path)}>
-                                        <Trash2 className="w-3 h-3" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-xs text-muted-foreground py-2 text-center">Nenhuma etiqueta anexada.</p>
-                          )}
-                        </div>
-
-                        {/* Comprovantes de Reembolso */}
-                        {(order.status === 'reembolsado' || refundDocuments.length > 0 || isAdmin) && (
-                          <div className="pt-2 border-t border-border/40 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 uppercase">Comprovantes de Reembolso (PDF)</span>
-                              {isAdmin && (
-                                <div>
-                                  <Input
-                                    type="file"
-                                    accept=".pdf"
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0];
-                                      if (file) setRefundUploadFile(file);
-                                    }}
-                                    className="hidden"
-                                    id="modal-refund-upload"
-                                  />
-                                  <Label
-                                    htmlFor="modal-refund-upload"
-                                    className="cursor-pointer inline-flex items-center rounded text-xs font-medium border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 px-2 py-1 gap-1"
-                                  >
-                                    <Upload className="w-3 h-3" />
-                                    <span>Enviar PDF</span>
-                                  </Label>
-                                </div>
-                              )}
-                            </div>
-
-                            {refundUploadFile && isAdmin && (
-                              <div className="p-2 border border-amber-200 rounded bg-amber-50 flex items-center justify-between text-xs">
-                                <span className="truncate max-w-[200px] font-medium text-amber-900">{refundUploadFile.name}</span>
-                                <div className="flex items-center gap-1.5">
-                                  <Button size="sm" className="h-7 text-xs" onClick={() => handleRefundFileUpload(refundUploadFile)} disabled={isRefundUploading}>
-                                    {isRefundUploading ? "Enviando..." : "Confirmar"}
-                                  </Button>
-                                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setRefundUploadFile(null)}>
-                                    Cancelar
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
-
-                            {refundDocuments.length > 0 ? (
-                              <div className="space-y-1.5">
-                                {refundDocuments.map((doc) => (
-                                  <div key={doc.id} className="flex items-center justify-between p-2 border border-amber-200/60 rounded bg-amber-50/50 text-xs">
-                                    <div className="min-w-0 flex-1">
-                                      <p className="font-medium text-amber-900 truncate">{doc.file_name}</p>
-                                      <p className="text-[10px] text-amber-700">
-                                        {formatFileSize(doc.file_size)} • {formatDate(doc.uploaded_at)}
-                                      </p>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <Button variant="outline" size="sm" className="h-7 px-2 text-xs border-amber-300" onClick={() => downloadRefundDocument(doc.file_path, doc.file_name)}>
-                                        <Download className="w-3 h-3 mr-1" />
-                                        Baixar PDF
-                                      </Button>
-                                      {isAdmin && (
-                                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-rose-500" onClick={() => deleteRefundDocument(doc.id, doc.file_path)}>
-                                          <Trash2 className="w-3 h-3" />
-                                        </Button>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="text-xs text-muted-foreground py-1 text-center">Nenhum comprovante de reembolso anexado.</p>
-                            )}
-                          </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-foreground line-clamp-2 leading-tight">
+                        {itemsToRender[0]?.product_snapshot?.name || pipelineItem?.main_product?.name || "Produto"}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-x-2 text-[10px] text-muted-foreground mt-0.5">
+                        <span>
+                          Qtd: <strong className="text-foreground">{itemsToRender[0]?.quantity || 1} un.</strong>
+                        </span>
+                        {itemsToRender[0]?.product_snapshot?.sku && (
+                          <span>• SKU: <span className="font-mono">{itemsToRender[0]?.product_snapshot?.sku}</span></span>
                         )}
-                      </AccordionContent>
-                    </AccordionItem>
-
-                    {/* 2. Endereço de Entrega */}
-                    {(order.shipping_address || order.billing_address) && (
-                      <AccordionItem value="address" className="border border-border/60 rounded-lg px-3 bg-muted/10">
-                        <AccordionTrigger className="py-2.5 text-xs font-semibold hover:no-underline">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="w-3.5 h-3.5 text-blue-500" />
-                            <span>Endereço de Entrega</span>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="pt-2 pb-3 text-xs space-y-2">
-                          {order.shipping_address && (
-                            <div className="p-2.5 rounded border border-border/50 bg-background space-y-1">
-                              {order.shipping_address.name || order.shipping_address.receiver_name ? (
-                                <p className="font-semibold text-foreground">
-                                  Destinatário: {order.shipping_address.name || order.shipping_address.receiver_name}
-                                </p>
-                              ) : null}
-                              <p className="text-foreground">
-                                {[
-                                  order.shipping_address.street || order.shipping_address.address,
-                                  order.shipping_address.number,
-                                  order.shipping_address.complement,
-                                ].filter(Boolean).join(", ")}
-                              </p>
-                              {order.shipping_address.neighborhood && (
-                                <p className="text-muted-foreground">Bairro: {order.shipping_address.neighborhood}</p>
-                              )}
-                              <p className="text-muted-foreground">
-                                {[order.shipping_address.city, order.shipping_address.state].filter(Boolean).join(" - ")}
-                                {order.shipping_address.zip_code && ` • CEP: ${order.shipping_address.zip_code}`}
-                              </p>
-                            </div>
-                          )}
-
-                          {order.billing_address && (
-                            <div className="p-2.5 rounded border border-border/50 bg-background space-y-1">
-                              <span className="text-[10px] font-semibold text-muted-foreground uppercase">Endereço de Cobrança:</span>
-                              <p className="text-foreground">
-                                {[
-                                  order.billing_address.street || order.billing_address.address,
-                                  order.billing_address.number,
-                                  order.billing_address.complement,
-                                ].filter(Boolean).join(", ")}
-                              </p>
-                              <p className="text-muted-foreground">
-                                {[order.billing_address.city, order.billing_address.state].filter(Boolean).join(" - ")}
-                                {order.billing_address.zip_code && ` • CEP: ${order.billing_address.zip_code}`}
-                              </p>
-                            </div>
-                          )}
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
-
-                    {/* 3. Observações do Pedido */}
-                    {order.notes && (
-                      <AccordionItem value="notes" className="border border-border/60 rounded-lg px-3 bg-muted/10">
-                        <AccordionTrigger className="py-2.5 text-xs font-semibold hover:no-underline">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-3.5 h-3.5 text-amber-500" />
-                            <span>Observações do Pedido</span>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="pt-2 pb-3">
-                          <div className="p-2.5 rounded border border-border/50 bg-background text-xs whitespace-pre-wrap text-muted-foreground font-mono">
-                            {order.notes}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
-
-                    {/* 4. Webhook de Pedido Pago (Apenas Admin) */}
-                    {isAdmin && isPaid && (
-                      <AccordionItem value="webhook" className="border border-border/60 rounded-lg px-3 bg-muted/10">
-                        <AccordionTrigger className="py-2.5 text-xs font-semibold hover:no-underline">
-                          <div className="flex items-center gap-2">
-                            <Send className="w-3.5 h-3.5 text-primary" />
-                            <span>Webhook de Pedido Pago</span>
-                            {webhookLog ? (
-                              <Badge variant={webhookLog.status_code && webhookLog.status_code >= 200 && webhookLog.status_code < 300 ? "default" : "destructive"} className="text-[10px] px-1.5 py-0 h-4">
-                                {webhookLog.status_code ? `HTTP ${webhookLog.status_code}` : 'Disparado'}
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-amber-600">
-                                Pendente
-                              </Badge>
-                            )}
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="pt-2 pb-3 space-y-2 text-xs">
-                          {webhookLog ? (
-                            <div className="p-2.5 rounded border bg-background space-y-1.5">
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Último disparo:</span>
-                                <span className="font-medium">{formatDate(webhookLog.dispatched_at)}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Status Code:</span>
-                                <span className={cn(
-                                  "font-mono font-semibold",
-                                  webhookLog.status_code && webhookLog.status_code >= 200 && webhookLog.status_code < 300 ? "text-emerald-600" : "text-rose-600"
-                                )}>
-                                  {webhookLog.status_code || 'N/A'}
-                                </span>
-                              </div>
-                              {webhookLog.error_message && (
-                                <p className="text-rose-600 bg-rose-50 dark:bg-rose-950/20 p-2 rounded text-[11px]">
-                                  {webhookLog.error_message}
-                                </p>
-                              )}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full h-7 text-xs mt-2"
-                                onClick={handleDispatchWebhook}
-                                disabled={isDispatchingWebhook}
-                              >
-                                {isDispatchingWebhook ? (
-                                  <>
-                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                    <span>Reenviando...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <RefreshCw className="w-3 h-3 mr-1" />
-                                    <span>Reenviar Webhook</span>
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="p-2.5 rounded border bg-background space-y-2">
-                              <p className="text-muted-foreground text-xs">O webhook order.paid ainda não foi disparado para este pedido.</p>
-                              <Button
-                                size="sm"
-                                className="w-full h-7 text-xs"
-                                onClick={handleDispatchWebhook}
-                                disabled={isDispatchingWebhook}
-                              >
-                                {isDispatchingWebhook ? (
-                                  <>
-                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                    <span>Disparando...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Send className="w-3 h-3 mr-1" />
-                                    <span>Disparar Webhook</span>
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                          )}
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
-
-                    {/* 5. Suporte & Tickets Relacionados */}
-                    {order && (
-                      <AccordionItem value="tickets" className="border border-border/60 rounded-lg px-3 bg-muted/10">
-                        <AccordionTrigger className="py-2.5 text-xs font-semibold hover:no-underline">
-                          <div className="flex items-center gap-2">
-                            <MessageSquarePlus className="w-3.5 h-3.5 text-indigo-500" />
-                            <span>Tickets & Suporte</span>
-                            {existingTicketId && (
-                              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-4">
-                                Aberto
-                              </Badge>
-                            )}
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="pt-2 pb-3 space-y-3">
-                          <RelatedTickets orderId={order.id} />
-                          {(() => {
-                            const availableTicketTypes = getAvailableTicketTypes(order.status, order.payment_status, deliveredAt);
-                            const showOpenTicket = !isAdmin && (existingTicketId || availableTicketTypes.length > 0);
-                            return showOpenTicket ? (
-                              <div className="pt-2 border-t border-border/40">
-                                <OpenTicketButton
-                                  orderId={order.id}
-                                  orderStatus={order.status}
-                                  paymentStatus={order.payment_status}
-                                  deliveredAt={deliveredAt}
-                                  existingTicketId={existingTicketId}
-                                  variant="default"
-                                  size="sm"
-                                  className="w-full h-8 text-xs"
-                                />
-                              </div>
-                            ) : null;
-                          })()}
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
-                  </Accordion>
-                </TabsContent>
-
-                {/* ============================================================== */}
-                {/* ABA 2 — FINANCEIRO (Decomposição Completa)                      */}
-                {/* ============================================================== */}
-                <TabsContent value="financeiro" className="space-y-4 mt-0">
-                  <div className="space-y-3">
-                    {/* Bloco 1: REVENDEDOR */}
-                    <div className="rounded-lg border border-border/70 bg-card p-3.5 shadow-2xs space-y-2">
-                      <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                          <Receipt className="w-3.5 h-3.5 text-primary" />
-                          Revendedor
-                        </span>
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                          {pipelineItem?.is_marketplace ? "Marketplace" : "Venda Direta"}
-                        </Badge>
-                      </div>
-
-                      {/* Grid Financeiro Contábil Alinhado (Estilo Kanban / Google Sheets) */}
-                      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1.5 text-xs py-1">
-                        {/* Venda */}
-                        <span className="text-muted-foreground font-medium">Venda</span>
-                        <span className="font-mono text-muted-foreground text-right text-[11px]">R$</span>
-                        <span className="font-mono font-semibold text-foreground text-right tabular-nums">
-                          {formatAmountOnly(pipelineItem?.sale_amount || order.total_amount)}
-                        </span>
-
-                        {/* Taxas Marketplace com Tooltip Informativo */}
-                        <span className="inline-flex items-center gap-1 text-muted-foreground">
-                          <span>Taxas</span>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="cursor-help inline-flex items-center">
-                                <Info className="w-3 h-3 text-muted-foreground/70 hover:text-foreground transition-colors" />
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-[260px] p-2.5 space-y-1.5 text-xs bg-popover text-popover-foreground shadow-md border">
-                              <p className="font-semibold text-foreground text-[11px]">Composição das Taxas (Marketplace):</p>
-                              {(pipelineItem?.sale_amount || order.total_amount) < 79 ? (
-                                <div className="space-y-1">
-                                  <div className="flex justify-between text-[11px]">
-                                    <span className="text-muted-foreground">Tarifa fixa unitária (&lt; R$ 79):</span>
-                                    <span className="font-mono text-rose-500 font-medium">R$ 6,00</span>
-                                  </div>
-                                  <div className="flex justify-between text-[11px]">
-                                    <span className="text-muted-foreground">Comissão estimada:</span>
-                                    <span className="font-mono text-rose-500 font-medium">
-                                      {formatPrice(Math.max(0, (pipelineItem?.marketplace_fee || 0) - 6))}
-                                    </span>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="flex justify-between text-[11px]">
-                                  <span className="text-muted-foreground">Comissão de categoria:</span>
-                                  <span className="font-mono text-rose-500 font-medium">
-                                    {formatPrice(pipelineItem?.marketplace_fee || 0)}
-                                  </span>
-                                </div>
-                              )}
-                              <div className="border-t border-border/60 pt-1 mt-1 flex justify-between font-semibold text-[11px]">
-                                <span>Total retido pelo Canal:</span>
-                                <span className="font-mono text-rose-600 dark:text-rose-400">
-                                  -{formatPrice(pipelineItem?.marketplace_fee || 0)}
-                                </span>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </span>
-                        <span className="font-mono text-rose-600 dark:text-rose-400 text-right text-[11px] font-medium">-R$</span>
-                        <span className="font-mono font-medium text-rose-600 dark:text-rose-400 text-right tabular-nums">
-                          {formatAmountOnly(pipelineItem?.marketplace_fee || 0)}
-                        </span>
-
-                        {/* Custo (Preço Cobrado pela Lojafy) */}
-                        <span className="text-muted-foreground font-medium">Custo do Produto (Lojafy)</span>
-                        <span className="font-mono text-muted-foreground text-right text-[11px]">R$</span>
-                        <span className="font-mono font-semibold text-foreground text-right tabular-nums">
-                          {formatAmountOnly(pipelineItem?.seller_cost || 0)}
-                        </span>
-
-                        <Separator className="col-span-3 my-1" />
-
-                        {/* Lucro Líquido Revendedor */}
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                          <span>Lucro Líquido:</span>
-                          <span className="font-mono text-[11px] font-semibold">
-                            {formatPercent(pipelineItem?.seller_margin_pct || 0)}
-                          </span>
-                        </span>
-                        <span className="font-mono text-emerald-600 dark:text-emerald-400 text-right text-[11px] font-bold">R$</span>
-                        <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-right tabular-nums text-sm">
-                          {formatAmountOnly(pipelineItem?.seller_profit || 0)}
-                        </span>
+                        {itemsToRender.length > 1 && (
+                          <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">
+                            +{itemsToRender.length - 1} outro(s)
+                          </Badge>
+                        )}
                       </div>
                     </div>
 
-                    {/* Bloco 2: LOJAFY (Exclusivo para SuperAdmin / Admin) */}
-                    {showAdminMetrics && (
-                      <div className="rounded-lg border border-border/70 bg-muted/20 p-3.5 shadow-2xs space-y-2">
-                        <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-primary" />
-                            Lojafy (Operação & Fornecedor)
-                          </span>
-                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                            Admin
-                          </Badge>
-                        </div>
-
-                        {/* Grid Financeiro Lojafy */}
-                        <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1.5 text-xs py-1">
-                          {/* Venda Lojafy */}
-                          <span className="text-muted-foreground font-medium">Venda Lojafy (Custo Revendedor)</span>
-                          <span className="font-mono text-muted-foreground text-right text-[11px]">R$</span>
-                          <span className="font-mono font-semibold text-foreground text-right tabular-nums">
-                            {formatAmountOnly(pipelineItem?.lojafy_sale || pipelineItem?.seller_cost || 0)}
-                          </span>
-
-                          {/* Taxas Lojafy com Tooltip Informativo */}
-                          <span className="inline-flex items-center gap-1 text-muted-foreground">
-                            <span>Taxas Lojafy</span>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="cursor-help inline-flex items-center">
-                                  <Info className="w-3 h-3 text-muted-foreground/70 hover:text-foreground transition-colors" />
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-[260px] p-2.5 space-y-1.5 text-xs bg-popover text-popover-foreground shadow-md border">
-                                <p className="font-semibold text-foreground text-[11px]">Composição das Taxas (Lojafy):</p>
-                                <div className="space-y-1">
-                                  <div className="flex justify-between text-[11px]">
-                                    <span className="text-muted-foreground">Taxa de transação (4,50%):</span>
-                                    <span className="font-mono text-rose-500 font-medium">
-                                      {formatPrice((pipelineItem?.lojafy_sale || 0) * 0.045)}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between text-[11px]">
-                                    <span className="text-muted-foreground">Contingenciamento (1,00%):</span>
-                                    <span className="font-mono text-rose-500 font-medium">
-                                      {formatPrice(((pipelineItem?.lojafy_sale || 0) * 0.955) * 0.01)}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="border-t border-border/60 pt-1 mt-1 flex justify-between font-semibold text-[11px]">
-                                  <span>Total retido Lojafy:</span>
-                                  <span className="font-mono text-rose-600 dark:text-rose-400">
-                                    -{formatPrice(pipelineItem?.lojafy_fee || 0)}
-                                  </span>
-                                </div>
-                              </TooltipContent>
-                            </Tooltip>
-                          </span>
-                          <span className="font-mono text-rose-600 dark:text-rose-400 text-right text-[11px] font-medium">-R$</span>
-                          <span className="font-mono font-medium text-rose-600 dark:text-rose-400 text-right tabular-nums">
-                            {formatAmountOnly(pipelineItem?.lojafy_fee || 0)}
-                          </span>
-
-                          {/* Custo Fornecedor */}
-                          <span className="text-muted-foreground font-medium">Custo do Fornecedor</span>
-                          <span className="font-mono text-muted-foreground text-right text-[11px]">R$</span>
-                          <span className="font-mono font-semibold text-foreground text-right tabular-nums">
-                            {formatAmountOnly(pipelineItem?.lojafy_cost || 0)}
-                          </span>
-
-                          <Separator className="col-span-3 my-1" />
-
-                          {/* Lucro Líquido Lojafy */}
-                          <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                            <span>Lucro Líquido:</span>
-                            <span className="font-mono text-[11px] font-semibold">
-                              {formatPercent(pipelineItem?.lojafy_margin_pct || 0)}
-                            </span>
-                          </span>
-                          <span className="font-mono text-emerald-600 dark:text-emerald-400 text-right text-[11px] font-bold">R$</span>
-                          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-right tabular-nums text-sm">
-                            {formatAmountOnly(pipelineItem?.lojafy_profit || 0)}
-                          </span>
-                        </div>
-                      </div>
+                    {itemsToRender[0]?.product_id && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 shrink-0 text-muted-foreground hover:text-foreground"
+                        onClick={() => window.open(`/produto/${itemsToRender[0].product_id}`, '_blank')}
+                        title="Ver produto"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </Button>
                     )}
+                  </>
+                )}
+              </div>
 
-                    {/* Detalhamento dos Produtos / Itens do Pedido */}
-                    {order.order_items.length > 0 && (
-                      <div className="rounded-lg border border-border/60 bg-muted/10 p-3 space-y-2">
-                        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
-                          Composição por Item ({order.order_items.length})
+              {/* Coluna Participantes da Operação */}
+              <div className="rounded-lg border border-border/60 bg-muted/15 p-2.5 flex flex-col justify-center space-y-1 text-xs">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">Seller:</span>
+                  <span className="font-bold text-foreground truncate max-w-[200px] text-right" title={pipelineItem?.seller_name}>
+                    {pipelineItem?.seller_name || "Lojafy"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">Cliente:</span>
+                  <span className="font-bold text-foreground truncate max-w-[200px] text-right" title={pipelineItem?.customer_name}>
+                    {pipelineItem?.customer_name || "Cliente Final"}
+                    {(pipelineItem?.customer_city || pipelineItem?.customer_state) && (
+                      <span className="font-normal text-muted-foreground ml-1 text-[10px]">
+                        ({[pipelineItem.customer_city, pipelineItem.customer_state].filter(Boolean).join(" / ")})
+                      </span>
+                    )}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">Fornecedor:</span>
+                  <span className="font-bold text-foreground truncate max-w-[200px] text-right" title={displayedSupplierName}>
+                    {displayedSupplierName}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Decomposição Financeira Completa (Exibida Direto, Sem Abas!) */}
+            <div className={cn(
+              "grid gap-2.5",
+              showAdminMetrics ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
+            )}>
+              {/* Bloco 1: REVENDEDOR */}
+              <div className="rounded-lg border border-border/70 bg-card p-3 shadow-2xs space-y-1.5">
+                <div className="flex items-center justify-between pb-1 border-b border-border/50">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                    <Receipt className="w-3 h-3 text-primary" />
+                    Revendedor
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-mono">
+                    {pipelineItem?.is_marketplace ? "Marketplace (ML)" : "Venda Direta"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1 text-xs">
+                  {/* Venda */}
+                  <span className="text-muted-foreground">Venda</span>
+                  <span className="font-mono text-muted-foreground text-right text-[11px]">R$</span>
+                  <span className="font-mono font-semibold text-foreground text-right tabular-nums">
+                    {formatAmountOnly(pipelineItem?.sale_amount || order?.total_amount || 0)}
+                  </span>
+
+                  {/* Taxas Marketplace com Tooltip Informativo */}
+                  <span className="inline-flex items-center gap-1 text-muted-foreground">
+                    <span>Taxas</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-help inline-flex items-center">
+                          <Info className="w-2.5 h-2.5 text-muted-foreground/70 hover:text-foreground transition-colors" />
                         </span>
-                        <div className="divide-y divide-border/50 text-xs">
-                          {order.order_items.map((item, idx) => {
-                            const prod = item.product_snapshot || {};
-                            const unitPrice = Number(item.unit_price) || 0;
-                            const totalPrice = Number(item.total_price) || unitPrice * item.quantity;
-                            const supplierCost = Number(item.supplier_unit_cost || currentProductCosts[item.product_id] || 0);
-
-                            return (
-                              <div key={item.id || idx} className="py-2 flex items-center justify-between gap-3">
-                                <div className="min-w-0 flex-1">
-                                  <p className="font-medium text-foreground truncate">{prod.name || "Item"}</p>
-                                  <p className="text-[11px] text-muted-foreground">
-                                    {item.quantity} un. x {formatPrice(unitPrice)}
-                                    {supplierCost > 0 && showAdminMetrics && (
-                                      <span> • Custo fornecedor un.: {formatPrice(supplierCost)}</span>
-                                    )}
-                                  </p>
-                                </div>
-                                <div className="text-right shrink-0">
-                                  <span className="font-mono font-semibold text-foreground text-xs block">
-                                    {formatPrice(totalPrice)}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })}
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[240px] p-2 space-y-1 text-xs bg-popover text-popover-foreground shadow-md border">
+                        <p className="font-semibold text-foreground text-[10px]">Composição das Taxas:</p>
+                        <div className="space-y-0.5 text-[10px]">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Tarifa Fixa ML:</span>
+                            <span className="font-mono text-rose-500 font-medium">R$ 6,00</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Comissão ML:</span>
+                            <span className="font-mono text-rose-500 font-medium">
+                              {formatBRL(Math.max(0, (pipelineItem?.marketplace_fee || 0) - 6))}
+                            </span>
+                          </div>
                         </div>
+                        <div className="border-t border-border/60 pt-1 mt-1 flex justify-between font-semibold text-[10px]">
+                          <span>Total Retido ML:</span>
+                          <span className="font-mono text-rose-600 dark:text-rose-400">
+                            -{formatBRL(pipelineItem?.marketplace_fee || 0)}
+                          </span>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </span>
+                  <span className="font-mono text-rose-600 dark:text-rose-400 text-right text-[11px] font-medium">-R$</span>
+                  <span className="font-mono font-medium text-rose-600 dark:text-rose-400 text-right tabular-nums">
+                    {formatAmountOnly(pipelineItem?.marketplace_fee || 0)}
+                  </span>
+
+                  {/* Custo (Preço Cobrado pela Lojafy) */}
+                  <span className="text-muted-foreground">Custo</span>
+                  <span className="font-mono text-muted-foreground text-right text-[11px]">R$</span>
+                  <span className="font-mono font-semibold text-foreground text-right tabular-nums">
+                    {formatAmountOnly(pipelineItem?.seller_cost || 0)}
+                  </span>
+
+                  <Separator className="col-span-3 my-0.5" />
+
+                  {/* Lucro Líquido Revendedor */}
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <span>Lucro Líquido:</span>
+                    <span className="font-mono text-[10px] font-semibold">
+                      {formatPercent(pipelineItem?.seller_margin_pct || 0)}
+                    </span>
+                  </span>
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400 text-right text-[11px] font-bold">R$</span>
+                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-right tabular-nums text-sm">
+                    {formatAmountOnly(pipelineItem?.seller_profit || 0)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Bloco 2: LOJAFY (Exclusivo para SuperAdmin / Admin) */}
+              {showAdminMetrics && (
+                <div className="rounded-lg border border-border/70 bg-muted/20 p-3 shadow-2xs space-y-1.5">
+                  <div className="flex items-center justify-between pb-1 border-b border-border/50">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-primary flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      Lojafy
+                    </span>
+                    <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">
+                      Admin
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1 text-xs">
+                    {/* Venda Lojafy */}
+                    <span className="text-[11px] text-muted-foreground">Venda</span>
+                    <span className="font-mono text-muted-foreground text-right text-[11px]">R$</span>
+                    <span className="font-mono font-medium text-foreground text-right tabular-nums text-[11px]">
+                      {formatAmountOnly(pipelineItem?.lojafy_sale || pipelineItem?.seller_cost || 0)}
+                    </span>
+
+                    {/* Taxas Lojafy com Tooltip */}
+                    <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <span>Taxas</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-help inline-flex items-center">
+                            <Info className="w-2.5 h-2.5 text-muted-foreground/70 hover:text-foreground transition-colors" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[240px] p-2 space-y-1 text-xs bg-popover text-popover-foreground shadow-md border">
+                          <p className="font-semibold text-foreground text-[10px]">Taxas Lojafy:</p>
+                          <div className="space-y-0.5 text-[10px]">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Transação (4,5%):</span>
+                              <span className="font-mono text-rose-500 font-medium">
+                                {formatBRL((pipelineItem?.lojafy_sale || 0) * 0.045)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Contingenciamento (1%):</span>
+                              <span className="font-mono text-rose-500 font-medium">
+                                {formatBRL(((pipelineItem?.lojafy_sale || 0) * 0.955) * 0.01)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="border-t border-border/60 pt-1 mt-1 flex justify-between font-semibold text-[10px]">
+                            <span>Total Lojafy:</span>
+                            <span className="font-mono text-rose-600 dark:text-rose-400">
+                              -{formatBRL(pipelineItem?.lojafy_fee || 0)}
+                            </span>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </span>
+                    <span className="font-mono text-rose-600 dark:text-rose-400 text-right text-[11px] font-medium">-R$</span>
+                    <span className="font-mono font-medium text-rose-600 dark:text-rose-400 text-right tabular-nums text-[11px]">
+                      {formatAmountOnly(pipelineItem?.lojafy_fee || 0)}
+                    </span>
+
+                    {/* Custo Fornecedor */}
+                    <span className="text-[11px] text-muted-foreground">Custo Fornecedor</span>
+                    <span className="font-mono text-muted-foreground text-right text-[11px]">R$</span>
+                    <span className="font-mono font-medium text-foreground text-right tabular-nums text-[11px]">
+                      {formatAmountOnly(pipelineItem?.lojafy_cost || 0)}
+                    </span>
+
+                    <Separator className="col-span-3 my-0.5" />
+
+                    {/* Lucro Líquido Lojafy */}
+                    <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      <span>Lucro Líquido:</span>
+                      <span className="font-mono text-[10px] font-semibold">
+                        {formatPercent(pipelineItem?.lojafy_margin_pct || 0)}
+                      </span>
+                    </span>
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 text-right text-[11px] font-bold">R$</span>
+                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-right tabular-nums text-xs">
+                      {formatAmountOnly(pipelineItem?.lojafy_profit || 0)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 3. Seções Recolhíveis (Anexos, Observações, Histórico e Endereço) */}
+            <Accordion type="multiple" className="w-full space-y-2 pt-0.5">
+              {/* A. Anexos & Etiquetas de Envio */}
+              <AccordionItem value="documents" className="border border-border/60 rounded-lg px-3 bg-muted/10">
+                <AccordionTrigger className="py-2 text-xs font-semibold hover:no-underline">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5 text-primary" />
+                    <span>Anexos & Etiquetas de Envio</span>
+                    {(shippingFiles.length > 0 || refundDocuments.length > 0) && (
+                      <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4">
+                        {shippingFiles.length + refundDocuments.length}
+                      </Badge>
+                    )}
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-1.5 pb-2.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-muted-foreground">Etiquetas Disponíveis:</span>
+                    {canManageShippingFiles && (
+                      <div>
+                        <Input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) setUploadFile(file);
+                          }}
+                          className="hidden"
+                          id="modal-quick-shipping-upload"
+                        />
+                        <Label
+                          htmlFor="modal-quick-shipping-upload"
+                          className="cursor-pointer inline-flex items-center rounded text-xs font-medium border border-input bg-background hover:bg-accent px-2 py-1 gap-1"
+                        >
+                          <Upload className="w-3 h-3" />
+                          <span>Anexar Nova Etiqueta</span>
+                        </Label>
                       </div>
                     )}
                   </div>
-                </TabsContent>
 
-                {/* ============================================================== */}
-                {/* ABA 3 — HISTÓRICO (Timeline Compacta)                          */}
-                {/* ============================================================== */}
-                <TabsContent value="historico" className="space-y-4 mt-0">
-                  <div className="rounded-lg border border-border/60 bg-card p-4">
-                    <div className="flex items-center justify-between pb-3 mb-4 border-b border-border/40">
+                  {uploadFile && canManageShippingFiles && (
+                    <div className="p-2 border rounded bg-muted/40 flex items-center justify-between text-xs">
+                      <span className="truncate max-w-[200px] font-medium">{uploadFile.name}</span>
                       <div className="flex items-center gap-1.5">
-                        <History className="w-4 h-4 text-primary" />
-                        <span className="text-xs font-semibold text-foreground">Timeline de Movimentações</span>
+                        <Button size="sm" className="h-7 text-xs" onClick={() => handleFileUpload(uploadFile)} disabled={isUploading}>
+                          {isUploading ? "Enviando..." : "Confirmar"}
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setUploadFile(null)}>
+                          Cancelar
+                        </Button>
                       </div>
-                      <span className="text-[11px] text-muted-foreground">
-                        {statusHistory.length} evento(s) registrado(s)
-                      </span>
                     </div>
+                  )}
 
-                    {statusHistory.length > 0 ? (
-                      <div className="relative border-l-2 border-border/70 ml-3.5 space-y-4 pl-4 py-1">
-                        {statusHistory.map((item) => (
-                          <div key={item.id} className="relative group">
-                            {/* Marcador na linha */}
-                            <div className="absolute -left-[23px] top-0.5 w-6 h-6 rounded-full bg-primary/10 border-2 border-background text-primary flex items-center justify-center">
-                              {getStatusIcon(item.status)}
-                            </div>
-
-                            <div className="min-w-0 space-y-0.5">
-                              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
-                                <Badge variant={getStatusVariant(item.status)} className="text-[10px] px-1.5 py-0 h-4 font-semibold">
-                                  {getStatusLabel(item.status)}
-                                </Badge>
-                                <span className="text-[11px] font-mono text-muted-foreground">
-                                  {formatDate(item.created_at)}
-                                </span>
-                              </div>
-
-                              {item.notes && (
-                                <p className="text-xs text-muted-foreground mt-1 bg-muted/30 p-2 rounded border border-border/40">
-                                  {item.notes}
-                                </p>
-                              )}
-                            </div>
+                  {shippingFiles.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {shippingFiles.map((file) => (
+                        <div key={file.id} className="flex flex-wrap items-center justify-between gap-2 p-2 border border-border/50 rounded bg-background text-xs">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium truncate">{file.file_name}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {formatFileSize(file.file_size)} • {formatDate(file.uploaded_at)}
+                            </p>
                           </div>
-                        ))}
+                          <div className="flex items-center gap-1">
+                            <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={() => viewShippingFile(file.file_path, file.file_name)}>
+                              <Eye className="w-3 h-3 mr-1" />
+                              Ver
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={() => downloadShippingFile(file.file_path, file.file_name)}>
+                              <Download className="w-3 h-3 mr-1" />
+                              Baixar
+                            </Button>
+                            <Button size="sm" className="h-6 px-2 text-[11px] bg-blue-600 hover:bg-blue-700 text-white" onClick={() => printShippingFile(file.file_path, file.file_name)}>
+                              <Printer className="w-3 h-3 mr-1" />
+                              Imprimir
+                            </Button>
+                            {canManageShippingFiles && (
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-rose-500 hover:text-rose-600 hover:bg-rose-50" onClick={() => deleteShippingFile(file.id, file.file_path)}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground py-1 text-center">Nenhuma etiqueta anexada a este pedido.</p>
+                  )}
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* B. Observações do Pedido & Campo para Anotar */}
+              <AccordionItem value="notes" className="border border-border/60 rounded-lg px-3 bg-muted/10">
+                <AccordionTrigger className="py-2 text-xs font-semibold hover:no-underline">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Observações do Pedido</span>
+                    {(order?.notes || statusHistory.some((h) => h.notes)) && (
+                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-amber-300 text-amber-700">
+                        Possui notas
+                      </Badge>
+                    )}
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-1.5 pb-2.5 space-y-2.5 text-xs">
+                  {/* Notas existentes registradas no pedido */}
+                  {order?.notes && (
+                    <div className="p-2 rounded border border-border/50 bg-background whitespace-pre-wrap text-muted-foreground font-mono text-[11px]">
+                      {order.notes}
+                    </div>
+                  )}
+
+                  {/* Notas do histórico */}
+                  {statusHistory.filter((h) => h.notes).length > 0 && (
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase">Anotações Anteriores:</span>
+                      <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
+                        {statusHistory
+                          .filter((h) => h.notes)
+                          .map((h) => (
+                            <div key={h.id} className="p-1.5 rounded bg-background border border-border/40 text-[11px]">
+                              <p className="text-foreground">{h.notes}</p>
+                              <span className="text-[9px] text-muted-foreground block mt-0.5 font-mono">
+                                {formatDate(h.created_at)}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Campo direto para registrar nova anotação */}
+                  <div className="pt-1 border-t border-border/40 space-y-1.5">
+                    <Label className="text-[11px] font-medium text-foreground">Nova Observação:</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={quickNote}
+                        onChange={(e) => setQuickNote(e.target.value)}
+                        placeholder="Escreva uma anotação sobre o pedido..."
+                        className="h-8 text-xs flex-1 bg-background"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleAddQuickNote();
+                          }
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        className="h-8 px-3 text-xs gap-1 cursor-pointer shrink-0"
+                        onClick={handleAddQuickNote}
+                        disabled={isAddingNote || !quickNote.trim()}
+                      >
+                        {isAddingNote ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Plus className="w-3 h-3" />
+                        )}
+                        <span>Salvar</span>
+                      </Button>
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* C. Histórico de Movimentações */}
+              <AccordionItem value="history" className="border border-border/60 rounded-lg px-3 bg-muted/10">
+                <AccordionTrigger className="py-2 text-xs font-semibold hover:no-underline">
+                  <div className="flex items-center gap-2">
+                    <History className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span>Histórico de Movimentações</span>
+                    {statusHistory.length > 0 && (
+                      <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4">
+                        {statusHistory.length}
+                      </Badge>
+                    )}
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-1.5 pb-2.5 text-xs">
+                  {statusHistory.length > 0 ? (
+                    <div className="relative border-l-2 border-border/70 ml-2.5 space-y-3 pl-3 py-1">
+                      {statusHistory.map((item) => (
+                        <div key={item.id} className="relative">
+                          <div className="absolute -left-[19px] top-0.5 w-5 h-5 rounded-full bg-primary/10 border-2 border-background text-primary flex items-center justify-center">
+                            {getStatusIcon(item.status)}
+                          </div>
+                          <div className="min-w-0 space-y-0.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <Badge variant={getStatusVariant(item.status)} className="text-[9px] px-1 py-0 h-4">
+                                {getStatusLabel(item.status)}
+                              </Badge>
+                              <span className="text-[10px] font-mono text-muted-foreground">
+                                {formatDate(item.created_at)}
+                              </span>
+                            </div>
+                            {item.notes && (
+                              <p className="text-[11px] text-muted-foreground mt-0.5 bg-muted/30 p-1.5 rounded border border-border/40">
+                                {item.notes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center py-2">
+                      Nenhuma movimentação registrada no histórico.
+                    </p>
+                  )}
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* D. Endereço Completo de Entrega */}
+              {(order?.shipping_address || pipelineItem?.customer_city) && (
+                <AccordionItem value="address" className="border border-border/60 rounded-lg px-3 bg-muted/10">
+                  <AccordionTrigger className="py-2 text-xs font-semibold hover:no-underline">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-3.5 h-3.5 text-blue-500" />
+                      <span>Endereço Completo de Entrega</span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-1.5 pb-2.5 text-xs">
+                    {order?.shipping_address ? (
+                      <div className="p-2 rounded border border-border/50 bg-background space-y-0.5 text-[11px]">
+                        {(order.shipping_address.name || order.shipping_address.receiver_name) && (
+                          <p className="font-semibold text-foreground">
+                            Destinatário: {order.shipping_address.name || order.shipping_address.receiver_name}
+                          </p>
+                        )}
+                        <p className="text-foreground">
+                          {[
+                            order.shipping_address.street || order.shipping_address.address,
+                            order.shipping_address.number,
+                            order.shipping_address.complement,
+                          ].filter(Boolean).join(", ")}
+                        </p>
+                        {order.shipping_address.neighborhood && (
+                          <p className="text-muted-foreground">Bairro: {order.shipping_address.neighborhood}</p>
+                        )}
+                        <p className="text-muted-foreground">
+                          {[order.shipping_address.city, order.shipping_address.state].filter(Boolean).join(" - ")}
+                          {order.shipping_address.zip_code && ` • CEP: ${order.shipping_address.zip_code}`}
+                        </p>
                       </div>
                     ) : (
-                      <div className="text-center py-8 text-xs text-muted-foreground">
-                        <Clock className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
-                        <p>Nenhuma movimentação adicional registrada no histórico deste pedido.</p>
-                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Destino: {[pipelineItem?.customer_city, pipelineItem?.customer_state].filter(Boolean).join(" / ")}
+                      </p>
                     )}
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </div>
-          ) : (
-            <div className="text-center py-16 text-muted-foreground text-xs">
-              Pedido não encontrado.
-            </div>
-          )}
+                  </AccordionContent>
+                </AccordionItem>
+              )}
+            </Accordion>
+          </div>
         </TooltipProvider>
       </DialogContent>
     </Dialog>

@@ -736,6 +736,7 @@ const AdminOrders = () => {
         <OrderDetailsModal
           orderId={selectedOrder.id}
           isOpen={!!selectedOrder}
+          initialOrder={pipelineItems.find((p) => p.id === selectedOrder.id)}
           onClose={() => {
             setSelectedOrder(null);
             fetchOrders();

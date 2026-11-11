@@ -72,8 +72,14 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
 
   // Modals
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedPipelineOrder, setSelectedPipelineOrder] = useState<OrderPipelineItem | null>(null);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [archiveModalOrder, setArchiveModalOrder] = useState<OrderPipelineItem | null>(null);
+
+  const handleOpenDetails = (item: OrderPipelineItem) => {
+    setSelectedPipelineOrder(item);
+    setSelectedOrderId(item.id);
+  };
 
   // Pix modal state
   const [pixModalOrder, setPixModalOrder] = useState<OrderPipelineItem | null>(null);
@@ -432,10 +438,10 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
               pipeline={activePipeline}
               orders={filteredOrders}
               onUpdateOrderStatus={onUpdateOrderStatus}
-              onViewDetails={(item) => setSelectedOrderId(item.id)}
+              onViewDetails={handleOpenDetails}
               onGeneratePix={handleGeneratePix}
               onPrintLabel={handlePrintLabel}
-              onGenerateLabel={(item) => setSelectedOrderId(item.id)}
+              onGenerateLabel={handleOpenDetails}
               onArchiveOrder={(item) => setArchiveModalOrder(item)}
             />
           ) : (
@@ -455,10 +461,10 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
               orders={filteredOrders}
               pipeline={activePipeline}
               onUpdateOrderStatus={onUpdateOrderStatus}
-              onViewDetails={(item) => setSelectedOrderId(item.id)}
+              onViewDetails={handleOpenDetails}
               onGeneratePix={handleGeneratePix}
               onPrintLabel={handlePrintLabel}
-              onGenerateLabel={(item) => setSelectedOrderId(item.id)}
+              onGenerateLabel={handleOpenDetails}
               onArchiveOrder={(item) => setArchiveModalOrder(item)}
               onRefreshOrders={onRefreshOrders}
             />
@@ -479,8 +485,10 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
         <OrderDetailsModal
           orderId={selectedOrderId}
           isOpen={!!selectedOrderId}
+          initialOrder={selectedPipelineOrder || undefined}
           onClose={() => {
             setSelectedOrderId(null);
+            setSelectedPipelineOrder(null);
             onRefreshOrders?.();
           }}
         />
