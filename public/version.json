@@ -1,7 +1,7 @@
 {
-  "hash": "db49ac49e47bcd2985aa736bc5ef83074b456327",
-  "shortHash": "db49ac4",
-  "message": "fix(admin): simplificar coluna marketplace para exibir apenas se produto estiver validado/publicado sem duplicacao",
+  "hash": "2d2b0615598c7d2e72d7617794ce9f30fc0ecde5",
+  "shortHash": "2d2b061",
+  "message": "fix(deploy): apply missing ad schema prerequisites",
   "author": "Lojafy Developer",
-  "timestamp": 1794364832669
+  "timestamp": 1794422899190
 }

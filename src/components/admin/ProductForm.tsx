@@ -103,6 +103,26 @@ const productSchema = z.object({
   badge: z.string().optional().or(z.literal('')),
   reference_ad_url: z.string().optional().or(z.literal('')),
   approval_status: z.string().optional().or(z.literal('')),
+}).superRefine((data, ctx) => {
+  const cost = Number(data.cost_price || 0);
+  const price = Number(data.price || 0);
+  const supCost = Number(data.supplier_cost_price || 0);
+
+  if (cost > 0 && price > 0 && price < cost) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'O Preço de Venda da Lojafy não pode ser menor que o Preço de Custo (repasse ao fornecedor).',
+      path: ['price'],
+    });
+  }
+
+  if (supCost > 0 && cost > 0 && cost < supCost) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'O Preço de Venda do Fornecedor não pode ser menor que o Custo de Produção dele.',
+      path: ['cost_price'],
+    });
+  }
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -436,7 +456,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
     else if (rounding === '99') calculated = Math.ceil(calculated - 0.99) + 0.99;
     else calculated = Math.round(calculated * 100) / 100;
 
-    return calculated;
+    // Regra do Sistema: O Preço de Venda da Lojafy NUNCA pode ser menor que o repasse do fornecedor
+    return Math.max(calculated, costPrice);
   };
 
   useEffect(() => {
@@ -1053,9 +1074,11 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
     pricing: {
       id: 'pricing',
       label: 'Preços',
-      isComplete: Number(form.watch('cost_price') || 0) > 0,
+      isComplete: Number(form.watch('cost_price') || 0) > 0 && Number(form.watch('price') || 0) > 0,
       hasError: !!formErrors.cost_price || !!formErrors.price,
-      summaryText: `Custo R$ ${Number(form.watch('cost_price') || 0).toFixed(2)} | Venda R$ ${Number(form.watch('price') || 0).toFixed(2)}`,
+      summaryText: Number(form.watch('supplier_cost_price') || 0) > 0
+        ? `Custo Forn. R$ ${Number(form.watch('supplier_cost_price') || 0).toFixed(2)} | Repasse R$ ${Number(form.watch('cost_price') || 0).toFixed(2)} | Venda Lojafy R$ ${Number(form.watch('price') || 0).toFixed(2)}`
+        : `Repasse Forn. R$ ${Number(form.watch('cost_price') || 0).toFixed(2)} | Venda Lojafy R$ ${Number(form.watch('price') || 0).toFixed(2)}`,
     },
     stock: {
       id: 'stock',

@@ -184,7 +184,7 @@ export const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
                     </FormControl>
                     <SelectContent className="max-h-60 overflow-y-auto">
                       <SelectItem value="none" className="text-xs font-medium text-muted-foreground">
-                        Nenhum (Catálogo Próprio Loja FAI)
+                        Nenhum (Catálogo Próprio Lojafy)
                       </SelectItem>
                       {supplierOrganizations?.map((sup: any) => (
                         <SelectItem key={sup.id} value={sup.id} className="text-xs">
