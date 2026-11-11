@@ -14,6 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { 
   Package, Megaphone, Plus, Search, Filter, Sparkles, Store, Copy, Edit3, PauseCircle, 
@@ -25,7 +26,7 @@ import { AiVariationModal } from './AiVariationModal';
 import { AdHistoryModal } from './AdHistoryModal';
 import { useSupplierOrganization } from '@/hooks/supplier/useSupplierOrganization';
 import { useMercadoLivreIntegration } from '@/hooks/useMercadoLivreIntegration';
-import { getProductMarketplaceLinks } from '@/utils/marketplaceLinks';
+import { getProductMarketplaceLinks, getProductMarketplaceValidations } from '@/utils/marketplaceLinks';
 
 interface MetaAdsManagerViewProps {
   roleMode?: 'admin' | 'supplier' | 'reseller';
@@ -486,7 +487,8 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                 marketplace,
                 listing_id,
                 listing_status,
-                listing_url
+                listing_url,
+                is_validated
               )
             )
           `)
@@ -519,7 +521,8 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
             marketplace,
             listing_id,
             listing_status,
-            listing_url
+            listing_url,
+            is_validated
           ),
           supplier_organization:supplier_organizations!supplier_organization_id (
             id,
@@ -1342,6 +1345,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                       paginatedProducts.map((product: any) => {
                         const isSelected = selectedProductIds.includes(product.id);
                         const adsCount = ads.filter((ad: any) => ad.product_id === product.id || ad.product?.id === product.id).length;
+                        const mkpValidations = getProductMarketplaceValidations(product, publishedProducts, ads);
                         const mkpLinks = getProductMarketplaceLinks(product, ads, publishedProducts);
 
                         return (
@@ -1379,31 +1383,47 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
                             {/* Marketplace */}
                             <TableCell>
-                              {mkpLinks.length > 0 ? (
+                              {mkpValidations.length > 0 ? (
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  {mkpLinks.map((link, lIdx) => (
-                                    <a
-                                      key={lIdx}
-                                      href={link.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      title={`Abrir anúncio no ${link.name}`}
-                                      className="inline-flex items-center gap-1 p-1 hover:bg-muted/80 rounded transition-colors group"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      {link.badgeIcon ? (
-                                        <img src={link.badgeIcon} alt={link.name} className="h-4 object-contain" />
-                                      ) : (
-                                        <Badge variant="outline" className="text-[10px] py-0 px-1 font-medium bg-amber-50 text-amber-800 border-amber-300">
-                                          {link.name}
-                                        </Badge>
-                                      )}
-                                      <ExternalLink className="h-3 w-3 text-muted-foreground group-hover:text-foreground" />
-                                    </a>
+                                  {mkpValidations.map((val) => (
+                                    <TooltipProvider key={val.marketplace}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          {val.url ? (
+                                            <a
+                                              href={val.url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 dark:text-amber-200 border-amber-500/30 transition-colors group cursor-pointer"
+                                              onClick={(e) => e.stopPropagation()}
+                                            >
+                                              <img src={val.badgeIcon} alt={val.name} className="h-3.5 w-auto object-contain" />
+                                              <span className="text-[11px] font-semibold">
+                                                {val.status === 'published' ? 'Ativo' : 'Validado'}
+                                              </span>
+                                              <ExternalLink className="h-3 w-3 text-amber-700/80 group-hover:text-amber-900 dark:text-amber-300" />
+                                            </a>
+                                          ) : (
+                                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30">
+                                              <img src={val.badgeIcon} alt={val.name} className="h-3.5 w-auto object-contain" />
+                                              <span className="text-[11px] font-semibold">Validado</span>
+                                            </div>
+                                          )}
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p className="text-xs font-semibold">{val.name} - {val.statusLabel}</p>
+                                          {val.url ? (
+                                            <p className="text-[10px] text-muted-foreground">Clique para abrir o anúncio ativo</p>
+                                          ) : (
+                                            <p className="text-[10px] text-muted-foreground">Produto validado para envio ao marketplace</p>
+                                          )}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
                                   ))}
                                 </div>
                               ) : (
-                                <span className="text-xs text-muted-foreground">-</span>
+                                <span className="text-xs text-muted-foreground font-mono">-</span>
                               )}
                             </TableCell>
 

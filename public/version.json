@@ -1,7 +1,7 @@
 {
-  "hash": "7ebd3df7e2a0389d7165c99ce97e095df679878b",
-  "shortHash": "7ebd3df",
-  "message": "fix(payment): use only existing columns in public-order-payment query",
+  "hash": "d059e5b9cbf03cfd1f7182e0669242997fe80d81",
+  "shortHash": "d059e5b",
+  "message": "feat(payment): add Fornecedor Nacional store header logo and auto popup explaining pending shipping label verification",
   "author": "Lojafy Developer",
-  "timestamp": 1794322507670
+  "timestamp": 1794363377355
 }
