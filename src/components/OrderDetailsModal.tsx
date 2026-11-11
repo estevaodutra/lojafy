@@ -1,20 +1,59 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Package, Eye, Truck, CheckCircle, Clock, XCircle, MapPin, CreditCard, Calendar, User, FileText, Download, Upload, TrendingUp, MessageSquarePlus, Send, Loader2, RefreshCw, Trash2, Printer, ExternalLink } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  Package,
+  Eye,
+  Truck,
+  Check,
+  CheckCircle,
+  Clock,
+  XCircle,
+  MapPin,
+  CreditCard,
+  Calendar,
+  User,
+  FileText,
+  Download,
+  Upload,
+  TrendingUp,
+  MessageSquarePlus,
+  Send,
+  Loader2,
+  RefreshCw,
+  Trash2,
+  Printer,
+  ExternalLink,
+  Copy,
+  Link2,
+  QrCode,
+  Info,
+  ArrowRight,
+  ShieldCheck,
+  Receipt,
+  History,
+} from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { OpenTicketButton } from '@/components/order-tickets/OpenTicketButton';
 import { getAvailableTicketTypes } from '@/types/orderTickets';
 import { getStatusConfig, getStatusLabel as gslFn, getStatusVariant as gsvFn } from '@/constants/orderStatus';
 import { OrderActionBar } from '@/components/order-details/OrderActionBar';
 import { RelatedTickets } from '@/components/order-details/RelatedTickets';
+import { normalizeOrderToPipelineItem } from '@/utils/orderPipelineAdapter';
+import { OrderPipelineItem } from '@/types/orderPipeline';
+import { cn } from '@/lib/utils';
+import { toast as sonnerToast } from 'sonner';
+
 interface OrderItem {
   id: string;
   product_id: string;
@@ -22,7 +61,11 @@ interface OrderItem {
   unit_price: number;
   total_price: number;
   product_snapshot?: any;
+  supplier_unit_cost?: number;
+  supplier_id?: string;
+  supplier_organization_id?: string;
 }
+
 interface OrderFinancials {
   totalCost: number;
   subtotal: number;
@@ -32,12 +75,14 @@ interface OrderFinancials {
   netProfit: number;
   profitMargin: number;
 }
+
 interface OrderStatusHistory {
   id: string;
   status: string;
   notes?: string;
   created_at: string;
 }
+
 interface Order {
   id: string;
   order_number: string;
@@ -47,20 +92,32 @@ interface Order {
   total_amount: number;
   shipping_amount?: number;
   tax_amount?: number;
+  marketplace_fee?: number;
   created_at: string;
   tracking_number?: string;
+  external_reference?: string;
+  ml_order_id?: string;
+  ml_shipment_id?: string;
+  marketplace?: string;
+  channel?: string;
+  origin_type?: string;
   shipping_address?: any;
   billing_address?: any;
   notes?: string;
   user_id: string;
+  reseller_id?: string;
+  supplier_organization_id?: string;
+  supplier_name?: string;
   order_items: OrderItem[];
 }
+
 interface CustomerProfile {
   first_name: string;
   last_name: string;
   cpf?: string;
   phone?: string;
 }
+
 interface ShippingFile {
   id: string;
   file_name: string;
@@ -68,6 +125,7 @@ interface ShippingFile {
   file_size: number;
   uploaded_at: string;
 }
+
 interface RefundDocument {
   id: string;
   file_name: string;
@@ -88,13 +146,18 @@ interface OrderDetailsModalProps {
   orderId: string | null;
   isOpen: boolean;
   onClose: () => void;
+  initialOrder?: OrderPipelineItem;
 }
+
 const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   orderId,
   isOpen,
-  onClose
+  onClose,
+  initialOrder,
 }) => {
+  const [activeTab, setActiveTab] = useState<'geral' | 'financeiro' | 'historico'>('geral');
   const [order, setOrder] = useState<Order | null>(null);
+  const [pipelineItem, setPipelineItem] = useState<OrderPipelineItem | null>(initialOrder || null);
   const [customer, setCustomer] = useState<CustomerProfile | null>(null);
   const [statusHistory, setStatusHistory] = useState<OrderStatusHistory[]>([]);
   const [shippingFiles, setShippingFiles] = useState<ShippingFile[]>([]);
@@ -110,17 +173,20 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const [webhookLog, setWebhookLog] = useState<WebhookLogInfo | null>(null);
   const [webhookLoading, setWebhookLoading] = useState(false);
   const [isDispatchingWebhook, setIsDispatchingWebhook] = useState(false);
-  const {
-    toast
-  } = useToast();
-  const {
-    profile
-  } = useAuth();
+  const [copiedOrderId, setCopiedOrderId] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const { toast } = useToast();
+  const { profile } = useAuth();
+  const { role, isSuperAdmin, isSupplier, isReseller, isCustomer } = useUserRole();
+
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
-  const isSupplier = profile?.role === 'supplier';
-  const canManageShippingFiles = isAdmin || isSupplier;
+  const showAdminMetrics = isSuperAdmin() || isAdmin;
+  const canManageShippingFiles = isAdmin || isSupplier();
+
   useEffect(() => {
     if (orderId && isOpen) {
+      setActiveTab('geral');
       fetchOrderDetails();
       fetchStatusHistory();
       fetchShippingFiles();
@@ -134,6 +200,8 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       setExistingTicketId(null);
       setDeliveredAt(null);
       setWebhookLog(null);
+      setOrder(null);
+      setPipelineItem(null);
     }
   }, [orderId, isOpen, isAdmin]);
 
@@ -173,7 +241,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     if (!orderId) return;
     setWebhookLoading(true);
     try {
-      // Buscar logs de webhook para este pedido usando textSearch no payload
       const { data, error } = await supabase
         .from('webhook_dispatch_logs')
         .select('id, dispatched_at, status_code, error_message, payload')
@@ -187,7 +254,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         return;
       }
 
-      // Filtrar manualmente para encontrar o log do pedido específico
       const matchingLog = data?.find((log: any) => {
         const payload = log.payload;
         return payload?.data?.order_id === orderId;
@@ -243,7 +309,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         description: `Webhook order.paid disparado para o pedido ${data?.order_number || orderId}`,
       });
 
-      // Recarregar o log de webhook
       await fetchWebhookLog();
     } catch (error: any) {
       console.error('Erro ao disparar webhook:', error);
@@ -261,25 +326,29 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     if (!orderId) return;
     setLoading(true);
     try {
-      const {
-        data,
-        error
-      } = await supabase.from('orders').select(`
-        *,
-        order_items (
-          id,
-          product_id,
-          quantity,
-          unit_price,
-          total_price,
-          product_snapshot,
-          supplier_unit_cost
-        )
-      `).eq('id', orderId).single();
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (
+            id,
+            product_id,
+            quantity,
+            unit_price,
+            total_price,
+            product_snapshot,
+            supplier_unit_cost,
+            supplier_id,
+            supplier_organization_id
+          )
+        `)
+        .eq('id', orderId)
+        .single();
+
       if (error) throw error;
       setOrder(data);
 
-      // Fetch customer profile (with multi-layer fallback for suppliers)
+      // Customer resolution
       let resolvedCustomer: any = null;
       if (data?.user_id) {
         const { data: profileData } = await supabase
@@ -290,101 +359,118 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         resolvedCustomer = profileData;
       }
 
-      // Fallback 1: Extract from shipping_address or billing_address
-      if (!resolvedCustomer || (!resolvedCustomer.first_name && !resolvedCustomer.last_name)) {
-        const parseAddr = (addr: any) => {
-          if (!addr) return null;
-          if (typeof addr === 'string') {
-            try { return JSON.parse(addr); } catch (e) { return null; }
-          }
-          if (typeof addr === 'object') return addr;
-          return null;
-        };
+      // Fallback: shipping_address
+      const parseAddr = (addr: any) => {
+        if (!addr) return null;
+        if (typeof addr === 'string') {
+          try { return JSON.parse(addr); } catch { return null; }
+        }
+        if (typeof addr === 'object') return addr;
+        return null;
+      };
 
-        const sa = parseAddr(data.shipping_address) || parseAddr(data.billing_address);
-        if (sa) {
-          let firstName = sa.first_name || '';
-          let lastName = sa.last_name || '';
-          if (!firstName && !lastName) {
-            const fullName = sa.name || sa.full_name || sa.recipient_name || sa.customer_name || sa.contact_name || sa.receiver_name;
-            if (fullName && typeof fullName === 'string' && fullName.trim()) {
-              const parts = fullName.trim().split(' ');
-              firstName = parts[0];
-              lastName = parts.slice(1).join(' ');
-            }
-          }
-          if (firstName || lastName) {
-            resolvedCustomer = {
-              first_name: firstName,
-              last_name: lastName,
-              cpf: sa.cpf || sa.document || sa.tax_id || resolvedCustomer?.cpf || null,
-              phone: sa.phone || sa.telephone || sa.mobile || resolvedCustomer?.phone || null,
-            };
+      const sa = parseAddr(data.shipping_address) || parseAddr(data.billing_address);
+      if (sa && (!resolvedCustomer || (!resolvedCustomer.first_name && !resolvedCustomer.last_name))) {
+        let firstName = sa.first_name || '';
+        let lastName = sa.last_name || '';
+        if (!firstName && !lastName) {
+          const fullName = sa.name || sa.full_name || sa.recipient_name || sa.customer_name || sa.receiver_name;
+          if (fullName && typeof fullName === 'string' && fullName.trim()) {
+            const parts = fullName.trim().split(' ');
+            firstName = parts[0];
+            lastName = parts.slice(1).join(' ');
           }
         }
-      }
-
-      // Fallback 2: Edge Function invoke (uses Service Role Key to fetch profile bypassing RLS)
-      if ((!resolvedCustomer || (!resolvedCustomer.first_name && !resolvedCustomer.last_name)) && orderId) {
-        try {
-          const { data: webhookRes } = await supabase.functions.invoke('dispatch-order-webhook', {
-            body: { order_id: orderId }
-          });
-          if (webhookRes?.customer?.name) {
-            const parts = String(webhookRes.customer.name).trim().split(' ');
-            resolvedCustomer = {
-              first_name: parts[0] || 'Cliente',
-              last_name: parts.slice(1).join(' ') || '',
-              phone: webhookRes.customer.phone || null,
-              cpf: resolvedCustomer?.cpf || null,
-            };
-          }
-        } catch (e) {
-          console.error('Error fetching customer via edge function:', e);
+        if (firstName || lastName) {
+          resolvedCustomer = {
+            first_name: firstName,
+            last_name: lastName,
+            cpf: sa.cpf || sa.document || resolvedCustomer?.cpf || null,
+            phone: sa.phone || sa.telephone || resolvedCustomer?.phone || null,
+          };
         }
       }
 
       setCustomer(resolvedCustomer);
 
-      // Custos vêm congelados de order_items.supplier_unit_cost (fallback: snapshot da compra)
+      // Costs map
       const costsMap: Record<string, number> = {};
-      data.order_items.forEach((item: any) => {
+      data.order_items?.forEach((item: any) => {
         if (item.supplier_unit_cost != null) {
           costsMap[item.product_id] = Number(item.supplier_unit_cost);
         }
       });
       setCurrentProductCosts(costsMap);
+
+      // Resolve Seller Name
+      let resolvedSellerName = "Lojafy";
+      if (data?.reseller_id) {
+        const { data: rProfile } = await supabase
+          .from('profiles')
+          .select('business_name, first_name, last_name')
+          .eq('user_id', data.reseller_id)
+          .maybeSingle();
+        if (rProfile) {
+          resolvedSellerName = rProfile.business_name || `${rProfile.first_name || ''} ${rProfile.last_name || ''}`.trim() || "Revendedor";
+        }
+      }
+
+      // Resolve Supplier Name
+      let resolvedSupplierName = "Fornecedor Nacional";
+      const supplierOrgId = data?.order_items?.[0]?.supplier_organization_id || data?.supplier_organization_id;
+      if (supplierOrgId) {
+        const { data: orgData } = await supabase
+          .from('supplier_organizations')
+          .select('trade_name, name')
+          .eq('id', supplierOrgId)
+          .maybeSingle();
+        if (orgData) {
+          resolvedSupplierName = orgData.trade_name || orgData.name || "Fornecedor";
+        }
+      } else if (data?.supplier_name) {
+        resolvedSupplierName = data.supplier_name;
+      }
+
+      // Normalize into pipeline item to guarantee 100% calculation and visual parity with Kanban Card
+      const orderToNormalize = {
+        ...data,
+        seller_name: resolvedSellerName,
+        supplier_name: resolvedSupplierName,
+        customer_name: resolvedCustomer ? `${resolvedCustomer.first_name || ''} ${resolvedCustomer.last_name || ''}`.trim() : undefined,
+      };
+
+      const normalized = normalizeOrderToPipelineItem(orderToNormalize);
+      setPipelineItem(normalized);
     } catch (error) {
       console.error('Erro ao buscar detalhes do pedido:', error);
     } finally {
       setLoading(false);
     }
   };
+
   const fetchStatusHistory = async () => {
     if (!orderId) return;
     try {
-      const {
-        data,
-        error
-      } = await supabase.from('order_status_history').select('*').eq('order_id', orderId).order('created_at', {
-        ascending: false
-      });
+      const { data, error } = await supabase
+        .from('order_status_history')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: false });
       if (error) throw error;
       setStatusHistory(data || []);
     } catch (error) {
       console.error('Erro ao buscar histórico:', error);
     }
   };
+
   const fetchShippingFiles = async () => {
     if (!orderId) return;
     try {
-      // 1. Direct DB query (returns files when RLS policy grants supplier access)
-      const {
-        data,
-        error
-      } = await supabase.from('order_shipping_files').select('*').eq('order_id', orderId).order('uploaded_at', {
-        ascending: false
-      });
+      const { data, error } = await supabase
+        .from('order_shipping_files')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('uploaded_at', { ascending: false });
 
       if (!error && data && data.length > 0) {
         setShippingFiles(data);
@@ -393,7 +479,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
       const fallbackFiles: ShippingFile[] = [];
 
-      // 2. Fallback to shipment_label_extractions table
       try {
         const { data: extractions } = await supabase
           .from('shipment_label_extractions')
@@ -402,7 +487,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           .order('created_at', { ascending: false });
 
         if (extractions && extractions.length > 0) {
-          const extractionFiles: ShippingFile[] = extractions.map(ext => ({
+          const extractionFiles: ShippingFile[] = extractions.map((ext: any) => ({
             id: ext.id,
             file_name: ext.file_path.split('/').pop() || `etiqueta_${orderId}.pdf`,
             file_path: ext.file_path,
@@ -416,7 +501,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         console.log('Error checking shipment_label_extractions:', e);
       }
 
-      // 3. Storage list fallback
       const buckets = ['shipping-labels', 'shipping-files'];
       for (const bucket of buckets) {
         try {
@@ -447,8 +531,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       console.error('Erro ao buscar arquivos de envio:', error);
     }
   };
+
   const deleteShippingFile = async (fileId: string, filePath: string) => {
-    if (!isAdmin && !isSupplier) return;
+    if (!isAdmin && !isSupplier()) return;
     if (!confirm('Tem certeza que deseja excluir esta etiqueta de envio?')) return;
     
     try {
@@ -459,7 +544,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         
       if (dbError) throw dbError;
       
-      // Attempt to remove from storage (best effort)
       await supabase.storage.from('shipping-files').remove([filePath]);
       await supabase.storage.from('shipping-labels').remove([filePath]);
       
@@ -479,7 +563,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   };
 
   const getShippingFileBlob = async (filePath: string, fileName: string) => {
-    // 0. If filePath is a full HTTP(S) URL
     if (filePath && (filePath.startsWith('http://') || filePath.startsWith('https://'))) {
       try {
         const response = await fetch(filePath);
@@ -494,7 +577,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       }
     }
 
-    // 1. Direct storage download from shipping-labels
     let { data, error } = await supabase.storage.from('shipping-labels').download(filePath);
     if (error && filePath.includes('/')) {
       const pureFileName = filePath.split('/').pop() || fileName;
@@ -505,7 +587,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       }
     }
 
-    // 2. Direct storage download from shipping-files
     if (error || !data) {
       const { data: fData, error: fError } = await supabase.storage.from('shipping-files').download(filePath);
       if (fError && filePath.includes('/')) {
@@ -562,7 +643,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       } else {
         toast({
           title: "Aviso",
-          description: "Pop-up bloqueado. Permita janelas pop-up no navegador para abrir a janela de impressão automaticamente.",
+          description: "Pop-up bloqueado. Permita janelas pop-up no navegador para abrir a janela de impressão.",
         });
       }
     } catch (error: any) {
@@ -599,57 +680,46 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       });
     }
   };
+
   const fetchRefundDocuments = async () => {
     if (!orderId) return;
     try {
-      const {
-        data,
-        error
-      } = await supabase.from('order_refund_documents').select('*').eq('order_id', orderId).order('uploaded_at', {
-        ascending: false
-      });
+      const { data, error } = await supabase
+        .from('order_refund_documents')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('uploaded_at', { ascending: false });
       if (error) throw error;
       setRefundDocuments(data || []);
     } catch (error) {
       console.error('Erro ao buscar documentos de reembolso:', error);
     }
   };
+
   const handleFileUpload = async (file: File) => {
-    if (!orderId || (!isAdmin && !isSupplier)) return;
+    if (!orderId || (!isAdmin && !isSupplier())) return;
     setIsUploading(true);
     try {
-      // Generate unique filename
       const fileExtension = file.name.split('.').pop();
       const fileName = `upload_${Date.now()}.${fileExtension}`;
       const filePath = `${orderId}/${fileName}`;
 
-      // Upload file to Supabase Storage
-      const {
-        data,
-        error: uploadError
-      } = await supabase.storage.from('shipping-files').upload(filePath, file);
-      if (uploadError) {
-        throw uploadError;
-      }
+      const { error: uploadError } = await supabase.storage.from('shipping-files').upload(filePath, file);
+      if (uploadError) throw uploadError;
 
-      // Insert file record into database
-      const {
-        error: dbError
-      } = await supabase.from('order_shipping_files').insert({
+      const { error: dbError } = await supabase.from('order_shipping_files').insert({
         order_id: orderId,
         file_name: file.name,
         file_path: filePath,
         file_size: file.size
       });
-      if (dbError) {
-        throw dbError;
-      }
+      if (dbError) throw dbError;
+
       toast({
         title: "Sucesso",
-        description: "Arquivo enviado com sucesso."
+        description: "Etiqueta enviada com sucesso."
       });
 
-      // Disparar webhook order.updated com event_reason: shipping_label_attached
       supabase.functions.invoke('dispatch-webhook', {
         body: {
           event_type: 'order.updated',
@@ -662,9 +732,8 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             }
           }
         }
-      }).catch(err => console.warn('[OrderDetailsModal] Aviso ao disparar webhook order.updated:', err));
+      }).catch(err => console.warn('[OrderDetailsModal] Aviso webhook order.updated:', err));
 
-      // Refresh shipping files
       fetchShippingFiles();
       setUploadFile(null);
     } catch (error: any) {
@@ -678,6 +747,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       setIsUploading(false);
     }
   };
+
   const handleRefundFileUpload = async (file: File) => {
     if (!orderId || !isAdmin) return;
     setIsRefundUploading(true);
@@ -686,16 +756,10 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       const fileName = `refund_${Date.now()}.${fileExtension}`;
       const filePath = `${orderId}/${fileName}`;
 
-      // Upload to storage
-      const {
-        error: uploadError
-      } = await supabase.storage.from('refund-documents').upload(filePath, file);
+      const { error: uploadError } = await supabase.storage.from('refund-documents').upload(filePath, file);
       if (uploadError) throw uploadError;
 
-      // Insert record
-      const {
-        error: dbError
-      } = await supabase.from('order_refund_documents').insert({
+      const { error: dbError } = await supabase.from('order_refund_documents').insert({
         order_id: orderId,
         file_name: file.name,
         file_path: filePath,
@@ -703,6 +767,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         uploaded_by: profile?.user_id
       });
       if (dbError) throw dbError;
+
       toast({
         title: "Sucesso",
         description: "Comprovante enviado com sucesso."
@@ -720,6 +785,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       setIsRefundUploading(false);
     }
   };
+
   const deleteRefundDocument = async (fileId: string, filePath: string) => {
     if (!isAdmin) return;
     if (!confirm('Tem certeza que deseja excluir este comprovante?')) return;
@@ -733,7 +799,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       if (dbError) throw dbError;
       
       await supabase.storage.from('refund-documents').remove([filePath]);
-      
       setRefundDocuments(prev => prev.filter(f => f.id !== fileId));
       toast({
         title: "Sucesso",
@@ -751,10 +816,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
   const downloadRefundDocument = async (filePath: string, fileName: string) => {
     try {
-      const {
-        data,
-        error
-      } = await supabase.storage.from('refund-documents').download(filePath);
+      const { data, error } = await supabase.storage.from('refund-documents').download(filePath);
       if (error) throw error;
       const blob = new Blob([data]);
       const url = window.URL.createObjectURL(blob);
@@ -778,6 +840,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       });
     }
   };
+
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -785,847 +848,1088 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
+
   const getStatusIcon = (status: string) => {
     const Icon = getStatusConfig(status).icon;
-    return <Icon className="h-4 w-4" />;
+    return <Icon className="h-3.5 w-3.5" />;
   };
-  const getStatusLabel = (status: string) => {
-    return gslFn(status);
-  };
-  const getStatusVariant = (status: string) => {
-    return gsvFn(status);
-  };
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
-    }).format(price);
+    }).format(price || 0);
   };
+
+  const formatAmountOnly = (val: number) =>
+    Math.abs(val || 0).toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+  const formatPercent = (val: number) =>
+    `${(val || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('pt-BR');
+    if (!dateString) return '-';
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return dateString;
+    return d.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
-  const calculateOrderFinancials = (order: Order): OrderFinancials => {
-    // Calcular custo total dos produtos (usando fallback para currentProductCosts)
-    const totalCost = order.order_items.reduce((acc: number, item: OrderItem) => {
-      let costPrice = Number(item.product_snapshot?.cost_price || 0);
 
-      // Fallback para custo atual se não estiver no snapshot
-      if (!costPrice && currentProductCosts[item.product_id]) {
-        costPrice = currentProductCosts[item.product_id];
-      }
-      return acc + costPrice * item.quantity;
-    }, 0);
-
-    // Calcular subtotal (preço de venda dos produtos)
-    const subtotal = order.order_items.reduce((acc: number, item: OrderItem) => {
-      return acc + Number(item.total_price);
-    }, 0);
-    const shippingAmount = Number(order.shipping_amount || 0);
-    const taxAmount = Number(order.tax_amount || 0);
-    const totalRevenue = Number(order.total_amount);
-
-    // Lucro = Receita Total - Custo dos Produtos
-    const netProfit = totalRevenue - totalCost;
-
-    // Margem de lucro = (Lucro / Receita) * 100
-    const profitMargin = totalRevenue > 0 ? netProfit / totalRevenue * 100 : 0;
-    return {
-      totalCost,
-      subtotal,
-      shippingAmount,
-      taxAmount,
-      totalRevenue,
-      netProfit,
-      profitMargin
-    };
+  const handleCopyPaymentLink = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (!order?.id) return;
+    const paymentUrl = `https://lojafy.app/pagamento/${order.id}`;
+    navigator.clipboard.writeText(paymentUrl);
+    setCopiedLink(true);
+    sonnerToast.success("Link de pagamento copiado!");
+    setTimeout(() => setCopiedLink(false), 2000);
   };
-  const calculateProductPriceBreakdown = (item: OrderItem) => {
-    // Tentar obter cost_price do snapshot primeiro, depois do produto atual
-    let costPrice = Number(item.product_snapshot?.cost_price || 0);
-    let isEstimated = false;
-    if (!costPrice && currentProductCosts[item.product_id]) {
-      costPrice = currentProductCosts[item.product_id];
-      isEstimated = true;
+
+  const handleCopyOrderNumber = () => {
+    if (!order?.order_number) return;
+    navigator.clipboard.writeText(order.order_number);
+    setCopiedOrderId(true);
+    sonnerToast.success("Número do pedido copiado!");
+    setTimeout(() => setCopiedOrderId(false), 2000);
+  };
+
+  // Regra de identificação do fornecedor conforme o perfil:
+  // - Cliente: Exibir Lojafy
+  // - Revendedor / Seller: Exibir Lojafy
+  // - Super Admin / Admin: Exibir o nome real do fornecedor vinculado ao pedido
+  // - Fornecedor: Exibir o nome do próprio fornecedor
+  const displayedSupplierName = useMemo(() => {
+    if (isSuperAdmin() || isAdmin) {
+      return pipelineItem?.supplier_name || order?.supplier_name || 'Fornecedor';
     }
-    const salePrice = Number(item.unit_price);
+    if (isSupplier()) {
+      return (
+        profile?.business_name ||
+        `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() ||
+        pipelineItem?.supplier_name ||
+        'Fornecedor'
+      );
+    }
+    // Cliente e Revendedor / Seller veem Lojafy
+    return 'Lojafy';
+  }, [isSuperAdmin, isAdmin, isSupplier, profile, pipelineItem, order]);
 
-    // Percentuais fixos
-    const transactionPercent = 4.5; // Taxa de Transação
-    const contingencyPercent = 1; // Contingenciamento
+  // Fallback data if pipelineItem is still preparing
+  const isPaid = order?.payment_status === 'paid' || order?.status === 'pago';
+  const displayOrderNumber = order?.order_number || pipelineItem?.order_number || orderId?.slice(0, 8);
+  const displayTracking = order?.tracking_number || pipelineItem?.tracking_number;
+  const displayExternalRef =
+    order?.external_reference ||
+    order?.ml_order_id ||
+    pipelineItem?.external_reference;
 
-    // DECOMPOSIÇÃO REVERSA: Partir do preço de venda e descontar taxas até chegar no lucro
-    // 1. Preço de Venda
-    const startPrice = salePrice;
-
-    // 2. Subtrair Taxa de Transação
-    const transactionAmount = salePrice * (transactionPercent / 100);
-    const afterTransaction = salePrice - transactionAmount;
-
-    // 3. Subtrair Contingenciamento
-    const contingencyAmount = afterTransaction * (contingencyPercent / 100);
-    const afterContingency = afterTransaction - contingencyAmount;
-
-    // 4. Subtrair Preço de Custo
-    const afterCost = afterContingency - costPrice;
-
-    // 5. O que sobra é o Lucro Real
-    const realProfit = afterCost;
-    return {
-      costPrice,
-      isEstimated,
-      salePrice: startPrice,
-      transactionPercent,
-      transactionAmount,
-      afterTransaction,
-      contingencyPercent,
-      contingencyAmount,
-      afterContingency,
-      afterCost,
-      realProfit
-    };
-  };
-  if (!order && !loading) {
+  if (!order && !pipelineItem && !loading) {
     return null;
   }
-  return <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <div>
-              <div>Pedido #{order?.order_number}</div>
-              {customer && <div className="text-sm font-normal text-muted-foreground mt-1">
-                  Cliente: {customer.first_name} {customer.last_name}
-                </div>}
-            </div>
-            {order && <Badge variant={getStatusVariant(order.status)} className="flex items-center gap-1">
-                {getStatusIcon(order.status)}
-                {getStatusLabel(order.status)}
-              </Badge>}
-          </DialogTitle>
-        </DialogHeader>
 
-        {/* Action Bar */}
-        {order && profile && (
-          <OrderActionBar
-            order={order}
-            userRole={profile.role || 'customer'}
-            deliveredAt={deliveredAt}
-            existingTicketId={existingTicketId}
-            onRefresh={() => {
-              fetchOrderDetails();
-              fetchStatusHistory();
-              fetchExistingTicket();
-              fetchDeliveredAt();
-            }}
-          />
-        )}
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-3xl sm:max-w-4xl max-h-[92vh] flex flex-col p-0 gap-0 overflow-hidden bg-background">
+        <TooltipProvider>
+          {/* 1. Header Compacto e Limpo */}
+          <DialogHeader className="p-4 sm:p-5 pb-3 border-b bg-muted/20 shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* Identificação Principal & Badges */}
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <DialogTitle className="text-base sm:text-lg font-bold tracking-tight text-foreground flex items-center gap-1.5">
+                    <span>Pedido #{displayOrderNumber}</span>
+                    <button
+                      onClick={handleCopyOrderNumber}
+                      title="Copiar número do pedido"
+                      className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded"
+                    >
+                      {copiedOrderId ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </DialogTitle>
 
-        {loading ? <div className="text-center py-12">
-            <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
-            <p className="text-muted-foreground mt-2">Carregando detalhes...</p>
-          </div> : order ? <div className="space-y-6">
-            {/* Customer Info */}
-            {customer && <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Informações do Cliente
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <p className="font-medium text-muted-foreground">Nome</p>
-                      <p className="font-semibold">{customer.first_name} {customer.last_name}</p>
-                    </div>
-                    {customer.cpf && <div>
-                        <p className="font-medium text-muted-foreground">CPF</p>
-                        <p className="font-semibold">{customer.cpf}</p>
-                      </div>}
-                    {customer.phone && <div>
-                        <p className="font-medium text-muted-foreground">Telefone</p>
-                        <p className="font-semibold">{customer.phone}</p>
-                      </div>}
-                    <div>
-                      <p className="font-medium text-muted-foreground">Total do Pedido</p>
-                      <p className="font-semibold text-lg text-primary">{formatPrice(Number(order.total_amount))}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>}
+                  {/* Status Operacional */}
+                  {order && (
+                    <Badge variant={getStatusVariant(order.status)} className="gap-1 text-[11px] font-medium h-6">
+                      {getStatusIcon(order.status)}
+                      <span>{getStatusLabel(order.status)}</span>
+                    </Badge>
+                  )}
 
-            {/* Order Info */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Data do Pedido
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="font-semibold">{formatDate(order.created_at)}</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <CreditCard className="h-4 w-4" />
-                    Pagamento
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-1">
-                    <p className="font-semibold">
-                      {order.payment_method === 'pix' ? 'PIX' : order.payment_method === 'credit_card' ? 'Cartão de Crédito' : order.payment_method || 'Não informado'}
-                    </p>
-                    <p className={`text-sm ${order.payment_status === 'paid' ? 'text-green-600' : 'text-amber-600'}`}>
-                      {order.payment_status === 'paid' ? 'Pago' : 'Pendente'}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {order.tracking_number && <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <Truck className="h-4 w-4" />
-                      Rastreamento
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="font-semibold">{order.tracking_number}</p>
-                    <Button variant="outline" size="sm" className="mt-2">
-                      Rastrear Pedido
-                    </Button>
-                  </CardContent>
-                </Card>}
-            </div>
-
-            {/* Webhook Status - Only for Admin */}
-            {isAdmin && order.payment_status === 'paid' && (
-              <Card className="border-primary/20">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Send className="h-4 w-4 text-primary" />
-                      Webhook de Pedido Pago
-                    </div>
-                    {webhookLoading ? (
-                      <Badge variant="outline" className="gap-1">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Verificando...
-                      </Badge>
-                    ) : webhookLog ? (
-                      <Badge 
-                        variant={webhookLog.status_code && webhookLog.status_code >= 200 && webhookLog.status_code < 300 ? "default" : "destructive"}
-                        className="gap-1"
-                      >
-                        <CheckCircle className="h-3 w-3" />
-                        Enviado
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="gap-1 text-amber-600 border-amber-300">
-                        <Clock className="h-3 w-3" />
-                        Não enviado
-                      </Badge>
+                  {/* Canal / Plataforma */}
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-[10px] px-2 py-0 font-semibold uppercase tracking-wider h-5",
+                      pipelineItem?.channel === "mercadolivre"
+                        ? "bg-yellow-50 text-yellow-800 border-yellow-300 dark:bg-yellow-950/40 dark:text-yellow-300 dark:border-yellow-800"
+                        : pipelineItem?.channel === "shopee"
+                        ? "bg-orange-50 text-orange-800 border-orange-300 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-800"
+                        : "bg-muted text-muted-foreground"
                     )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {webhookLog ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Último disparo:</span>
-                        <span className="font-medium">{formatDate(webhookLog.dispatched_at)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Status:</span>
-                        <span className={`font-medium ${webhookLog.status_code && webhookLog.status_code >= 200 && webhookLog.status_code < 300 ? 'text-green-600' : 'text-red-600'}`}>
-                          {webhookLog.status_code || 'N/A'}
+                  >
+                    {pipelineItem?.channel_label || order?.marketplace?.toUpperCase() || "LOJAFY"}
+                  </Badge>
+
+                  {/* Origem AUTO / MANUAL */}
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      "text-[10px] px-1.5 py-0 font-semibold tracking-wider h-5",
+                      pipelineItem?.origin_type === "AUTO"
+                        ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300"
+                        : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                    )}
+                  >
+                    {pipelineItem?.origin_type || "AUTO"}
+                  </Badge>
+
+                  {/* Tempo na etapa */}
+                  {pipelineItem?.time_in_stage_display && (
+                    <span className="text-[11px] text-muted-foreground flex items-center gap-1 font-medium">
+                      <Clock className="w-3 h-3 text-muted-foreground/80" />
+                      {pipelineItem.time_in_stage_display}
+                    </span>
+                  )}
+                </div>
+
+                {/* Sublinha de identificadores secundários */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  {displayExternalRef && (
+                    <span className="inline-flex items-center gap-1 font-mono text-[11px] bg-background/80 px-1.5 py-0.5 rounded border border-border/50">
+                      <span className="text-muted-foreground">Ref:</span>
+                      <strong className="text-foreground">{displayExternalRef}</strong>
+                    </span>
+                  )}
+
+                  {displayTracking && (
+                    <span className="inline-flex items-center gap-1 font-mono text-[11px] bg-background/80 px-1.5 py-0.5 rounded border border-border/50">
+                      <Truck className="w-3 h-3 text-blue-500" />
+                      <span>{displayTracking}</span>
+                    </span>
+                  )}
+
+                  {order?.created_at && (
+                    <span className="text-[11px] text-muted-foreground">
+                      Criado em {formatDate(order.created_at)}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Botão de Pagamento Contextual */}
+              <div className="flex items-center gap-2 shrink-0">
+                {isPaid ? (
+                  <Badge
+                    variant="default"
+                    className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-600 text-white font-medium gap-1.5 pointer-events-none select-none shadow-none"
+                  >
+                    <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>Pago ✓</span>
+                  </Badge>
+                ) : isSuperAdmin() || isSupplier() ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 px-3 text-xs font-medium gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 shadow-2xs transition-colors"
+                    onClick={handleCopyPaymentLink}
+                    title="Copiar link da página de checkout/pagamento"
+                  >
+                    {copiedLink ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
+                        <span className="font-semibold">Copiado!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Link2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                        <span>Copiar Link</span>
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 px-3 text-xs font-medium gap-1.5 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-400 border border-amber-500/20"
+                    onClick={handleCopyPaymentLink}
+                  >
+                    <QrCode className="w-3.5 h-3.5" />
+                    <span>Gerar Pix</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Barra de Ações Operacionais (Integrada e Compacta) */}
+            {order && profile && (
+              <div className="pt-2.5 mt-2 border-t border-border/40">
+                <OrderActionBar
+                  order={order}
+                  userRole={profile.role || 'customer'}
+                  deliveredAt={deliveredAt}
+                  existingTicketId={existingTicketId}
+                  onRefresh={() => {
+                    fetchOrderDetails();
+                    fetchStatusHistory();
+                    fetchExistingTicket();
+                    fetchDeliveredAt();
+                  }}
+                />
+              </div>
+            )}
+          </DialogHeader>
+
+          {/* 2. Loading State ou Corpo com Abas */}
+          {loading && !order ? (
+            <div className="text-center py-16">
+              <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+              <p className="text-muted-foreground text-xs mt-3">Carregando detalhes do pedido...</p>
+            </div>
+          ) : order ? (
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+              <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="w-full">
+                {/* Navegação entre as 3 abas */}
+                <TabsList className="grid w-full grid-cols-3 h-9 bg-muted/50 p-1 mb-4">
+                  <TabsTrigger value="geral" className="text-xs font-semibold gap-1.5 data-[state=active]:bg-background">
+                    <Package className="w-3.5 h-3.5" />
+                    <span>Geral</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="financeiro" className="text-xs font-semibold gap-1.5 data-[state=active]:bg-background">
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span>Financeiro</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="historico" className="text-xs font-semibold gap-1.5 data-[state=active]:bg-background">
+                    <History className="w-3.5 h-3.5" />
+                    <span>Histórico</span>
+                    {statusHistory.length > 0 && (
+                      <span className="ml-1 text-[10px] px-1.5 py-0 rounded-full bg-muted-foreground/15 font-mono">
+                        {statusHistory.length}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
+
+                {/* ============================================================== */}
+                {/* ABA 1 — GERAL (Aba inicial padrão)                             */}
+                {/* ============================================================== */}
+                <TabsContent value="geral" className="space-y-4 mt-0">
+                  {/* Seção Produto(s) — Compacta */}
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                      {order.order_items.length > 1 ? `Produtos do Pedido (${order.order_items.length})` : "Produto"}
+                    </span>
+                    <div className="divide-y divide-border/50 rounded-lg border border-border/60 bg-muted/15 overflow-hidden">
+                      {order.order_items.map((item, idx) => {
+                        const prod = item.product_snapshot || {};
+                        const img = prod.image_url || prod.imageUrl || prod.images?.[0] || prod.image;
+                        return (
+                          <div key={item.id || idx} className="p-2.5 sm:p-3 flex items-center gap-3 hover:bg-muted/30 transition-colors">
+                            {/* Miniatura 48px */}
+                            <div className="w-12 h-12 rounded border bg-background overflow-hidden shrink-0 flex items-center justify-center">
+                              {img ? (
+                                <img
+                                  src={img}
+                                  alt={prod.name || "Produto"}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <Package className="w-5 h-5 text-muted-foreground" />
+                              )}
+                            </div>
+
+                            {/* Informações do Produto */}
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-medium text-foreground line-clamp-2 leading-snug">
+                                {prod.name || "Produto"}
+                              </p>
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground mt-0.5">
+                                <span>
+                                  Quantidade: <strong className="text-foreground font-semibold">{item.quantity} un.</strong>
+                                </span>
+                                {prod.sku && (
+                                  <span>• SKU: <span className="font-mono">{prod.sku}</span></span>
+                                )}
+                                {item.unit_price > 0 && (
+                                  <span>• Preço un.: {formatPrice(Number(item.unit_price))}</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Ação: Ver Produto */}
+                            {item.product_id && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 shrink-0 text-muted-foreground hover:text-foreground"
+                                onClick={() => window.open(`/produto/${item.product_id}`, '_blank')}
+                                title="Ver página do produto"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Informações da Operação (Seller, Cliente, Fornecedor) */}
+                  <div className="rounded-lg border border-border/60 bg-muted/15 p-3 space-y-2">
+                    <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                      Participantes da Operação
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-0.5 text-xs">
+                      <div>
+                        <span className="text-[11px] text-muted-foreground block">Seller / Revendedor:</span>
+                        <span className="font-semibold text-foreground truncate block mt-0.5" title={pipelineItem?.seller_name}>
+                          {pipelineItem?.seller_name || "Lojafy"}
                         </span>
                       </div>
-                      {webhookLog.error_message && (
-                        <div className="text-sm text-red-600 bg-red-50 dark:bg-red-950/20 p-2 rounded">
-                          {webhookLog.error_message}
-                        </div>
-                      )}
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="w-full mt-2"
-                        onClick={handleDispatchWebhook}
-                        disabled={isDispatchingWebhook}
-                      >
-                        {isDispatchingWebhook ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Disparando...
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                            Reenviar Webhook
-                          </>
+                      <div>
+                        <span className="text-[11px] text-muted-foreground block">Cliente Final:</span>
+                        <span className="font-semibold text-foreground truncate block mt-0.5" title={pipelineItem?.customer_name}>
+                          {pipelineItem?.customer_name || "Cliente"}
+                        </span>
+                        {(pipelineItem?.customer_city || pipelineItem?.customer_state) && (
+                          <span className="text-[10px] text-muted-foreground block truncate">
+                            {[pipelineItem.customer_city, pipelineItem.customer_state].filter(Boolean).join(" / ")}
+                          </span>
                         )}
+                      </div>
+                      <div>
+                        <span className="text-[11px] text-muted-foreground block">Fornecedor:</span>
+                        <span className="font-semibold text-foreground truncate block mt-0.5" title={displayedSupplierName}>
+                          {displayedSupplierName}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Resumo Financeiro Compacto (Aba Geral) */}
+                  <div className="rounded-lg border border-border/60 bg-muted/15 p-3 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Resumo Financeiro
+                      </span>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-xs text-primary font-medium hover:underline gap-1 cursor-pointer"
+                        onClick={() => setActiveTab('financeiro')}
+                      >
+                        <span>Ver detalhamento completo</span>
+                        <ArrowRight className="w-3 h-3" />
                       </Button>
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <p className="text-sm text-muted-foreground">
-                        O webhook order.paid ainda não foi disparado para este pedido.
-                      </p>
-                      <Button 
-                        variant="default" 
-                        size="sm" 
-                        className="w-full"
-                        onClick={handleDispatchWebhook}
-                        disabled={isDispatchingWebhook}
-                      >
-                        {isDispatchingWebhook ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Disparando...
-                          </>
-                        ) : (
-                          <>
-                            <Send className="h-4 w-4 mr-2" />
-                            Disparar Webhook
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
 
-            {/* Products */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Produtos</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                {order.order_items.map((item, index) => {
-                const product = item.product_snapshot;
-                const breakdown = calculateProductPriceBreakdown(item);
-                return <div key={index} className="pb-4 border-b border-border last:border-0">
-                      <div className="flex items-center gap-4">
-                        {product?.image_url && <img src={product.image_url} alt={product.name} className="w-16 h-16 object-cover rounded-lg" />}
-                        <div className="flex-1">
-                          <h4 className="font-semibold">{product?.name || 'Produto'}</h4>
-                          {product?.brand && <p className="text-sm text-muted-foreground">{product.brand}</p>}
-                          <p className="text-sm text-muted-foreground">
-                            Quantidade: {item.quantity} • Preço unitário: {formatPrice(Number(item.unit_price))}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <p className="font-semibold">{formatPrice(Number(item.total_price))}</p>
-                          </div>
-                          <Button variant="outline" size="sm" onClick={() => window.open(`/produto/${item.product_id}`, '_blank')} title="Ver página do produto">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-0.5 text-xs">
+                      <div className="p-2.5 rounded bg-background border border-border/50">
+                        <span className="text-[11px] text-muted-foreground block">Venda:</span>
+                        <span className="font-mono font-bold text-foreground text-sm block mt-0.5">
+                          {formatBRL(pipelineItem?.sale_amount || order.total_amount)}
+                        </span>
                       </div>
 
-                      {/* Breakdown de Precificação - Apenas para Admin */}
-                      {isAdmin && (
-                        breakdown.costPrice > 0 ? <div className="mt-3 ml-20 p-3 bg-muted/20 rounded-lg border border-border/50">
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-semibold text-muted-foreground">
-                              📊 Composição de Preço (por unidade)
-                            </p>
-                            {breakdown.isEstimated && <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700">
-                                ⚠️ Custo Estimado
-                              </Badge>}
+                      <div className="p-2.5 rounded bg-background border border-border/50">
+                        <span className="text-[11px] text-muted-foreground block">Lucro Líquido:</span>
+                        <span className={cn(
+                          "font-mono font-bold text-sm block mt-0.5",
+                          (pipelineItem?.seller_profit || 0) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                        )}>
+                          {formatBRL(pipelineItem?.seller_profit || 0)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground block font-mono">
+                          Margem: {formatPercent(pipelineItem?.seller_margin_pct || 0)}
+                        </span>
+                      </div>
+
+                      {showAdminMetrics && (
+                        <>
+                          <div className="p-2.5 rounded bg-background border border-border/50">
+                            <span className="text-[11px] text-muted-foreground block">Venda Lojafy:</span>
+                            <span className="font-mono font-bold text-foreground text-sm block mt-0.5">
+                              {formatBRL(pipelineItem?.lojafy_sale || pipelineItem?.seller_cost || 0)}
+                            </span>
                           </div>
-                          <div className="space-y-1 text-sm">
-                            {/* Preço de Venda */}
-                            <div className="flex justify-between font-semibold">
-                              <span>Preço de Venda:</span>
-                              <span className="text-primary">{formatPrice(breakdown.salePrice)}</span>
-                            </div>
-                            
-                            {/* (-) Taxa de Transação */}
-                            <div className="flex justify-between text-orange-600 pl-4">
-                              <span>(-) Taxa de Transação ({breakdown.transactionPercent}%):</span>
-                              <span>
-                                {formatPrice(breakdown.transactionAmount)} 
-                                <span className="text-muted-foreground ml-1">
-                                  ({formatPrice(breakdown.afterTransaction)})
-                                </span>
-                              </span>
-                            </div>
-                            
-                            {/* (-) Contingenciamento */}
-                            <div className="flex justify-between text-blue-600 pl-4">
-                              <span>(-) Contingenciamento de Conta ({breakdown.contingencyPercent}%):</span>
-                              <span>
-                                {formatPrice(breakdown.contingencyAmount)} 
-                                <span className="text-muted-foreground ml-1">
-                                  ({formatPrice(breakdown.afterContingency)})
-                                </span>
-                              </span>
-                            </div>
-                            
-                            {/* (-) Preço de Custo */}
-                            <div className="flex justify-between text-red-600 pl-4">
-                              <span>(-) Preço de Custo do Produto:</span>
-                              <span>
-                                {formatPrice(breakdown.costPrice)} 
-                                <span className="text-green-600 font-semibold ml-1">
-                                  ({formatPrice(breakdown.afterCost)})
-                                </span>
-                              </span>
-                            </div>
-                            
-                            {/* Linha divisória */}
-                            <div className="border-t border-border my-2"></div>
-                            
-                            {/* Lucro */}
-                            <div className="flex justify-between font-semibold text-base text-green-600">
-                              <span className="flex items-center gap-1">
-                                <TrendingUp className="h-4 w-4" />
-                                Lucro:
-                              </span>
-                              <span>{formatPrice(breakdown.realProfit)}</span>
-                            </div>
+
+                          <div className="p-2.5 rounded bg-background border border-border/50">
+                            <span className="text-[11px] text-muted-foreground block">Lucro Lojafy:</span>
+                            <span className={cn(
+                              "font-mono font-bold text-sm block mt-0.5",
+                              (pipelineItem?.lojafy_profit || 0) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                            )}>
+                              {formatBRL(pipelineItem?.lojafy_profit || 0)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground block font-mono">
+                              Margem: {formatPercent(pipelineItem?.lojafy_margin_pct || 0)}
+                            </span>
                           </div>
-                        </div> : <div className="mt-3 ml-20 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-300 dark:border-amber-700">
-                          <p className="text-xs text-amber-700 dark:text-amber-400">
-                            ⚠️ Preço de custo não disponível para este produto
-                          </p>
-                        </div>
+                        </>
                       )}
-                    </div>;
-              })}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Order Summary with Financial Breakdown */}
-            <Card>
-              <CardHeader>
-                <CardTitle>{(isAdmin || isSupplier) ? 'Resumo Financeiro do Pedido' : 'Resumo do Pedido'}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {(isAdmin || isSupplier) ? (
-                  (() => {
-                    const financials = calculateOrderFinancials(order);
-
-                    // Calcular totais agregados com decomposição reversa
-                    const totalSalePrice = financials.subtotal; // Soma dos preços de venda
-
-                    // Taxa de transação sobre o total
-                    const transactionPercent = 4.5;
-                    const transactionAmount = totalSalePrice * (transactionPercent / 100);
-                    const afterTransaction = totalSalePrice - transactionAmount;
-
-                    // Contingenciamento sobre o que sobrou
-                    const contingencyPercent = 1;
-                    const contingencyAmount = afterTransaction * (contingencyPercent / 100);
-                    const afterContingency = afterTransaction - contingencyAmount;
-
-                    // Subtrair custo total
-                    const afterCost = afterContingency - financials.totalCost;
-
-                    // Lucro real dos produtos
-                    const productProfit = afterCost;
-                    return <>
-                      {/* Preço de Venda Total */}
-                      <div className="flex justify-between font-semibold text-base pb-2 border-b">
-                        <span>Preço de Venda:</span>
-                        <span className="text-primary">{formatPrice(totalSalePrice)}</span>
-                      </div>
-
-                      {/* Deduções */}
-                      <div className="space-y-2 pl-4">
-                        <div className="flex justify-between text-sm text-orange-600">
-                          <span>(-) Taxa de Transação ({transactionPercent}%):</span>
-                          <span>
-                            {formatPrice(transactionAmount)}
-                            <span className="text-muted-foreground ml-2">
-                              ({formatPrice(afterTransaction)})
-                            </span>
-                          </span>
-                        </div>
-
-                        <div className="flex justify-between text-sm text-blue-600">
-                          <span>(-) Contingenciamento de Conta ({contingencyPercent}%):</span>
-                          <span>
-                            {formatPrice(contingencyAmount)}
-                            <span className="text-muted-foreground ml-2">
-                              ({formatPrice(afterContingency)})
-                            </span>
-                          </span>
-                        </div>
-
-                        <div className="flex justify-between text-sm text-red-600">
-                          <span>(-) Preço de Custo dos Produtos:</span>
-                          <span>
-                            {formatPrice(financials.totalCost)}
-                            <span className="text-green-600 font-semibold ml-2">
-                              ({formatPrice(afterCost)})
-                            </span>
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Linha divisória */}
-                      <Separator className="my-3" />
-
-                      {/* Informações Adicionais (Frete, Taxas, Receita Total) */}
-                      {Number(order.shipping_amount || 0) > 0 && <>
-                          <Separator className="my-3" />
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between text-muted-foreground">
-                              <span>+ Frete cobrado:</span>
-                              <span className="font-medium">{formatPrice(Number(order.shipping_amount))}</span>
-                            </div>
-                            {Number(order.tax_amount || 0) > 0 && <div className="flex justify-between text-muted-foreground">
-                                <span>+ Taxas adicionais:</span>
-                                <span className="font-medium">{formatPrice(Number(order.tax_amount))}</span>
-                              </div>}
-                            <div className="flex justify-between font-semibold pt-2 border-t">
-                              <span>Receita Total:</span>
-                              <span className="text-primary">{formatPrice(Number(order.total_amount))}</span>
-                            </div>
-                          </div>
-                        </>}
-
-                      {/* Lucro Líquido Final */}
-                      <Separator className="my-3" />
-                      
-                      <div className="space-y-2 bg-green-50 dark:bg-green-950/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
-                        <div className="flex justify-between font-semibold text-base">
-                          <span className="flex items-center gap-2">
-                            <TrendingUp className="h-4 w-4 text-green-600" />
-                            Lucro Líquido Real:
-                          </span>
-                          <span className={(() => {
-                            // Soma dos lucros reais de todos os produtos
-                            const totalRealProfit = order.order_items.reduce((acc, item) => {
-                              const breakdown = calculateProductPriceBreakdown(item);
-                              return acc + (breakdown.realProfit * item.quantity);
-                            }, 0);
-                            return totalRealProfit >= 0 ? "text-green-600" : "text-red-600";
-                          })()}>
-                            {(() => {
-                              // Soma dos lucros reais de todos os produtos
-                              const totalRealProfit = order.order_items.reduce((acc, item) => {
-                                const breakdown = calculateProductPriceBreakdown(item);
-                                return acc + (breakdown.realProfit * item.quantity);
-                              }, 0);
-                              return formatPrice(totalRealProfit);
-                            })()}
-                          </span>
-                        </div>
-                        
-                        <div className="flex justify-between text-sm text-muted-foreground">
-                          <span>Margem de Lucro Real:</span>
-                          <span className={(() => {
-                            const totalRealProfit = order.order_items.reduce((acc, item) => {
-                              const breakdown = calculateProductPriceBreakdown(item);
-                              return acc + (breakdown.realProfit * item.quantity);
-                            }, 0);
-                            const margin = financials.totalRevenue > 0 ? (totalRealProfit / financials.totalRevenue * 100) : 0;
-                            return `font-medium ${margin >= 0 ? "text-green-600" : "text-red-600"}`;
-                          })()}>
-                            {(() => {
-                              const totalRealProfit = order.order_items.reduce((acc, item) => {
-                                const breakdown = calculateProductPriceBreakdown(item);
-                                return acc + (breakdown.realProfit * item.quantity);
-                              }, 0);
-                              const margin = financials.totalRevenue > 0 ? (totalRealProfit / financials.totalRevenue * 100) : 0;
-                              return margin.toFixed(2);
-                            })()}%
-                          </span>
-                        </div>
-                      </div>
-                    </>;
-                  })()
-                ) : (
-                  /* Visualização simplificada para clientes */
-                  <div className="flex justify-between items-center text-lg font-semibold">
-                    <span>Valor:</span>
-                    <span className="text-primary">
-                      {formatPrice(Number(order.total_amount))}
-                    </span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Suporte ao Pedido - Apenas para Clientes com tickets elegíveis */}
-            {(() => {
-              const availableTicketTypes = getAvailableTicketTypes(order.status, order.payment_status, deliveredAt);
-              const showTicketCard = !isAdmin && (existingTicketId || availableTicketTypes.length > 0);
-              
-              return showTicketCard ? (
-                <Card className="border-primary/20 bg-primary/5">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <MessageSquarePlus className="h-4 w-4 text-primary" />
-                      Precisa de Ajuda com Este Pedido?
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Se você teve algum problema com seu pedido, pode abrir um ticket para solicitar reembolso, troca ou cancelamento.
-                    </p>
-                    <OpenTicketButton
-                      orderId={order.id}
-                      orderStatus={order.status}
-                      paymentStatus={order.payment_status}
-                      deliveredAt={deliveredAt}
-                      existingTicketId={existingTicketId}
-                      variant="default"
-                      size="default"
-                      className="w-full"
-                    />
-                  </CardContent>
-                </Card>
-              ) : null;
-            })()}
-
-            {/* Shipping Files */}
-            {(shippingFiles.length > 0 || canManageShippingFiles) && <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Etiquetas de Envio
                     </div>
-                    {canManageShippingFiles && <div className="flex items-center gap-2">
-                        <Input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => {
-                  const file = e.target.files?.[0];
-                  if (file) setUploadFile(file);
-                }} className="hidden" id="file-upload" />
-                        <Label htmlFor="file-upload" className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 py-2">
-                          <Upload className="h-4 w-4 mr-2" />
-                          Enviar Arquivo
-                        </Label>
-                      </div>}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {uploadFile && canManageShippingFiles && <div className="mb-4 p-3 border border-border rounded-lg bg-muted/50">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4" />
-                          <span className="text-sm font-medium">{uploadFile.name}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button size="sm" onClick={() => handleFileUpload(uploadFile)} disabled={isUploading}>
-                            {isUploading ? "Enviando..." : "Confirmar"}
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => setUploadFile(null)}>
-                            Cancelar
-                          </Button>
-                        </div>
-                      </div>
-                    </div>}
-                  
-                  <div className="space-y-3">
-                    {shippingFiles.length > 0 ? shippingFiles.map(file => <div key={file.id} className="flex flex-wrap items-center justify-between gap-2 p-3 border border-border rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center justify-center w-10 h-10 bg-primary/10 rounded-lg">
-                              <FileText className="h-5 w-5 text-primary" />
-                            </div>
-                            <div>
-                              <p className="font-medium">{file.file_name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {formatFileSize(file.file_size)} • Enviado em {formatDate(file.uploaded_at)}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button variant="outline" size="sm" onClick={() => viewShippingFile(file.file_path, file.file_name)}>
-                              <Eye className="h-4 w-4 mr-1" />
-                              Visualizar
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => downloadShippingFile(file.file_path, file.file_name)}>
-                              <Download className="h-4 w-4 mr-1" />
-                              Baixar
-                            </Button>
-                            <Button size="sm" onClick={() => printShippingFile(file.file_path, file.file_name)} className="bg-blue-600 hover:bg-blue-700 text-white">
-                              <Printer className="h-4 w-4 mr-1" />
-                              Imprimir
-                            </Button>
-                            {canManageShippingFiles && (
-                              <Button variant="outline" size="sm" onClick={() => deleteShippingFile(file.id, file.file_path)} className="text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>) : !canManageShippingFiles ? <p className="text-sm text-muted-foreground text-center py-4">
-                        Nenhuma etiqueta disponível para este pedido.
-                      </p> : <p className="text-sm text-muted-foreground text-center py-4">
-                        Nenhuma etiqueta enviada ainda. Use o botão acima para fazer upload.
-                      </p>}
                   </div>
-                </CardContent>
-              </Card>}
 
-            {/* Refund Documents */}
-            {(order.status === 'reembolsado' || refundDocuments.length > 0 || isAdmin || isSupplier) && <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-amber-600" />
-                      Comprovantes de Reembolso (PDF)
-                    </div>
-                    {canManageShippingFiles && <div className="flex items-center gap-2">
-                        <Input type="file" accept=".pdf" onChange={e => {
-                  const file = e.target.files?.[0];
-                  if (file && file.type === 'application/pdf') {
-                    setRefundUploadFile(file);
-                  } else {
-                    toast({
-                      title: "Erro",
-                      description: "Por favor, selecione apenas arquivos PDF.",
-                      variant: "destructive"
-                    });
-                  }
-                }} className="hidden" id="refund-file-upload" />
-                        <Label htmlFor="refund-file-upload" className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 py-2">
-                          <Upload className="h-4 w-4 mr-2" />
-                          Enviar PDF
-                        </Label>
-                      </div>}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {refundUploadFile && canManageShippingFiles && <div className="mb-4 p-3 border border-amber-200 rounded-lg bg-amber-50">
-                      <div className="flex items-center justify-between">
+                  {/* Informações Complementares Recolhíveis (Accordion) */}
+                  <Accordion type="multiple" className="w-full space-y-2 pt-1">
+                    {/* 1. Documentos (Etiquetas & Comprovantes) */}
+                    <AccordionItem value="documents" className="border border-border/60 rounded-lg px-3 bg-muted/10">
+                      <AccordionTrigger className="py-2.5 text-xs font-semibold hover:no-underline">
                         <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-amber-600" />
-                          <span className="text-sm font-medium text-amber-900">{refundUploadFile.name}</span>
+                          <FileText className="w-3.5 h-3.5 text-primary" />
+                          <span>Documentos & Etiquetas</span>
+                          {(shippingFiles.length > 0 || refundDocuments.length > 0) && (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                              {shippingFiles.length + refundDocuments.length}
+                            </Badge>
+                          )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button size="sm" onClick={() => handleRefundFileUpload(refundUploadFile)} disabled={isRefundUploading}>
-                            {isRefundUploading ? "Enviando..." : "Confirmar"}
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => setRefundUploadFile(null)}>
-                            Cancelar
-                          </Button>
-                        </div>
-                      </div>
-                    </div>}
-                  
-                  <div className="space-y-3">
-                    {refundDocuments.length > 0 ? refundDocuments.map(doc => <div key={doc.id} className="flex items-center justify-between p-3 border border-amber-200 rounded-lg bg-amber-50">
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center justify-center w-10 h-10 bg-amber-100 rounded-lg">
-                              <FileText className="h-5 w-5 text-amber-600" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-amber-900">{doc.file_name}</p>
-                              <p className="text-sm text-amber-700">
-                                {formatFileSize(doc.file_size)} • Enviado em {formatDate(doc.uploaded_at)}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" onClick={() => downloadRefundDocument(doc.file_path, doc.file_name)} className="border-amber-300 hover:bg-amber-100">
-                              <Download className="h-4 w-4 mr-2" />
-                              Baixar PDF
-                            </Button>
-                            {canManageShippingFiles && (
-                              <Button variant="outline" size="sm" onClick={() => deleteRefundDocument(doc.id, doc.file_path)} className="text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>) : !canManageShippingFiles ? <p className="text-sm text-muted-foreground text-center py-4">
-                        Nenhum comprovante disponível.
-                      </p> : <p className="text-sm text-muted-foreground text-center py-4">
-                        Nenhum comprovante enviado. Use o botão acima para fazer upload de PDFs.
-                      </p>}
-                  </div>
-                </CardContent>
-              </Card>}
-
-            {/* Addresses */}
-            {(order.shipping_address || order.billing_address) && <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {order.shipping_address && <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm flex items-center gap-2">
-                        <MapPin className="h-4 w-4" />
-                        Endereço de Entrega
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-1 text-sm">
-                      <p>{order.shipping_address.street}, {order.shipping_address.number}</p>
-                      {order.shipping_address.complement && <p>{order.shipping_address.complement}</p>}
-                      <p>{order.shipping_address.neighborhood}</p>
-                      <p>{order.shipping_address.city} - {order.shipping_address.state}</p>
-                      <p>CEP: {order.shipping_address.zip_code}</p>
-                    </CardContent>
-                  </Card>}
-
-                {order.billing_address && <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm flex items-center gap-2">
-                        <CreditCard className="h-4 w-4" />
-                        Endereço de Cobrança
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-1 text-sm">
-                      <p>{order.billing_address.street}, {order.billing_address.number}</p>
-                      {order.billing_address.complement && <p>{order.billing_address.complement}</p>}
-                      <p>{order.billing_address.neighborhood}</p>
-                      <p>{order.billing_address.city} - {order.billing_address.state}</p>
-                      <p>CEP: {order.billing_address.zip_code}</p>
-                    </CardContent>
-                  </Card>}
-              </div>}
-
-            {/* Related Tickets */}
-            <RelatedTickets orderId={order.id} />
-
-            {/* Status History */}
-            {statusHistory.length > 0 && <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Histórico do Pedido
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {statusHistory.map(item => <div key={item.id} className="flex items-start gap-3">
-                        <div className="flex items-center justify-center w-8 h-8 bg-primary/10 rounded-full mt-0.5">
-                          {getStatusIcon(item.status)}
-                        </div>
-                        <div className="flex-1">
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-2 pb-3 space-y-3">
+                        {/* Etiquetas de Envio */}
+                        <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <p className="font-medium">{getStatusLabel(item.status)}</p>
-                            <p className="text-sm text-muted-foreground">{formatDate(item.created_at)}</p>
+                            <span className="text-[11px] font-semibold text-muted-foreground uppercase">Etiquetas de Envio</span>
+                            {canManageShippingFiles && (
+                              <div>
+                                <Input
+                                  type="file"
+                                  accept=".pdf,.jpg,.jpeg,.png"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) setUploadFile(file);
+                                  }}
+                                  className="hidden"
+                                  id="modal-shipping-upload"
+                                />
+                                <Label
+                                  htmlFor="modal-shipping-upload"
+                                  className="cursor-pointer inline-flex items-center rounded text-xs font-medium border border-input bg-background hover:bg-accent px-2 py-1 gap-1"
+                                >
+                                  <Upload className="w-3 h-3" />
+                                  <span>Enviar Etiqueta</span>
+                                </Label>
+                              </div>
+                            )}
                           </div>
-                          {item.notes && <p className="text-sm text-muted-foreground mt-1">{item.notes}</p>}
-                        </div>
-                      </div>)}
-                  </div>
-                </CardContent>
-              </Card>}
 
-            {/* Order Notes */}
-            {order.notes && <Card>
-                <CardHeader>
-                  <CardTitle>Observações</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm">{order.notes}</p>
-                </CardContent>
-              </Card>}
-          </div> : <div className="text-center py-12">
-            <p className="text-muted-foreground">Pedido não encontrado.</p>
-          </div>}
+                          {uploadFile && canManageShippingFiles && (
+                            <div className="p-2 border rounded bg-muted/40 flex items-center justify-between text-xs">
+                              <span className="truncate max-w-[200px] font-medium">{uploadFile.name}</span>
+                              <div className="flex items-center gap-1.5">
+                                <Button size="sm" className="h-7 text-xs" onClick={() => handleFileUpload(uploadFile)} disabled={isUploading}>
+                                  {isUploading ? "Enviando..." : "Confirmar"}
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setUploadFile(null)}>
+                                  Cancelar
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {shippingFiles.length > 0 ? (
+                            <div className="space-y-1.5">
+                              {shippingFiles.map((file) => (
+                                <div key={file.id} className="flex flex-wrap items-center justify-between gap-2 p-2 border border-border/50 rounded bg-background text-xs">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-medium truncate">{file.file_name}</p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                      {formatFileSize(file.file_size)} • {formatDate(file.uploaded_at)}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => viewShippingFile(file.file_path, file.file_name)}>
+                                      <Eye className="w-3 h-3 mr-1" />
+                                      Ver
+                                    </Button>
+                                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => downloadShippingFile(file.file_path, file.file_name)}>
+                                      <Download className="w-3 h-3 mr-1" />
+                                      Baixar
+                                    </Button>
+                                    <Button size="sm" className="h-7 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white" onClick={() => printShippingFile(file.file_path, file.file_name)}>
+                                      <Printer className="w-3 h-3 mr-1" />
+                                      Imprimir
+                                    </Button>
+                                    {canManageShippingFiles && (
+                                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-rose-500 hover:text-rose-600 hover:bg-rose-50" onClick={() => deleteShippingFile(file.id, file.file_path)}>
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground py-2 text-center">Nenhuma etiqueta anexada.</p>
+                          )}
+                        </div>
+
+                        {/* Comprovantes de Reembolso */}
+                        {(order.status === 'reembolsado' || refundDocuments.length > 0 || isAdmin) && (
+                          <div className="pt-2 border-t border-border/40 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 uppercase">Comprovantes de Reembolso (PDF)</span>
+                              {isAdmin && (
+                                <div>
+                                  <Input
+                                    type="file"
+                                    accept=".pdf"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) setRefundUploadFile(file);
+                                    }}
+                                    className="hidden"
+                                    id="modal-refund-upload"
+                                  />
+                                  <Label
+                                    htmlFor="modal-refund-upload"
+                                    className="cursor-pointer inline-flex items-center rounded text-xs font-medium border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 px-2 py-1 gap-1"
+                                  >
+                                    <Upload className="w-3 h-3" />
+                                    <span>Enviar PDF</span>
+                                  </Label>
+                                </div>
+                              )}
+                            </div>
+
+                            {refundUploadFile && isAdmin && (
+                              <div className="p-2 border border-amber-200 rounded bg-amber-50 flex items-center justify-between text-xs">
+                                <span className="truncate max-w-[200px] font-medium text-amber-900">{refundUploadFile.name}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <Button size="sm" className="h-7 text-xs" onClick={() => handleRefundFileUpload(refundUploadFile)} disabled={isRefundUploading}>
+                                    {isRefundUploading ? "Enviando..." : "Confirmar"}
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setRefundUploadFile(null)}>
+                                    Cancelar
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+
+                            {refundDocuments.length > 0 ? (
+                              <div className="space-y-1.5">
+                                {refundDocuments.map((doc) => (
+                                  <div key={doc.id} className="flex items-center justify-between p-2 border border-amber-200/60 rounded bg-amber-50/50 text-xs">
+                                    <div className="min-w-0 flex-1">
+                                      <p className="font-medium text-amber-900 truncate">{doc.file_name}</p>
+                                      <p className="text-[10px] text-amber-700">
+                                        {formatFileSize(doc.file_size)} • {formatDate(doc.uploaded_at)}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <Button variant="outline" size="sm" className="h-7 px-2 text-xs border-amber-300" onClick={() => downloadRefundDocument(doc.file_path, doc.file_name)}>
+                                        <Download className="w-3 h-3 mr-1" />
+                                        Baixar PDF
+                                      </Button>
+                                      {isAdmin && (
+                                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-rose-500" onClick={() => deleteRefundDocument(doc.id, doc.file_path)}>
+                                          <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground py-1 text-center">Nenhum comprovante de reembolso anexado.</p>
+                            )}
+                          </div>
+                        )}
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    {/* 2. Endereço de Entrega */}
+                    {(order.shipping_address || order.billing_address) && (
+                      <AccordionItem value="address" className="border border-border/60 rounded-lg px-3 bg-muted/10">
+                        <AccordionTrigger className="py-2.5 text-xs font-semibold hover:no-underline">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-3.5 h-3.5 text-blue-500" />
+                            <span>Endereço de Entrega</span>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-2 pb-3 text-xs space-y-2">
+                          {order.shipping_address && (
+                            <div className="p-2.5 rounded border border-border/50 bg-background space-y-1">
+                              {order.shipping_address.name || order.shipping_address.receiver_name ? (
+                                <p className="font-semibold text-foreground">
+                                  Destinatário: {order.shipping_address.name || order.shipping_address.receiver_name}
+                                </p>
+                              ) : null}
+                              <p className="text-foreground">
+                                {[
+                                  order.shipping_address.street || order.shipping_address.address,
+                                  order.shipping_address.number,
+                                  order.shipping_address.complement,
+                                ].filter(Boolean).join(", ")}
+                              </p>
+                              {order.shipping_address.neighborhood && (
+                                <p className="text-muted-foreground">Bairro: {order.shipping_address.neighborhood}</p>
+                              )}
+                              <p className="text-muted-foreground">
+                                {[order.shipping_address.city, order.shipping_address.state].filter(Boolean).join(" - ")}
+                                {order.shipping_address.zip_code && ` • CEP: ${order.shipping_address.zip_code}`}
+                              </p>
+                            </div>
+                          )}
+
+                          {order.billing_address && (
+                            <div className="p-2.5 rounded border border-border/50 bg-background space-y-1">
+                              <span className="text-[10px] font-semibold text-muted-foreground uppercase">Endereço de Cobrança:</span>
+                              <p className="text-foreground">
+                                {[
+                                  order.billing_address.street || order.billing_address.address,
+                                  order.billing_address.number,
+                                  order.billing_address.complement,
+                                ].filter(Boolean).join(", ")}
+                              </p>
+                              <p className="text-muted-foreground">
+                                {[order.billing_address.city, order.billing_address.state].filter(Boolean).join(" - ")}
+                                {order.billing_address.zip_code && ` • CEP: ${order.billing_address.zip_code}`}
+                              </p>
+                            </div>
+                          )}
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
+
+                    {/* 3. Observações do Pedido */}
+                    {order.notes && (
+                      <AccordionItem value="notes" className="border border-border/60 rounded-lg px-3 bg-muted/10">
+                        <AccordionTrigger className="py-2.5 text-xs font-semibold hover:no-underline">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-3.5 h-3.5 text-amber-500" />
+                            <span>Observações do Pedido</span>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-2 pb-3">
+                          <div className="p-2.5 rounded border border-border/50 bg-background text-xs whitespace-pre-wrap text-muted-foreground font-mono">
+                            {order.notes}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
+
+                    {/* 4. Webhook de Pedido Pago (Apenas Admin) */}
+                    {isAdmin && isPaid && (
+                      <AccordionItem value="webhook" className="border border-border/60 rounded-lg px-3 bg-muted/10">
+                        <AccordionTrigger className="py-2.5 text-xs font-semibold hover:no-underline">
+                          <div className="flex items-center gap-2">
+                            <Send className="w-3.5 h-3.5 text-primary" />
+                            <span>Webhook de Pedido Pago</span>
+                            {webhookLog ? (
+                              <Badge variant={webhookLog.status_code && webhookLog.status_code >= 200 && webhookLog.status_code < 300 ? "default" : "destructive"} className="text-[10px] px-1.5 py-0 h-4">
+                                {webhookLog.status_code ? `HTTP ${webhookLog.status_code}` : 'Disparado'}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-amber-600">
+                                Pendente
+                              </Badge>
+                            )}
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-2 pb-3 space-y-2 text-xs">
+                          {webhookLog ? (
+                            <div className="p-2.5 rounded border bg-background space-y-1.5">
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Último disparo:</span>
+                                <span className="font-medium">{formatDate(webhookLog.dispatched_at)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Status Code:</span>
+                                <span className={cn(
+                                  "font-mono font-semibold",
+                                  webhookLog.status_code && webhookLog.status_code >= 200 && webhookLog.status_code < 300 ? "text-emerald-600" : "text-rose-600"
+                                )}>
+                                  {webhookLog.status_code || 'N/A'}
+                                </span>
+                              </div>
+                              {webhookLog.error_message && (
+                                <p className="text-rose-600 bg-rose-50 dark:bg-rose-950/20 p-2 rounded text-[11px]">
+                                  {webhookLog.error_message}
+                                </p>
+                              )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full h-7 text-xs mt-2"
+                                onClick={handleDispatchWebhook}
+                                disabled={isDispatchingWebhook}
+                              >
+                                {isDispatchingWebhook ? (
+                                  <>
+                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                    <span>Reenviando...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <RefreshCw className="w-3 h-3 mr-1" />
+                                    <span>Reenviar Webhook</span>
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="p-2.5 rounded border bg-background space-y-2">
+                              <p className="text-muted-foreground text-xs">O webhook order.paid ainda não foi disparado para este pedido.</p>
+                              <Button
+                                size="sm"
+                                className="w-full h-7 text-xs"
+                                onClick={handleDispatchWebhook}
+                                disabled={isDispatchingWebhook}
+                              >
+                                {isDispatchingWebhook ? (
+                                  <>
+                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                    <span>Disparando...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Send className="w-3 h-3 mr-1" />
+                                    <span>Disparar Webhook</span>
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          )}
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
+
+                    {/* 5. Suporte & Tickets Relacionados */}
+                    {order && (
+                      <AccordionItem value="tickets" className="border border-border/60 rounded-lg px-3 bg-muted/10">
+                        <AccordionTrigger className="py-2.5 text-xs font-semibold hover:no-underline">
+                          <div className="flex items-center gap-2">
+                            <MessageSquarePlus className="w-3.5 h-3.5 text-indigo-500" />
+                            <span>Tickets & Suporte</span>
+                            {existingTicketId && (
+                              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-4">
+                                Aberto
+                              </Badge>
+                            )}
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-2 pb-3 space-y-3">
+                          <RelatedTickets orderId={order.id} />
+                          {(() => {
+                            const availableTicketTypes = getAvailableTicketTypes(order.status, order.payment_status, deliveredAt);
+                            const showOpenTicket = !isAdmin && (existingTicketId || availableTicketTypes.length > 0);
+                            return showOpenTicket ? (
+                              <div className="pt-2 border-t border-border/40">
+                                <OpenTicketButton
+                                  orderId={order.id}
+                                  orderStatus={order.status}
+                                  paymentStatus={order.payment_status}
+                                  deliveredAt={deliveredAt}
+                                  existingTicketId={existingTicketId}
+                                  variant="default"
+                                  size="sm"
+                                  className="w-full h-8 text-xs"
+                                />
+                              </div>
+                            ) : null;
+                          })()}
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
+                  </Accordion>
+                </TabsContent>
+
+                {/* ============================================================== */}
+                {/* ABA 2 — FINANCEIRO (Decomposição Completa)                      */}
+                {/* ============================================================== */}
+                <TabsContent value="financeiro" className="space-y-4 mt-0">
+                  <div className="space-y-3">
+                    {/* Bloco 1: REVENDEDOR */}
+                    <div className="rounded-lg border border-border/70 bg-card p-3.5 shadow-2xs space-y-2">
+                      <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <Receipt className="w-3.5 h-3.5 text-primary" />
+                          Revendedor
+                        </span>
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                          {pipelineItem?.is_marketplace ? "Marketplace" : "Venda Direta"}
+                        </Badge>
+                      </div>
+
+                      {/* Grid Financeiro Contábil Alinhado (Estilo Kanban / Google Sheets) */}
+                      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1.5 text-xs py-1">
+                        {/* Venda */}
+                        <span className="text-muted-foreground font-medium">Venda</span>
+                        <span className="font-mono text-muted-foreground text-right text-[11px]">R$</span>
+                        <span className="font-mono font-semibold text-foreground text-right tabular-nums">
+                          {formatAmountOnly(pipelineItem?.sale_amount || order.total_amount)}
+                        </span>
+
+                        {/* Taxas Marketplace com Tooltip Informativo */}
+                        <span className="inline-flex items-center gap-1 text-muted-foreground">
+                          <span>Taxas</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-help inline-flex items-center">
+                                <Info className="w-3 h-3 text-muted-foreground/70 hover:text-foreground transition-colors" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[260px] p-2.5 space-y-1.5 text-xs bg-popover text-popover-foreground shadow-md border">
+                              <p className="font-semibold text-foreground text-[11px]">Composição das Taxas (Marketplace):</p>
+                              {(pipelineItem?.sale_amount || order.total_amount) < 79 ? (
+                                <div className="space-y-1">
+                                  <div className="flex justify-between text-[11px]">
+                                    <span className="text-muted-foreground">Tarifa fixa unitária (&lt; R$ 79):</span>
+                                    <span className="font-mono text-rose-500 font-medium">R$ 6,00</span>
+                                  </div>
+                                  <div className="flex justify-between text-[11px]">
+                                    <span className="text-muted-foreground">Comissão estimada:</span>
+                                    <span className="font-mono text-rose-500 font-medium">
+                                      {formatPrice(Math.max(0, (pipelineItem?.marketplace_fee || 0) - 6))}
+                                    </span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex justify-between text-[11px]">
+                                  <span className="text-muted-foreground">Comissão de categoria:</span>
+                                  <span className="font-mono text-rose-500 font-medium">
+                                    {formatPrice(pipelineItem?.marketplace_fee || 0)}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="border-t border-border/60 pt-1 mt-1 flex justify-between font-semibold text-[11px]">
+                                <span>Total retido pelo Canal:</span>
+                                <span className="font-mono text-rose-600 dark:text-rose-400">
+                                  -{formatPrice(pipelineItem?.marketplace_fee || 0)}
+                                </span>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </span>
+                        <span className="font-mono text-rose-600 dark:text-rose-400 text-right text-[11px] font-medium">-R$</span>
+                        <span className="font-mono font-medium text-rose-600 dark:text-rose-400 text-right tabular-nums">
+                          {formatAmountOnly(pipelineItem?.marketplace_fee || 0)}
+                        </span>
+
+                        {/* Custo (Preço Cobrado pela Lojafy) */}
+                        <span className="text-muted-foreground font-medium">Custo do Produto (Lojafy)</span>
+                        <span className="font-mono text-muted-foreground text-right text-[11px]">R$</span>
+                        <span className="font-mono font-semibold text-foreground text-right tabular-nums">
+                          {formatAmountOnly(pipelineItem?.seller_cost || 0)}
+                        </span>
+
+                        <Separator className="col-span-3 my-1" />
+
+                        {/* Lucro Líquido Revendedor */}
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                          <span>Lucro Líquido:</span>
+                          <span className="font-mono text-[11px] font-semibold">
+                            {formatPercent(pipelineItem?.seller_margin_pct || 0)}
+                          </span>
+                        </span>
+                        <span className="font-mono text-emerald-600 dark:text-emerald-400 text-right text-[11px] font-bold">R$</span>
+                        <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-right tabular-nums text-sm">
+                          {formatAmountOnly(pipelineItem?.seller_profit || 0)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Bloco 2: LOJAFY (Exclusivo para SuperAdmin / Admin) */}
+                    {showAdminMetrics && (
+                      <div className="rounded-lg border border-border/70 bg-muted/20 p-3.5 shadow-2xs space-y-2">
+                        <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-primary" />
+                            Lojafy (Operação & Fornecedor)
+                          </span>
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            Admin
+                          </Badge>
+                        </div>
+
+                        {/* Grid Financeiro Lojafy */}
+                        <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1.5 text-xs py-1">
+                          {/* Venda Lojafy */}
+                          <span className="text-muted-foreground font-medium">Venda Lojafy (Custo Revendedor)</span>
+                          <span className="font-mono text-muted-foreground text-right text-[11px]">R$</span>
+                          <span className="font-mono font-semibold text-foreground text-right tabular-nums">
+                            {formatAmountOnly(pipelineItem?.lojafy_sale || pipelineItem?.seller_cost || 0)}
+                          </span>
+
+                          {/* Taxas Lojafy com Tooltip Informativo */}
+                          <span className="inline-flex items-center gap-1 text-muted-foreground">
+                            <span>Taxas Lojafy</span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="cursor-help inline-flex items-center">
+                                  <Info className="w-3 h-3 text-muted-foreground/70 hover:text-foreground transition-colors" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[260px] p-2.5 space-y-1.5 text-xs bg-popover text-popover-foreground shadow-md border">
+                                <p className="font-semibold text-foreground text-[11px]">Composição das Taxas (Lojafy):</p>
+                                <div className="space-y-1">
+                                  <div className="flex justify-between text-[11px]">
+                                    <span className="text-muted-foreground">Taxa de transação (4,50%):</span>
+                                    <span className="font-mono text-rose-500 font-medium">
+                                      {formatPrice((pipelineItem?.lojafy_sale || 0) * 0.045)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between text-[11px]">
+                                    <span className="text-muted-foreground">Contingenciamento (1,00%):</span>
+                                    <span className="font-mono text-rose-500 font-medium">
+                                      {formatPrice(((pipelineItem?.lojafy_sale || 0) * 0.955) * 0.01)}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="border-t border-border/60 pt-1 mt-1 flex justify-between font-semibold text-[11px]">
+                                  <span>Total retido Lojafy:</span>
+                                  <span className="font-mono text-rose-600 dark:text-rose-400">
+                                    -{formatPrice(pipelineItem?.lojafy_fee || 0)}
+                                  </span>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </span>
+                          <span className="font-mono text-rose-600 dark:text-rose-400 text-right text-[11px] font-medium">-R$</span>
+                          <span className="font-mono font-medium text-rose-600 dark:text-rose-400 text-right tabular-nums">
+                            {formatAmountOnly(pipelineItem?.lojafy_fee || 0)}
+                          </span>
+
+                          {/* Custo Fornecedor */}
+                          <span className="text-muted-foreground font-medium">Custo do Fornecedor</span>
+                          <span className="font-mono text-muted-foreground text-right text-[11px]">R$</span>
+                          <span className="font-mono font-semibold text-foreground text-right tabular-nums">
+                            {formatAmountOnly(pipelineItem?.lojafy_cost || 0)}
+                          </span>
+
+                          <Separator className="col-span-3 my-1" />
+
+                          {/* Lucro Líquido Lojafy */}
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                            <span>Lucro Líquido:</span>
+                            <span className="font-mono text-[11px] font-semibold">
+                              {formatPercent(pipelineItem?.lojafy_margin_pct || 0)}
+                            </span>
+                          </span>
+                          <span className="font-mono text-emerald-600 dark:text-emerald-400 text-right text-[11px] font-bold">R$</span>
+                          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-right tabular-nums text-sm">
+                            {formatAmountOnly(pipelineItem?.lojafy_profit || 0)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Detalhamento dos Produtos / Itens do Pedido */}
+                    {order.order_items.length > 0 && (
+                      <div className="rounded-lg border border-border/60 bg-muted/10 p-3 space-y-2">
+                        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                          Composição por Item ({order.order_items.length})
+                        </span>
+                        <div className="divide-y divide-border/50 text-xs">
+                          {order.order_items.map((item, idx) => {
+                            const prod = item.product_snapshot || {};
+                            const unitPrice = Number(item.unit_price) || 0;
+                            const totalPrice = Number(item.total_price) || unitPrice * item.quantity;
+                            const supplierCost = Number(item.supplier_unit_cost || currentProductCosts[item.product_id] || 0);
+
+                            return (
+                              <div key={item.id || idx} className="py-2 flex items-center justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium text-foreground truncate">{prod.name || "Item"}</p>
+                                  <p className="text-[11px] text-muted-foreground">
+                                    {item.quantity} un. x {formatPrice(unitPrice)}
+                                    {supplierCost > 0 && showAdminMetrics && (
+                                      <span> • Custo fornecedor un.: {formatPrice(supplierCost)}</span>
+                                    )}
+                                  </p>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <span className="font-mono font-semibold text-foreground text-xs block">
+                                    {formatPrice(totalPrice)}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+
+                {/* ============================================================== */}
+                {/* ABA 3 — HISTÓRICO (Timeline Compacta)                          */}
+                {/* ============================================================== */}
+                <TabsContent value="historico" className="space-y-4 mt-0">
+                  <div className="rounded-lg border border-border/60 bg-card p-4">
+                    <div className="flex items-center justify-between pb-3 mb-4 border-b border-border/40">
+                      <div className="flex items-center gap-1.5">
+                        <History className="w-4 h-4 text-primary" />
+                        <span className="text-xs font-semibold text-foreground">Timeline de Movimentações</span>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground">
+                        {statusHistory.length} evento(s) registrado(s)
+                      </span>
+                    </div>
+
+                    {statusHistory.length > 0 ? (
+                      <div className="relative border-l-2 border-border/70 ml-3.5 space-y-4 pl-4 py-1">
+                        {statusHistory.map((item) => (
+                          <div key={item.id} className="relative group">
+                            {/* Marcador na linha */}
+                            <div className="absolute -left-[23px] top-0.5 w-6 h-6 rounded-full bg-primary/10 border-2 border-background text-primary flex items-center justify-center">
+                              {getStatusIcon(item.status)}
+                            </div>
+
+                            <div className="min-w-0 space-y-0.5">
+                              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
+                                <Badge variant={getStatusVariant(item.status)} className="text-[10px] px-1.5 py-0 h-4 font-semibold">
+                                  {getStatusLabel(item.status)}
+                                </Badge>
+                                <span className="text-[11px] font-mono text-muted-foreground">
+                                  {formatDate(item.created_at)}
+                                </span>
+                              </div>
+
+                              {item.notes && (
+                                <p className="text-xs text-muted-foreground mt-1 bg-muted/30 p-2 rounded border border-border/40">
+                                  {item.notes}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-xs text-muted-foreground">
+                        <Clock className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
+                        <p>Nenhuma movimentação adicional registrada no histórico deste pedido.</p>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+          ) : (
+            <div className="text-center py-16 text-muted-foreground text-xs">
+              Pedido não encontrado.
+            </div>
+          )}
+        </TooltipProvider>
       </DialogContent>
-    </Dialog>;
+    </Dialog>
+  );
 };
+
 export default OrderDetailsModal;
