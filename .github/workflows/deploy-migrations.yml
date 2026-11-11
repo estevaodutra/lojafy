@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'supabase/migrations/**'
+      - 'scripts/apply-primary-ads-migration.sh'
       - '.github/workflows/deploy-migrations.yml'
   workflow_dispatch:
 
@@ -26,6 +27,8 @@ jobs:
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p /root/lojafy-deploy/migrations"
           sshpass -p "${{ secrets.VPS_PASSWORD }}" rsync -avz -e "ssh -p 22022 -o StrictHostKeyChecking=no" \
             supabase/migrations/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/root/lojafy-deploy/migrations/
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" rsync -avz -e "ssh -p 22022 -o StrictHostKeyChecking=no" \
+            scripts/apply-primary-ads-migration.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/root/lojafy-deploy/
 
       - name: Aplicar migrations pendentes e recarregar schema cache do PostgREST
         run: |
@@ -48,46 +51,16 @@ jobs:
             fi
           done
 
-          # Esta migração cria o anúncio principal de 1 unidade para os produtos
-          # existentes e instala o gatilho para os produtos novos. Executar uma
-          # única vez, com rollback integral se qualquer comando falhar.
-          PRIMARY_AD_MIGRATION="/root/lojafy-deploy/migrations/20261111130000_product_primary_ads_and_kits.sql"
-          if [ ! -f "$PRIMARY_AD_MIGRATION" ]; then
-            echo "Migração de anúncios principais não encontrada: $PRIMARY_AD_MIGRATION" >&2
-            exit 1
-          fi
-          PRIMARY_AD_APPLIED=$($DC exec -T db psql -U postgres -d postgres -tAc \
-            "SELECT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'create_primary_ad_for_product' AND tgrelid = 'public.products'::regclass)")
-          if [ "$PRIMARY_AD_APPLIED" = "t" ]; then
-            echo "==> Migração de anúncios principais já aplicada"
-          else
-            PRIMARY_AD_PARTIAL=$($DC exec -T db psql -U postgres -d postgres -tAc \
-              "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ml_listing_variants' AND column_name = 'is_primary')")
-            if [ "$PRIMARY_AD_PARTIAL" = "t" ]; then
-              echo "Migração de anúncios principais parcialmente aplicada; revisão manual necessária" >&2
-              exit 1
-            fi
-            echo "==> Aplicando migração de anúncios principais e kits"
-            {
-              printf 'BEGIN;\n'
-              cat "$PRIMARY_AD_MIGRATION"
-              printf '\nCOMMIT;\n'
-            } | $DC exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1
-          fi
-
-          MISSING_PRIMARY_COUNT=$($DC exec -T db psql -U postgres -d postgres -tAc \
-            "SELECT count(*) FROM public.products p WHERE NOT EXISTS (SELECT 1 FROM public.ml_listing_variants a WHERE a.product_id = p.id AND a.is_primary)")
-          echo "==> Produtos sem anúncio principal: $MISSING_PRIMARY_COUNT"
-          if [ "$MISSING_PRIMARY_COUNT" != "0" ]; then
-            echo "Ainda há produtos sem anúncio principal; verificar a fila ad_restructure_review" >&2
-            exit 1
-          fi
-
           echo "==> Recarregando schema cache do PostgREST"
           $DC exec -T db psql -U postgres -d postgres -c "NOTIFY pgrst, 'reload schema';" || true
           $DC restart rest || true
           echo "==> Migrations aplicadas e PostgREST recarregado com sucesso!"
           REMOTE
+
+      - name: Aplicar anúncios principais e conferir todos os produtos
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -p 22022 -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "bash /root/lojafy-deploy/apply-primary-ads-migration.sh"
 
       - name: Limpar arquivos temporários da VPS
         if: always()
