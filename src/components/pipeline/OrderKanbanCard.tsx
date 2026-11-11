@@ -98,29 +98,11 @@ export const OrderKanbanCard = React.memo<OrderKanbanCardProps>(({
     return idx >= 0 ? idx : 0;
   }, [activeStages, order.status, order.active_ticket_status]);
 
-  // Etapas para frente (caminho para frente)
+  // Etapas para frente (caminho para frente na pipeline)
   const forwardStages = useMemo(() => {
     if (!activeStages || currentStageIndex < 0) return [];
-    const rawForward = activeStages.slice(currentStageIndex + 1);
-
-    if (isSupplier()) {
-      const allowed = SUPPLIER_STATUSES as string[];
-      return rawForward.filter((st) => {
-        const key = (st.status_key || "").toLowerCase();
-        const name = st.name.toLowerCase();
-        return (
-          allowed.includes(key) ||
-          name.includes("recebido") ||
-          name.includes("embalado") ||
-          name.includes("enviado") ||
-          name.includes("incorreta") ||
-          name.includes("finalizado")
-        );
-      });
-    }
-
-    return rawForward;
-  }, [activeStages, currentStageIndex, isSupplier]);
+    return activeStages.slice(currentStageIndex + 1);
+  }, [activeStages, currentStageIndex]);
 
   const nextStage = forwardStages[0] || null;
   const canAdvanceStage = (isSuperAdmin() || isSupplier()) && !!nextStage && !!onAdvanceStage;

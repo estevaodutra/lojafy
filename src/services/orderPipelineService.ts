@@ -159,27 +159,83 @@ export const DEFAULT_PIPELINES: OrderPipeline[] = [
 
 export const orderPipelineService = {
   /**
-   * Obtém pipelines e etapas ativas
+   * Garante que os pipelines padrão existam no Supabase
+   */
+  async seedDefaultPipelinesIfEmpty(): Promise<void> {
+    try {
+      const { data: existing, error } = await supabase
+        .from("order_pipelines" as any)
+        .select("id")
+        .limit(1);
+
+      if (error || !existing || existing.length === 0) {
+        // Inserir pipelines
+        await supabase.from("order_pipelines" as any).upsert(
+          DEFAULT_PIPELINES.map((p) => ({
+            id: p.id,
+            key: p.key,
+            name: p.name,
+            description: p.description,
+            order_index: p.order_index,
+            is_active: p.is_active,
+          }))
+        );
+
+        // Inserir etapas
+        const allStages = DEFAULT_PIPELINES.flatMap((p) => p.stages);
+        await supabase.from("order_pipeline_stages" as any).upsert(
+          allStages.map((s) => ({
+            id: s.id,
+            pipeline_id: s.pipeline_id,
+            name: s.name,
+            status_key: s.status_key,
+            order_index: s.order_index,
+            color_class: s.color_class,
+            icon_name: s.icon_name,
+            is_active: s.is_active,
+          }))
+        );
+      }
+    } catch (seedErr) {
+      console.warn("Could not seed default pipelines to Supabase:", seedErr);
+    }
+  },
+
+  /**
+   * Obtém pipelines e etapas ativas (Fonte da Verdade: Supabase)
    */
   async getPipelines(): Promise<OrderPipeline[]> {
     try {
-      // 1. Tentar buscar no Supabase
-      const { data: pipelinesData, error: pError } = await supabase
+      // 1. Buscar pipelines no Supabase
+      let { data: pipelinesData, error: pError } = await supabase
         .from("order_pipelines" as any)
         .select("*")
         .order("order_index", { ascending: true });
 
       if (pError || !pipelinesData || pipelinesData.length === 0) {
-        // Fallback local caso tabela remota não esteja pronta
-        return this.getLocalPipelines();
+        // Tenta semear no banco se estiver vazio
+        await this.seedDefaultPipelinesIfEmpty();
+
+        const retry = await supabase
+          .from("order_pipelines" as any)
+          .select("*")
+          .order("order_index", { ascending: true });
+
+        if (retry.data && retry.data.length > 0) {
+          pipelinesData = retry.data;
+        } else {
+          // Apenas fallback se o banco estiver inacessível
+          return this.getLocalPipelines();
+        }
       }
 
+      // 2. Buscar etapas no Supabase
       const { data: stagesData, error: sError } = await supabase
         .from("order_pipeline_stages" as any)
         .select("*")
         .order("order_index", { ascending: true });
 
-      if (sError || !stagesData) {
+      if (sError || !stagesData || stagesData.length === 0) {
         return this.getLocalPipelines();
       }
 
@@ -204,9 +260,12 @@ export const orderPipelineService = {
           })),
       }));
 
+      // Sincroniza cache local com o Supabase para manter tudo alinhado
+      this.saveLocalPipelines(pipelines);
+
       return pipelines;
     } catch (err) {
-      console.warn("Using local pipeline fallback:", err);
+      console.warn("Using local pipeline fallback due to exception:", err);
       return this.getLocalPipelines();
     }
   },
@@ -232,22 +291,23 @@ export const orderPipelineService = {
   },
 
   /**
-   * Reordena etapas de uma pipeline
+   * Reordena etapas de uma pipeline no Supabase
    */
   async reorderStages(pipelineId: string, orderedStageIds: string[]): Promise<void> {
-    try {
-      const updates = orderedStageIds.map((stageId, index) =>
-        supabase
-          .from("order_pipeline_stages" as any)
-          .update({ order_index: index + 1, updated_at: new Date().toISOString() })
-          .eq("id", stageId)
-      );
-      await Promise.all(updates);
-    } catch {
-      // ignore supabase error if table doesn't exist
+    const updates = orderedStageIds.map((stageId, index) =>
+      supabase
+        .from("order_pipeline_stages" as any)
+        .update({ order_index: index + 1, updated_at: new Date().toISOString() })
+        .eq("id", stageId)
+    );
+    const results = await Promise.all(updates);
+    const hasError = results.find((r) => r.error);
+    if (hasError?.error) {
+      console.error("Erro ao reordenar etapas no Supabase:", hasError.error);
+      throw new Error(hasError.error.message || "Erro ao reordenar etapas no banco de dados.");
     }
 
-    // Persistir localmente também
+    // Persistir no cache local também
     const current = this.getLocalPipelines();
     const updated = current.map((pipe) => {
       if (pipe.id !== pipelineId) return pipe;
@@ -265,9 +325,12 @@ export const orderPipelineService = {
   },
 
   /**
-   * Salva/cria uma etapa (o status do pedido é o nome da etapa)
+   * Salva/cria/renomeia uma etapa no Supabase
+   * O nome da etapa é o status do pedido
    */
-  async saveStage(stage: Partial<OrderPipelineStage> & { pipeline_id: string; name: string; status_key?: string }): Promise<OrderPipelineStage> {
+  async saveStage(
+    stage: Partial<OrderPipelineStage> & { pipeline_id: string; name: string; status_key?: string }
+  ): Promise<OrderPipelineStage> {
     const isNew = !stage.id;
     const stageName = stage.name.trim();
     const stageStatus = stageName;
@@ -290,22 +353,20 @@ export const orderPipelineService = {
         is_active: stage.is_active ?? true,
       };
 
-      try {
-        const { error: insertErr } = await supabase.from("order_pipeline_stages" as any).insert({
-          id: savedStage.id,
-          pipeline_id: savedStage.pipeline_id,
-          name: savedStage.name,
-          status_key: savedStage.status_key,
-          order_index: savedStage.order_index,
-          color_class: savedStage.color_class,
-          icon_name: savedStage.icon_name,
-          is_active: savedStage.is_active,
-        });
-        if (insertErr) {
-          console.warn("order_pipeline_stages insert warning:", insertErr);
-        }
-      } catch (err) {
-        console.warn("order_pipeline_stages insert exception:", err);
+      const { error: insertErr } = await supabase.from("order_pipeline_stages" as any).insert({
+        id: savedStage.id,
+        pipeline_id: savedStage.pipeline_id,
+        name: savedStage.name,
+        status_key: savedStage.status_key,
+        order_index: savedStage.order_index,
+        color_class: savedStage.color_class,
+        icon_name: savedStage.icon_name,
+        is_active: savedStage.is_active,
+      });
+
+      if (insertErr) {
+        console.error("Erro ao criar etapa no Supabase:", insertErr);
+        throw new Error(insertErr.message || "Erro ao salvar nova etapa no banco de dados.");
       }
     } else {
       savedStage = {
@@ -315,44 +376,39 @@ export const orderPipelineService = {
         status_key: stageStatus,
       } as OrderPipelineStage;
 
-      // Se o nome foi alterado, atualizar pedidos vinculados com o nome anterior
+      // Se o nome foi alterado pelo Super Admin, atualizar pedidos vinculados com o nome anterior no Supabase
       if (oldStage && (oldStage.name !== stageName || oldStage.status_key !== stageStatus)) {
         try {
           await supabase
             .from("orders")
-            .update({ status: stageStatus, updated_at: new Date().toISOString() })
+            .update({ status: stageName, updated_at: new Date().toISOString() })
             .or(`status.eq.${oldStage.status_key},status.eq.${oldStage.name}`);
         } catch (err) {
           console.warn("orders status rename error:", err);
         }
       }
 
-      try {
-        const stageUpdatePayload = {
-          name: savedStage.name,
-          status_key: savedStage.status_key,
-          order_index: savedStage.order_index,
-          color_class: savedStage.color_class,
-          icon_name: savedStage.icon_name,
-          is_active: savedStage.is_active,
-          updated_at: new Date().toISOString(),
-        };
+      const stageUpdatePayload = {
+        name: savedStage.name,
+        status_key: savedStage.status_key,
+        order_index: savedStage.order_index,
+        color_class: savedStage.color_class,
+        icon_name: savedStage.icon_name,
+        is_active: savedStage.is_active,
+        updated_at: new Date().toISOString(),
+      };
 
-        const { error: updateErr } = await supabase
-          .from("order_pipeline_stages" as any)
-          .update(stageUpdatePayload)
-          .eq("id", stage.id);
+      const { error: updateErr } = await supabase
+        .from("order_pipeline_stages" as any)
+        .upsert({
+          id: stage.id,
+          pipeline_id: stage.pipeline_id,
+          ...stageUpdatePayload,
+        });
 
-        if (updateErr) {
-          console.warn("order_pipeline_stages update warning, trying upsert:", updateErr);
-          await supabase.from("order_pipeline_stages" as any).upsert({
-            id: stage.id,
-            pipeline_id: stage.pipeline_id,
-            ...stageUpdatePayload,
-          });
-        }
-      } catch (err) {
-        console.warn("order_pipeline_stages update exception:", err);
+      if (updateErr) {
+        console.error("Erro ao atualizar etapa no Supabase:", updateErr);
+        throw new Error(updateErr.message || "Erro ao salvar alterações da etapa no banco de dados.");
       }
     }
 
@@ -387,8 +443,7 @@ export const orderPipelineService = {
   },
 
   /**
-   * Remove ou desativa uma etapa, migrando pedidos para uma etapa de destino se houver pedidos vinculados.
-   * Atende com rigor o Requisito 10: não deixar pedidos órfãos!
+   * Remove ou desativa uma etapa no Supabase, migrando pedidos se houver pedidos vinculados.
    */
   async removeOrDeactivateStage(
     stageId: string,
@@ -417,8 +472,6 @@ export const orderPipelineService = {
 
       if (!updateError) {
         ordersMigrated = currentOrdersCount;
-        
-        // Registrar histórico de migração em lote
         try {
           await supabase.from("order_status_history" as any).insert({
             order_id: null,
@@ -432,17 +485,21 @@ export const orderPipelineService = {
     }
 
     // Deletar ou desativar na base
-    try {
-      if (action === "delete") {
-        await supabase.from("order_pipeline_stages" as any).delete().eq("id", stageId);
-      } else {
-        await supabase
-          .from("order_pipeline_stages" as any)
-          .update({ is_active: false, updated_at: new Date().toISOString() })
-          .eq("id", stageId);
+    if (action === "delete") {
+      const { error: delErr } = await supabase.from("order_pipeline_stages" as any).delete().eq("id", stageId);
+      if (delErr) {
+        console.error("Erro ao deletar etapa no Supabase:", delErr);
+        throw new Error(delErr.message || "Erro ao remover etapa do banco de dados.");
       }
-    } catch {
-      // fallback
+    } else {
+      const { error: deactErr } = await supabase
+        .from("order_pipeline_stages" as any)
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq("id", stageId);
+      if (deactErr) {
+        console.error("Erro ao desativar etapa no Supabase:", deactErr);
+        throw new Error(deactErr.message || "Erro ao desativar etapa do banco de dados.");
+      }
     }
 
     // Atualizar local
@@ -460,9 +517,16 @@ export const orderPipelineService = {
   },
 
   /**
-   * Reseta as pipelines para os padrões iniciais
+   * Reseta as pipelines para os padrões iniciais no Supabase
    */
   async resetToDefaults(): Promise<OrderPipeline[]> {
+    try {
+      await supabase.from("order_pipeline_stages" as any).delete().neq("id", "none");
+      await supabase.from("order_pipelines" as any).delete().neq("id", "none");
+      await this.seedDefaultPipelinesIfEmpty();
+    } catch (err) {
+      console.warn("Reset to defaults Supabase error:", err);
+    }
     this.saveLocalPipelines(DEFAULT_PIPELINES);
     return DEFAULT_PIPELINES;
   },

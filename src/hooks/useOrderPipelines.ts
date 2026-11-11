@@ -24,6 +24,9 @@ export function useOrderPipelines() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["order-pipelines"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["reseller-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["supplier-orders"] });
       toast({
         title: "Ordem salva",
         description: "A ordem das etapas da pipeline foi atualizada.",
@@ -47,9 +50,12 @@ export function useOrderPipelines() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["order-pipelines"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["reseller-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["supplier-orders"] });
       toast({
         title: "Etapa salva",
-        description: "A etapa da pipeline foi salva com sucesso.",
+        description: "A etapa da pipeline foi salva no banco de dados com sucesso.",
       });
     },
     onError: (err: any) => {

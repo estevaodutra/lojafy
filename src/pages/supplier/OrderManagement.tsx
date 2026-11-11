@@ -310,15 +310,6 @@ const SupplierOrderManagement = () => {
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    if (!SUPPLIER_STATUSES.includes(newStatus as OrderStatus)) {
-      toast({
-        title: "Ação não permitida",
-        description: `Fornecedores podem selecionar apenas os status: Recebido, Enviado ou Etiqueta Incorreta.`,
-        variant: "destructive",
-      });
-      return;
-    }
-
     const previousOrders = orders;
     setOrders((prev) =>
       prev.map((o) => (o.order_id === orderId || o.id === orderId ? { ...o, status: newStatus } : o))
@@ -327,7 +318,11 @@ const SupplierOrderManagement = () => {
     try {
       const { error: oErr } = await supabase
         .from("orders")
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .update({
+          status: newStatus,
+          stage_entered_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as any)
         .eq("id", orderId);
 
       if (oErr) throw oErr;
@@ -342,12 +337,12 @@ const SupplierOrderManagement = () => {
         title: "Sucesso",
         description: "Status do pedido atualizado com sucesso.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating order status:", error);
       setOrders(previousOrders);
       toast({
         title: "Erro",
-        description: "Erro ao atualizar status do pedido",
+        description: error?.message || "Erro ao atualizar status do pedido",
         variant: "destructive",
       });
     }

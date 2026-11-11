@@ -182,25 +182,10 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
       return;
     }
 
-    // Validação por perfil
+    // Validação por perfil: Super Admin e Fornecedor podem movimentar cards livremente entre as etapas
     if (role === "reseller") {
       toast.error("Revendedores não podem alterar o status operacional diretamente por arrasto.");
       return;
-    }
-
-    if (isSupplier()) {
-      const allowed = SUPPLIER_STATUSES as string[];
-      const isAllowed =
-        allowed.includes(targetStage.status_key) ||
-        targetStage.name.toLowerCase().includes("recebido") ||
-        targetStage.name.toLowerCase().includes("embalado") ||
-        targetStage.name.toLowerCase().includes("enviado") ||
-        targetStage.name.toLowerCase().includes("incorreta");
-
-      if (!isAllowed) {
-        toast.error(`Fornecedores não têm permissão para mover pedidos para esta etapa.`);
-        return;
-      }
     }
 
     try {

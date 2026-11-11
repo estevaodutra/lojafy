@@ -1,7 +1,7 @@
 {
-  "hash": "2d2b0615598c7d2e72d7617794ce9f30fc0ecde5",
-  "shortHash": "2d2b061",
-  "message": "fix(deploy): apply missing ad schema prerequisites",
+  "hash": "9febb85b46369d0992945c50fe41a8b44673e733",
+  "shortHash": "9febb85",
+  "message": "feat(pricing): implementar hierarquia de precificacao e regra de cobranca da Lojafy",
   "author": "Lojafy Developer",
-  "timestamp": 1794422899190
+  "timestamp": 1794423758774
 }
