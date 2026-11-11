@@ -59,6 +59,16 @@ export const OrderKanbanCard = React.memo<OrderKanbanCardProps>(({
   const showAdminMetrics = isSuperAdmin();
 
   const [isAdvancing, setIsAdvancing] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const handleCopyPaymentLink = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const paymentUrl = `https://lojafy.app/pagamento/${order.id}`;
+    navigator.clipboard.writeText(paymentUrl);
+    setCopiedLink(true);
+    toast.success("Link de pagamento copiado!");
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
 
   // Determinar a etapa atual do pedido na pipeline ativa
   const currentStageIndex = useMemo(() => {
@@ -560,7 +570,7 @@ export const OrderKanbanCard = React.memo<OrderKanbanCardProps>(({
             </Tooltip>
           )}
 
-          {/* 2. Pix Action */}
+          {/* 2. Pix Action / Copiar Link */}
           <div className="flex-1 min-w-0">
             {isPaid ? (
               <Badge
@@ -570,6 +580,26 @@ export const OrderKanbanCard = React.memo<OrderKanbanCardProps>(({
                 <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>Pago ✓</span>
               </Badge>
+            ) : isSuperAdmin() || isSupplier() ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full h-8 px-2 text-xs font-medium gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 shadow-2xs transition-colors"
+                onClick={handleCopyPaymentLink}
+                title="Copiar link da página de pagamento com todos os detalhes"
+              >
+                {copiedLink ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span className="truncate font-semibold">Copiado!</span>
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                    <span className="truncate">Copiar Link</span>
+                  </>
+                )}
+              </Button>
             ) : (
               <Button
                 variant="secondary"

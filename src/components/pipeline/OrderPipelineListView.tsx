@@ -104,8 +104,19 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
   onArchiveOrder,
   onRefreshOrders,
 }) => {
-  const { isSuperAdmin } = useUserRole();
+  const { isSuperAdmin, isSupplier } = useUserRole();
   const showAdminMetrics = isSuperAdmin();
+
+  const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
+
+  const handleCopyOrderLink = (order: OrderPipelineItem, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const paymentUrl = `https://lojafy.app/pagamento/${order.id}`;
+    navigator.clipboard.writeText(paymentUrl);
+    setCopiedOrderId(order.id);
+    toast.success("Link de pagamento copiado!");
+    setTimeout(() => setCopiedOrderId(null), 2000);
+  };
 
   const formatBRL = (val: number) =>
     new Intl.NumberFormat("pt-BR", {
@@ -882,7 +893,7 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                               </TooltipContent>
                             </Tooltip>
 
-                            {/* 2. Pix Action */}
+                            {/* 2. Pix Action ou Copiar Link */}
                             {isPaid ? (
                               <Badge
                                 variant="default"
@@ -891,6 +902,26 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                                 <Check className="w-3 h-3 stroke-[2.5]" />
                                 <span>Pago ✓</span>
                               </Badge>
+                            ) : isSuperAdmin() || isSupplier() ? (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="h-7 px-2 text-[10px] font-medium gap-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 shadow-2xs transition-colors"
+                                onClick={(e) => handleCopyOrderLink(order, e)}
+                                title="Copiar link da página de pagamento com todos os detalhes"
+                              >
+                                {copiedOrderId === order.id ? (
+                                  <>
+                                    <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
+                                    <span className="font-semibold">Copiado!</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Link2 className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
+                                    <span>Copiar Link</span>
+                                  </>
+                                )}
+                              </Button>
                             ) : (
                               <Button
                                 variant="secondary"
@@ -1196,6 +1227,26 @@ export const OrderPipelineListView: React.FC<OrderPipelineListViewProps> = ({
                         <Badge className="h-7 px-2 text-[10px] bg-emerald-600 text-white font-medium">
                           Pago ✓
                         </Badge>
+                      ) : isSuperAdmin() || isSupplier() ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="h-7 px-2 text-[10px] font-medium bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800"
+                          onClick={(e) => handleCopyOrderLink(order, e)}
+                          title="Copiar link da página de pagamento"
+                        >
+                          {copiedOrderId === order.id ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400 mr-1 stroke-[2.5]" />
+                              <span>Copiado!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Link2 className="w-3 h-3 text-indigo-600 dark:text-indigo-400 mr-1" />
+                              <span>Link</span>
+                            </>
+                          )}
+                        </Button>
                       ) : (
                         <Button
                           variant="secondary"
