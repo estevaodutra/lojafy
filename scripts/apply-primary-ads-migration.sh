@@ -6,6 +6,8 @@ DC="docker compose"
 $DC version >/dev/null 2>&1 || DC="docker-compose"
 
 MIGRATION="/root/lojafy-deploy/migrations/20261111130000_product_primary_ads_and_kits.sql"
+ADS_STRUCTURE="/root/lojafy-deploy/migrations/20260806130000_new_product_ads_structure.sql"
+ADS_SKU="/root/lojafy-deploy/migrations/20260904120000_add_sku_gtin_to_ml_listing_variants.sql"
 if [ ! -f "$MIGRATION" ]; then
   echo "Migração de anúncios principais não encontrada: $MIGRATION" >&2
   exit 1
@@ -24,9 +26,30 @@ else
     exit 1
   fi
 
+  HAS_BUNDLE=$($DC exec -T db psql -U postgres -d postgres -tAc \
+    "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ml_listing_variants' AND column_name = 'bundle_quantity')")
+  HAS_SKU=$($DC exec -T db psql -U postgres -d postgres -tAc \
+    "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ml_listing_variants' AND column_name = 'sku')")
+  if [ "$HAS_BUNDLE" != "t" ] && [ ! -f "$ADS_STRUCTURE" ]; then
+    echo "Migração anterior da estrutura de anúncios não encontrada" >&2
+    exit 1
+  fi
+  if [ "$HAS_SKU" != "t" ] && [ ! -f "$ADS_SKU" ]; then
+    echo "Migração anterior de SKU de anúncios não encontrada" >&2
+    exit 1
+  fi
+
   echo "Aplicando migração de anúncios principais e kits"
   {
     printf 'BEGIN;\n'
+    if [ "$HAS_BUNDLE" != "t" ]; then
+      echo "Aplicando pré-requisito: estrutura de anúncios" >&2
+      cat "$ADS_STRUCTURE"
+    fi
+    if [ "$HAS_SKU" != "t" ]; then
+      echo "Aplicando pré-requisito: SKU de anúncios" >&2
+      cat "$ADS_SKU"
+    fi
     cat "$MIGRATION"
     printf '\nCOMMIT;\n'
   } | $DC exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1
