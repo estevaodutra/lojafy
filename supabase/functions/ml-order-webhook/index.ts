@@ -351,7 +351,7 @@ async function resolveMatchedProduct(
   item: any,
   mlItemId: string | null,
   resellerUserId?: string | null
-): Promise<{ product: any; matchedBy: string }> {
+): Promise<{ product: any; matchedBy: string; bundleQuantity: number; adSku: string | null }> {
   const itemTitle = (item.item?.title || '').trim();
   const rawSku = (
     item.item?.seller_sku ||
@@ -362,6 +362,31 @@ async function resolveMatchedProduct(
 
   let matchedProduct: any = null;
   let matchedBy = 'none';
+
+  // Match the commercial offer before the physical product. A kit consumes
+  // several units of one product, but retains its own marketplace SKU.
+  let matchedAd: any = null;
+  if (rawSku) {
+    const { data: offers } = await supabase.from('ml_listing_variants')
+      .select('product_id, sku, bundle_quantity, user_id')
+      .eq('sku', rawSku).not('product_id', 'is', null).limit(20);
+    matchedAd = offers?.find((offer: any) => offer.user_id === resellerUserId) ||
+      (offers?.length === 1 ? offers[0] : null);
+  }
+  if (!matchedAd && mlItemId) {
+    const { data: offers } = await supabase.from('ml_listing_variants')
+      .select('product_id, sku, bundle_quantity, user_id')
+      .eq('ml_item_id', mlItemId).not('product_id', 'is', null).limit(20);
+    matchedAd = offers?.find((offer: any) => offer.user_id === resellerUserId) ||
+      (offers?.length === 1 ? offers[0] : null);
+  }
+  if (matchedAd?.product_id) {
+    const { data: physicalProduct } = await supabase.from('products')
+      .select('*').eq('id', matchedAd.product_id).maybeSingle();
+    if (physicalProduct) return { product: physicalProduct, matchedBy: 'listing_offer',
+      bundleQuantity: Math.max(1, Number(matchedAd.bundle_quantity) || 1),
+      adSku: matchedAd.sku || rawSku };
+  }
 
   // 1. Tentar por ml_item_id em mercadolivre_published_products
   if (mlItemId) {
@@ -508,7 +533,7 @@ async function resolveMatchedProduct(
     }
   }
 
-  return { product: matchedProduct, matchedBy };
+  return { product: matchedProduct, matchedBy, bundleQuantity: 1, adSku: rawSku };
 }
 
 /**
@@ -630,7 +655,7 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
 
   for (const item of orderItems) {
     const mlItemId = item.item?.id ?? null;
-    const { product: matchedProd } = await resolveMatchedProduct(item, mlItemId, resellerUserId);
+    const { product: matchedProd, bundleQuantity, adSku } = await resolveMatchedProduct(item, mlItemId, resellerUserId);
 
     const rawSku = (
       item.item?.seller_sku ||
@@ -640,7 +665,9 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
     ).trim() || null;
 
     const unitPrice = Number(item.unit_price ?? 0);
-    const quantity = Number(item.quantity ?? 1);
+    const marketplaceQuantity = Number(item.quantity ?? 1);
+    const quantity = marketplaceQuantity * bundleQuantity;
+    const productUnitPrice = unitPrice / bundleQuantity;
     const costPrice = Number(matchedProd?.cost_price ?? 0);
     const resellerPrice = Number(matchedProd?.price ?? costPrice);
     const itemTotalCost = Math.round(costPrice * quantity * 100) / 100;
@@ -652,9 +679,12 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
     compiledItems.push({
       productId: matchedProd?.id ?? null,
       name: matchedProd?.name || item.item?.title || 'Produto Mercado Livre',
-      sku: rawSku || matchedProd?.sku || null,
+      sku: matchedProd?.sku || rawSku || null,
       quantity,
-      unitPrice,
+      unitPrice: productUnitPrice,
+      marketplaceQuantity,
+      bundleQuantity,
+      adSku,
       costPrice,
       resellerPrice,
       totalCost: itemTotalCost,
@@ -684,6 +714,9 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
         product_snapshot: {
           name: ci.name,
           sku: ci.sku,
+          ad_sku: ci.adSku,
+          bundle_quantity: ci.bundleQuantity,
+          marketplace_quantity: ci.marketplaceQuantity,
           ml_item_id: ci.mlItemId,
           cost_price: ci.costPrice,
           price: ci.resellerPrice,
@@ -958,6 +991,9 @@ async function processSingleMlOrder(
     name: string;
     sku: string | null;
     quantity: number;
+    marketplaceQuantity: number;
+    bundleQuantity: number;
+    adSku: string | null;
     unitPrice: number;
     costPrice: number;
     resellerPrice: number;
@@ -976,9 +1012,10 @@ async function processSingleMlOrder(
   for (const item of orderItems) {
     const mlItemId = item.item?.id ?? null;
     const unitPrice = Number(item.unit_price ?? 0);
-    const quantity = Number(item.quantity ?? 1);
-
-    const { product: dbProduct, matchedBy } = await resolveMatchedProduct(item, mlItemId, resellerUserId);
+    const { product: dbProduct, matchedBy, bundleQuantity, adSku } = await resolveMatchedProduct(item, mlItemId, resellerUserId);
+    const marketplaceQuantity = Number(item.quantity ?? 1);
+    const quantity = marketplaceQuantity * bundleQuantity;
+    const productUnitPrice = unitPrice / bundleQuantity;
     const matchedProductId = dbProduct?.id ?? null;
 
     const rawSku = (
@@ -1013,7 +1050,10 @@ async function processSingleMlOrder(
       name: productName,
       sku,
       quantity,
-      unitPrice,
+      unitPrice: productUnitPrice,
+      marketplaceQuantity,
+      bundleQuantity,
+      adSku,
       costPrice,
       resellerPrice,
       totalCost: itemTotalCost,
@@ -1227,6 +1267,9 @@ async function processSingleMlOrder(
       product_snapshot: {
         name: item.name,
         sku: item.sku,
+        ad_sku: item.adSku,
+        bundle_quantity: item.bundleQuantity,
+        marketplace_quantity: item.marketplaceQuantity,
         ml_item_id: item.mlItemId,
         cost_price: item.costPrice,
         price: item.resellerPrice,

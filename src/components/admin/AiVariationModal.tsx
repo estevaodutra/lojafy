@@ -109,6 +109,10 @@ export const AiVariationModal: React.FC<AiVariationModalProps> = ({
         variant_title: v.public_title,
         variant_description: v.public_description,
         price: selectedAds[0]?.price || 0,
+        bundle_quantity: selectedAds[0]?.bundle_quantity || 1,
+        primary_ad_id: selectedAds[0]?.primary_ad_id ||
+          (selectedAds[0]?.is_primary ? selectedAds[0].id : null),
+        image_gallery: selectedAds[0]?.image_gallery || [],
         status: 'draft',
         origin_type: 'ai_generated',
         origin_user_id: user!.id,

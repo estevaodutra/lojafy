@@ -944,8 +944,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
         toast({ title: "Produto criado com sucesso!" });
       }
 
-      // Sincronizar preço no anúncio padrão / variantes de anúncio se existir
-      if (savedProduct?.id) {
+      // Apenas o anúncio primário acompanha o preço do produto.
+      if (savedProduct?.id && product?.id && Number(data.price) !== Number(product.price)) {
         try {
           await supabase
             .from('ml_listing_variants')
@@ -953,7 +953,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product: propProduct, 
               price: Number(data.price || 0),
               updated_at: new Date().toISOString()
             })
-            .eq('product_id', savedProduct.id);
+            .eq('product_id', savedProduct.id)
+            .eq('is_primary', true)
+            .eq('price', product.price);
         } catch (adErr) {
           console.warn('Aviso ao sincronizar preço em anúncios vinculados:', adErr);
         }

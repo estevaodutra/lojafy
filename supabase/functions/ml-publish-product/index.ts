@@ -216,7 +216,7 @@ async function handleRequest(req: Request) {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { product, reseller_price, marketplace_data, user_id, action, ml_item_id } = await req.json();
+    let { product, reseller_price, marketplace_data, user_id, action, ml_item_id, ad_id } = await req.json();
 
     if (!user_id) {
       return new Response(JSON.stringify({ error: 'user_id required' }), {
@@ -275,20 +275,59 @@ async function handleRequest(req: Request) {
       });
     }
 
+    let listingAd: any = null;
+    let publishOfficialCopy = false;
+    if (ad_id) {
+      const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+      const { data: identity, error: identityError } = await supabase.auth.getUser(jwt);
+      if (identityError || identity.user?.id !== user_id) {
+        return new Response(JSON.stringify({ error: 'Usuário não autorizado' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const { data: ad } = await supabase.from('ml_listing_variants')
+        .select('*').eq('id', ad_id).maybeSingle();
+      if (!ad || ad.product_id !== product.id || (ad.user_id !== user_id && !ad.is_official_model)) {
+        return new Response(JSON.stringify({ error: 'Anúncio não corresponde ao produto ou usuário' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      listingAd = ad;
+      publishOfficialCopy = ad.user_id !== user_id;
+      const { data: canonicalProduct, error: canonicalError } = await supabase.from('products')
+        .select('*').eq('id', ad.product_id).single();
+      if (canonicalError || !canonicalProduct) throw canonicalError || new Error('Produto não encontrado');
+      product = { ...product, ...canonicalProduct };
+    }
+
     const validated = marketplace_data?.validated_body ?? {};
     // Arredondar preco para 2 casas decimais (exigencia da API do ML)
-    const rawPrice = reseller_price ?? product.price;
+    const rawPrice = listingAd?.price ?? reseller_price ?? product.price;
     const price = Math.round(Number(rawPrice) * 100) / 100;
+    const { data: stockOverview } = listingAd
+      ? await supabase.from('supplier_stock_overview').select('available_quantity')
+          .eq('product_id', product.id).maybeSingle()
+      : { data: null };
+    const physicalAvailable = Math.max(0, Number(stockOverview?.available_quantity ?? product.stock_quantity ?? 0));
 
     let activeMlItemId = ml_item_id;
 
     // Re-activate existing listing
     if (activeMlItemId) {
       console.log(`[ml-publish] Attempting to reactivate existing item ${activeMlItemId}...`);
+      const updatedPictures = listingAd?.image_gallery?.length
+        ? await Promise.all(listingAd.image_gallery.slice(0, 12).map(async (url: string) =>
+            ({ source: await sanitizeImageForMl(url) })))
+        : null;
       const activateRes = await fetch(`https://api.mercadolibre.com/items/${activeMlItemId}`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'active', price: Math.round(Number(price) * 100) / 100 }),
+        body: JSON.stringify({ status: 'active', price: Math.round(Number(price) * 100) / 100,
+          ...(listingAd ? { title: listingAd.variant_title,
+            seller_custom_field: listingAd.sku || product.sku,
+            available_quantity: Math.floor(physicalAvailable /
+              Math.max(1, Number(listingAd.bundle_quantity) || 1)),
+            ...(updatedPictures ? { pictures: updatedPictures } : {}) } : {}) }),
       });
 
       if (!activateRes.ok) {
@@ -297,7 +336,6 @@ async function handleRequest(req: Request) {
         
         if (
           activateRes.status === 404 || 
-          activateRes.status === 400 ||
           errMsg.includes('status:closed') || 
           errMsg.includes('status:inactive') || 
           errMsg.includes('Cannot update item') ||
@@ -323,6 +361,22 @@ async function handleRequest(req: Request) {
         }
       } else {
         const item = await activateRes.json();
+        if (listingAd?.variant_description) {
+          const descriptionRes = await fetch(`https://api.mercadolibre.com/items/${activeMlItemId}/description`, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plain_text: listingAd.variant_description }),
+          });
+          if (!descriptionRes.ok) {
+            console.warn('[ml-publish] Description update failed:', descriptionRes.status);
+          }
+        }
+        if (listingAd && !publishOfficialCopy) {
+          await supabase.from('ml_listing_variants').update({
+            status: 'published', permalink: item.permalink,
+            last_synced_at: new Date().toISOString(),
+          }).eq('id', listingAd.id);
+        }
         return new Response(JSON.stringify({ success: true, ml_item_id: item.id, permalink: item.permalink, status: item.status }), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -331,8 +385,10 @@ async function handleRequest(req: Request) {
 
     // Build pictures array from product images
     const imageUrls: string[] = [];
-    if (product.main_image_url) imageUrls.push(product.main_image_url);
-    if (Array.isArray(product.images)) {
+    if (Array.isArray(listingAd?.image_gallery) && listingAd.image_gallery.length) {
+      imageUrls.push(...listingAd.image_gallery);
+    } else if (product.main_image_url) imageUrls.push(product.main_image_url);
+    if ((!listingAd?.image_gallery || !listingAd.image_gallery.length) && Array.isArray(product.images)) {
       for (const img of product.images) {
         const u = typeof img === 'string' ? img : img?.url ?? img?.src ?? null;
         if (u && !imageUrls.includes(u)) imageUrls.push(u);
@@ -433,15 +489,16 @@ async function handleRequest(req: Request) {
       ...safeValidatedFields
     } = validated;
 
-    const productSku = product.sku || product.internal_sku || null;
+    const productSku = listingAd?.sku || product.sku || product.internal_sku || null;
 
     const mlPayload: Record<string, unknown> = {
       ...safeValidatedFields, // INJETA o payload pré-validado guardado no BD (incluindo variações, canais, garantia, etc.)
-      title: product.name.substring(0, 60), // ML limita título a 60 chars
+      title: (listingAd?.variant_title || product.name).substring(0, 60), // ML limita título a 60 chars
       category_id: categoryId ?? validated.category_id ?? 'MLB1051',  // fallback: Outros
       price: Math.round(Number(price) * 100) / 100,
       currency_id: 'BRL',
-      available_quantity: Number(product.stock_quantity ?? 10),
+      available_quantity: Math.floor(physicalAvailable /
+        Math.max(1, Number(listingAd?.bundle_quantity) || 1)),
       buying_mode: 'buy_it_now',
       listing_type_id: validated.listing_type_id ?? 'gold_pro',
       condition: validated.condition ?? 'new',
@@ -457,8 +514,10 @@ async function handleRequest(req: Request) {
     mlPayload.shipping = shipping;
 
     // Attributes - Injetar SELLER_SKU oficial se não estiver presente
-    if (productSku && !attributes.some((a: any) => a.id === 'SELLER_SKU')) {
-      attributes.push({ id: 'SELLER_SKU', value_name: productSku });
+    if (productSku) {
+      const existingSku = attributes.find((a: any) => a.id === 'SELLER_SKU');
+      if (existingSku) existingSku.value_name = productSku;
+      else attributes.push({ id: 'SELLER_SKU', value_name: productSku });
     }
 
     if (attributes.length > 0) {
@@ -698,7 +757,7 @@ async function handleRequest(req: Request) {
 
     // 1. Inserir ou atualizar mercadolivre_published_products
     try {
-      await supabase.from('mercadolivre_published_products').upsert({
+      if (!listingAd) await supabase.from('mercadolivre_published_products').upsert({
         user_id: user_id,
         product_id: product.id,
         status: 'published',
@@ -721,7 +780,25 @@ async function handleRequest(req: Request) {
         .eq('ml_item_id', responseBody.id)
         .maybeSingle();
 
-      if (existingVariant) {
+      if (listingAd && publishOfficialCopy) {
+        const { error: copyError } = await supabase.from('ml_listing_variants').insert({
+          user_id, product_id: product.id, primary_ad_id: listingAd.primary_ad_id ||
+            (listingAd.is_primary ? listingAd.id : null), source_ad_id: listingAd.id,
+          internal_name: listingAd.internal_name, variant_title: listingAd.variant_title,
+          variant_description: listingAd.variant_description, price,
+          bundle_quantity: listingAd.bundle_quantity || 1, image_gallery: listingAd.image_gallery || [],
+          status: 'published', origin_type: 'official', is_official_model: false,
+          marketplace: 'mercadolivre', ml_item_id: responseBody.id,
+          permalink: responseBody.permalink, last_synced_at: new Date().toISOString(),
+        });
+        if (copyError) throw copyError;
+      } else if (listingAd) {
+        const { error: updateError } = await supabase.from('ml_listing_variants').update({
+          ml_item_id: responseBody.id, status: 'published', permalink: responseBody.permalink,
+          last_synced_at: new Date().toISOString(),
+        }).eq('id', listingAd.id);
+        if (updateError) throw updateError;
+      } else if (existingVariant) {
         await supabase.from('ml_listing_variants').update({
           variant_title: (product.name || '').substring(0, 60),
           price: price,
@@ -766,7 +843,7 @@ async function handleRequest(req: Request) {
     }
 
     // Adicionar descrição em chamada separada
-    const descriptionText = (product.description ?? product.name).substring(0, 50000);
+    const descriptionText = (listingAd?.variant_description ?? product.description ?? product.name).substring(0, 50000);
     if (descriptionText) {
       console.log(`[ml-publish] Adding description to item ${responseBody.id}`);
       try {

@@ -95,6 +95,23 @@ const Produto = ({
     enabled: !!id
   });
 
+  const { data: adGalleries = [] } = useQuery({
+    queryKey: ['product-ad-galleries', id],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from('ml_listing_variants')
+        .select('id, variant_title, image_gallery, is_primary, origin_type, is_official_model')
+        .eq('product_id', id!)
+        .eq('status', 'published').eq('is_primary', false);
+      if (error) throw error;
+      return (data || []).filter((ad: any) =>
+        (ad.is_official_model || ['supplier', 'super_admin'].includes(ad.origin_type)) &&
+        Array.isArray(ad.image_gallery) && ad.image_gallery.length)
+        .map((ad: any) => ({ id: `ad-${ad.id}`, name: ad.variant_title,
+          is_main: false, images: ad.image_gallery as string[] }));
+    },
+    enabled: !!id,
+  });
+
   // Fetch related products
   const {
     data: relatedProducts = []
@@ -165,14 +182,16 @@ const Produto = ({
   // Multi-galerias do produto (execução síncrona sem violação de Hooks)
   const productGalleries: ProductGalleryItem[] = (() => {
     if (!product) return [];
-    const rawGalleries = (product as any)?.image_galleries || (product?.attributes as any)?.image_galleries;
+    const columnGalleries = (product as any)?.image_galleries;
+    const rawGalleries = Array.isArray(columnGalleries) && columnGalleries.length
+      ? columnGalleries : (product?.attributes as any)?.image_galleries;
     if (Array.isArray(rawGalleries) && rawGalleries.length > 0) {
-      return rawGalleries.map((g: any, idx: number) => ({
+      return [...rawGalleries.map((g: any, idx: number) => ({
         id: g.id || `gal-${idx}`,
         name: g.name || (g.is_main ? 'Galeria Principal' : `Galeria ${idx + 1}`),
         is_main: Boolean(g.is_main),
         images: Array.isArray(g.images) ? g.images.filter(Boolean) : []
-      }));
+      })), ...adGalleries];
     }
     if (productImages.length > 0) {
       return [{
@@ -180,7 +199,7 @@ const Produto = ({
         name: 'Galeria Principal',
         is_main: true,
         images: productImages
-      }];
+      }, ...adGalleries];
     }
     return [];
   })();

@@ -139,6 +139,9 @@ export const useMercadoLivreIntegration = () => {
         .eq('product_id', productId)
         .maybeSingle();
 
+      const { data: primaryAd } = await (supabase as any).from('ml_listing_variants')
+        .select('id').eq('product_id', productId).eq('is_primary', true).maybeSingle();
+
       // 5. Publicar direto na ML API via edge function (sem n8n)
       const publishPayload = {
         product: productData,
@@ -146,6 +149,7 @@ export const useMercadoLivreIntegration = () => {
         marketplace_data: marketplaceData ?? null,
         user_id: user.id,
         ml_item_id: existingPublished?.ml_item_id ?? null,
+        ad_id: primaryAd?.id ?? null,
       };
 
       const { data: publishResponse, error: publishError } = await supabase.functions.invoke('ml-publish-product', {

@@ -27,6 +27,7 @@ import { AdHistoryModal } from './AdHistoryModal';
 import { useSupplierOrganization } from '@/hooks/supplier/useSupplierOrganization';
 import { useMercadoLivreIntegration } from '@/hooks/useMercadoLivreIntegration';
 import { getProductMarketplaceLinks, getProductMarketplaceValidations } from '@/utils/marketplaceLinks';
+import { ImageUploadArea, type ImageFile } from './ImageUploadArea';
 
 interface MetaAdsManagerViewProps {
   roleMode?: 'admin' | 'supplier' | 'reseller';
@@ -244,6 +245,25 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
   const [adFormTitle, setAdFormTitle] = useState('');
   const [adFormPrice, setAdFormPrice] = useState('');
   const [adFormDesc, setAdFormDesc] = useState('');
+  const [adFormBundleQuantity, setAdFormBundleQuantity] = useState('1');
+  const [adFormImages, setAdFormImages] = useState<ImageFile[]>([]);
+  const canManageAds = isSuperAdmin() || isSupplier();
+
+  const openAdForm = (ad: any | null = null, productId?: string) => {
+    const parent = products.find((p: any) => p.id === (productId || ad?.product_id));
+    setEditingAd(ad);
+    setTargetProductIdForNewAd(productId || ad?.product_id || selectedProductIds[0] || '');
+    setAdFormName(ad?.internal_name || (parent ? `${parent.name} - Novo anúncio` : ''));
+    setAdFormTitle(ad?.variant_title || parent?.name || '');
+    setAdFormPrice(String(ad?.price ?? parent?.price ?? ''));
+    setAdFormDesc(ad?.variant_description || parent?.description || '');
+    setAdFormBundleQuantity(String(ad?.bundle_quantity || 1));
+    setAdFormImages((Array.isArray(ad?.image_gallery) && ad.image_gallery.length
+      ? ad.image_gallery : parent?.images || [])
+      .map((url: string, index: number) => ({ id: `ad-img-${index}`, url, preview: url,
+        isMain: index === 0, isUploading: false })));
+    setShowAdFormModal(true);
+  };
 
   // Modal de Seleção de Anúncio para Duplicação (Ação na linha do produto)
   const [showAdSelectionModal, setShowAdSelectionModal] = useState(false);
@@ -251,6 +271,16 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
   const { data: orgData } = useSupplierOrganization();
   const orgId = orgData?.organization?.id;
+  const { data: restructuringReviews = [] } = useQuery({
+    queryKey: ['ad-restructure-review'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from('ad_restructure_review')
+        .select('product_id, reason').order('created_at', { ascending: false }).limit(100);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: isSuperAdmin(),
+  });
 
   const { isProductPublished, publishProduct, publishProductAsync, publishedProducts = [] } = useMercadoLivreIntegration();
   const [isBatchPublishing, setIsBatchPublishing] = useState(false);
@@ -318,6 +348,35 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
       refetchAds();
     } catch (err: any) {
       toast({ variant: 'destructive', title: 'Erro ao publicar no Mercado Livre', description: err.message });
+    }
+  };
+
+  const handlePublishAdMl = async (ad: any) => {
+    try {
+      let targetAd = ad;
+      if (ad.user_id !== user!.id && ad.is_official_model) {
+        const { data: ownCopy } = await (supabase as any).from('ml_listing_variants')
+          .select('*').eq('source_ad_id', ad.id).eq('user_id', user!.id)
+          .order('created_at', { ascending: false }).limit(1).maybeSingle();
+        if (ownCopy) targetAd = ownCopy;
+      }
+      const { data: product, error: productError } = await supabase.from('products')
+        .select('*, category:categories!category_id(id, name), subcategory:subcategories(id, name)')
+        .eq('id', targetAd.product_id).single();
+      if (productError || !product) throw productError || new Error('Produto não encontrado');
+      const { data: marketplaceData } = await supabase.from('product_marketplace_data')
+        .select('*').eq('product_id', targetAd.product_id)
+        .eq('marketplace', 'mercadolivre').maybeSingle();
+      const { data, error } = await supabase.functions.invoke('ml-publish-product', {
+        body: { product, marketplace_data: marketplaceData, user_id: user!.id,
+          ad_id: targetAd.id,
+          ml_item_id: targetAd.user_id === user!.id ? targetAd.ml_item_id || null : null },
+      });
+      if (error || !data?.success) throw error || new Error(data?.error || 'Falha ao publicar anúncio');
+      toast({ title: 'Anúncio publicado no Mercado Livre' });
+      refetchAds();
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Erro ao publicar anúncio', description: error.message });
     }
   };
 
@@ -581,7 +640,8 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
         // Filtro em memória seguro por perfil
         if (roleMode === 'reseller' && user?.id) {
-          result = result.filter((item: any) => item.is_official_model || item.user_id === user.id);
+          result = result.filter((item: any) =>
+            item.is_primary || (item.is_official_model && item.status === 'published') || item.user_id === user.id);
         } else if (roleMode === 'supplier' && user?.id) {
           const prodIds = new Set(products.map((p: any) => p.id));
           result = result.filter((item: any) => 
@@ -600,35 +660,8 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
     enabled: !!user?.id,
   });
 
-  // COMBINAÇÃO DE ANÚNCIOS: Cada produto gera por padrão o seu 1º Anúncio Principal (Modelo Oficial) + variações de ml_listing_variants!
-  const effectiveAds = React.useMemo(() => {
-    const combined: any[] = [...ads];
-
-    // Para cada produto cadastrado, garante que existe pelo menos o 1º Anúncio Principal (Modelo Oficial)
-    products.forEach((prod: any) => {
-      const hasBaseAd = ads.some((ad: any) => ad.product_id === prod.id && (ad.is_official_model || ad.origin_type === 'official'));
-      if (!hasBaseAd) {
-        combined.unshift({
-          id: `official-base-${prod.id}`,
-          product_id: prod.id,
-          product: prod,
-          internal_name: `${prod.name} (Anúncio Principal)`,
-          variant_title: prod.name,
-          price: prod.price || prod.cost_price || 0,
-          status: prod.active !== false ? 'published' : 'paused',
-          origin_type: 'official',
-          is_official_model: true,
-          marketplace: 'mercadolivre',
-          visits: 0,
-          sales: 0,
-          created_at: prod.created_at || new Date().toISOString(),
-          is_synthesized: true
-        });
-      }
-    });
-
-    return combined;
-  }, [products, ads]);
+  // O anúncio primário agora é um registro real, criado junto com o produto.
+  const effectiveAds = ads;
 
   // Alternar Status Ativo/Inativo do Produto (Nível Pai)
   const toggleProductActiveMutation = useMutation({
@@ -778,14 +811,27 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
   // Salvar Formulário de Anúncio
   const handleSaveAdForm = async () => {
+    if (!canManageAds) return;
     if (!adFormName.trim() || !adFormTitle.trim() || (!editingAd && !targetProductIdForNewAd)) {
       toast({ variant: 'destructive', title: 'Preencha o Nome Interno, Título e Selecione o Produto.' });
       return;
     }
 
+    const bundleQuantity = Number(adFormBundleQuantity);
+    if (!Number.isSafeInteger(bundleQuantity) || bundleQuantity < 1 || (editingAd?.is_primary && bundleQuantity !== 1)) {
+      toast({ variant: 'destructive', title: 'Informe uma quantidade inteira. O anúncio primário sempre vende 1 unidade.' });
+      return;
+    }
+    if (adFormImages.some(image => image.isUploading || !image.url)) {
+      toast({ variant: 'destructive', title: 'Aguarde o envio das fotos antes de salvar.' });
+      return;
+    }
+
     try {
       const targetProd = products.find((p: any) => p.id === (editingAd ? editingAd.product_id : targetProductIdForNewAd));
-      const priceNum = parseFloat(adFormPrice.replace(',', '.')) || Number(targetProd?.suggested_price || targetProd?.price || 0);
+      const priceNum = Number(adFormPrice.replace(',', '.'));
+      if (!Number.isFinite(priceNum) || priceNum <= 0) throw new Error('Informe um preço de venda válido.');
+      const imageGallery = adFormImages.map(image => image.url!);
 
       if (editingAd) {
         const { error } = await supabase
@@ -795,12 +841,16 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
             variant_title: adFormTitle,
             variant_description: adFormDesc,
             price: priceNum,
+            bundle_quantity: bundleQuantity,
+            image_gallery: imageGallery,
           })
           .eq('id', editingAd.id);
         if (error) throw error;
         toast({ title: 'Anúncio atualizado!' });
       } else {
-        const originType = isSuperAdmin ? 'super_admin' : isSupplier ? 'supplier' : 'reseller';
+        const originType = isSuperAdmin() ? 'super_admin' : 'supplier';
+        const primaryAd = ads.find((ad: any) => ad.product_id === targetProductIdForNewAd && ad.is_primary);
+        if (!primaryAd) throw new Error('O produto ainda não tem anúncio primário. Recarregue após aplicar a migração.');
         const { error } = await supabase
           .from('ml_listing_variants')
           .insert({
@@ -810,12 +860,15 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
             variant_title: adFormTitle,
             variant_description: adFormDesc,
             price: priceNum,
+            bundle_quantity: bundleQuantity,
+            primary_ad_id: (primaryAd as any).id,
+            image_gallery: imageGallery,
             status: 'draft',
             origin_type: originType,
             origin_user_id: user!.id,
             origin_user_role: originType,
             marketplace: 'mercadolivre',
-            is_official_model: false
+            is_official_model: true
           });
         if (error) throw error;
         toast({ title: 'Novo anúncio criado como Rascunho!' });
@@ -836,69 +889,18 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
     return `${cleanTitle} Copy`;
   };
 
-  const generateAdSku = (baseSku?: string) => {
-    const prefix = baseSku ? baseSku.trim() : 'PROD';
-    const randomHex = Math.floor(Math.random() * 0xffffff).toString(16).toUpperCase().padStart(6, '0');
-    return `${prefix}-COPY-${randomHex}`;
-  };
-
-  const generateAdGtin = () => {
-    const random10Digits = Math.floor(1000000000 + Math.random() * 9000000000).toString();
-    return `789${random10Digits}`;
-  };
-
   // Duplicar Anúncio (opera exclusivamente sobre a entidade de anúncio)
   const handleDuplicateAd = async (ad: any) => {
-    try {
-      const targetProductId = ad.product_id || ad.product?.id;
-      if (!targetProductId) {
-        throw new Error('Produto de origem não identificado para a duplicação.');
-      }
-
-      const newTitle = formatCopyTitle(ad.variant_title || ad.internal_name);
-      const newInternalName = formatCopyTitle(ad.internal_name || ad.variant_title);
-      const newSku = generateAdSku(ad.sku || ad.product?.sku);
-      const newGtin = generateAdGtin();
-
-      const { error } = await supabase
-        .from('ml_listing_variants')
-        .insert({
-          product_id: targetProductId,
-          user_id: user!.id,
-          internal_name: newInternalName,
-          variant_title: newTitle,
-          variant_description: ad.variant_description || null,
-          price: ad.price || 0,
-          promotional_price: ad.promotional_price || null,
-          video_url: ad.video_url || null,
-          category_id: ad.category_id || null,
-          sku: newSku,
-          gtin: newGtin,
-          status: 'draft',
-          origin_type: 'duplicated',
-          origin_user_id: user!.id,
-          source_ad_id: ad.id && !ad.is_synthesized ? ad.id : null,
-          marketplace: ad.marketplace || 'mercadolivre',
-          is_official_model: false,
-          ml_item_id: null,
-          permalink: null,
-          visits: 0,
-          sales: 0,
-          gross_revenue: 0,
-          net_profit: 0,
-          conversion_rate: 0,
-          cancellations: 0,
-          refunds: 0,
-          last_synced_at: null,
-        });
-
-      if (error) throw error;
-      toast({ title: 'Anúncio duplicado com sucesso!', description: 'A cópia foi criada como Rascunho com novos SKU e GTIN.' });
-      refetchAds();
-      refetchProducts();
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Erro ao duplicar anúncio', description: e.message });
-    }
+    if (!canManageAds) return;
+    openAdForm(null, ad.product_id);
+    setAdFormName(formatCopyTitle(ad.internal_name || ad.variant_title));
+    setAdFormTitle(ad.variant_title || '');
+    setAdFormDesc(ad.variant_description || '');
+    setAdFormPrice(String(ad.price || ''));
+    setAdFormBundleQuantity(String(ad.bundle_quantity || 1));
+    setAdFormImages((Array.isArray(ad.image_gallery) ? ad.image_gallery : [])
+      .map((url: string, index: number) => ({ id: `copy-img-${index}`, url, preview: url,
+        isMain: index === 0, isUploading: false })));
   };
 
   // Duplicar Entidade Produto
@@ -982,8 +984,11 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
           variant_title: ad.variant_title,
           variant_description: ad.variant_description,
           price: ad.price,
+          bundle_quantity: ad.bundle_quantity || 1,
+          primary_ad_id: ad.primary_ad_id || (ad.is_primary ? ad.id : null),
+          image_gallery: ad.image_gallery || [],
           status: 'published',
-          origin_type: isSuperAdmin ? 'super_admin' : 'supplier',
+          origin_type: isSuperAdmin() ? 'super_admin' : 'supplier',
           origin_user_id: user!.id,
           source_ad_id: ad.id,
           marketplace: ad.marketplace || 'mercadolivre',
@@ -1054,6 +1059,20 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
   return (
     <div className="space-y-6">
+      {isSuperAdmin() && restructuringReviews.length > 0 && (
+        <Card className="border-amber-400 bg-amber-50/60 dark:bg-amber-950/20">
+          <CardContent className="p-4">
+            <p className="font-semibold text-sm">Anúncios que precisam de revisão após a reorganização</p>
+            <div className="mt-2 max-h-40 overflow-y-auto text-xs space-y-1">
+              {restructuringReviews.map((item: any) => (
+                <p key={`${item.product_id}-${item.reason}`}>
+                  {products.find((product: any) => product.id === item.product_id)?.name || item.product_id}: {item.reason}
+                </p>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
       {/* ── CABEÇALHO DO META ADS MANAGER ───────────────────────────────────── */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
         <div>
@@ -1093,21 +1112,13 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                 <RefreshCw className={`h-4 w-4 ${isSyncingMl ? 'animate-spin' : ''}`} />
                 {isSyncingMl ? 'Sincronizando ML...' : 'Sincronizar Performance ML'}
               </Button>
-              <Button 
-                onClick={() => {
-                  setEditingAd(null);
-                  setTargetProductIdForNewAd(selectedProductIds[0] || (products[0]?.id || ''));
-                  setAdFormName('Novo Anúncio Vinculado');
-                  setAdFormTitle('');
-                  setAdFormPrice('');
-                  setAdFormDesc('');
-                  setShowAdFormModal(true);
-                }} 
+              {canManageAds && <Button
+                onClick={() => openAdForm(null, selectedProductIds[0] || products[0]?.id)}
                 className="gap-2"
               >
                 <Plus className="h-4 w-4" />
                 Novo Anúncio Vinculado
-              </Button>
+              </Button>}
             </>
           )}
         </div>
@@ -1701,7 +1712,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                 </Button>
               )}
 
-              {selectedAdIds.length >= 1 && (
+              {canManageAds && selectedAdIds.length >= 1 && (
                 <Button
                   size="sm"
                   className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5"
@@ -1788,7 +1799,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                         <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
                           <div className="flex flex-col items-center justify-center space-y-3">
                             <p className="text-sm font-medium">Nenhum anúncio encontrado para o filtro atual.</p>
-                            {selectedProductIds.length > 0 ? (
+                            {canManageAds && selectedProductIds.length > 0 ? (
                               <Button
                                 size="sm"
                                 onClick={() => setShowAiModal(true)}
@@ -1797,25 +1808,17 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                                 <Sparkles className="h-4 w-4" />
                                 Gerar Anúncios com IA para os {selectedProductIds.length} produto(s) selecionado(s)
                               </Button>
-                            ) : (
+                            ) : canManageAds ? (
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => {
-                                  setEditingAd(null);
-                                  setTargetProductIdForNewAd('');
-                                  setAdFormName('');
-                                  setAdFormTitle('');
-                                  setAdFormPrice('');
-                                  setAdFormDesc('');
-                                  setShowAdFormModal(true);
-                                }}
+                                onClick={() => openAdForm()}
                                 className="gap-2"
                               >
                                 <Plus className="h-4 w-4" />
                                 Criar Novo Anúncio
                               </Button>
-                            )}
+                            ) : null}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1848,9 +1851,9 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
                             {/* 3. Miniatura entre Ativo e Nome Interno */}
                             <TableCell className="text-center">
-                              {ad.product?.main_image_url || ad.product?.image_url ? (
+                              {ad.image_gallery?.[0] || ad.product?.main_image_url || ad.product?.image_url ? (
                                 <img
-                                  src={ad.product.main_image_url || ad.product.image_url}
+                                  src={ad.image_gallery?.[0] || ad.product?.main_image_url || ad.product?.image_url}
                                   alt=""
                                   className="w-9 h-9 rounded object-cover border mx-auto"
                                   onError={(e) => {
@@ -1876,7 +1879,14 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
                             {/* 5. SKU do Produto */}
                             <TableCell className="font-mono text-xs text-foreground font-semibold">
-                              {ad.product?.sku || '—'}
+                              {ad.sku || ad.product?.sku || '—'}
+                              {ad.is_primary && <div className="text-xs font-sans text-muted-foreground">Primário · 1 unidade</div>}
+                              {!ad.is_primary && Number(ad.bundle_quantity || 1) > 1 &&
+                                <div className="text-xs font-sans text-muted-foreground">Kit de {ad.bundle_quantity} unidades</div>}
+                              <div className="text-xs font-sans font-normal text-muted-foreground">
+                                {Math.floor(Number(ad.product?.stock_quantity || 0) /
+                                  Math.max(1, Number(ad.bundle_quantity || 1)))} disponíveis para este anúncio
+                              </div>
                             </TableCell>
 
                             {/* Marketplace */}
@@ -1899,6 +1909,10 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                             {/* Preço de Venda */}
                             <TableCell className="text-right font-bold text-foreground">
                               {formatPrice(ad.price)}
+                              <div className="text-xs font-normal text-muted-foreground">
+                                Custo: {formatPrice(Number(ad.product?.cost_price || 0) *
+                                  Math.max(1, Number(ad.bundle_quantity || 1)))}
+                              </div>
                             </TableCell>
 
                             {/* Performance */}
@@ -1943,25 +1957,18 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                                       </DropdownMenuItem>
                                     );
                                   })()}
-                                  <DropdownMenuItem onClick={() => handleSinglePublishMl(ad.product_id || ad.product?.id)}>
+                                  <DropdownMenuItem onClick={() => handlePublishAdMl(ad)}>
                                     <Send className="h-4 w-4 mr-2 text-amber-600" /> Publicar Anúncio no Mercado Livre
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => {
-                                    setEditingAd(ad);
-                                    setAdFormName(ad.internal_name || ad.variant_title);
-                                    setAdFormTitle(ad.variant_title || '');
-                                    setAdFormPrice(String(ad.price || ''));
-                                    setAdFormDesc(ad.variant_description || '');
-                                    setShowAdFormModal(true);
-                                  }}>
+                                  {canManageAds && <DropdownMenuItem onClick={() => openAdForm(ad)}>
                                     <Edit3 className="h-4 w-4 mr-2" /> Editar Anúncio
-                                  </DropdownMenuItem>
+                                  </DropdownMenuItem>}
 
-                                  <DropdownMenuItem onClick={() => handleDuplicateAd(ad)}>
+                                  {canManageAds && <DropdownMenuItem onClick={() => handleDuplicateAd(ad)}>
                                     <Copy className="h-4 w-4 mr-2" /> Duplicar Anúncio
-                                  </DropdownMenuItem>
+                                  </DropdownMenuItem>}
 
-                                  {(isSuperAdmin || isSupplier) && !ad.is_official_model && (
+                                  {canManageAds && !ad.is_official_model && !ad.is_primary && (
                                     <DropdownMenuItem onClick={() => handleTransformToOfficial(ad)}>
                                       <ShieldCheck className="h-4 w-4 mr-2 text-amber-500" /> Criar Modelo Oficial ⭐
                                     </DropdownMenuItem>
@@ -1992,18 +1999,18 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
       {/* MODAL DE ANÚNCIO VINCULADO */}
       <Dialog open={showAdFormModal} onOpenChange={setShowAdFormModal}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingAd ? 'Editar Anúncio' : 'Novo Anúncio Vinculado'}</DialogTitle>
             <DialogDescription>
-              Preencha os detalhes do anúncio diretamente vinculado ao produto.
+              Cada anúncio usa o mesmo estoque físico do produto. O anúncio primário vende sempre uma unidade cadastrada.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {!editingAd && (
               <div>
                 <label className="text-xs font-semibold block mb-1">Selecione o Produto Pai</label>
-                <Select value={targetProductIdForNewAd} onValueChange={setTargetProductIdForNewAd}>
+                <Select value={targetProductIdForNewAd} onValueChange={id => openAdForm(null, id)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o Produto" />
                   </SelectTrigger>
@@ -2044,6 +2051,35 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                 value={adFormPrice}
                 onChange={(e) => setAdFormPrice(e.target.value)}
               />
+            </div>
+            <div>
+              <label className="text-xs font-semibold block mb-1">Unidades cadastradas por venda</label>
+              <Input type="number" min="1" step="1" value={adFormBundleQuantity}
+                disabled={Boolean(editingAd?.is_primary)}
+                onChange={event => {
+                  setAdFormBundleQuantity(event.target.value);
+                  if (!editingAd) {
+                    const basePrice = Number(products.find((p: any) => p.id === targetProductIdForNewAd)?.price || 0);
+                    const units = Number(event.target.value);
+                    if (Number.isSafeInteger(units) && units > 0) {
+                      setAdFormPrice((basePrice * units).toFixed(2));
+                    }
+                  }
+                }} />
+              <p className="text-xs text-muted-foreground mt-1">
+                Custo calculado: {formatPrice(Number(products.find((p: any) => p.id ===
+                  (editingAd?.product_id || targetProductIdForNewAd))?.cost_price || 0) * Number(adFormBundleQuantity || 1))}
+              </p>
+            </div>
+            <div>
+              <label className="text-xs font-semibold block mb-1">Descrição deste anúncio</label>
+              <textarea className="w-full min-h-24 rounded-md border bg-background p-2 text-sm"
+                value={adFormDesc} onChange={event => setAdFormDesc(event.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-semibold block mb-2">Fotos deste anúncio</label>
+              <ImageUploadArea images={adFormImages} onImagesChange={setAdFormImages}
+                productId={editingAd?.product_id || targetProductIdForNewAd} maxImages={10} />
             </div>
           </div>
 
