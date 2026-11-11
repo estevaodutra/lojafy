@@ -660,8 +660,10 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
     enabled: !!user?.id,
   });
 
-  // O anúncio primário agora é um registro real, criado junto com o produto.
-  const effectiveAds = ads;
+  // A mesma tabela também recebe publicações importadas do Mercado Livre.
+  // Nesta tela aparecem somente os modelos internos: o anúncio principal e
+  // suas variações (kits, fotos, título e preço próprios).
+  const effectiveAds = ads.filter((ad: any) => ad.is_primary === true || ad.is_official_model === true);
 
   // Alternar Status Ativo/Inativo do Produto (Nível Pai)
   const toggleProductActiveMutation = useMutation({
@@ -849,7 +851,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
         toast({ title: 'Anúncio atualizado!' });
       } else {
         const originType = isSuperAdmin() ? 'super_admin' : 'supplier';
-        const primaryAd = ads.find((ad: any) => ad.product_id === targetProductIdForNewAd && ad.is_primary);
+        const primaryAd = effectiveAds.find((ad: any) => ad.product_id === targetProductIdForNewAd && ad.is_primary);
         if (!primaryAd) throw new Error('O produto ainda não tem anúncio primário. Recarregue após aplicar a migração.');
         const { error } = await supabase
           .from('ml_listing_variants')
@@ -1117,7 +1119,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                 className="gap-2"
               >
                 <Plus className="h-4 w-4" />
-                Novo Anúncio Vinculado
+                Nova Variação do Anúncio
               </Button>}
             </>
           )}
@@ -1140,7 +1142,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
             <TabsTrigger value="ads" className="gap-2 font-bold px-6">
               <Megaphone className="h-4 w-4" />
-              Anúncios ({filteredAds.length})
+              Anúncios Internos ({filteredAds.length})
               {selectedProductIds.length > 0 && (
                 <Badge variant="secondary" className="ml-1 bg-amber-500 text-white text-xs px-1.5 py-0">
                   Filtrado ({selectedProductIds.length})
@@ -1333,7 +1335,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                       <TableHead className="text-right">Preço de Custo</TableHead>
                       <TableHead className="text-right">Preço de Venda</TableHead>
                       <TableHead className="text-center">Estoque</TableHead>
-                      <TableHead className="text-center">Anúncios</TableHead>
+                      <TableHead className="text-center">Anúncios Internos</TableHead>
                       <TableHead className="text-center">Status</TableHead>
                       <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
@@ -1355,7 +1357,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                     ) : (
                       paginatedProducts.map((product: any) => {
                         const isSelected = selectedProductIds.includes(product.id);
-                        const adsCount = ads.filter((ad: any) => ad.product_id === product.id || ad.product?.id === product.id).length;
+                        const adsCount = effectiveAds.filter((ad: any) => ad.product_id === product.id || ad.product?.id === product.id).length;
                         const mkpValidations = getProductMarketplaceValidations(product, publishedProducts, ads);
                         const mkpLinks = getProductMarketplaceLinks(product, ads, publishedProducts);
 
@@ -1511,7 +1513,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                                 onClick={() => handleViewAdsForProduct(product.id)}
                                 className="h-7 text-xs font-bold text-primary hover:bg-primary/10"
                               >
-                                {adsCount} anúncio{adsCount !== 1 ? 's' : ''}
+                                {adsCount} anúncio{adsCount !== 1 ? 's' : ''} interno{adsCount !== 1 ? 's' : ''}
                               </Button>
                             </TableCell>
 
@@ -1689,13 +1691,13 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
               <div>
                 <h3 className="font-bold text-sm text-foreground">
                   {selectedProductIds.length > 0 
-                    ? `Exibindo Anúncios de ${selectedProductIds.length} Produto(s) Selecionado(s)` 
-                    : 'Exibindo Todos os Anúncios da Loja'}
+                    ? `Exibindo Anúncios Internos de ${selectedProductIds.length} Produto(s) Selecionado(s)`
+                    : 'Exibindo Todos os Anúncios Internos da Loja'}
                 </h3>
                 <p className="text-xs text-muted-foreground">
                   {selectedProductIds.length > 0 
                     ? 'A listagem está filtrada pelo contexto da seleção feita na aba Produtos.' 
-                    : 'Nenhum produto selecionado na aba Produtos. Mostrando o catálogo completo de anúncios.'}
+                    : 'Nenhum produto selecionado na aba Produtos. Mostrando os anúncios principais e suas variações internas.'}
                 </p>
               </div>
             </div>
@@ -1708,7 +1710,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                   onClick={() => setSelectedProductIds([])}
                   className="text-xs"
                 >
-                  <X className="h-3.5 w-3.5 mr-1" /> Exibir Todos os Anúncios
+                  <X className="h-3.5 w-3.5 mr-1" /> Exibir Todos os Anúncios Internos
                 </Button>
               )}
 
@@ -1798,8 +1800,14 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                       <TableRow>
                         <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
                           <div className="flex flex-col items-center justify-center space-y-3">
-                            <p className="text-sm font-medium">Nenhum anúncio encontrado para o filtro atual.</p>
-                            {canManageAds && selectedProductIds.length > 0 ? (
+                            <p className="text-sm font-medium">Nenhum anúncio interno encontrado para o filtro atual.</p>
+                            <p className="text-xs">Publicações importadas do Mercado Livre aparecem na área de Marketplaces.</p>
+                            {selectedProductIds.length > 0 && !effectiveAds.some((ad: any) =>
+                              selectedProductIds.includes(ad.product_id) && ad.is_primary) && (
+                              <p className="text-xs">Este produto ainda precisa do anúncio principal de 1 unidade.</p>
+                            )}
+                            {canManageAds && selectedProductIds.length > 0 && selectedProductIds.every(productId =>
+                              effectiveAds.some((ad: any) => ad.product_id === productId && ad.is_primary)) ? (
                               <Button
                                 size="sm"
                                 onClick={() => setShowAiModal(true)}
@@ -1808,7 +1816,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                                 <Sparkles className="h-4 w-4" />
                                 Gerar Anúncios com IA para os {selectedProductIds.length} produto(s) selecionado(s)
                               </Button>
-                            ) : canManageAds ? (
+                            ) : canManageAds && effectiveAds.some((ad: any) => ad.is_primary) ? (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1891,7 +1899,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
 
                             {/* Marketplace */}
                             <TableCell className="text-center">
-                              {ad.ml_item_id || ad.permalink || isProductPublished(ad.product_id || ad.product?.id) ? (
+                              {ad.ml_item_id || ad.permalink ? (
                                 <img
                                   src="https://http2.mlstatic.com/static/org-img/homesnw/mercado-libre.png"
                                   alt="Mercado Livre"
@@ -2095,7 +2103,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
         open={showAiModal}
         onOpenChange={setShowAiModal}
         productId={selectedProductIds[0] || (products[0]?.id || '')}
-        selectedAds={ads.filter((a: any) => selectedAdIds.includes(a.id))}
+        selectedAds={effectiveAds.filter((a: any) => selectedAdIds.includes(a.id))}
         onSuccess={() => {
           setSelectedAdIds([]);
           refetchAds();
@@ -2141,7 +2149,7 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2 max-h-96 overflow-y-auto">
-            {productForAdDuplication && ads
+            {productForAdDuplication && effectiveAds
               .filter((ad: any) => ad.product_id === productForAdDuplication.id || ad.product?.id === productForAdDuplication.id)
               .map((ad: any) => (
                 <div key={ad.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/40 transition-colors">
