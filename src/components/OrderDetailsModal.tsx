@@ -46,7 +46,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { OpenTicketButton } from '@/components/order-tickets/OpenTicketButton';
 import { getAvailableTicketTypes } from '@/types/orderTickets';
-import { getStatusConfig, getStatusLabel as gslFn, getStatusVariant as gsvFn } from '@/constants/orderStatus';
+import {
+  getStatusConfig,
+  getStatusLabel,
+  getStatusVariant,
+} from '@/constants/orderStatus';
 import { OrderActionBar } from '@/components/order-details/OrderActionBar';
 import { RelatedTickets } from '@/components/order-details/RelatedTickets';
 import { normalizeOrderToPipelineItem } from '@/utils/orderPipelineAdapter';
@@ -417,18 +421,22 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
       // Resolve Supplier Name
       let resolvedSupplierName = "Fornecedor Nacional";
-      const supplierOrgId = data?.order_items?.[0]?.supplier_organization_id || data?.supplier_organization_id;
+      const supplierOrgId = (data as any)?.order_items?.[0]?.supplier_organization_id || (data as any)?.supplier_organization_id;
       if (supplierOrgId) {
-        const { data: orgData } = await supabase
-          .from('supplier_organizations')
-          .select('trade_name, name')
-          .eq('id', supplierOrgId)
-          .maybeSingle();
-        if (orgData) {
-          resolvedSupplierName = orgData.trade_name || orgData.name || "Fornecedor";
+        try {
+          const { data: orgData } = await (supabase
+            .from('supplier_organizations' as any)
+            .select('trade_name')
+            .eq('id', supplierOrgId)
+            .maybeSingle() as any);
+          if (orgData) {
+            resolvedSupplierName = orgData.trade_name || "Fornecedor";
+          }
+        } catch {
+          // ignore
         }
-      } else if (data?.supplier_name) {
-        resolvedSupplierName = data.supplier_name;
+      } else if ((data as any)?.supplier_name) {
+        resolvedSupplierName = (data as any).supplier_name;
       }
 
       // Normalize into pipeline item to guarantee 100% calculation and visual parity with Kanban Card
@@ -480,11 +488,11 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       const fallbackFiles: ShippingFile[] = [];
 
       try {
-        const { data: extractions } = await supabase
-          .from('shipment_label_extractions')
+        const { data: extractions } = await (supabase
+          .from('shipment_label_extractions' as any)
           .select('*')
           .eq('order_id', orderId)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false }) as any);
 
         if (extractions && extractions.length > 0) {
           const extractionFiles: ShippingFile[] = extractions.map((ext: any) => ({
@@ -855,6 +863,13 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   };
 
   const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(price || 0);
+  };
+
+  const formatBRL = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
