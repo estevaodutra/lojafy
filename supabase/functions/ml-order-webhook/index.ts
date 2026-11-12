@@ -729,6 +729,7 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
   // 3. Checar status da remessa no ML (se já foi entregue ou despachado no ML)
   const { data: wallet } = await supabase.from('wallets').select('saldo').eq('user_id', resellerUserId).maybeSingle();
   const currentWalletBalance = Number(wallet?.saldo ?? 0);
+  const walletDebt = currentWalletBalance < 0 ? Math.round(Math.abs(currentWalletBalance) * 100) / 100 : 0;
   let walletDeducted = 0;
   let remainingPixAmount = 0;
   let isFullyPaid = false;
@@ -751,7 +752,7 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
     remainingPixAmount = Math.round((amountToCharge - currentWalletBalance) * 100) / 100;
     isFullyPaid = false;
   } else {
-    remainingPixAmount = amountToCharge;
+    remainingPixAmount = Math.round((amountToCharge + walletDebt) * 100) / 100;
     isFullyPaid = false;
   }
 
@@ -1097,6 +1098,7 @@ async function processSingleMlOrder(
   }
 
   const currentWalletBalance = Number(wallet?.saldo ?? 0);
+  const walletDebt = currentWalletBalance < 0 ? Math.round(Math.abs(currentWalletBalance) * 100) / 100 : 0;
   let walletDeducted = 0;
   let remainingPixAmount = 0;
   let isFullyPaid = false;
@@ -1118,7 +1120,7 @@ async function processSingleMlOrder(
     isFullyPaid = false;
   } else {
     walletDeducted = 0;
-    remainingPixAmount = amountToCharge;
+    remainingPixAmount = Math.round((amountToCharge + walletDebt) * 100) / 100;
     isFullyPaid = false;
   }
 
@@ -2390,11 +2392,27 @@ serve(async (req) => {
         totalResellerCost = Number(orderToPix.total_amount || 0);
       }
 
+      // Verificar se o parceiro possui saldo negativo (débito pendente na carteira) para somar ao valor do pedido
+      const targetUserId = orderToPix.reseller_id || orderToPix.user_id;
+      let walletDebt = 0;
+      if (targetUserId) {
+        const { data: userWallet } = await supabase
+          .from('wallets')
+          .select('saldo')
+          .eq('user_id', targetUserId)
+          .maybeSingle();
+        if (userWallet && Number(userWallet.saldo) < 0) {
+          walletDebt = Math.round(Math.abs(Number(userWallet.saldo)) * 100) / 100;
+        }
+      }
+
+      const totalPixAmountToCharge = Math.round((totalResellerCost + walletDebt) * 100) / 100;
+
       const forceRegenerate = !!body.force_regenerate;
       const isExpired = orderToPix.payment_expires_at && new Date(orderToPix.payment_expires_at).getTime() <= Date.now();
 
       // Verificar se o Pix existente bate com o valor exato (tag 54 do Pix EMV)
-      const expectedAmountStr = totalResellerCost.toFixed(2);
+      const expectedAmountStr = totalPixAmountToCharge.toFixed(2);
       const expectedAmountTag = `540${expectedAmountStr.length}${expectedAmountStr}`;
       const pixHasWrongAmount = orderToPix.pix_qr_code && !orderToPix.pix_qr_code.includes(expectedAmountTag);
 
@@ -2404,30 +2422,36 @@ serve(async (req) => {
           pix_qr_code: orderToPix.pix_qr_code,
           pix_qr_code_base64: orderToPix.pix_qr_code_base64,
           payment_expires_at: orderToPix.payment_expires_at,
-          amount: totalResellerCost,
+          amount: totalPixAmountToCharge,
+          order_cost: totalResellerCost,
+          wallet_debt: walletDebt,
         }), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      const { data: resellerProfile } = await supabase.from('profiles').select('first_name, last_name, cpf, phone').eq('user_id', orderToPix.reseller_id).maybeSingle();
+      const { data: resellerProfile } = await supabase.from('profiles').select('first_name, last_name, cpf, phone').eq('user_id', targetUserId).maybeSingle();
       let resellerEmail = null;
       try {
-        const { data: authUser } = await supabase.auth.admin.getUserById(orderToPix.reseller_id);
+        const { data: authUser } = await supabase.auth.admin.getUserById(targetUserId);
         resellerEmail = authUser?.user?.email ?? null;
       } catch {}
 
+      const pixDescription = walletDebt > 0
+        ? `Fulfillment Pedido #${orderToPix.order_number} (Pedido R$ ${totalResellerCost.toFixed(2)} + Débito Carteira R$ ${walletDebt.toFixed(2)})`
+        : `Fulfillment Pedido #${orderToPix.order_number}`;
+
       const pixRes = await generatePix24h({
         orderNumber: orderToPix.order_number,
-        amount: totalResellerCost,
-        description: `Fulfillment Pedido #${orderToPix.order_number}`,
-        resellerUserId: orderToPix.reseller_id,
+        amount: totalPixAmountToCharge,
+        description: pixDescription,
+        resellerUserId: targetUserId,
         resellerProfile,
         resellerEmail,
         items: orderItems || [],
         mlOrderId: orderToPix.ml_order_id || orderToPix.order_number,
         walletDeducted: 0,
-        totalCost: totalResellerCost,
+        totalCost: totalPixAmountToCharge,
       });
 
       await supabase.from('orders').update({
@@ -2443,7 +2467,9 @@ serve(async (req) => {
         pix_qr_code: pixRes.qrCode,
         pix_qr_code_base64: pixRes.qrCodeBase64,
         payment_expires_at: pixRes.expiresAt,
-        amount: totalResellerCost,
+        amount: totalPixAmountToCharge,
+        order_cost: totalResellerCost,
+        wallet_debt: walletDebt,
       }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

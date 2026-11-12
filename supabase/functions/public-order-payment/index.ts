@@ -192,13 +192,48 @@ serve(async (req) => {
       totalPayableAmount = Number(order.total_amount || 0);
     }
 
+    const isPaid = order.payment_status === 'paid' || order.status === 'pago' || order.status === 'recebido' || order.status === 'enviado';
+
+    // Verificar débito pendente na carteira do parceiro/revendedor (ou débito já quitado neste pedido)
+    const targetUserId = order.reseller_id || order.user_id;
+    let walletDebt = 0;
+    if (targetUserId) {
+      try {
+        if (!isPaid) {
+          const { data: userWallet } = await supabase
+            .from('wallets')
+            .select('saldo')
+            .eq('user_id', targetUserId)
+            .maybeSingle();
+          if (userWallet && Number(userWallet.saldo) < 0) {
+            walletDebt = Math.round(Math.abs(Number(userWallet.saldo)) * 100) / 100;
+          }
+        } else {
+          const { data: settledTx } = await supabase
+            .from('wallet_transactions')
+            .select('valor')
+            .eq('referencia_tipo', 'quitacao_debito_pedido')
+            .eq('referencia_id', order.id)
+            .maybeSingle();
+          if (settledTx && Number(settledTx.valor) > 0) {
+            walletDebt = Math.round(Number(settledTx.valor) * 100) / 100;
+          }
+        }
+      } catch (wErr) {
+        console.warn('[public-order-payment] Aviso ao consultar carteira:', wErr);
+      }
+    }
+
+    const productCostAmount = totalPayableAmount;
+    const totalPixPayable = Math.round((productCostAmount + walletDebt) * 100) / 100;
+
     let copyPaste = order.pix_qr_code || null;
     let base64 = order.pix_qr_code_base64 || null;
 
-    // Verificar se o Pix existente corresponde ao valor devido (tag 54 do Pix EMV)
-    if (isMarketplaceOrder && totalPayableAmount > 0) {
-      const expectedAmountStr = totalPayableAmount.toFixed(2);
-      const expectedAmountTag = `540${expectedAmountStr.length}${expectedAmountStr}`;
+    // Verificar se o Pix existente corresponde ao valor devido (produto + eventual débito da carteira)
+    if (!isPaid && (isMarketplaceOrder || walletDebt > 0) && totalPixPayable > 0) {
+      const expectedAmountStr = totalPixPayable.toFixed(2);
+      const expectedAmountTag = `54${String(expectedAmountStr.length).padStart(2, '0')}${expectedAmountStr}`;
       const isMismatched = copyPaste && !copyPaste.includes(expectedAmountTag);
 
       if (!copyPaste || isMismatched) {
@@ -220,8 +255,6 @@ serve(async (req) => {
     const qrImageUrl = copyPaste
       ? `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(copyPaste)}`
       : (base64 ? `data:image/png;base64,${base64}` : null);
-
-    const isPaid = order.payment_status === 'paid' || order.status === 'pago' || order.status === 'recebido' || order.status === 'enviado';
 
     // Buscar nome do revendedor (seller)
     let sellerName = 'Revendedor';
@@ -304,11 +337,13 @@ serve(async (req) => {
           status: order.status,
           payment_status: isPaid ? 'paid' : (order.payment_status || 'pending'),
           payment_method: order.payment_method || 'pix',
-          total_amount: isMarketplaceOrder ? totalPayableAmount : order.total_amount,
+          total_amount: (isMarketplaceOrder || walletDebt > 0) ? totalPixPayable : order.total_amount,
           retail_sale_amount: saleAmount,
           sale_amount: saleAmount,
           marketplace_fee: marketplaceFee,
           seller_cost: sellerCost,
+          wallet_debt: walletDebt,
+          total_payable_with_debt: totalPixPayable,
           seller_profit: sellerProfit,
           seller_margin_pct: sellerMarginPct,
           is_marketplace: isMarketplaceOrder,

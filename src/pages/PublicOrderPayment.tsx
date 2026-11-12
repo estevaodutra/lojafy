@@ -56,6 +56,8 @@ interface PublicOrderPaymentData {
   sale_amount?: number;
   marketplace_fee?: number;
   seller_cost?: number;
+  wallet_debt?: number;
+  total_payable_with_debt?: number;
   seller_profit?: number;
   seller_margin_pct?: number;
   is_marketplace?: boolean;
@@ -244,9 +246,13 @@ export const PublicOrderPayment: React.FC = () => {
     : order.pix.qr_code_image_url;
 
   const saleVal = order.sale_amount || order.retail_sale_amount || 0;
-  const costVal = order.total_amount || order.seller_cost || 0;
+  const productCostVal = order.seller_cost || order.total_amount || 0;
+  const walletDebtVal = order.wallet_debt || 0;
+  const costVal = walletDebtVal > 0
+    ? Math.round((productCostVal + walletDebtVal) * 100) / 100
+    : (order.total_amount || productCostVal);
   const feeVal = order.marketplace_fee || 0;
-  const profitVal = order.seller_profit !== undefined ? order.seller_profit : Math.max(0, saleVal - feeVal - costVal);
+  const profitVal = order.seller_profit !== undefined ? order.seller_profit : Math.max(0, saleVal - feeVal - productCostVal);
   const marginPct = order.seller_margin_pct !== undefined ? order.seller_margin_pct : (saleVal > 0 ? (profitVal / saleVal) * 100 : 0);
 
   const hasShippingLabel = !!(order.has_shipping_label || order.shipping_label_status === 'ready');
@@ -473,8 +479,25 @@ export const PublicOrderPayment: React.FC = () => {
                 <span className="text-muted-foreground font-medium">Custo do produto</span>
                 <span className="font-mono text-muted-foreground text-right text-xs">R$</span>
                 <span className="font-mono font-semibold text-foreground text-right tabular-nums">
-                  {formatAmountOnly(costVal)}
+                  {formatAmountOnly(productCostVal)}
                 </span>
+
+                {/* Débito em aberto na carteira (se houver) */}
+                {walletDebtVal > 0 && (
+                  <>
+                    <span className="text-rose-600 dark:text-rose-400 font-medium">Débito em aberto (Carteira)</span>
+                    <span className="font-mono text-rose-600 dark:text-rose-400 text-right text-xs font-medium">+R$</span>
+                    <span className="font-mono font-semibold text-rose-600 dark:text-rose-400 text-right tabular-nums">
+                      {formatAmountOnly(walletDebtVal)}
+                    </span>
+
+                    <span className="text-foreground font-semibold">Total a pagar (Pedido + Débito)</span>
+                    <span className="font-mono text-foreground text-right text-xs font-semibold">R$</span>
+                    <span className="font-mono font-bold text-foreground text-right tabular-nums">
+                      {formatAmountOnly(costVal)}
+                    </span>
+                  </>
+                )}
 
                 {/* Lucro Líquido com Percentual */}
                 <span className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
@@ -523,11 +546,16 @@ export const PublicOrderPayment: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <span className="text-xs text-slate-400 block">
-                    Custo do produto a pagar
+                    {walletDebtVal > 0 ? 'Total a pagar (Pedido + Débito)' : 'Custo do produto a pagar'}
                   </span>
                   <span className="text-2xl font-extrabold text-emerald-400">
                     {formatBRL(costVal)}
                   </span>
+                  {walletDebtVal > 0 && (
+                    <span className="text-[11px] text-amber-300 block mt-0.5">
+                      Pedido: {formatBRL(productCostVal)} + Débito: {formatBRL(walletDebtVal)}
+                    </span>
+                  )}
                 </div>
               </div>
             </CardHeader>

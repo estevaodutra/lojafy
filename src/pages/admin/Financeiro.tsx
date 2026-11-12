@@ -1112,7 +1112,9 @@ function WalletsTab() {
                         {getRoleLabel(wallet.profile?.role)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-semibold text-foreground">{formatBRL(Number(wallet.saldo))}</TableCell>
+                    <TableCell className={`font-semibold ${Number(wallet.saldo) < 0 ? "text-destructive" : "text-foreground"}`}>
+                      {formatBRL(Number(wallet.saldo))}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{formatBRL(Number(wallet.saldo_bloqueado))}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex gap-2 justify-end">

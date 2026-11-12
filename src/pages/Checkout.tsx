@@ -247,7 +247,8 @@ const Checkout = ({
   };
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discount = couponCode === "DESCONTO10" ? subtotal * 0.1 : 0;
-  const total = subtotal - discount + shippingCost;
+  const walletDebt = walletSaldo < 0 ? Math.round(Math.abs(walletSaldo) * 100) / 100 : 0;
+  const total = subtotal - discount + shippingCost + walletDebt;
   const formatPrice = (price: number) => {
     return price.toLocaleString('pt-BR', {
       style: 'currency',
@@ -464,7 +465,7 @@ const Checkout = ({
       const activeItems = freshCartItems && freshCartItems.length > 0 ? freshCartItems : cartItems;
       const currentSubtotal = activeItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
       const currentDiscount = couponCode === "DESCONTO10" ? currentSubtotal * 0.1 : 0;
-      const currentTotal = currentSubtotal - currentDiscount + shippingCost;
+      const currentTotal = currentSubtotal - currentDiscount + shippingCost + walletDebt;
 
       // Save user data and address before processing payment
       await saveUserDataAndAddress();
@@ -1261,6 +1262,19 @@ const Checkout = ({
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                      {user && walletDebt > 0 && (
+                        <div className="p-3.5 rounded-xl bg-rose-50/80 border border-rose-200 dark:bg-rose-950/30 dark:border-rose-800 flex items-start gap-3">
+                          <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                          <div className="text-xs space-y-1">
+                            <p className="font-semibold text-rose-900 dark:text-rose-200">
+                              Débito pendente na carteira: {formatPrice(walletDebt)}
+                            </p>
+                            <p className="text-rose-700 dark:text-rose-300">
+                              Este débito foi somado ao valor do pedido. Assim que o pagamento for confirmado, o saldo da sua carteira será regularizado automaticamente.
+                            </p>
+                          </div>
+                        </div>
+                      )}
                       {user && walletSaldo > 0 && (
                         <div 
                           className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${paymentMethod === 'wallet' ? 'border-emerald-600 bg-emerald-50/50 shadow-sm' : 'border-muted hover:border-primary/50'}`}
@@ -1431,6 +1445,12 @@ const Checkout = ({
                       {selectedShippingMethod ? (shippingCost === 0 ? <span className="text-emerald-600 font-semibold">GRÁTIS</span> : formatPrice(shippingCost)) : "A calcular"}
                     </span>
                   </div>
+                  {walletDebt > 0 && (
+                    <div className="flex justify-between text-rose-600 font-medium">
+                      <span>Débito pendente (Carteira)</span>
+                      <span>+{formatPrice(walletDebt)}</span>
+                    </div>
+                  )}
                   <Separator />
                   <div className="flex justify-between font-bold text-lg pt-1">
                     <span>Total</span>

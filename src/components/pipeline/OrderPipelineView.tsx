@@ -180,33 +180,27 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
 
   // Pix generation handler
   const handleGeneratePix = async (order: OrderPipelineItem) => {
-    // Verificar se o Pix existente corresponde ao valor devido pelo revendedor (custo Lojafy)
-    const expectedAmount = order.seller_cost || order.supplier_cost || order.total_amount || 0;
-    const expectedAmountStr = expectedAmount.toFixed(2);
-    const expectedAmountTag = `540${expectedAmountStr.length}${expectedAmountStr}`;
-    const pixHasWrongAmount = order.pix_qr_code && !order.pix_qr_code.includes(expectedAmountTag);
-
-    if (order.pix_qr_code && !pixHasWrongAmount) {
-      setPixModalOrder(order);
-      return;
-    }
-
     setIsGeneratingPix(true);
-    toast.info(`Gerando cobrança Pix (R$ ${expectedAmountStr.replace(".", ",")}) para o pedido #${order.order_number}...`);
     try {
       const { data, error } = await supabase.functions.invoke("ml-order-webhook", {
-        body: { action: "generate_pix_for_order", order_id: order.id, force_regenerate: true },
+        body: { action: "generate_pix_for_order", order_id: order.id },
       });
 
       if (error || !data?.success) {
+        if (order.pix_qr_code) {
+          setPixModalOrder(order);
+          return;
+        }
         throw new Error(data?.error || error?.message || "Falha ao gerar cobrança Pix.");
       }
 
-      const updated: OrderPipelineItem = {
+      const updated: OrderPipelineItem & { pix_total_amount?: number; wallet_debt?: number } = {
         ...order,
         pix_qr_code: data.pix_qr_code,
         pix_qr_code_base64: data.pix_qr_code_base64,
         payment_expires_at: data.payment_expires_at,
+        pix_total_amount: data.amount,
+        wallet_debt: data.wallet_debt || 0,
       };
 
       setPixModalOrder(updated);
@@ -527,7 +521,9 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
 
               <div className="text-center">
                 <p className="text-xs text-muted-foreground">
-                  {pixModalOrder.is_marketplace
+                  {(pixModalOrder as any).wallet_debt > 0
+                    ? "Total a pagar (Custo do Pedido + Débito Carteira)"
+                    : pixModalOrder.is_marketplace
                     ? "Valor a pagar (Custo do Produto na Lojafy)"
                     : "Valor a pagar"}
                 </p>
@@ -535,8 +531,20 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
                   {new Intl.NumberFormat("pt-BR", {
                     style: "currency",
                     currency: "BRL",
-                  }).format(pixModalOrder.seller_cost || pixModalOrder.supplier_cost || pixModalOrder.total_amount)}
+                  }).format((pixModalOrder as any).pix_total_amount || pixModalOrder.seller_cost || pixModalOrder.supplier_cost || pixModalOrder.total_amount)}
                 </p>
+                {(pixModalOrder as any).wallet_debt > 0 && (
+                  <p className="text-xs text-rose-600 dark:text-rose-400 font-medium mt-0.5">
+                    Pedido:{" "}
+                    {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+                      pixModalOrder.seller_cost || pixModalOrder.supplier_cost || pixModalOrder.total_amount
+                    )}{" "}
+                    + Débito Carteira:{" "}
+                    {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+                      (pixModalOrder as any).wallet_debt
+                    )}
+                  </p>
+                )}
                 {pixModalOrder.is_marketplace && (
                   <p className="text-xs text-muted-foreground mt-1">
                     Venda:{" "}

@@ -49,12 +49,21 @@ const CustomerWallet = () => {
       </div>
 
       {/* Balance Card */}
-      <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+      <Card className={saldo < 0 ? "bg-gradient-to-br from-rose-500/10 to-rose-500/5 border-rose-500/30" : "bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20"}>
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <p className="text-sm text-muted-foreground">Saldo Disponível</p>
-              <p className="text-4xl font-bold text-primary">{formatPrice(saldo)}</p>
+              <p className="text-sm text-muted-foreground">
+                {saldo < 0 ? "Débito Pendente na Carteira" : "Saldo Disponível"}
+              </p>
+              <p className={`text-4xl font-bold ${saldo < 0 ? "text-destructive" : "text-primary"}`}>
+                {formatPrice(saldo)}
+              </p>
+              {saldo < 0 && (
+                <p className="text-xs text-rose-600 dark:text-rose-400 mt-1">
+                  Este valor em aberto será somado automaticamente ao pagamento do seu próximo pedido.
+                </p>
+              )}
               {(wallet?.saldo_bloqueado ?? 0) > 0 && (
                 <p className="text-xs text-muted-foreground mt-1">
                   Bloqueado: {formatPrice(wallet!.saldo_bloqueado)}

@@ -39,16 +39,14 @@ export const AdminWalletAdjustModal = ({
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
-  const valorNum = parseFloat(valor) || 0;
-  const novoSaldo = tipo === "credito" ? currentBalance + valorNum : currentBalance - valorNum;
-  const isDebitoExcede = tipo === "debito" && valorNum > currentBalance;
+  const valorNum = parseFloat(valor.replace(",", ".")) || 0;
+  const novoSaldo = Math.round((tipo === "credito" ? currentBalance + valorNum : currentBalance - valorNum) * 100) / 100;
 
   const formatCurrency = (v: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
 
   const handleSubmit = async () => {
     if (!valor || valorNum <= 0 || !motivo.trim()) return;
-    if (isDebitoExcede) return;
 
     setSaving(true);
     try {
@@ -61,7 +59,7 @@ export const AdminWalletAdjustModal = ({
           p_descricao: motivo.trim(),
           p_referencia_tipo: "ajuste_credito",
           p_referencia_id: null,
-          p_tipo: "recarga",
+          p_tipo: "ajuste_credito",
         });
         if (error) throw error;
         const result = typeof data === "string" ? JSON.parse(data) : data;
@@ -140,16 +138,13 @@ export const AdminWalletAdjustModal = ({
               value={valor}
               onChange={(e) => setValor(e.target.value)}
             />
-            {isDebitoExcede && (
-              <p className="text-xs text-destructive">Saldo insuficiente para este débito</p>
-            )}
           </div>
 
           {/* Motivo */}
           <div className="space-y-2">
             <Label>Motivo *</Label>
             <Input
-              placeholder="Ex: Bônus de boas-vindas"
+              placeholder={tipo === "debito" ? "Ex: Desconto / Ajuste de débito" : "Ex: Bônus de boas-vindas"}
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
             />
@@ -170,10 +165,17 @@ export const AdminWalletAdjustModal = ({
           )}
 
           {/* Preview */}
-          {valorNum > 0 && !isDebitoExcede && (
-            <div className="p-3 bg-muted rounded-lg text-center">
+          {valorNum > 0 && (
+            <div className={`p-3 rounded-lg text-center border ${novoSaldo < 0 ? "bg-rose-50/70 border-rose-200 dark:bg-rose-950/30 dark:border-rose-800" : "bg-muted border-transparent"}`}>
               <p className="text-sm text-muted-foreground">Novo Saldo</p>
-              <p className="text-lg font-bold">{formatCurrency(novoSaldo)}</p>
+              <p className={`text-lg font-bold ${novoSaldo < 0 ? "text-destructive" : "text-foreground"}`}>
+                {formatCurrency(novoSaldo)}
+              </p>
+              {novoSaldo < 0 && (
+                <p className="text-xs text-rose-600 dark:text-rose-400 mt-1">
+                  Débito pendente: será somado automaticamente ao valor do próximo pedido pago pelo parceiro.
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -182,7 +184,7 @@ export const AdminWalletAdjustModal = ({
           <Button variant="outline" onClick={resetAndClose}>Cancelar</Button>
           <Button
             onClick={handleSubmit}
-            disabled={saving || valorNum <= 0 || !motivo.trim() || isDebitoExcede}
+            disabled={saving || valorNum <= 0 || !motivo.trim()}
           >
             {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Confirmar

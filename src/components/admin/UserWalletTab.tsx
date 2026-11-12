@@ -77,14 +77,8 @@ export const UserWalletTab = ({ userId, userName }: UserWalletTabProps) => {
     );
   }
 
-  if (!wallet) {
-    return (
-      <div className="text-center py-8 text-muted-foreground text-sm">
-        <Wallet className="w-8 h-8 mx-auto mb-2 opacity-50" />
-        Este usuário não possui carteira
-      </div>
-    );
-  }
+  const saldo = Number(wallet?.saldo ?? 0);
+  const saldoBloqueado = Number(wallet?.saldo_bloqueado ?? 0);
 
   return (
     <div className="space-y-4">
@@ -93,11 +87,20 @@ export const UserWalletTab = ({ userId, userName }: UserWalletTabProps) => {
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Saldo Disponível</p>
-              <p className="text-2xl font-bold">{formatCurrency(Number(wallet.saldo))}</p>
-              {Number(wallet.saldo_bloqueado) > 0 && (
+              <p className="text-sm text-muted-foreground">
+                {saldo < 0 ? "Saldo em Débito (Negativo)" : "Saldo Disponível"}
+              </p>
+              <p className={`text-2xl font-bold ${saldo < 0 ? "text-destructive" : ""}`}>
+                {formatCurrency(saldo)}
+              </p>
+              {saldo < 0 && (
+                <p className="text-xs text-rose-600 dark:text-rose-400 mt-1">
+                  Este débito será somado ao valor do próximo pedido pago pelo parceiro.
+                </p>
+              )}
+              {saldoBloqueado > 0 && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Bloqueado: {formatCurrency(Number(wallet.saldo_bloqueado))}
+                  Bloqueado: {formatCurrency(saldoBloqueado)}
                 </p>
               )}
             </div>
@@ -163,7 +166,7 @@ export const UserWalletTab = ({ userId, userName }: UserWalletTabProps) => {
         onClose={() => setAdjustOpen(false)}
         userId={userId}
         userName={userName}
-        currentBalance={Number(wallet.saldo)}
+        currentBalance={saldo}
         onSuccess={handleAdjustSuccess}
       />
     </div>
