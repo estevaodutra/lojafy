@@ -1,7 +1,7 @@
 {
-  "hash": "9febb85b46369d0992945c50fe41a8b44673e733",
-  "shortHash": "9febb85",
-  "message": "feat(pricing): implementar hierarquia de precificacao e regra de cobranca da Lojafy",
+  "hash": "8cf3f01db905713b042ba5283cbca64c2048ea1d",
+  "shortHash": "8cf3f01",
+  "message": "fix(pipeline): autorizar movimentacao de cards por fornecedor e persistir renomeacao globalmente no Supabase",
   "author": "Lojafy Developer",
-  "timestamp": 1794423758774
+  "timestamp": 1794431925719
 }

@@ -44,6 +44,7 @@ interface SupplierOrderRow {
     first_name: string;
     last_name: string;
   };
+  [key: string]: any;
 }
 
 const ALL_STATUS_OPTIONS = [
@@ -66,6 +67,8 @@ const SupplierOrderManagement = () => {
   const orgId = orgData?.organization?.id;
 
   const [orders, setOrders] = useState<SupplierOrderRow[]>([]);
+  const [productsMap, setProductsMap] = useState<Map<string, any>>(new Map());
+  const [profilesMap, setProfilesMap] = useState<Map<string, any>>(new Map());
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<SupplierOrderRow | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -115,7 +118,36 @@ const SupplierOrderManagement = () => {
             billing_address,
             webhook_paid_status,
             webhook_paid_error,
-            webhook_paid_dispatched_at
+            webhook_paid_dispatched_at,
+            marketplace,
+            external_reference,
+            marketplace_order_id,
+            ml_order_id,
+            ml_shipment_id,
+            origin_type,
+            reseller_id,
+            supplier_organization_id,
+            order_items (
+              id,
+              product_id,
+              quantity,
+              unit_price,
+              total_price,
+              supplier_unit_cost,
+              supplier_total_cost,
+              product_snapshot,
+              supplier_id,
+              supplier_organization_id,
+              product:products (
+                id,
+                name,
+                image_url,
+                images,
+                original_images,
+                cost_price,
+                price
+              )
+            )
           )
         `)
         .eq("supplier_organization_id", orgId)
@@ -131,49 +163,127 @@ const SupplierOrderManagement = () => {
 
       const orderIds = [...new Set(fulfillmentsData.map((f) => f.order_id).filter(Boolean))];
 
-      // 2. Fetch orders and order_items
+      // 2. Fetch orders directly with complete order_items & products
       let ordersData: any[] = [];
       if (orderIds.length > 0) {
         try {
-          const { data: oData } = await supabase
+          const { data: oData, error: oErr } = await supabase
             .from("orders")
             .select(`
-              id,
-              order_number,
-              status,
-              payment_status,
-              total_amount,
-              user_id,
-              created_at,
-              has_shipping_file,
-              shipping_address,
-              billing_address,
-              webhook_paid_status,
-              webhook_paid_error,
-              webhook_paid_dispatched_at,
+              *,
               order_items (
                 id,
                 product_id,
                 quantity,
                 unit_price,
                 total_price,
+                supplier_unit_cost,
+                supplier_total_cost,
                 product_snapshot,
+                supplier_id,
+                supplier_organization_id,
                 product:products (
                   id,
                   name,
                   image_url,
                   images,
-                  original_images
+                  original_images,
+                  cost_price,
+                  price
                 )
               )
             `)
             .in("id", orderIds);
+          if (oErr) {
+            console.warn("Direct orders fetch warning:", oErr);
+          }
           if (oData) ordersData = oData;
         } catch (e) {
           console.error("Error fetching orders directly:", e);
         }
       }
       const ordersMap = new Map(ordersData.map((o) => [o.id, o]));
+
+      // 2.1 Direct fallback query on order_items table to guarantee items exist
+      let directOrderItems: any[] = [];
+      if (orderIds.length > 0) {
+        try {
+          const { data: itemsData, error: itemsErr } = await supabase
+            .from("order_items")
+            .select(`
+              id,
+              order_id,
+              product_id,
+              quantity,
+              unit_price,
+              total_price,
+              supplier_unit_cost,
+              supplier_total_cost,
+              product_snapshot,
+              supplier_id,
+              supplier_organization_id,
+              product:products (
+                id,
+                name,
+                image_url,
+                images,
+                original_images,
+                cost_price,
+                price
+              )
+            `)
+            .in("order_id", orderIds);
+          if (!itemsErr && itemsData) {
+            directOrderItems = itemsData;
+          }
+        } catch (err) {
+          console.warn("Direct order_items fallback query exception:", err);
+        }
+      }
+      const orderItemsByOrderId = new Map<string, any[]>();
+      directOrderItems.forEach((it) => {
+        if (!orderItemsByOrderId.has(it.order_id)) {
+          orderItemsByOrderId.set(it.order_id, []);
+        }
+        orderItemsByOrderId.get(it.order_id)!.push(it);
+      });
+
+      // 2.2 Collect all product_ids across all sources and fetch products directly
+      const productIds: string[] = [];
+      const extractIds = (items: any[]) => {
+        if (Array.isArray(items)) {
+          items.forEach((it) => {
+            if (it?.product_id) productIds.push(it.product_id);
+          });
+        }
+      };
+
+      fulfillmentsData.forEach((f: any) => {
+        extractIds(f.orders?.order_items);
+      });
+      ordersData.forEach((o: any) => {
+        extractIds(o.order_items);
+      });
+      directOrderItems.forEach((it: any) => {
+        if (it?.product_id) productIds.push(it.product_id);
+      });
+
+      let loadedProductsMap = new Map<string, any>();
+      const uniqueProductIds = [...new Set(productIds)];
+      if (uniqueProductIds.length > 0) {
+        try {
+          const { data: prods, error: prodsErr } = await supabase
+            .from("products")
+            .select("id, name, image_url, images, original_images, cost_price, price")
+            .in("id", uniqueProductIds);
+          if (!prodsErr && prods) {
+            loadedProductsMap = new Map(prods.map((p) => [p.id, p]));
+          }
+        } catch (err) {
+          console.warn("Products direct query exception:", err);
+        }
+      }
+      setProductsMap(loadedProductsMap);
 
       // 3. Shipping files
       let shippingFilesData: Array<{ order_id: string }> = [];
@@ -223,7 +333,8 @@ const SupplierOrderManagement = () => {
           }
         }
       }
-      const profilesMap = new Map(profilesData.map((p) => [p.user_id, p]));
+      const loadedProfilesMap = new Map(profilesData.map((p) => [p.user_id, p]));
+      setProfilesMap(loadedProfilesMap);
 
       const parseAddress = (addr: any) => {
         if (!addr) return null;
@@ -239,8 +350,27 @@ const SupplierOrderManagement = () => {
       };
 
       const mappedRows: SupplierOrderRow[] = fulfillmentsData.map((item) => {
-        const orderObj = (item.orders as any) || ordersMap.get(item.order_id) || {};
-        const profile = orderObj?.user_id ? profilesMap.get(orderObj.user_id) : null;
+        const directOrder = ordersMap.get(item.order_id);
+        const embeddedOrder = (item.orders as any) || {};
+        const orderObj = { ...embeddedOrder, ...(directOrder || {}) };
+
+        // Ordem de prioridade para itens do pedido:
+        // 1. directOrderItems da tabela order_items
+        // 2. directOrder.order_items
+        // 3. embeddedOrder.order_items
+        const directItems = orderItemsByOrderId.get(item.order_id) || [];
+        const rawItems = directItems.length > 0 ? directItems : (directOrder?.order_items || embeddedOrder?.order_items || []);
+        const enrichedItems = Array.isArray(rawItems)
+          ? rawItems.map((it: any) => {
+              const matchedProduct = it.product || (it.product_id ? loadedProductsMap.get(it.product_id) : null);
+              return {
+                ...it,
+                product: matchedProduct,
+              };
+            })
+          : [];
+
+        const profile = orderObj?.user_id ? loadedProfilesMap.get(orderObj.user_id) : null;
 
         let firstName = profile?.first_name || "";
         let lastName = profile?.last_name || "";
@@ -272,6 +402,7 @@ const SupplierOrderManagement = () => {
         );
 
         return {
+          ...orderObj,
           id: orderObj?.id || item.id,
           fulfillment_id: item.id,
           order_id: item.order_id,
@@ -288,7 +419,7 @@ const SupplierOrderManagement = () => {
           webhook_paid_error: orderObj?.webhook_paid_error,
           sla_shipping_deadline: item.sla_shipping_deadline,
           shipping_address: orderObj?.shipping_address,
-          order_items: orderObj?.order_items || [],
+          order_items: enrichedItems,
           profiles: {
             first_name: firstName || "Cliente",
             last_name: lastName || "",
@@ -350,22 +481,19 @@ const SupplierOrderManagement = () => {
 
   // Convert to normalized pipeline items
   const pipelineItems: OrderPipelineItem[] = useMemo(() => {
+    const supplierOrgsMap = new Map<string, any>();
+    if (orgData?.organization) {
+      supplierOrgsMap.set(orgData.organization.id, orgData.organization);
+    }
+
     return orders.map((row) =>
-      normalizeOrderToPipelineItem({
-        id: row.order_id || row.id,
-        order_number: row.order_number,
-        status: row.status,
-        payment_status: row.payment_status,
-        total_amount: row.total_amount,
-        created_at: row.created_at,
-        user_id: row.user_id,
-        has_shipping_file: row.has_shipping_file,
-        shipping_address: row.shipping_address,
-        order_items: row.order_items,
-        profiles: row.profiles,
+      normalizeOrderToPipelineItem(row, {
+        productsMap,
+        supplierOrgsMap,
+        profilesMap,
       })
     );
-  }, [orders]);
+  }, [orders, productsMap, orgData, profilesMap]);
 
   const getPaymentStatusBadge = (status: string) => {
     const statusConfig = {
