@@ -105,50 +105,7 @@ const SupplierOrderManagement = () => {
           sla_shipping_deadline,
           created_at,
           supplier_organization_id,
-          orders (
-            id,
-            order_number,
-            status,
-            payment_status,
-            total_amount,
-            user_id,
-            created_at,
-            has_shipping_file,
-            shipping_address,
-            billing_address,
-            webhook_paid_status,
-            webhook_paid_error,
-            webhook_paid_dispatched_at,
-            marketplace,
-            external_reference,
-            marketplace_order_id,
-            ml_order_id,
-            ml_shipment_id,
-            origin_type,
-            reseller_id,
-            supplier_organization_id,
-            order_items (
-              id,
-              product_id,
-              quantity,
-              unit_price,
-              total_price,
-              supplier_unit_cost,
-              supplier_total_cost,
-              product_snapshot,
-              supplier_id,
-              supplier_organization_id,
-              product:products (
-                id,
-                name,
-                image_url,
-                images,
-                original_images,
-                cost_price,
-                price
-              )
-            )
-          )
+          orders (*)
         `)
         .eq("supplier_organization_id", orgId)
         .order("created_at", { ascending: false });
