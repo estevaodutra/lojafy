@@ -1,7 +1,7 @@
 {
-  "hash": "17170b9426ad46cebbd5c83094f5ee0ead4deb22",
-  "shortHash": "17170b9",
-  "message": "fix(pipeline): unificar botao de avancar etapa do pedido e corrigir erro de atualizacao de status",
+  "hash": "5f0cb6c15c066108e05c90e904d4aa9876f8bea1",
+  "shortHash": "5f0cb6c",
+  "message": "feat(revendedor): adicionar selecao e exportacao em massa para Shopee nos produtos e anuncios",
   "author": "Lojafy Developer",
-  "timestamp": 1794937576721
+  "timestamp": 1794938510895
 }
