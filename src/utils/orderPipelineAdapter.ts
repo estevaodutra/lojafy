@@ -12,6 +12,93 @@ export function formatTimeInStage(dateStr: string): string {
   return `Há ${days}d na etapa`;
 }
 
+/**
+ * Determina com exclusividade mútua e precisão cirúrgica se um pedido pertence à pipeline de Ocorrências.
+ * Regra: Um pedido nunca é onipresente. Ou ele está no Principal, ou em Ocorrências.
+ */
+export function isOrderInOccurrences(order: any): boolean {
+  if (!order) return false;
+
+  // 1. Se tem ticket ativo (order_tickets com status diferente de resolvido)
+  const ticketStatus = (order.active_ticket_status || "").toLowerCase().trim();
+  if (ticketStatus && ticketStatus !== "resolvido" && ticketStatus !== "closed" && ticketStatus !== "fechado") {
+    return true;
+  }
+  if (order.active_ticket_id && ticketStatus !== "resolvido") {
+    return true;
+  }
+
+  // 2. Se tem ocorrência aberta de fornecedor ou solicitação de pós-venda
+  if (order.has_solicitation) {
+    return true;
+  }
+  if (order.has_active_occurrence) {
+    return true;
+  }
+  if (order.cancelamento_motivo || order.devolucao_motivo) {
+    return true;
+  }
+
+  // 3. Se o pipeline_type do pedido está explicitamente definido como 'occurrences'
+  if (
+    order.pipeline === "occurrences" ||
+    order.pipeline_type === "occurrences" ||
+    order.pipeline_key === "occurrences"
+  ) {
+    return true;
+  }
+
+  // 4. Se o status atual do pedido corresponde a etapas de pós-venda/ocorrências
+  const status = (order.status || "").toLowerCase().trim();
+  const occurrenceStatuses = [
+    "aberto",
+    "ocorrência aberta",
+    "ocorrencia aberta",
+    "em_analise",
+    "em análise",
+    "aguardando_cliente",
+    "aguardando cliente",
+    "resolvido",
+    "devolucao_andamento",
+    "devolução em andamento",
+    "devolucao_recebida",
+    "devolucao_analise",
+    "devolucao_aprovada",
+    "devolucao",
+    "devolução",
+    "cancelamento_solicitado",
+    "em_reposicao",
+    "em_falta",
+    "reembolsado",
+    "troca",
+  ];
+
+  if (occurrenceStatuses.includes(status)) {
+    return true;
+  }
+
+  // Se o nome do status contiver explicitamente 'ocorrência', 'devolução' ou 'troca'
+  if (
+    status.includes("ocorrência") ||
+    status.includes("ocorrencia") ||
+    status.includes("devolução") ||
+    status.includes("devolucao") ||
+    status.includes("troca")
+  ) {
+    return true;
+  }
+
+  // Caso contrário, pertence à pipeline Principal
+  return false;
+}
+
+/**
+ * Determina se o pedido pertence à pipeline Principal (estritamente o oposto de Ocorrências).
+ */
+export function isOrderInPrimary(order: any): boolean {
+  return !isOrderInOccurrences(order);
+}
+
 export function normalizeOrderToPipelineItem(
   order: any,
   context?: {
@@ -325,12 +412,21 @@ export function normalizeOrderToPipelineItem(
   const lojafyProfit = Math.max(0, Math.round((lojafySale - lojafyFee - lojafyCost) * 100) / 100);
   const lojafyMarginPct = lojafySale > 0 ? (lojafyProfit / lojafySale) * 100 : 0;
 
+  const inOccurrences = isOrderInOccurrences({
+    ...order,
+    active_ticket_status: activeTicket?.status || order.active_ticket_status,
+    active_ticket_id: activeTicket?.id || order.active_ticket_id,
+    has_solicitation: !!(order.cancelamento_motivo || order.devolucao_motivo),
+  });
+
   return {
     id: order.id,
     order_number: order.order_number ? String(order.order_number).replace(/^#/, "") : "",
     created_at: order.created_at,
     updated_at: order.updated_at,
     status: order.status || "pendente",
+    pipeline_key: inOccurrences ? "occurrences" : "primary",
+    in_occurrences: inOccurrences,
     payment_status: order.payment_status || "pending",
     total_amount: saleAmount,
     sale_amount: saleAmount,

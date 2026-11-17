@@ -45,6 +45,8 @@ export interface OrderPipelineItem {
   created_at: string;
   updated_at?: string;
   status: string; // Operational status (ex: 'pendente', 'pago', etc.)
+  pipeline_key?: "primary" | "occurrences";
+  in_occurrences?: boolean;
   payment_status: "pending" | "paid" | "failed" | string;
   total_amount: number;
 

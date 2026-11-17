@@ -100,7 +100,12 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
         const sName = stage.name.toLowerCase().trim();
 
         if (pipeline.key === "occurrences") {
-          return ticketStatus === sKey || ticketStatus === sName || orderStatus === sKey || orderStatus === sName;
+          if (ticketStatus === sKey || ticketStatus === sName || orderStatus === sKey || orderStatus === sName) return true;
+          if ((sKey === "aberto" || sName.includes("abert")) && (orderStatus.includes("devolucao") || orderStatus.includes("cancelamento") || !!order.has_solicitation || !!order.cancelamento_motivo || !!order.devolucao_motivo)) return true;
+          if ((sKey === "em_analise" || sName.includes("analise") || sName.includes("análise")) && (orderStatus === "em_analise" || orderStatus === "devolucao_analise")) return true;
+          if ((sKey === "aguardando_cliente" || sName.includes("cliente")) && (ticketStatus === "aguardando_cliente" || orderStatus === "aguardando_cliente")) return true;
+          if ((sKey === "resolvido" || sName.includes("resolv")) && (ticketStatus === "resolvido" || orderStatus === "resolvido" || orderStatus === "reembolsado" || orderStatus === "devolucao_aprovada")) return true;
+          return false;
         }
 
         // Casamento direto por chave ou nome exato

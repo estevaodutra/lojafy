@@ -98,8 +98,8 @@ export const DEFAULT_PIPELINES: OrderPipeline[] = [
   {
     id: "22222222-2222-2222-2222-222222222222",
     key: "occurrences",
-    name: "Retornos e Ocorrências",
-    description: "Gestão de pós-venda, devoluções, trocas e ocorrências paralelas",
+    name: "Ocorrências",
+    description: "Gestão de pós-venda, devoluções, trocas e ocorrências",
     order_index: 2,
     is_active: true,
     stages: [

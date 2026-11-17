@@ -1,7 +1,7 @@
 {
-  "hash": "8cf3f01db905713b042ba5283cbca64c2048ea1d",
-  "shortHash": "8cf3f01",
-  "message": "fix(pipeline): autorizar movimentacao de cards por fornecedor e persistir renomeacao globalmente no Supabase",
+  "hash": "42707d43a4522fdf3d25d5933b42b93e2d5618a3",
+  "shortHash": "42707d4",
+  "message": "fix(pwa): deduplicate manifest link and add id to webmanifest",
   "author": "Lojafy Developer",
-  "timestamp": 1794431925719
+  "timestamp": 1794924792006
 }

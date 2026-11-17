@@ -33,10 +33,13 @@ import {
   RefreshCw,
   Loader2,
   ExternalLink,
+  AlertCircle,
+  Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { isOrderInOccurrences, isOrderInPrimary } from "@/utils/orderPipelineAdapter";
 
 interface OrderPipelineViewProps {
   orders: OrderPipelineItem[];
@@ -103,9 +106,33 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
     return Array.from(set);
   }, [orders]);
 
-  // Filtered orders
+  // Separação estrita dos pedidos por pipeline: NUNCA ONIPRESENTES
+  // Um pedido está em Ocorrências OU no Principal, exclusivamente.
+  const primaryOrders = useMemo(() => {
+    return orders.filter((o) => isOrderInPrimary(o));
+  }, [orders]);
+
+  const occurrencesOrders = useMemo(() => {
+    return orders.filter((o) => isOrderInOccurrences(o));
+  }, [orders]);
+
+  // Contagens dos pedidos de cada pipeline
+  const primaryCount = useMemo(() => {
+    return primaryOrders.filter((o) => (showArchivedOnly ? o.is_archived : !o.is_archived)).length;
+  }, [primaryOrders, showArchivedOnly]);
+
+  const occurrencesCount = useMemo(() => {
+    return occurrencesOrders.filter((o) => (showArchivedOnly ? o.is_archived : !o.is_archived)).length;
+  }, [occurrencesOrders, showArchivedOnly]);
+
+  // Base de pedidos da pipeline ativa
+  const activePipelineOrders = useMemo(() => {
+    return activePipelineKey === "occurrences" ? occurrencesOrders : primaryOrders;
+  }, [activePipelineKey, occurrencesOrders, primaryOrders]);
+
+  // Filtered orders aplicados EXCLUSIVAMENTE sobre a pipeline ativa
   const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
+    return activePipelineOrders.filter((order) => {
       // Archiving condition (Section 7 & 11)
       if (showArchivedOnly) {
         if (!order.is_archived) return false;
@@ -138,7 +165,22 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
 
       return true;
     });
-  }, [orders, searchTerm, channelFilter, selectedSeller, showArchivedOnly]);
+  }, [activePipelineOrders, searchTerm, channelFilter, selectedSeller, showArchivedOnly]);
+
+  // Detector inteligente: se a busca não encontrou na pipeline ativa, mas existe na outra
+  const matchInOtherPipeline = useMemo(() => {
+    if (!searchTerm.trim()) return null;
+    const term = searchTerm.toLowerCase();
+    const otherOrders = activePipelineKey === "occurrences" ? primaryOrders : occurrencesOrders;
+    return otherOrders.find((order) => {
+      const matchesNum = order.order_number.toLowerCase().includes(term);
+      const matchesExt = order.external_reference?.toLowerCase().includes(term);
+      const matchesTrack = order.tracking_number?.toLowerCase().includes(term);
+      const matchesCustomer = order.customer_name.toLowerCase().includes(term);
+      const matchesProd = order.main_product?.name.toLowerCase().includes(term);
+      return matchesNum || matchesExt || matchesTrack || matchesCustomer || matchesProd;
+    });
+  }, [searchTerm, activePipelineKey, primaryOrders, occurrencesOrders]);
 
   // Label sync state
   const [isSyncingLabels, setIsSyncingLabels] = useState(false);
@@ -266,25 +308,55 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
             </Button>
           </div>
 
-          {/* Sub-Pipelines Selector (available in both Pipeline and List views) */}
-          <div className="flex items-center rounded-md bg-muted/60 p-0.5 border">
+          {/* Sub-Pipelines Selector (disponível tanto no Pipeline quanto na Lista) */}
+          <div className="flex items-center rounded-md bg-muted p-0.5 border">
             <Button
-              variant={activePipelineKey === "primary" ? "secondary" : "ghost"}
+              variant={activePipelineKey === "primary" ? "default" : "ghost"}
               size="sm"
-              className="h-6 px-2 text-[11px] font-medium gap-1"
+              className={cn(
+                "h-6 px-2.5 text-[11px] font-semibold gap-1.5 shadow-none transition-all",
+                activePipelineKey === "primary"
+                  ? "bg-primary text-primary-foreground font-bold shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
               onClick={() => setActivePipelineKey("primary")}
             >
-              <Package className="w-3 h-3 text-primary" />
-              Principal
+              <Package className="w-3 h-3" />
+              <span>Principal</span>
+              <span
+                className={cn(
+                  "text-[10px] px-1.5 py-0 rounded-full font-bold leading-none",
+                  activePipelineKey === "primary"
+                    ? "bg-primary-foreground/25 text-primary-foreground"
+                    : "bg-muted-foreground/15 text-muted-foreground"
+                )}
+              >
+                {primaryCount}
+              </span>
             </Button>
             <Button
-              variant={activePipelineKey === "occurrences" ? "secondary" : "ghost"}
+              variant={activePipelineKey === "occurrences" ? "default" : "ghost"}
               size="sm"
-              className="h-6 px-2 text-[11px] font-medium gap-1"
+              className={cn(
+                "h-6 px-2.5 text-[11px] font-semibold gap-1.5 shadow-none transition-all",
+                activePipelineKey === "occurrences"
+                  ? "bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
               onClick={() => setActivePipelineKey("occurrences")}
             >
-              <RotateCcw className="w-3 h-3 text-amber-500" />
-              Retornos / Ocorrências
+              <AlertCircle className={cn("w-3 h-3", activePipelineKey === "occurrences" ? "text-white" : "text-amber-500")} />
+              <span>Ocorrências</span>
+              <span
+                className={cn(
+                  "text-[10px] px-1.5 py-0 rounded-full font-bold leading-none",
+                  activePipelineKey === "occurrences"
+                    ? "bg-white/30 text-white"
+                    : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                )}
+              >
+                {occurrencesCount}
+              </span>
             </Button>
           </div>
         </div>
@@ -418,6 +490,28 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
           </Button>
         )}
       </div>
+
+      {/* Banner inteligente quando a busca encontrar o pedido no outro pipeline */}
+      {matchInOtherPipeline && (
+        <div className="flex items-center justify-between gap-2 p-2 px-3 rounded-lg border border-amber-500/30 bg-amber-500/10 text-xs shrink-0 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 min-w-0">
+            <Info className="w-4 h-4 text-amber-600 shrink-0" />
+            <span className="truncate">
+              O pedido <strong>#{matchInOtherPipeline.order_number}</strong> pertence ao fluxo de{" "}
+              <strong className="underline">{activePipelineKey === "occurrences" ? "Principal" : "Ocorrências"}</strong>.
+            </span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 text-[11px] px-2.5 gap-1 border-amber-500/40 hover:bg-amber-500/20 shrink-0 font-medium"
+            onClick={() => setActivePipelineKey(activePipelineKey === "occurrences" ? "primary" : "occurrences")}
+          >
+            <span>Alternar para {activePipelineKey === "occurrences" ? "Principal" : "Ocorrências"}</span>
+            <ExternalLink className="w-3 h-3" />
+          </Button>
+        </div>
+      )}
 
       {/* Main Content Area (Fills remaining height) */}
       <div className="flex-1 min-h-0 w-full overflow-hidden flex flex-col">
