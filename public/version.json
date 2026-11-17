@@ -1,7 +1,7 @@
 {
-  "hash": "932d1805e9fb8979ec82993054e62a62be714556",
-  "shortHash": "932d180",
-  "message": "fix(revendedor): ocultar secao Minha Loja do menu lateral",
+  "hash": "1321db885af93b67bc41f689d63c402959ecf64a",
+  "shortHash": "1321db8",
+  "message": "fix(pedidos): tornar etiqueta de envio opcional na abertura de ocorrencia e devolucao",
   "author": "Lojafy Developer",
-  "timestamp": 1794928518783
+  "timestamp": 1794935137858
 }
