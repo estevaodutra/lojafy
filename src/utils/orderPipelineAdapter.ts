@@ -178,7 +178,13 @@ export function normalizeOrderToPipelineItem(
 
     mainProduct = {
       id: first.product_id,
-      name: snapshot.name || prod.name || prod.title || "Produto",
+      name:
+        snapshot.name ||
+        first.product_name ||
+        prod.name ||
+        prod.title ||
+        order.product_name ||
+        "Produto",
       imageUrl: img || undefined,
       quantity: first.quantity || 1,
     };
@@ -186,12 +192,25 @@ export function normalizeOrderToPipelineItem(
     totalQuantity = items.reduce((acc: number, it: any) => acc + (it.quantity || 1), 0);
   } else {
     // Fallback if no order_items joined
+    const fallbackName =
+      order.product_name ||
+      order.product_snapshot?.name ||
+      (Array.isArray(order.items_snapshot) && order.items_snapshot[0]?.name) ||
+      "Item do Pedido";
+    const fallbackImage =
+      order.product_image ||
+      order.image_url ||
+      order.product_snapshot?.image_url ||
+      order.product_snapshot?.imageUrl ||
+      (Array.isArray(order.items_snapshot) && (order.items_snapshot[0]?.image_url || order.items_snapshot[0]?.imageUrl)) ||
+      undefined;
+
     mainProduct = {
-      name: order.product_name || "Item do Pedido",
-      imageUrl: order.product_image || order.image_url || undefined,
-      quantity: order.items_count || 1,
+      name: fallbackName,
+      imageUrl: fallbackImage,
+      quantity: order.items_count || order.total_items_count || 1,
     };
-    totalQuantity = order.items_count || 1;
+    totalQuantity = order.items_count || order.total_items_count || 1;
   }
 
   // Seller resolution

@@ -91,7 +91,7 @@ const SupplierOrderManagement = () => {
       setLoading(true);
       const { data: { user: currentUser } } = await supabase.auth.getUser();
 
-      // 1. Fetch fulfillments cleanly
+      // 1. Fetch fulfillments cleanly with embedded orders and items
       const { data: fulfillmentsData, error: fError } = await supabase
         .from("supplier_fulfillments")
         .select(`
@@ -105,7 +105,22 @@ const SupplierOrderManagement = () => {
           sla_shipping_deadline,
           created_at,
           supplier_organization_id,
-          orders (*)
+          orders (
+            *,
+            order_items (
+              id,
+              order_id,
+              product_id,
+              quantity,
+              unit_price,
+              total_price,
+              supplier_unit_cost,
+              supplier_total_cost,
+              product_snapshot,
+              supplier_id,
+              supplier_organization_id
+            )
+          )
         `)
         .eq("supplier_organization_id", orgId)
         .order("created_at", { ascending: false });
@@ -120,7 +135,7 @@ const SupplierOrderManagement = () => {
 
       const orderIds = [...new Set(fulfillmentsData.map((f) => f.order_id).filter(Boolean))];
 
-      // 2. Fetch orders directly with complete order_items & products
+      // 2. Fetch orders directly with complete order_items
       let ordersData: any[] = [];
       if (orderIds.length > 0) {
         try {
@@ -130,6 +145,7 @@ const SupplierOrderManagement = () => {
               *,
               order_items (
                 id,
+                order_id,
                 product_id,
                 quantity,
                 unit_price,
@@ -138,16 +154,7 @@ const SupplierOrderManagement = () => {
                 supplier_total_cost,
                 product_snapshot,
                 supplier_id,
-                supplier_organization_id,
-                product:products (
-                  id,
-                  name,
-                  image_url,
-                  images,
-                  original_images,
-                  cost_price,
-                  price
-                )
+                supplier_organization_id
               )
             `)
             .in("id", orderIds);
@@ -178,16 +185,7 @@ const SupplierOrderManagement = () => {
               supplier_total_cost,
               product_snapshot,
               supplier_id,
-              supplier_organization_id,
-              product:products (
-                id,
-                name,
-                image_url,
-                images,
-                original_images,
-                cost_price,
-                price
-              )
+              supplier_organization_id
             `)
             .in("order_id", orderIds);
           if (!itemsErr && itemsData) {
@@ -205,7 +203,42 @@ const SupplierOrderManagement = () => {
         orderItemsByOrderId.get(it.order_id)!.push(it);
       });
 
-      // 2.2 Collect all product_ids across all sources and fetch products directly
+      // 2.2 RPC security-definer fallback for any remaining orders without items
+      const missingItemOrderIds = orderIds.filter((id) => {
+        const hasDirect = (orderItemsByOrderId.get(id) || []).length > 0;
+        const hasOrder = (ordersMap.get(id)?.order_items || []).length > 0;
+        const embedded = fulfillmentsData.find((f) => f.order_id === id)?.orders as any;
+        const hasEmbedded = (embedded?.order_items || []).length > 0;
+        return !hasDirect && !hasOrder && !hasEmbedded;
+      });
+
+      if (missingItemOrderIds.length > 0) {
+        try {
+          const { data: rpcItems, error: rpcErr } = await supabase.rpc("get_supplier_order_items", {
+            p_order_ids: missingItemOrderIds,
+          });
+          if (!rpcErr && rpcItems && Array.isArray(rpcItems)) {
+            rpcItems.forEach((it: any) => {
+              if (!orderItemsByOrderId.has(it.order_id)) {
+                orderItemsByOrderId.set(it.order_id, []);
+              }
+              orderItemsByOrderId.get(it.order_id)!.push({
+                ...it,
+                product_snapshot: it.product_snapshot || {
+                  name: it.product_name,
+                  image_url: it.product_image_url,
+                  imageUrl: it.product_image_url,
+                  sku: it.product_sku,
+                },
+              });
+            });
+          }
+        } catch (rpcEx) {
+          console.warn("RPC get_supplier_order_items exception:", rpcEx);
+        }
+      }
+
+      // 2.3 Collect all product_ids across all sources and fetch products directly
       const productIds: string[] = [];
       const extractIds = (items: any[]) => {
         if (Array.isArray(items)) {
@@ -224,6 +257,9 @@ const SupplierOrderManagement = () => {
       directOrderItems.forEach((it: any) => {
         if (it?.product_id) productIds.push(it.product_id);
       });
+      orderItemsByOrderId.forEach((items) => {
+        extractIds(items);
+      });
 
       let loadedProductsMap = new Map<string, any>();
       const uniqueProductIds = [...new Set(productIds)];
@@ -231,7 +267,7 @@ const SupplierOrderManagement = () => {
         try {
           const { data: prods, error: prodsErr } = await supabase
             .from("products")
-            .select("id, name, image_url, images, original_images, cost_price, price")
+            .select("id, name, image_url, images, original_images, cost_price, price, sku")
             .in("id", uniqueProductIds);
           if (!prodsErr && prods) {
             loadedProductsMap = new Map(prods.map((p) => [p.id, p]));
@@ -320,12 +356,47 @@ const SupplierOrderManagement = () => {
         const enrichedItems = Array.isArray(rawItems)
           ? rawItems.map((it: any) => {
               const matchedProduct = it.product || (it.product_id ? loadedProductsMap.get(it.product_id) : null);
+              const snapshot = it.product_snapshot || {};
+              const resolvedName =
+                snapshot.name ||
+                it.product_name ||
+                matchedProduct?.name ||
+                matchedProduct?.title ||
+                "Produto";
+              const resolvedImage =
+                snapshot.image_url ||
+                snapshot.imageUrl ||
+                it.product_image_url ||
+                matchedProduct?.image_url ||
+                (Array.isArray(matchedProduct?.images) && matchedProduct.images[0]) ||
+                (Array.isArray(matchedProduct?.original_images) &&
+                  (matchedProduct.original_images[0]?.url || matchedProduct.original_images[0])) ||
+                null;
+              const resolvedSku = snapshot.sku || it.product_sku || matchedProduct?.sku || "";
+
               return {
                 ...it,
                 product: matchedProduct,
+                product_snapshot: {
+                  ...snapshot,
+                  name: resolvedName,
+                  image_url: resolvedImage,
+                  imageUrl: resolvedImage,
+                  sku: resolvedSku,
+                },
+                quantity: it.quantity || 1,
               };
             })
           : [];
+
+        const mainItem = enrichedItems[0];
+        const fallbackProdName = mainItem?.product_snapshot?.name || orderObj?.product_name || "";
+        const fallbackProdImage =
+          mainItem?.product_snapshot?.image_url ||
+          mainItem?.product_snapshot?.imageUrl ||
+          orderObj?.product_image ||
+          orderObj?.image_url ||
+          "";
 
         const profile = orderObj?.user_id ? loadedProfilesMap.get(orderObj.user_id) : null;
 
@@ -364,6 +435,8 @@ const SupplierOrderManagement = () => {
           fulfillment_id: item.id,
           order_id: item.order_id,
           order_number: orderObj?.order_number || "",
+          product_name: fallbackProdName || orderObj?.product_name || "",
+          product_image: fallbackProdImage || orderObj?.product_image || "",
           status: orderObj?.status || item.status || "recebido",
           order_status: orderObj?.status || "",
           payment_status: orderObj?.payment_status || "pending",
