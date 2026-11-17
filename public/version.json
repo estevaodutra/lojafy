@@ -1,7 +1,7 @@
 {
-  "hash": "d3906607340dfcc8ce668251524ea86371a24088",
-  "shortHash": "d390660",
-  "message": "feat(shopee): exportar produtos em formato XLSX nativo de acordo com os requisitos da Shopee",
+  "hash": "3ed00340d0ddf7c637111ae9e16d3bcb3c2b4f28",
+  "shortHash": "3ed0034",
+  "message": "fix(shopee): usar template oficial Shopee Brasil com todas abas estruturais e aba Modelo",
   "author": "Lojafy Developer",
-  "timestamp": 1794939177800
+  "timestamp": 1794939664350
 }

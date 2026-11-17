@@ -326,6 +326,7 @@ export interface ShopeeExportOptions {
   markupMultiplier?: number;
   defaultWeightKg?: number;
   filenamePrefix?: string;
+  shippingChannelToggle?: string;
 }
 
 /**
@@ -366,11 +367,12 @@ export function mapProductToShopeeRow(product: any, options?: ShopeeExportOption
     const rawW = Number(product.weight);
     weightKg = rawW > 50 ? rawW / 1000 : rawW;
   }
-  const finalWeight = Math.max(0.01, Number(weightKg.toFixed(2)));
+  const finalWeight = Math.max(0.05, Number(weightKg.toFixed(2)));
 
-  const lengthCm = Math.max(1, Math.round(Number(product.length) || 16));
-  const widthCm = Math.max(1, Math.round(Number(product.width) || 11));
-  const heightCm = Math.max(1, Math.round(Number(product.height) || 6));
+  // Dimensões seguras e válidas para transporte (mínimo 16x11x2 cm, máximo 100 cm)
+  const lengthCm = Math.min(100, Math.max(16, Math.round(Number(product.length) || 16)));
+  const widthCm = Math.min(100, Math.max(11, Math.round(Number(product.width) || 11)));
+  const heightCm = Math.min(100, Math.max(2, Math.round(Number(product.height) || 6)));
 
   const categoryId = product.shopee_category_id ? String(product.shopee_category_id) : '';
   const ncm = product.ncm ? String(product.ncm).replace(/\D/g, '').slice(0, 8) : '';
@@ -407,7 +409,9 @@ export function mapProductToShopeeRow(product: any, options?: ShopeeExportOption
   cols[27] = lengthCm;
   cols[28] = widthCm;
   cols[29] = heightCm;
-  cols[30] = 'Ativar';
+  // Canal de envio Correios / Logística: deixar vazio '' para o sistema Shopee aplicar automaticamente
+  // as regras de logística ativas na conta do vendedor (evita o erro "ID[90003] channelToggleStr[Ativar]")
+  cols[30] = options?.shippingChannelToggle !== undefined ? options.shippingChannelToggle : '';
   cols[31] = '';
   cols[32] = ncm;
   cols[33] = '';
@@ -469,11 +473,12 @@ export function mapAdToShopeeRow(ad: any, options?: ShopeeExportOptions): (strin
     const rawW = Number(product.weight);
     weightKg = rawW > 50 ? rawW / 1000 : rawW;
   }
-  const finalWeight = Math.max(0.01, Number(weightKg.toFixed(2)));
+  const finalWeight = Math.max(0.05, Number(weightKg.toFixed(2)));
 
-  const lengthCm = Math.max(1, Math.round(Number(product.length) || 16));
-  const widthCm = Math.max(1, Math.round(Number(product.width) || 11));
-  const heightCm = Math.max(1, Math.round(Number(product.height) || 6));
+  // Dimensões seguras e válidas para transporte (mínimo 16x11x2 cm, máximo 100 cm)
+  const lengthCm = Math.min(100, Math.max(16, Math.round(Number(product.length) || 16)));
+  const widthCm = Math.min(100, Math.max(11, Math.round(Number(product.width) || 11)));
+  const heightCm = Math.min(100, Math.max(2, Math.round(Number(product.height) || 6)));
 
   const ncm = product.ncm ? String(product.ncm).replace(/\D/g, '').slice(0, 8) : '';
 
@@ -508,7 +513,9 @@ export function mapAdToShopeeRow(ad: any, options?: ShopeeExportOptions): (strin
   cols[27] = lengthCm;
   cols[28] = widthCm;
   cols[29] = heightCm;
-  cols[30] = 'Ativar';
+  // Canal de envio Correios / Logística: deixar vazio '' para o sistema Shopee aplicar automaticamente
+  // as regras de logística ativas na conta do vendedor (evita o erro "ID[90003] channelToggleStr[Ativar]")
+  cols[30] = options?.shippingChannelToggle !== undefined ? options.shippingChannelToggle : '';
   cols[31] = '';
   cols[32] = ncm;
   cols[33] = '';
