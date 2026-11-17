@@ -1,7 +1,7 @@
 {
-  "hash": "051d7331410d45b350f665339b40155cebce08dc",
-  "shortHash": "051d733",
-  "message": "fix(pipeline): separar estritamente pedidos entre Principal e Ocorrencias e renomear aba",
+  "hash": "7aca9e9aaf0e4d573cccfb8eb17d3af78ea4c564",
+  "shortHash": "7aca9e9",
+  "message": "feat(pedidos): unificar acoes em Abrir Ocorrencia com wizard de 2 etapas e anexo de etiqueta",
   "author": "Lojafy Developer",
-  "timestamp": 1794926070834
+  "timestamp": 1794927248615
 }

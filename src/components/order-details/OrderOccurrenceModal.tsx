@@ -1,4 +1,4 @@
-import { useState, useId } from 'react';
+import { useState, useId, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -129,10 +129,24 @@ export const OrderOccurrenceModal = ({
   const [returnTrackingCode, setReturnTrackingCode] = useState<string>('');
 
   const [loading, setLoading] = useState(false);
+  const [localShippingFiles, setLocalShippingFiles] = useState<OccurrenceShippingFile[]>(existingShippingFiles);
+  const [isFetchingMlLabel, setIsFetchingMlLabel] = useState(false);
+
+  useEffect(() => {
+    setLocalShippingFiles(existingShippingFiles);
+  }, [existingShippingFiles]);
+
+  const isMlLinked = Boolean(
+    order.ml_order_id ||
+    (order as any).channel === 'mercadolivre' ||
+    (order as any).payment_method === 'mercadolivre' ||
+    ((order as any).external_reference && String((order as any).external_reference).toLowerCase().includes('ml')) ||
+    ((order as any).notes && String((order as any).notes).toLowerCase().includes('mercadolivre'))
+  );
 
   // Checagem se o pedido já tem etiqueta registrada
   const hasExistingLabel =
-    (existingShippingFiles && existingShippingFiles.length > 0) ||
+    (localShippingFiles && localShippingFiles.length > 0) ||
     !!order.shipping_label_url ||
     order.shipping_label_status === 'ready' ||
     Boolean(order.has_shipping_label);
@@ -145,6 +159,39 @@ export const OrderOccurrenceModal = ({
 
   // Validação da Etapa 2: se não possui etiqueta anterior, deve enviar obrigatoriamente
   const isStep2Valid = hasExistingLabel || Boolean(newShippingLabelFile);
+
+  const handleFetchMlLabel = async () => {
+    setIsFetchingMlLabel(true);
+    toast.info('Buscando etiqueta no Mercado Livre...');
+    try {
+      const { error } = await supabase.functions.invoke('ml-order-webhook', {
+        body: {
+          action: 'repair_orders',
+          order_id: order.id,
+        },
+      });
+      if (error) throw error;
+
+      // Buscar arquivos atualizados de envio
+      const { data: files } = await supabase
+        .from('order_shipping_files')
+        .select('*')
+        .eq('order_id', order.id)
+        .order('uploaded_at', { ascending: false });
+
+      if (files && files.length > 0) {
+        setLocalShippingFiles(files);
+        toast.success('Etiqueta do Mercado Livre obtida com sucesso!');
+      } else {
+        toast.warning('Etiqueta ainda não disponível para download no Mercado Livre.');
+      }
+    } catch (err: any) {
+      console.error('Erro ao buscar etiqueta do ML:', err);
+      toast.error('Não foi possível obter a etiqueta do Mercado Livre.');
+    } finally {
+      setIsFetchingMlLabel(false);
+    }
+  };
 
   const handleTipoChange = (newTipo: OccurrenceType) => {
     setTipo(newTipo);
@@ -659,25 +706,52 @@ export const OrderOccurrenceModal = ({
                       Etiqueta do Pedido Identificada
                     </p>
                     <p className="text-emerald-800 dark:text-emerald-300 text-[11px] leading-relaxed">
-                      Este pedido já possui uma etiqueta de envio cadastrada no sistema
-                      {existingShippingFiles[0] ? ` (${existingShippingFiles[0].file_name})` : ''}.
+                      Este pedido já possui etiqueta de envio cadastrada no sistema
+                      {(localShippingFiles[0] || existingShippingFiles[0]) ? ` (${(localShippingFiles[0] || existingShippingFiles[0]).file_name})` : ''}.
                     </p>
                     <p className="text-muted-foreground text-[10px] pt-1">
-                      Você pode manter a etiqueta atual ou anexar abaixo uma nova etiqueta específica de devolução / logística reversa.
+                      Você pode prosseguir diretamente ou anexar abaixo uma nova etiqueta específica de devolução / logística reversa se desejar.
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 flex items-start gap-2.5">
-                  <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                  <div className="text-xs space-y-1">
-                    <p className="font-semibold text-amber-900 dark:text-amber-200">
-                      Etiqueta de Envio / Reversa Necessária *
-                    </p>
-                    <p className="text-amber-800 dark:text-amber-300 text-[11px] leading-relaxed">
-                      Este pedido ainda não possui etiqueta de envio cadastrada. Para prosseguir com a ocorrência de devolução/troca, é <strong>obrigatório anexar a etiqueta</strong> de logística reversa ou postagem.
-                    </p>
+                <div className="space-y-2.5">
+                  <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 flex items-start gap-2.5">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div className="text-xs space-y-1 flex-1">
+                      <p className="font-semibold text-amber-900 dark:text-amber-200">
+                        Etiqueta de Envio / Reversa Necessária *
+                      </p>
+                      <p className="text-amber-800 dark:text-amber-300 text-[11px] leading-relaxed">
+                        Este pedido ainda não possui etiqueta vinculada. Você pode buscar automaticamente no Mercado Livre ou anexar o arquivo manualmente.
+                      </p>
+                    </div>
                   </div>
+
+                  {/* Atalho de Busca Automática no Mercado Livre */}
+                  {isMlLinked && (
+                    <div className="p-3 rounded-lg border border-yellow-500/40 bg-yellow-500/10 flex items-center justify-between gap-3 shadow-2xs">
+                      <div className="text-xs space-y-0.5">
+                        <p className="font-bold text-yellow-950 dark:text-yellow-200 flex items-center gap-1.5">
+                          <Package className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400" />
+                          <span>Pedido vinculado ao Mercado Livre</span>
+                        </p>
+                        <p className="text-[11px] text-yellow-800 dark:text-yellow-300">
+                          Puxe a etiqueta oficial direto da remessa do Mercado Livre.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleFetchMlLabel}
+                        disabled={isFetchingMlLabel}
+                        className="h-8 px-3 text-xs font-semibold gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-slate-950 shrink-0 shadow-xs cursor-pointer"
+                      >
+                        <RefreshCw className={cn("w-3.5 h-3.5", isFetchingMlLabel && "animate-spin")} />
+                        <span>{isFetchingMlLabel ? 'Buscando...' : 'Puxar do Mercado Livre'}</span>
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
 

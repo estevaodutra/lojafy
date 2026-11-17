@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   AlertCircle,
   ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
@@ -27,6 +28,7 @@ import { UpdateTrackingModal } from './UpdateTrackingModal';
 import { OrderOccurrenceModal, OccurrenceShippingFile } from './OrderOccurrenceModal';
 import { supabase } from '@/integrations/supabase/client';
 import { getAvailableTransitions } from '@/constants/orderStatus';
+import { cn } from '@/lib/utils';
 
 interface OrderActionBarProps {
   order: {
@@ -42,6 +44,12 @@ interface OrderActionBarProps {
     shipping_label_status?: string | null;
     has_shipping_label?: boolean;
     customer_name?: string;
+    channel?: string;
+    payment_method?: string;
+    ml_order_id?: string | number | null;
+    external_reference?: string | null;
+    notes?: string | null;
+    [key: string]: any;
   };
   userRole: string;
   deliveredAt?: string | null;
@@ -66,11 +74,21 @@ export const OrderActionBar = ({
   const [statusOpen, setStatusOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [trackingOpen, setTrackingOpen] = useState(false);
+  const [isUpdatingMl, setIsUpdatingMl] = useState(false);
 
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
   const isSupplier = userRole === 'supplier';
   const isReseller = userRole === 'reseller';
   const canManage = isAdmin || isSupplier;
+
+  // Verifica se o pedido está vinculado ao Mercado Livre
+  const isMlLinked = Boolean(
+    order.ml_order_id ||
+    order.channel === 'mercadolivre' ||
+    order.payment_method === 'mercadolivre' ||
+    (order.external_reference && order.external_reference.toLowerCase().includes('ml')) ||
+    (order.notes && order.notes.toLowerCase().includes('mercadolivre'))
+  );
 
   const cancelableStatuses = ['pendente', 'pago', 'recebido', 'embalado', 'em_reposicao'];
   const showCancel = cancelableStatuses.includes(order.status) && (isAdmin || isSupplier || isReseller);
@@ -84,6 +102,57 @@ export const OrderActionBar = ({
   const handleOpenExistingTicket = () => {
     if (existingTicketId) {
       navigate(`/minha-conta/tickets/${existingTicketId}`);
+    }
+  };
+
+  // Atualização automática via Mercado Livre (busca status, rastreio e etiqueta)
+  const handleUpdateFromMercadoLivre = async () => {
+    setIsUpdatingMl(true);
+    toast.info('Sincronizando com Mercado Livre...', {
+      description: 'Buscando status atualizado, remessa e etiqueta do pedido...',
+    });
+
+    try {
+      const mlId = order.ml_order_id
+        ? String(order.ml_order_id)
+        : order.external_reference?.startsWith('ml_')
+        ? order.external_reference.replace(/\D/g, '')
+        : undefined;
+
+      const { data, error } = await supabase.functions.invoke('ml-order-webhook', {
+        body: {
+          action: 'repair_orders',
+          order_id: order.id,
+          ml_order_id: mlId,
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Falha ao sincronizar com o Mercado Livre.');
+      }
+
+      // Se temos o identificador do Mercado Livre, executamos também a reconciliação direta
+      if (mlId && mlId.length > 5) {
+        await supabase.functions.invoke('ml-order-webhook', {
+          body: {
+            action: 'process_order',
+            order_id: String(mlId),
+          },
+        }).catch((err) => console.warn('Aviso no process_order:', err));
+      }
+
+      toast.success('Pedido atualizado com sucesso!', {
+        description: 'Dados, etiqueta e status sincronizados diretamente com o Mercado Livre.',
+      });
+
+      onRefresh();
+    } catch (err: any) {
+      console.error('Erro ao atualizar do Mercado Livre:', err);
+      toast.error('Não foi possível atualizar pelo Mercado Livre', {
+        description: err.message || 'Verifique se a integração do Mercado Livre está ativa.',
+      });
+    } finally {
+      setIsUpdatingMl(false);
     }
   };
 
@@ -192,6 +261,21 @@ export const OrderActionBar = ({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Botão Atualizar Pedido Mercado Livre (ao lado do Mais quando produto estiver vinculado) */}
+        {isMlLinked && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleUpdateFromMercadoLivre}
+            disabled={isUpdatingMl}
+            title="Buscar status, remessa e etiqueta mais recentes diretamente do Mercado Livre"
+            className="h-8 px-3 text-xs font-semibold gap-1.5 bg-yellow-500/10 text-yellow-800 dark:text-yellow-300 border-yellow-500/35 hover:bg-yellow-500/20 hover:text-yellow-900 shadow-2xs transition-colors cursor-pointer"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5 text-yellow-600 dark:text-yellow-400", isUpdatingMl && "animate-spin")} />
+            <span>{isUpdatingMl ? 'Atualizando...' : 'Atualizar Pedido'}</span>
+          </Button>
+        )}
       </div>
 
       {/* Modal Passo a Passo de Ocorrência (Etapas 1 e 2) */}

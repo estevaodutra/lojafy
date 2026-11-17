@@ -2592,6 +2592,88 @@ serve(async (req) => {
       });
     }
 
+    if (topic === 'claims') {
+      const claimIdMatch = resource.match(/\/claims\/(\d+)/);
+      if (claimIdMatch) {
+        const claimId = claimIdMatch[1];
+        console.log(`[ml-order-webhook] Recebido webhook claims #${claimId} do Mercado Livre.`);
+
+        const { data: allIntegrations } = await supabase
+          .from('mercadolivre_integrations')
+          .select('user_id, access_token, refresh_token, expires_at')
+          .eq('is_active', true);
+
+        for (const intg of allIntegrations || []) {
+          try {
+            const token = await getValidTokenForIntegration(intg);
+            const clRes = await fetch(`https://api.mercadolibre.com/v1/claims/${claimId}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (clRes.ok) {
+              const claimData = await clRes.json();
+              const mlOrderId = claimData.resource_id; // ID do pedido no Mercado Livre
+              if (mlOrderId) {
+                console.log(`[ml-order-webhook] Reclamação #${claimId} vinculada ao pedido ML #${mlOrderId}. Atualizando status para ocorrência...`);
+
+                const { data: ord } = await supabase
+                  .from('orders')
+                  .select('id, reseller_id, order_number, status')
+                  .or(`ml_order_id.eq.${mlOrderId},id.eq.${mlOrderId}`)
+                  .maybeSingle();
+
+                if (ord) {
+                  const claimReason = claimData.reason_id || claimData.type || 'Devolução/Reclamação iniciada no Mercado Livre';
+
+                  // 1. Atualizar pedido para status de devolução/ocorrência
+                  await supabase.from('orders').update({
+                    status: 'devolucao_andamento',
+                    devolucao_motivo: claimReason,
+                    devolucao_iniciada_em: new Date().toISOString(),
+                  }).eq('id', ord.id);
+
+                  // 2. Criar ou atualizar ticket
+                  const { data: existingTicket } = await supabase
+                    .from('order_tickets')
+                    .select('id')
+                    .eq('order_id', ord.id)
+                    .maybeSingle();
+
+                  if (!existingTicket) {
+                    await supabase.from('order_tickets').insert({
+                      order_id: ord.id,
+                      ticket_number: `ML-CLAIM-${claimId}`,
+                      tipo: 'reembolso',
+                      status: 'aberto',
+                      reason: `[MERCADO LIVRE] Devolução/Reclamação aberta no ML (#${claimId}): ${claimReason}`,
+                      customer_id: ord.reseller_id,
+                      reseller_id: ord.reseller_id,
+                    });
+                  }
+
+                  // 3. Registrar movimentação no histórico
+                  await supabase.from('order_status_history').insert({
+                    order_id: ord.id,
+                    status: 'devolucao_andamento',
+                    notes: `Reclamação/Devolução detectada via Mercado Livre (#${claimId}). Pedido transferido automaticamente para Ocorrências.`,
+                  });
+                }
+
+                return new Response(JSON.stringify({ ok: true, claim_handled: true, ml_order_id: mlOrderId }), {
+                  status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                });
+              }
+            }
+          } catch (clErr) {
+            console.warn('[ml-order-webhook] Erro ao processar claim:', clErr);
+          }
+        }
+      }
+
+      return new Response(JSON.stringify({ ok: true, claim_handled: false }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (topic !== 'orders_v2' && topic !== 'orders') {
       console.log('[ml-order-webhook] Ignorando tópico:', topic);
       return new Response(JSON.stringify({ ok: true, ignored_topic: topic }), {
