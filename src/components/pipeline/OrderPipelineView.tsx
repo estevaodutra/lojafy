@@ -138,7 +138,7 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
 
       return true;
     });
-  }, [orders, searchTerm, channelFilter, selectedSeller]);
+  }, [orders, searchTerm, channelFilter, selectedSeller, showArchivedOnly]);
 
   // Label sync state
   const [isSyncingLabels, setIsSyncingLabels] = useState(false);

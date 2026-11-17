@@ -168,7 +168,7 @@ export const orderPipelineService = {
         .select("id")
         .limit(1);
 
-      if (error || !existing || existing.length === 0) {
+      if (!error && existing?.length === 0) {
         // Inserir pipelines
         await supabase.from("order_pipelines" as any).upsert(
           DEFAULT_PIPELINES.map((p) => ({
@@ -178,7 +178,8 @@ export const orderPipelineService = {
             description: p.description,
             order_index: p.order_index,
             is_active: p.is_active,
-          }))
+          })),
+          { onConflict: "id", ignoreDuplicates: true }
         );
 
         // Inserir etapas
@@ -193,7 +194,8 @@ export const orderPipelineService = {
             color_class: s.color_class,
             icon_name: s.icon_name,
             is_active: s.is_active,
-          }))
+          })),
+          { onConflict: "id", ignoreDuplicates: true }
         );
       }
     } catch (seedErr) {
@@ -373,24 +375,11 @@ export const orderPipelineService = {
         ...(oldStage || {}),
         ...stage,
         name: stageName,
-        status_key: stageStatus,
+        status_key: oldStage?.status_key ?? stage.status_key ?? stageStatus,
       } as OrderPipelineStage;
-
-      // Se o nome foi alterado pelo Super Admin, atualizar pedidos vinculados com o nome anterior no Supabase
-      if (oldStage && (oldStage.name !== stageName || oldStage.status_key !== stageStatus)) {
-        try {
-          await supabase
-            .from("orders")
-            .update({ status: stageName, updated_at: new Date().toISOString() })
-            .or(`status.eq.${oldStage.status_key},status.eq.${oldStage.name}`);
-        } catch (err) {
-          console.warn("orders status rename error:", err);
-        }
-      }
 
       const stageUpdatePayload = {
         name: savedStage.name,
-        status_key: savedStage.status_key,
         order_index: savedStage.order_index,
         color_class: savedStage.color_class,
         icon_name: savedStage.icon_name,
@@ -398,18 +387,19 @@ export const orderPipelineService = {
         updated_at: new Date().toISOString(),
       };
 
-      const { error: updateErr } = await supabase
+      const { data: updatedStage, error: updateErr } = await supabase
         .from("order_pipeline_stages" as any)
-        .upsert({
-          id: stage.id,
-          pipeline_id: stage.pipeline_id,
-          ...stageUpdatePayload,
-        });
+        .update(stageUpdatePayload)
+        .eq("id", stage.id)
+        .eq("pipeline_id", stage.pipeline_id)
+        .select("status_key")
+        .single();
 
       if (updateErr) {
         console.error("Erro ao atualizar etapa no Supabase:", updateErr);
         throw new Error(updateErr.message || "Erro ao salvar alterações da etapa no banco de dados.");
       }
+      savedStage.status_key = (updatedStage as { status_key: string }).status_key;
     }
 
     // Atualiza localmente

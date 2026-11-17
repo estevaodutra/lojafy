@@ -84,7 +84,6 @@ export default defineConfig(({ mode }) => {
     react(),
     mode === "development" && componentTagger(),
     VitePWA({
-      selfDestroying: true,
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "favicon.png", "robots.txt", "apple-touch-icon.png"],
       manifest: {
@@ -135,9 +134,10 @@ export default defineConfig(({ mode }) => {
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
-        navigateFallback: '/index.html',
+        cleanupOutdatedCaches: true,
+        navigateFallback: null,
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        globPatterns: ["**/*.{ico,png,svg,woff2}"],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
