@@ -1,7 +1,7 @@
 {
-  "hash": "5f0cb6c15c066108e05c90e904d4aa9876f8bea1",
-  "shortHash": "5f0cb6c",
-  "message": "feat(revendedor): adicionar selecao e exportacao em massa para Shopee nos produtos e anuncios",
+  "hash": "d3906607340dfcc8ce668251524ea86371a24088",
+  "shortHash": "d390660",
+  "message": "feat(shopee): exportar produtos em formato XLSX nativo de acordo com os requisitos da Shopee",
   "author": "Lojafy Developer",
-  "timestamp": 1794938510895
+  "timestamp": 1794939177800
 }

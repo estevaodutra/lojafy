@@ -5,6 +5,7 @@
  */
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import { SHOPEE_TEMPLATE_BASE64 } from './shopeeTemplateBase64';
 
 // As 51 chaves técnicas oficiais da Shopee (Linha 1)
 export const SHOPEE_ROW_1_KEYS: string[] = [
@@ -529,21 +530,49 @@ export function downloadShopeeXlsx(rows: (string | number)[][], filenamePrefix: 
     return;
   }
 
-  // Monta a matriz de dados com as 6 linhas de cabeçalho obrigatórias da Shopee
-  const allRows: (string | number)[][] = [
-    SHOPEE_ROW_1_KEYS,
-    SHOPEE_ROW_2_METADATA,
-    SHOPEE_ROW_3_NAMES,
-    SHOPEE_ROW_4_REQUIREMENTS,
-    SHOPEE_ROW_5_INSTRUCTIONS,
-    SHOPEE_ROW_6_RULES,
-    ...rows,
-  ];
+  // Garante que cada linha tenha rigorosamente 51 colunas
+  const sanitizedRows = rows.map((r) => {
+    const cols = [...r];
+    while (cols.length < 51) cols.push('');
+    return cols.slice(0, 51);
+  });
 
-  // Cria a pasta de trabalho (Workbook) e adiciona a aba 'template' oficial da Shopee
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(allRows);
-  XLSX.utils.book_append_sheet(wb, ws, 'template');
+  let wb: XLSX.WorkBook;
+
+  try {
+    // Carrega o template oficial da Shopee Brasil preservando todas as abas estruturais:
+    // ['Orientação', 'Modelo', 'Fazer upload do exemplo', 'Intervalo do PP para Encomenda', 'Lista de Modelos de Tabela de M', 'HiddenShopBrand', 'HiddenTax']
+    wb = XLSX.read(SHOPEE_TEMPLATE_BASE64, { type: 'base64' });
+  } catch (err) {
+    console.error('Falha ao carregar template base da Shopee:', err);
+    wb = XLSX.utils.book_new();
+    const wsFallback = XLSX.utils.aoa_to_sheet([
+      SHOPEE_ROW_1_KEYS,
+      SHOPEE_ROW_2_METADATA,
+      SHOPEE_ROW_3_NAMES,
+      SHOPEE_ROW_4_REQUIREMENTS,
+      SHOPEE_ROW_5_INSTRUCTIONS,
+      SHOPEE_ROW_6_RULES,
+    ]);
+    XLSX.utils.book_append_sheet(wb, wsFallback, 'Modelo');
+  }
+
+  // Garante que a aba 'Modelo' (nome oficial exigido pelo validador da Shopee Brasil) exista
+  let ws = wb.Sheets['Modelo'];
+  if (!ws) {
+    ws = XLSX.utils.aoa_to_sheet([
+      SHOPEE_ROW_1_KEYS,
+      SHOPEE_ROW_2_METADATA,
+      SHOPEE_ROW_3_NAMES,
+      SHOPEE_ROW_4_REQUIREMENTS,
+      SHOPEE_ROW_5_INSTRUCTIONS,
+      SHOPEE_ROW_6_RULES,
+    ]);
+    XLSX.utils.book_append_sheet(wb, ws, 'Modelo');
+  }
+
+  // Insere os produtos selecionados diretamente a partir da célula A7 (linha 7, logo abaixo das 6 linhas de cabeçalho da Shopee)
+  XLSX.utils.sheet_add_aoa(ws, sanitizedRows, { origin: 'A7' });
 
   // Gera o buffer em formato binário .xlsx
   const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
