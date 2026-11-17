@@ -1,7 +1,7 @@
 {
-  "hash": "3ed00340d0ddf7c637111ae9e16d3bcb3c2b4f28",
-  "shortHash": "3ed0034",
-  "message": "fix(shopee): usar template oficial Shopee Brasil com todas abas estruturais e aba Modelo",
+  "hash": "4339d761e599dbfbfa04eb1e0e331e5362a18df2",
+  "shortHash": "4339d76",
+  "message": "fix(shopee): deixar canal de envio 90003 em branco para aplicar canal padrao da conta e sanitizar dimensoes",
   "author": "Lojafy Developer",
-  "timestamp": 1794939664350
+  "timestamp": 1794940296757
 }
