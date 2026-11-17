@@ -317,11 +317,12 @@ const AdminOrders = () => {
     }
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+  const updateOrderStatus = async (orderId: string | any, newStatus: string) => {
+    const cleanId = typeof orderId === "object" && orderId !== null ? orderId.id || orderId.order_id : String(orderId);
     // Optimistic update
     const previousOrders = orders;
     setOrders((prev) =>
-      prev.map((order) => (order.id === orderId ? { ...order, status: newStatus } : order))
+      prev.map((order) => (order.id === cleanId ? { ...order, status: newStatus } : order))
     );
 
     try {
@@ -332,13 +333,13 @@ const AdminOrders = () => {
           stage_entered_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         } as any)
-        .eq("id", orderId);
+        .eq("id", cleanId);
 
       if (error) throw error;
 
       // Status history
       await supabase.from("order_status_history").insert({
-        order_id: orderId,
+        order_id: cleanId,
         status: newStatus,
         notes: `Status atualizado para ${newStatus}`,
       });
@@ -347,12 +348,12 @@ const AdminOrders = () => {
         title: "Sucesso",
         description: "Status do pedido atualizado com sucesso.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating order status:", error);
       setOrders(previousOrders);
       toast({
         title: "Erro",
-        description: "Erro ao atualizar status do pedido",
+        description: error?.message || "Erro ao atualizar status do pedido",
         variant: "destructive",
       });
     }

@@ -1,7 +1,7 @@
 {
-  "hash": "1321db885af93b67bc41f689d63c402959ecf64a",
-  "shortHash": "1321db8",
-  "message": "fix(pedidos): tornar etiqueta de envio opcional na abertura de ocorrencia e devolucao",
+  "hash": "0cba91869830131b2e5ca5433f64c6ff952ece07",
+  "shortHash": "0cba918",
+  "message": "fix(supplier): garantir exibicao de produtos, imagens e quantidades no painel do fornecedor",
   "author": "Lojafy Developer",
-  "timestamp": 1794935137858
+  "timestamp": 1794937117110
 }

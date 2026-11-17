@@ -201,6 +201,13 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
     }
   };
 
+  const handleAdvanceStage = useCallback(
+    async (order: OrderPipelineItem, targetStatus: string) => {
+      await onUpdateOrderStatus(order.id, targetStatus);
+    },
+    [onUpdateOrderStatus]
+  );
+
   return (
     <DndContext
       sensors={sensors}
@@ -223,7 +230,7 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
                 onPrintLabel={onPrintLabel}
                 onGenerateLabel={onGenerateLabel}
                 onArchiveOrder={onArchiveOrder}
-                onAdvanceStage={onUpdateOrderStatus}
+                onAdvanceStage={handleAdvanceStage}
                 isDropDisabled={role === "reseller"}
               />
             );

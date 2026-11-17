@@ -632,75 +632,65 @@ export const OrderKanbanCard = React.memo<OrderKanbanCardProps>(({
 
         {/* 4. Linha de Avançar Etapa (Super Admin e Fornecedor) */}
         {canAdvanceStage && nextStage && (
-          <div className="pt-2 border-t border-border/50 flex items-stretch gap-1 mt-1">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1 h-8 text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50 border-emerald-300 dark:border-emerald-800 gap-1.5 justify-center transition-colors shadow-2xs"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleAdvanceTo(nextStage.name);
-              }}
-              disabled={isAdvancing}
-              title={`Avançar para "${nextStage.name}"`}
-            >
-              {isAdvancing ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-              ) : (
-                <ArrowRight className="w-3.5 h-3.5 stroke-[2.5] shrink-0 text-emerald-600 dark:text-emerald-400" />
-              )}
-              <span className="truncate">Avançar para {nextStage.name}</span>
-            </Button>
-
-            {forwardStages.length > 1 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 px-2 shrink-0 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50 border-emerald-300 dark:border-emerald-800 shadow-2xs"
-                    disabled={isAdvancing}
-                    title="Escolher para qual etapa avançar"
-                    onClick={(e) => e.stopPropagation()}
+          <div className="pt-2 border-t border-border/50 mt-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-8 text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50 border-emerald-300 dark:border-emerald-800 flex items-center justify-between px-3 transition-colors shadow-2xs cursor-pointer"
+                  disabled={isAdvancing}
+                  title="Clique para selecionar e avançar a etapa"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {isAdvancing ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    ) : (
+                      <ArrowRight className="w-3.5 h-3.5 stroke-[2.5] shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    )}
+                    <span className="truncate">Avançar: {nextStage.name}</span>
+                  </div>
+                  <ChevronDown className="w-3.5 h-3.5 shrink-0 text-emerald-700 dark:text-emerald-400 ml-1 opacity-80" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64 bg-popover shadow-xl border p-1 z-50">
+                <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1.5">
+                  Avançar para etapa:
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {forwardStages.map((stage, idx) => (
+                  <DropdownMenuItem
+                    key={stage.id || stage.name}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAdvanceTo(stage.name);
+                    }}
+                    className={cn(
+                      "text-xs cursor-pointer flex items-center justify-between py-2 px-2.5 rounded-md transition-colors",
+                      idx === 0 && "bg-emerald-50/70 dark:bg-emerald-950/30 font-medium"
+                    )}
                   >
-                    <ChevronDown className="w-3.5 h-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-60 bg-popover shadow-xl border">
-                  <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                    Avançar para etapa:
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {forwardStages.map((stage, idx) => (
-                    <DropdownMenuItem
-                      key={stage.id || stage.name}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAdvanceTo(stage.name);
-                      }}
-                      className="text-xs cursor-pointer flex items-center justify-between py-2"
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <span
-                          className={cn(
-                            "w-2 h-2 rounded-full shrink-0",
-                            idx === 0 ? "bg-emerald-500 ring-2 ring-emerald-200" : "bg-muted-foreground/40"
-                          )}
-                        />
-                        <span className={cn("truncate", idx === 0 ? "font-semibold text-foreground" : "text-foreground/80")}>
-                          {stage.name}
-                        </span>
-                      </div>
-                      {idx === 0 && (
-                        <Badge variant="outline" className="text-[9px] px-1 py-0 bg-emerald-50 text-emerald-700 border-emerald-300 shrink-0 font-medium">
-                          Próxima
-                        </Badge>
-                      )}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+                    <div className="flex items-center gap-2 truncate">
+                      <span
+                        className={cn(
+                          "w-2 h-2 rounded-full shrink-0",
+                          idx === 0 ? "bg-emerald-500 ring-2 ring-emerald-200" : "bg-muted-foreground/40"
+                        )}
+                      />
+                      <span className={cn("truncate", idx === 0 ? "font-semibold text-foreground" : "text-foreground/80")}>
+                        {stage.name}
+                      </span>
+                    </div>
+                    {idx === 0 && (
+                      <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-emerald-100 text-emerald-800 border-emerald-300 shrink-0 font-medium">
+                        Próxima
+                      </Badge>
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
       </TooltipProvider>

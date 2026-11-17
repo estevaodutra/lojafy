@@ -470,10 +470,11 @@ const SupplierOrderManagement = () => {
     }
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+  const updateOrderStatus = async (orderId: string | any, newStatus: string) => {
+    const cleanId = typeof orderId === "object" && orderId !== null ? orderId.id || orderId.order_id : String(orderId);
     const previousOrders = orders;
     setOrders((prev) =>
-      prev.map((o) => (o.order_id === orderId || o.id === orderId ? { ...o, status: newStatus } : o))
+      prev.map((o) => (o.order_id === cleanId || o.id === cleanId ? { ...o, status: newStatus } : o))
     );
 
     try {
@@ -484,12 +485,12 @@ const SupplierOrderManagement = () => {
           stage_entered_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         } as any)
-        .eq("id", orderId);
+        .eq("id", cleanId);
 
       if (oErr) throw oErr;
 
       await supabase.from("order_status_history").insert({
-        order_id: orderId,
+        order_id: cleanId,
         status: newStatus,
         notes: `Status atualizado pelo fornecedor`,
       });
