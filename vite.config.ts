@@ -87,6 +87,7 @@ export default defineConfig(({ mode }) => {
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "favicon.png", "robots.txt", "apple-touch-icon.png"],
       manifest: {
+        id: "/",
         name: "Lojafy - Sua Loja Descomplicada",
         short_name: "Lojafy",
         description: "Plataforma de revenda de produtos",
