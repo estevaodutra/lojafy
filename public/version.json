@@ -1,7 +1,7 @@
 {
-  "hash": "9df7f27e5c9b7995302419d5a730ad77829cd7a3",
-  "shortHash": "9df7f27",
-  "message": "feat(ml): adicionar botao Atualizar Pedido para sincronizar status/etiqueta do ML e suporte a webhook de claims",
+  "hash": "932d1805e9fb8979ec82993054e62a62be714556",
+  "shortHash": "932d180",
+  "message": "fix(revendedor): ocultar secao Minha Loja do menu lateral",
   "author": "Lojafy Developer",
-  "timestamp": 1794927868334
+  "timestamp": 1794928518783
 }

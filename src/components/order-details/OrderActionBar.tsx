@@ -113,11 +113,21 @@ export const OrderActionBar = ({
     });
 
     try {
-      const mlId = order.ml_order_id
-        ? String(order.ml_order_id)
-        : order.external_reference?.startsWith('ml_')
-        ? order.external_reference.replace(/\D/g, '')
+      const rawMlId = order.ml_order_id || order.marketplace_order_id;
+      const mlId = (rawMlId && String(rawMlId) !== 'null' && String(rawMlId).trim() !== '')
+        ? String(rawMlId).trim()
+        : (order.external_reference && !order.external_reference.startsWith('ml_pay_'))
+        ? String(order.external_reference).trim()
         : undefined;
+
+      // Se identificamos o ID oficial do ML e o banco ainda não tinha gravado, persiste agora
+      if (mlId && !order.ml_order_id) {
+        await supabase
+          .from('orders')
+          .update({ ml_order_id: mlId, external_reference: mlId })
+          .eq('id', order.id)
+          .catch(() => {});
+      }
 
       const { data, error } = await supabase.functions.invoke('ml-order-webhook', {
         body: {

@@ -930,10 +930,44 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const isPaid = order?.payment_status === 'paid' || order?.status === 'pago' || pipelineItem?.is_paid;
   const displayOrderNumber = order?.order_number || pipelineItem?.order_number || orderId?.slice(0, 8);
   const displayTracking = order?.tracking_number || pipelineItem?.tracking_number;
+
+  // Resolução unificada do ID oficial do Mercado Livre (para eliminar divergências com a listagem)
+  const resolvedMlOrderId =
+    (order?.ml_order_id && String(order.ml_order_id).trim() !== '' && String(order.ml_order_id) !== 'null' ? String(order.ml_order_id) : null) ||
+    (pipelineItem?.ml_order_id && String(pipelineItem.ml_order_id).trim() !== '' && String(pipelineItem.ml_order_id) !== 'null' ? String(pipelineItem.ml_order_id) : null) ||
+    (order?.marketplace_order_id ? String(order.marketplace_order_id) : null) ||
+    (pipelineItem?.marketplace_order_id ? String(pipelineItem.marketplace_order_id) : null) ||
+    (pipelineItem?.external_reference && !pipelineItem.external_reference.startsWith('ml_pay_') ? String(pipelineItem.external_reference) : null) ||
+    (order?.external_reference && !order.external_reference.startsWith('ml_pay_') ? String(order.external_reference) : null);
+
   const displayExternalRef =
-    order?.external_reference ||
-    order?.ml_order_id ||
-    pipelineItem?.external_reference;
+    resolvedMlOrderId ||
+    (order?.external_reference && !order.external_reference.startsWith('ml_pay_') ? order.external_reference : null) ||
+    (pipelineItem?.external_reference && !pipelineItem.external_reference.startsWith('ml_pay_') ? pipelineItem.external_reference : null);
+
+  // Pedido efetivo mesclando dados completos para garantir que ações e sincronizações utilizem o ID correto
+  const effectiveOrder = useMemo(() => {
+    if (!order && !pipelineItem) return null;
+    const base = order || {};
+    return {
+      ...base,
+      id: base.id || pipelineItem?.id,
+      order_number: base.order_number || pipelineItem?.order_number,
+      status: base.status || pipelineItem?.status,
+      payment_status: base.payment_status || (pipelineItem?.is_paid ? 'paid' : 'pending'),
+      total_amount: base.total_amount || pipelineItem?.sale_amount || 0,
+      user_id: base.user_id || pipelineItem?.raw?.user_id,
+      reseller_id: base.reseller_id || pipelineItem?.raw?.reseller_id,
+      tracking_number: base.tracking_number || pipelineItem?.tracking_number,
+      ml_order_id: resolvedMlOrderId || base.ml_order_id || pipelineItem?.ml_order_id,
+      ml_shipment_id: base.ml_shipment_id || pipelineItem?.ml_shipment_id,
+      channel: pipelineItem?.channel || base.channel || (resolvedMlOrderId ? 'mercadolivre' : 'lojafy'),
+      payment_method: base.payment_method || (pipelineItem?.channel === 'mercadolivre' || resolvedMlOrderId ? 'mercadolivre' : undefined),
+      external_reference: resolvedMlOrderId || (base.external_reference?.startsWith('ml_pay_') ? resolvedMlOrderId : base.external_reference) || pipelineItem?.external_reference,
+      shipping_label_url: base.shipping_label_url || pipelineItem?.ml_label_url,
+      has_shipping_label: base.has_shipping_label || pipelineItem?.has_shipping_file,
+    };
+  }, [order, pipelineItem, resolvedMlOrderId]);
 
   // Products list to render
   const itemsToRender = order?.order_items && order.order_items.length > 0
@@ -986,6 +1020,13 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     </button>
                   </DialogTitle>
 
+                  {/* Badge Mercado Livre com o ID oficial exatamente igual à lista/card */}
+                  {resolvedMlOrderId && (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 font-mono">
+                      ML: #{resolvedMlOrderId}
+                    </span>
+                  )}
+
                   {/* Status Operacional */}
                   {(order?.status || pipelineItem?.status) && (
                     <Badge variant={getStatusVariant(order?.status || pipelineItem?.status || 'pendente')} className="gap-1 text-[10px] font-semibold h-5 px-1.5">
@@ -1036,7 +1077,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   {displayExternalRef && (
                     <span className="inline-flex items-center gap-1 font-mono text-[10px] bg-background/80 px-1.5 py-0.2 rounded border border-border/50">
                       <span className="text-muted-foreground">Ref:</span>
-                      <strong className="text-foreground">{displayExternalRef}</strong>
+                      <strong className="text-foreground">
+                        {displayExternalRef.startsWith('#') ? displayExternalRef : `#${displayExternalRef}`}
+                      </strong>
                     </span>
                   )}
 
@@ -1100,13 +1143,13 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             </div>
 
             {/* Ações Operacionais (Inline, compactas) */}
-            {order && profile && (
+            {effectiveOrder && profile && (
               <div className="pt-2 mt-1.5 border-t border-border/40">
                 <OrderActionBar
-                  order={order}
+                  order={effectiveOrder}
                   userRole={profile.role || 'customer'}
                   deliveredAt={deliveredAt}
-                  paidAt={order.paid_at}
+                  paidAt={effectiveOrder.paid_at}
                   existingTicketId={existingTicketId}
                   shippingFiles={shippingFiles}
                   onRefresh={() => {

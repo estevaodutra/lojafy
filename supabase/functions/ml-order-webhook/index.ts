@@ -539,21 +539,30 @@ async function resolveMatchedProduct(
 /**
  * Repara um pedido existente garantindo que etiqueta, rastreio, itens, custo e cobrança Pix estejam 100% corretos.
  */
-async function repairExistingOrder(orderRecord: any, resellerUserId: string) {
-  const mlOrderIdStr = String(orderRecord.ml_order_id);
+async function repairExistingOrder(orderRecord: any, resellerUserId: string, targetMlOrderId?: string | null) {
+  const mlOrderIdStr = String(targetMlOrderId || orderRecord.ml_order_id || '').trim();
+  if (!mlOrderIdStr || mlOrderIdStr === 'null' || mlOrderIdStr === 'undefined') {
+    console.warn(`[ml-order-webhook] Pedido #${orderRecord.order_number} não possui ml_order_id válido.`);
+    return;
+  }
   console.log(`[ml-order-webhook] Reparando pedido #${orderRecord.order_number} (ML #${mlOrderIdStr})...`);
 
-  const { data: intg } = await supabase
-    .from('mercadolivre_integrations')
-    .select('user_id, ml_user_id, access_token, refresh_token, expires_at')
-    .eq('user_id', resellerUserId)
-    .eq('is_active', true)
-    .maybeSingle();
+  // Se o pedido no banco não tinha ml_order_id gravado, atualiza agora
+  if (!orderRecord.ml_order_id && mlOrderIdStr) {
+    await supabase.from('orders').update({
+      ml_order_id: mlOrderIdStr,
+      external_reference: mlOrderIdStr,
+    }).eq('id', orderRecord.id);
+  }
 
-  if (!intg) return;
-  const token = await getValidTokenForIntegration(intg);
-
-  const mlOrder = await fetchOrderOrPack(mlOrderIdStr, token);
+  // Tenta encontrar vendedor e pedido usando findSellerForOrder
+  const sellerInfo = await findSellerForOrder(mlOrderIdStr, resellerUserId);
+  if (!sellerInfo) {
+    console.warn(`[ml-order-webhook] Não foi possível encontrar vendedor/pedido ML #${mlOrderIdStr}`);
+    return;
+  }
+  const token = sellerInfo.accessToken;
+  const mlOrder = sellerInfo.mlOrder;
   if (!mlOrder) return;
 
   // 1. Extrair ID da remessa oficial (shipping.id no ML)
@@ -2300,7 +2309,8 @@ serve(async (req) => {
       if (body.order_id) {
         const { data: ord } = await supabase.from('orders').select('*').eq('id', body.order_id).maybeSingle();
         if (ord) {
-          await repairExistingOrder(ord, ord.reseller_id);
+          const targetMlId = body.ml_order_id || ord.ml_order_id;
+          await repairExistingOrder(ord, ord.reseller_id, targetMlId);
           return new Response(JSON.stringify({ success: true, repaired: 1 }), {
             status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
