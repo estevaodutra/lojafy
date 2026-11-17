@@ -1,7 +1,7 @@
 {
-  "hash": "7aca9e9aaf0e4d573cccfb8eb17d3af78ea4c564",
-  "shortHash": "7aca9e9",
-  "message": "feat(pedidos): unificar acoes em Abrir Ocorrencia com wizard de 2 etapas e anexo de etiqueta",
+  "hash": "9df7f27e5c9b7995302419d5a730ad77829cd7a3",
+  "shortHash": "9df7f27",
+  "message": "feat(ml): adicionar botao Atualizar Pedido para sincronizar status/etiqueta do ML e suporte a webhook de claims",
   "author": "Lojafy Developer",
-  "timestamp": 1794927248615
+  "timestamp": 1794927868334
 }

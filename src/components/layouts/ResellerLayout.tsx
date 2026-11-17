@@ -79,19 +79,10 @@ const baseMenuGroups: MenuGroup[] = [
       { title: 'Metas', url: '/reseller/metas', icon: Target },
     ]
   },
-  {
-    label: 'Minha Loja',
-    items: [
-      { title: 'Configurar Loja', url: '/reseller/loja', icon: Settings },
-      { title: 'Páginas', url: '/reseller/paginas', icon: FileText },
-      { title: 'Banners', url: '/reseller/banners', icon: Image },
-      { title: 'Vantagens', url: '/reseller/vantagens', icon: Gift },
-      { title: 'Cupons', url: '/reseller/cupons', icon: Ticket },
-      { title: 'Frete', url: '/reseller/frete', icon: Truck },
-      { title: 'Depoimentos', url: '/reseller/depoimentos', icon: Star },
-    ]
-  },
 ];
+
+// Ocultado temporariamente a pedido. Reative alterando SHOW_MINHA_LOJA para true quando o recurso estiver pronto.
+const SHOW_MINHA_LOJA = false;
 
 const ResellerSidebar = () => {
   const { profile } = useAuth();
@@ -102,6 +93,21 @@ const ResellerSidebar = () => {
 
   const menuGroups = useMemo(() => {
     const groups = [...baseMenuGroups];
+
+    if (SHOW_MINHA_LOJA) {
+      groups.push({
+        label: 'Minha Loja',
+        items: [
+          { title: 'Configurar Loja', url: '/reseller/loja', icon: Settings },
+          { title: 'Páginas', url: '/reseller/paginas', icon: FileText },
+          { title: 'Banners', url: '/reseller/banners', icon: Image },
+          { title: 'Vantagens', url: '/reseller/vantagens', icon: Gift },
+          { title: 'Cupons', url: '/reseller/cupons', icon: Ticket },
+          { title: 'Frete', url: '/reseller/frete', icon: Truck },
+          { title: 'Depoimentos', url: '/reseller/depoimentos', icon: Star },
+        ]
+      });
+    }
 
     if (hasAcademyFeature) {
       groups.push({
