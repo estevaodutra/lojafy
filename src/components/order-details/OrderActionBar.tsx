@@ -9,23 +9,22 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   Ban,
-  HandMetal,
-  RotateCcw,
   MoreHorizontal,
   Copy,
   FileText,
   Tag,
   Zap,
   AlertTriangle,
+  AlertCircle,
+  ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { OpenTicketButton } from '@/components/order-tickets/OpenTicketButton';
+import { useNavigate } from 'react-router-dom';
 import { CancelOrderModal } from './CancelOrderModal';
-import { RequestCancelModal } from './RequestCancelModal';
-import { RequestReturnModal } from './RequestReturnModal';
 import { UpdateStatusModal } from './UpdateStatusModal';
 import { AddNoteModal } from './AddNoteModal';
 import { UpdateTrackingModal } from './UpdateTrackingModal';
+import { OrderOccurrenceModal, OccurrenceShippingFile } from './OrderOccurrenceModal';
 import { supabase } from '@/integrations/supabase/client';
 import { getAvailableTransitions } from '@/constants/orderStatus';
 
@@ -38,20 +37,32 @@ interface OrderActionBarProps {
     total_amount: number;
     user_id: string;
     tracking_number?: string;
+    reseller_id?: string | null;
+    shipping_label_url?: string | null;
+    shipping_label_status?: string | null;
+    has_shipping_label?: boolean;
+    customer_name?: string;
   };
   userRole: string;
   deliveredAt?: string | null;
   paidAt?: string | null;
   existingTicketId?: string | null;
+  shippingFiles?: OccurrenceShippingFile[];
   onRefresh: () => void;
 }
 
 export const OrderActionBar = ({
-  order, userRole, deliveredAt, paidAt, existingTicketId, onRefresh,
+  order,
+  userRole,
+  deliveredAt,
+  paidAt,
+  existingTicketId,
+  shippingFiles = [],
+  onRefresh,
 }: OrderActionBarProps) => {
+  const navigate = useNavigate();
+  const [occurrenceOpen, setOccurrenceOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [requestCancelOpen, setRequestCancelOpen] = useState(false);
-  const [returnOpen, setReturnOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [trackingOpen, setTrackingOpen] = useState(false);
@@ -63,13 +74,17 @@ export const OrderActionBar = ({
 
   const cancelableStatuses = ['pendente', 'pago', 'recebido', 'embalado', 'em_reposicao'];
   const showCancel = cancelableStatuses.includes(order.status) && (isAdmin || isSupplier || isReseller);
-  const showRequestCancel = order.status === 'enviado' && (isAdmin || isReseller);
-  const showReturn = order.status === 'finalizado' && (isAdmin || isReseller);
   const hasTransitions = getAvailableTransitions(order.status).length > 0;
 
   const handleCopyOrderNumber = () => {
     navigator.clipboard.writeText(order.order_number);
     toast.success('Número do pedido copiado!');
+  };
+
+  const handleOpenExistingTicket = () => {
+    if (existingTicketId) {
+      navigate(`/minha-conta/tickets/${existingTicketId}`);
+    }
   };
 
   const handleMarkFraud = async () => {
@@ -97,47 +112,40 @@ export const OrderActionBar = ({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 py-3 border-b">
-        <OpenTicketButton
-          orderId={order.id}
-          orderStatus={order.status}
-          paymentStatus={order.payment_status}
-          deliveredAt={deliveredAt}
-          paidAt={paidAt}
-          existingTicketId={existingTicketId}
-          variant="outline"
-          size="sm"
-        />
-
-        {showCancel && (
-          <Button variant="outline" size="sm" onClick={() => setCancelOpen(true)} className="text-destructive hover:text-destructive">
-            <Ban className="h-4 w-4 mr-1" />
-            Solicitar Cancelamento
+      <div className="flex flex-wrap items-center gap-2 py-1.5">
+        {/* Botão Único Unificado: Abrir Ocorrência (ou Ver Ocorrência Aberta) */}
+        {existingTicketId ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleOpenExistingTicket}
+            className="h-8 px-3 text-xs font-semibold text-amber-700 dark:text-amber-300 border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 gap-1.5 shadow-2xs"
+          >
+            <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+            <span>Ver Ocorrência Aberta</span>
+            <ExternalLink className="h-3 w-3 opacity-70 ml-0.5" />
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setOccurrenceOpen(true)}
+            className="h-8 px-3 text-xs font-semibold text-amber-700 dark:text-amber-300 border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 gap-1.5 shadow-2xs"
+          >
+            <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+            <span>Abrir Ocorrência</span>
           </Button>
         )}
 
-        {showRequestCancel && (
-          <Button variant="outline" size="sm" onClick={() => setRequestCancelOpen(true)}>
-            <HandMetal className="h-4 w-4 mr-1" />
-            Solicitar Cancelamento
-          </Button>
-        )}
-
-        {showReturn && (
-          <Button variant="outline" size="sm" onClick={() => setReturnOpen(true)}>
-            <RotateCcw className="h-4 w-4 mr-1" />
-            Solicitar Devolução
-          </Button>
-        )}
-
+        {/* Menu Suspenso Mais para Ações Secundárias */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <MoreHorizontal className="h-4 w-4 mr-1" />
-              Mais
+            <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground">
+              <MoreHorizontal className="h-3.5 w-3.5 mr-1" />
+              <span>Mais</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="start" className="w-56">
             <DropdownMenuItem onClick={handleCopyOrderNumber}>
               <Copy className="h-4 w-4 mr-2" />
               Copiar Número do Pedido
@@ -163,6 +171,16 @@ export const OrderActionBar = ({
               </>
             )}
 
+            {showCancel && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setCancelOpen(true)} className="text-destructive focus:text-destructive">
+                  <Ban className="h-4 w-4 mr-2" />
+                  Cancelar Pedido
+                </DropdownMenuItem>
+              </>
+            )}
+
             {userRole === 'super_admin' && order.status !== 'cancelado' && (
               <>
                 <DropdownMenuSeparator />
@@ -176,6 +194,16 @@ export const OrderActionBar = ({
         </DropdownMenu>
       </div>
 
+      {/* Modal Passo a Passo de Ocorrência (Etapas 1 e 2) */}
+      <OrderOccurrenceModal
+        open={occurrenceOpen}
+        onOpenChange={setOccurrenceOpen}
+        order={order}
+        existingShippingFiles={shippingFiles}
+        deliveredAt={deliveredAt}
+        onSuccess={onRefresh}
+      />
+
       <CancelOrderModal
         open={cancelOpen}
         onOpenChange={setCancelOpen}
@@ -183,21 +211,6 @@ export const OrderActionBar = ({
         orderNumber={order.order_number}
         totalAmount={Number(order.total_amount)}
         userId={order.user_id}
-        onSuccess={onRefresh}
-      />
-      <RequestCancelModal
-        open={requestCancelOpen}
-        onOpenChange={setRequestCancelOpen}
-        orderId={order.id}
-        orderNumber={order.order_number}
-        onSuccess={onRefresh}
-      />
-      <RequestReturnModal
-        open={returnOpen}
-        onOpenChange={setReturnOpen}
-        orderId={order.id}
-        orderNumber={order.order_number}
-        deliveredAt={deliveredAt}
         onSuccess={onRefresh}
       />
       <UpdateStatusModal

@@ -1,7 +1,7 @@
 {
-  "hash": "42707d43a4522fdf3d25d5933b42b93e2d5618a3",
-  "shortHash": "42707d4",
-  "message": "fix(pwa): deduplicate manifest link and add id to webmanifest",
+  "hash": "051d7331410d45b350f665339b40155cebce08dc",
+  "shortHash": "051d733",
+  "message": "fix(pipeline): separar estritamente pedidos entre Principal e Ocorrencias e renomear aba",
   "author": "Lojafy Developer",
-  "timestamp": 1794924792006
+  "timestamp": 1794926070834
 }

@@ -1106,12 +1106,15 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   order={order}
                   userRole={profile.role || 'customer'}
                   deliveredAt={deliveredAt}
+                  paidAt={order.paid_at}
                   existingTicketId={existingTicketId}
+                  shippingFiles={shippingFiles}
                   onRefresh={() => {
                     fetchOrderDetails();
                     fetchStatusHistory();
                     fetchExistingTicket();
                     fetchDeliveredAt();
+                    fetchShippingFiles();
                   }}
                 />
               </div>
