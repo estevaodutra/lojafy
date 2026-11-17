@@ -31,6 +31,13 @@ export interface CatalogProduct {
   isInMyStore?: boolean;
   myStorePrice?: number;
   ml_ready?: boolean;
+  weight?: number;
+  length?: number;
+  width?: number;
+  height?: number;
+  gtin_ean13?: string;
+  ncm?: string;
+  shopee_category_id?: string | number;
 }
 
 export interface CatalogFilters {

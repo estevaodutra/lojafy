@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import {
   Pagination,
@@ -32,7 +33,8 @@ import {
   Check,
   Trophy,
   CheckCircle2,
-  Info
+  Info,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useCategories } from '@/hooks/useCategories';
 import { useResellerCatalog } from '@/hooks/useResellerCatalog';
@@ -40,6 +42,7 @@ import { useResellerStore } from '@/hooks/useResellerStore';
 import { ProductCalculatorModal } from '@/components/reseller/ProductCalculatorModal';
 import { useSubscriptionCheck } from '@/hooks/useSubscriptionCheck';
 import { PremiumRequiredModal } from '@/components/premium/PremiumRequiredModal';
+import { exportProductsToShopee } from '@/utils/shopeeExport';
 
 const TAXA_ML = 0.14; // 14% Clássico
 
@@ -57,6 +60,7 @@ const ResellerCatalog = () => {
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [specialFilter, setSpecialFilter] = useState<'all' | 'top10' | 'ml_ready'>('all');
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const { requiresPremium, paymentUrl } = useSubscriptionCheck();
 
   const { data: categories = [], isLoading: categoriesLoading } = useCategories();
@@ -151,6 +155,35 @@ const ResellerCatalog = () => {
       topProducts: filter === 'top10' ? true : undefined,
       mlReadyOnly: filter === 'ml_ready' ? true : undefined,
     });
+  };
+
+  const toggleSelectProduct = (productId: string) => {
+    setSelectedProductIds((prev) =>
+      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
+    );
+  };
+
+  const toggleSelectAllPage = () => {
+    const pageIds = products.map((p) => p.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedProductIds.includes(id));
+    if (allSelected) {
+      setSelectedProductIds((prev) => prev.filter((id) => !pageIds.includes(id)));
+    } else {
+      setSelectedProductIds((prev) => Array.from(new Set([...prev, ...pageIds])));
+    }
+  };
+
+  const handleExportShopeeSelected = () => {
+    const listToExport = products.filter((p) => selectedProductIds.includes(p.id));
+    if (listToExport.length === 0) {
+      toast({
+        title: "Selecione pelo menos um produto",
+        description: "Marque a caixinha de seleção dos produtos que deseja exportar.",
+        variant: "destructive",
+      });
+      return;
+    }
+    exportProductsToShopee(listToExport);
   };
 
   const handleAddToStore = async (productId: string, customPrice?: number) => {
@@ -382,12 +415,47 @@ const ResellerCatalog = () => {
         </CardContent>
       </Card>
 
-      {/* Results Info */}
+      {/* Results Info & Ações de Seleção Shopee */}
       {!isLoading && products.length > 0 && (
-        <div className="flex justify-between items-center mb-4">
-          <p className="text-sm text-muted-foreground">
-            Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} de {totalCount} produtos
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-card border rounded-lg shadow-2xs">
+          <div className="flex items-center gap-3">
+            <Checkbox
+              id="select-all-catalog-page"
+              checked={products.length > 0 && products.every((p) => selectedProductIds.includes(p.id))}
+              onCheckedChange={toggleSelectAllPage}
+            />
+            <Label htmlFor="select-all-catalog-page" className="text-xs font-semibold cursor-pointer">
+              Selecionar todos da página ({selectedProductIds.length} selecionado{selectedProductIds.length === 1 ? '' : 's'})
+            </Label>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-xs text-muted-foreground mr-1">
+              Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} de {totalCount} produtos
+            </p>
+
+            <Button
+              size="sm"
+              onClick={handleExportShopeeSelected}
+              disabled={selectedProductIds.length === 0}
+              className="gap-1.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs shadow-2xs h-8"
+              title="Exportar produtos selecionados para o modelo de envio em massa da Shopee"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Exportar Shopee {selectedProductIds.length > 0 ? `(${selectedProductIds.length})` : ''}</span>
+            </Button>
+
+            {selectedProductIds.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedProductIds([])}
+                className="text-xs text-muted-foreground hover:text-foreground h-8 px-2"
+              >
+                Limpar
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
@@ -446,6 +514,22 @@ const ResellerCatalog = () => {
               <Card key={product.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader className="pb-2">
                   <div className="relative">
+                    {/* Checkbox de Seleção Shopee */}
+                    <div 
+                      className="absolute top-2 left-2 z-10 bg-background/95 backdrop-blur-xs p-1.5 rounded-md shadow-xs border border-border flex items-center justify-center cursor-pointer hover:bg-background transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSelectProduct(product.id);
+                      }}
+                      title="Selecionar para exportar para a Shopee"
+                    >
+                      <Checkbox
+                        checked={selectedProductIds.includes(product.id)}
+                        onCheckedChange={() => toggleSelectProduct(product.id)}
+                        className="data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500 w-4 h-4 cursor-pointer"
+                      />
+                    </div>
+
                     {productImages.length === 1 ? (
                       <img 
                         src={productImages[0]} 
@@ -465,7 +549,7 @@ const ResellerCatalog = () => {
                       </div>
                     )}
                     {product.featured && (
-                      <Badge className="absolute top-2 left-2 bg-purple-500 hover:bg-purple-600">
+                      <Badge className="absolute top-2 left-11 bg-purple-500 hover:bg-purple-600 text-xs">
                         <Star className="h-3 w-3 mr-1" />
                         Destaque
                       </Badge>

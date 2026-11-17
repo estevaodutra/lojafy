@@ -1,7 +1,7 @@
 {
-  "hash": "0cba91869830131b2e5ca5433f64c6ff952ece07",
-  "shortHash": "0cba918",
-  "message": "fix(supplier): garantir exibicao de produtos, imagens e quantidades no painel do fornecedor",
+  "hash": "17170b9426ad46cebbd5c83094f5ee0ead4deb22",
+  "shortHash": "17170b9",
+  "message": "fix(pipeline): unificar botao de avancar etapa do pedido e corrigir erro de atualizacao de status",
   "author": "Lojafy Developer",
-  "timestamp": 1794937117110
+  "timestamp": 1794937576721
 }

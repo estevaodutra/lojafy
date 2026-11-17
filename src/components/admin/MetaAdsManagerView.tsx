@@ -28,6 +28,7 @@ import { useSupplierOrganization } from '@/hooks/supplier/useSupplierOrganizatio
 import { useMercadoLivreIntegration } from '@/hooks/useMercadoLivreIntegration';
 import { getProductMarketplaceLinks, getProductMarketplaceValidations } from '@/utils/marketplaceLinks';
 import { ImageUploadArea, type ImageFile } from './ImageUploadArea';
+import { exportProductsToShopee, exportAdsToShopee } from '@/utils/shopeeExport';
 
 interface MetaAdsManagerViewProps {
   roleMode?: 'admin' | 'supplier' | 'reseller';
@@ -1233,6 +1234,25 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                     <span>Exportar CSV</span>
                   </Button>
 
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const list = selectedProductIds.length > 0 
+                        ? products.filter((p: any) => selectedProductIds.includes(p.id))
+                        : (filteredProducts.length > 0 ? filteredProducts : products);
+                      exportProductsToShopee(list);
+                    }}
+                    className="gap-2 border-orange-300 bg-orange-50/50 hover:bg-orange-100/60 text-orange-800 shadow-xs h-10 px-3 shrink-0 font-medium"
+                    title="Exportar modelo de criação em massa oficial da Shopee (CSV)"
+                  >
+                    <FileSpreadsheet className="h-4 w-4 text-orange-600" />
+                    <span>
+                      {selectedProductIds.length > 0
+                        ? `Exportar Shopee (${selectedProductIds.length})`
+                        : 'Exportar Shopee'}
+                    </span>
+                  </Button>
+
                   {selectedProductIds.length > 0 && (
                     <div className="flex items-center gap-2 flex-wrap">
                       <Button
@@ -1711,6 +1731,22 @@ export const MetaAdsManagerView: React.FC<MetaAdsManagerViewProps> = ({
                   className="text-xs"
                 >
                   <X className="h-3.5 w-3.5 mr-1" /> Exibir Todos os Anúncios Internos
+                </Button>
+              )}
+
+              {selectedAdIds.length >= 1 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const listToExport = effectiveAds.filter((ad: any) => selectedAdIds.includes(ad.id));
+                    exportAdsToShopee(listToExport);
+                  }}
+                  className="border-orange-300 bg-orange-50/50 hover:bg-orange-100/60 text-orange-800 text-xs gap-1.5 h-8 font-semibold shadow-xs"
+                  title="Exportar anúncios selecionados para o modelo de envio em massa da Shopee"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5 text-orange-600" />
+                  Exportar Shopee ({selectedAdIds.length})
                 </Button>
               )}
 
