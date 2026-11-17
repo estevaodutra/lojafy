@@ -317,31 +317,51 @@ const AdminOrders = () => {
     }
   };
 
-  const updateOrderStatus = async (orderId: string | any, newStatus: string) => {
+  const updateOrderStatus = async (
+    orderId: string | any,
+    newStatus: string,
+    metadata?: { returnCode?: string | null }
+  ) => {
     const cleanId = typeof orderId === "object" && orderId !== null ? orderId.id || orderId.order_id : String(orderId);
     // Optimistic update
     const previousOrders = orders;
     setOrders((prev) =>
-      prev.map((order) => (order.id === cleanId ? { ...order, status: newStatus } : order))
+      prev.map((order) =>
+        order.id === cleanId
+          ? {
+              ...order,
+              status: newStatus,
+              devolucao_codigo: metadata?.returnCode !== undefined ? metadata.returnCode : order.devolucao_codigo,
+            }
+          : order
+      )
     );
 
     try {
+      const updatePayload: Record<string, any> = {
+        status: newStatus,
+        stage_entered_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      if (metadata?.returnCode !== undefined) {
+        updatePayload.devolucao_codigo = metadata.returnCode ? metadata.returnCode.trim() : null;
+        updatePayload.devolucao_codigo_informado_em = new Date().toISOString();
+      }
+
       const { error } = await supabase
         .from("orders")
-        .update({
-          status: newStatus,
-          stage_entered_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        } as any)
+        .update(updatePayload as any)
         .eq("id", cleanId);
 
       if (error) throw error;
 
       // Status history
+      const returnCodeNote = metadata?.returnCode ? ` • Código de devolução: ${metadata.returnCode.trim()}` : "";
       await supabase.from("order_status_history").insert({
         order_id: cleanId,
         status: newStatus,
-        notes: `Status atualizado para ${newStatus}`,
+        notes: `Status atualizado para ${newStatus}${returnCodeNote}`,
       });
 
       toast({

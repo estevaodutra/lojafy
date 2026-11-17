@@ -21,6 +21,7 @@ import { OrderPipelineView } from "@/components/pipeline/OrderPipelineView";
 import { normalizeOrderToPipelineItem } from "@/utils/orderPipelineAdapter";
 import { OrderPipelineItem } from "@/types/orderPipeline";
 import OrderDetailsModal from "@/components/OrderDetailsModal";
+import { isOccurrenceStageAllowedForReseller } from "@/services/orderOccurrenceDeliveryService";
 
 function ResellerOrders() {
   const navigate = useNavigate();
@@ -549,12 +550,66 @@ function ResellerOrders() {
         <OrderPipelineView
           orders={pipelineItems}
           isLoading={isLoading}
-          onUpdateOrderStatus={async () => {
-            toast({
-              title: "Ação não permitida",
-              description: "Revendedores não podem alterar o status operacional diretamente.",
-              variant: "destructive",
-            });
+          onUpdateOrderStatus={async (orderId, newStatus, metadata) => {
+            const targetOrder = pipelineItems.find((o) => o.id === orderId);
+            if (!targetOrder) return;
+
+            // Verificar se está em ocorrências
+            if (!targetOrder.in_occurrences && targetOrder.pipeline_key !== "occurrences") {
+              toast({
+                title: "Ação restrita",
+                description: "Revendedores não podem alterar o status operacional na pipeline principal.",
+                variant: "destructive",
+              });
+              return;
+            }
+
+            // Verificar se a etapa de destino é uma das permitidas para revendedor
+            if (!isOccurrenceStageAllowedForReseller({ name: newStatus, status_key: newStatus })) {
+              toast({
+                title: "Etapa restrita",
+                description: "Revendedores só podem movimentar pedidos entre Nova Ocorrência, Produto Enviado e Entrega Hoje.",
+                variant: "destructive",
+              });
+              return;
+            }
+
+            try {
+              const updatePayload: Record<string, any> = {
+                status: newStatus,
+                stage_entered_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              };
+
+              if (metadata?.returnCode !== undefined) {
+                updatePayload.devolucao_codigo = metadata.returnCode ? metadata.returnCode.trim() : null;
+                updatePayload.devolucao_codigo_informado_em = new Date().toISOString();
+              }
+
+              const { error } = await supabase
+                .from("orders")
+                .update(updatePayload)
+                .eq("id", orderId);
+
+              if (error) throw error;
+
+              const returnCodeNote = metadata?.returnCode ? ` • Código de devolução: ${metadata.returnCode.trim()}` : "";
+              await supabase.from("order_status_history").insert({
+                order_id: orderId,
+                status: newStatus,
+                notes: `Revendedor atualizou status para ${newStatus}${returnCodeNote}`,
+              });
+
+              queryClient.invalidateQueries({ queryKey: ["reseller-orders"] });
+              queryClient.invalidateQueries({ queryKey: ["orders"] });
+            } catch (err: any) {
+              console.error("Erro ao atualizar status pelo revendedor:", err);
+              toast({
+                title: "Erro ao atualizar",
+                description: err.message || "Não foi possível atualizar o status do pedido.",
+                variant: "destructive",
+              });
+            }
           }}
           listViewContent={listViewContent}
           userScopeLabel="Revendedor"

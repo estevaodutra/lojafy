@@ -19,12 +19,22 @@ import { OrderKanbanCard } from "./OrderKanbanCard";
 import { STATUS_TRANSITIONS, SUPPLIER_STATUSES, OrderStatus } from "@/constants/orderStatus";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useOrderPreferences } from "@/hooks/useOrderPreferences";
+import { ReturnCodeModal } from "./ReturnCodeModal";
+import {
+  isOccurrenceStageAllowedForReseller,
+  isEntregaHojeStage,
+  notifySupplierOfDeliveryToday,
+} from "@/services/orderOccurrenceDeliveryService";
 import { toast } from "sonner";
 
 interface OrderKanbanBoardProps {
   pipeline: OrderPipeline;
   orders: OrderPipelineItem[];
-  onUpdateOrderStatus: (orderId: string, newStatus: string) => Promise<void>;
+  onUpdateOrderStatus: (
+    orderId: string,
+    newStatus: string,
+    metadata?: { returnCode?: string | null }
+  ) => Promise<void>;
   onViewDetails: (order: OrderPipelineItem) => void;
   onGeneratePix?: (order: OrderPipelineItem) => void;
   onPrintLabel?: (order: OrderPipelineItem) => void;
@@ -45,6 +55,10 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
   const { role, isSuperAdmin, isSupplier } = useUserRole();
   const { sortOrders } = useOrderPreferences();
   const [activeOrder, setActiveOrder] = useState<OrderPipelineItem | null>(null);
+
+  // Controle do modal de código de devolução / recebimento ao mover para Entrega Hoje
+  const [pendingDeliveryTodayOrder, setPendingDeliveryTodayOrder] = useState<OrderPipelineItem | null>(null);
+  const [pendingTargetStatus, setPendingTargetStatus] = useState<string>("Entrega Hoje");
 
   // Sensores rápidos e sem conflitos com cliques internos
   const sensors = useSensors(
@@ -100,11 +114,70 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
         const sName = stage.name.toLowerCase().trim();
 
         if (pipeline.key === "occurrences") {
+          // 1. Casamento direto
           if (ticketStatus === sKey || ticketStatus === sName || orderStatus === sKey || orderStatus === sName) return true;
-          if ((sKey === "aberto" || sName.includes("abert")) && (orderStatus.includes("devolucao") || orderStatus.includes("cancelamento") || !!order.has_solicitation || !!order.cancelamento_motivo || !!order.devolucao_motivo)) return true;
-          if ((sKey === "em_analise" || sName.includes("analise") || sName.includes("análise")) && (orderStatus === "em_analise" || orderStatus === "devolucao_analise")) return true;
-          if ((sKey === "aguardando_cliente" || sName.includes("cliente")) && (ticketStatus === "aguardando_cliente" || orderStatus === "aguardando_cliente")) return true;
-          if ((sKey === "resolvido" || sName.includes("resolv")) && (ticketStatus === "resolvido" || orderStatus === "resolvido" || orderStatus === "reembolsado" || orderStatus === "devolucao_aprovada")) return true;
+
+          // 2. Etapa 1: Nova Ocorrência
+          if (
+            (sKey === "nova_ocorrencia" || sKey === "aberto" || sName.includes("nova") || sName.includes("abert")) &&
+            (orderStatus.includes("devolucao") || orderStatus.includes("cancelamento") || !!order.has_solicitation || !!order.solicitation_type)
+          ) {
+            return true;
+          }
+
+          // 3. Etapa 2: Produto Enviado
+          if (
+            (sKey === "produto_enviado" || sName.includes("enviado")) &&
+            (orderStatus === "enviado" || orderStatus === "produto_enviado" || orderStatus === "devolucao_andamento")
+          ) {
+            return true;
+          }
+
+          // 4. Etapa 3: Entrega Hoje
+          if (isEntregaHojeStage(sKey) || isEntregaHojeStage(sName)) {
+            if (orderStatus === "entrega_hoje" || orderStatus === "entrega hoje") return true;
+          }
+
+          // 5. Etapa 4: Produto Recebido
+          if (
+            (sKey === "produto_recebido" || sName.includes("recebido")) &&
+            (orderStatus === "recebido" || orderStatus === "devolucao_recebida")
+          ) {
+            return true;
+          }
+
+          // 6. Etapa 5: Em Análise
+          if (
+            (sKey === "em_analise" || sName.includes("analise") || sName.includes("análise")) &&
+            (orderStatus === "em_analise" || orderStatus === "devolucao_analise")
+          ) {
+            return true;
+          }
+
+          // 7. Etapa 6: Aprovado Troca/Devolução
+          if (
+            (sKey === "aprovado_troca_devolucao" || sName.includes("aprovado")) &&
+            (orderStatus === "devolucao_aprovada" || orderStatus.includes("aprovad"))
+          ) {
+            return true;
+          }
+
+          // 8. Etapa 7: Resolvido
+          if (
+            (sKey === "resolvido" || sName.includes("resolv")) &&
+            (ticketStatus === "resolvido" || orderStatus === "resolvido" || orderStatus === "reembolsado")
+          ) {
+            return true;
+          }
+
+          // 9. Etapa 8: Cancelado
+          if (
+            (sKey === "cancelado" || sName.includes("cancel")) &&
+            orderStatus === "cancelado"
+          ) {
+            return true;
+          }
+
           return false;
         }
 
@@ -187,15 +260,46 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
       return;
     }
 
-    // Validação por perfil: Super Admin e Fornecedor podem movimentar cards livremente entre as etapas
+    // Validação por perfil:
+    // Na pipeline principal, apenas Super Admin e Fornecedor podem movimentar cards livremente por arrasto.
+    // Na pipeline de ocorrências, o Revendedor pode movimentar apenas entre as 3 primeiras etapas (Nova Ocorrência, Produto Enviado, Entrega Hoje).
     if (role === "reseller") {
-      toast.error("Revendedores não podem alterar o status operacional diretamente por arrasto.");
+      if (pipeline.key !== "occurrences") {
+        toast.error("Revendedores não podem alterar o status operacional diretamente por arrasto.");
+        return;
+      }
+
+      const isTargetAllowed = isOccurrenceStageAllowedForReseller(targetStage, activeStages);
+      if (!isTargetAllowed) {
+        toast.error("Revendedores só podem movimentar pedidos entre Nova Ocorrência, Produto Enviado e Entrega Hoje.");
+        return;
+      }
+    }
+
+    // Se estiver movendo para 'Entrega Hoje', abre a janelinha para informar o código de devolução/recebimento
+    if (isEntregaHojeStage(newStatus)) {
+      setPendingDeliveryTodayOrder(draggedOrder);
+      setPendingTargetStatus(newStatus);
       return;
     }
 
+    await executeStatusUpdate(draggedOrder, newStatus);
+  };
+
+  const executeStatusUpdate = async (
+    targetOrder: OrderPipelineItem,
+    targetStatus: string,
+    returnCode?: string | null
+  ) => {
     try {
-      await onUpdateOrderStatus(orderId, newStatus);
-      toast.success(`Pedido #${draggedOrder.order_number} movido para "${newStatus}".`);
+      await onUpdateOrderStatus(targetOrder.id, targetStatus, { returnCode });
+
+      // Se for Entrega Hoje, disparar a notificação para o fornecedor
+      if (isEntregaHojeStage(targetStatus)) {
+        await notifySupplierOfDeliveryToday(targetOrder, returnCode);
+      }
+
+      toast.success(`Pedido #${targetOrder.order_number} movido para "${targetStatus}".`);
     } catch (err: any) {
       toast.error(err.message || "Erro ao atualizar status do pedido.");
     }
@@ -203,9 +307,24 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
 
   const handleAdvanceStage = useCallback(
     async (order: OrderPipelineItem, targetStatus: string) => {
-      await onUpdateOrderStatus(order.id, targetStatus);
+      // Se for para Entrega Hoje, interceptar e abrir o modal de código de recebimento
+      if (isEntregaHojeStage(targetStatus)) {
+        setPendingDeliveryTodayOrder(order);
+        setPendingTargetStatus(targetStatus);
+        return;
+      }
+      await executeStatusUpdate(order, targetStatus);
     },
     [onUpdateOrderStatus]
+  );
+
+  const isResellerDropDisabled = useCallback(
+    (stage: OrderPipelineStage) => {
+      if (role !== "reseller") return false;
+      if (pipeline.key !== "occurrences") return true;
+      return !isOccurrenceStageAllowedForReseller(stage, activeStages);
+    },
+    [role, pipeline.key, activeStages]
   );
 
   return (
@@ -231,7 +350,7 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
                 onGenerateLabel={onGenerateLabel}
                 onArchiveOrder={onArchiveOrder}
                 onAdvanceStage={handleAdvanceStage}
-                isDropDisabled={role === "reseller"}
+                isDropDisabled={isResellerDropDisabled(stage)}
               />
             );
           })}
@@ -250,6 +369,27 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
           </div>
         ) : null}
       </DragOverlay>
+
+      {/* Modal de Código de Devolução / Recebimento ao Mover para Entrega Hoje */}
+      <ReturnCodeModal
+        open={!!pendingDeliveryTodayOrder}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingDeliveryTodayOrder(null);
+          }
+        }}
+        order={pendingDeliveryTodayOrder}
+        targetStageName={pendingTargetStatus}
+        onConfirm={async (returnCode) => {
+          if (!pendingDeliveryTodayOrder) return;
+          await executeStatusUpdate(
+            pendingDeliveryTodayOrder,
+            pendingTargetStatus,
+            returnCode
+          );
+          setPendingDeliveryTodayOrder(null);
+        }}
+      />
     </DndContext>
   );
 };

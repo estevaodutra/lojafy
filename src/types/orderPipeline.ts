@@ -81,6 +81,11 @@ export interface OrderPipelineItem {
   // Identifiers & tracking
   external_reference?: string | null;
   tracking_number?: string | null;
+  return_code?: string | null;
+  codigo_devolucao?: string | null;
+  supplier_id?: string | null;
+  supplier_organization_id?: string | null;
+  reseller_id?: string | null;
   
   // Origin & channel badges
   channel: string; // 'mercadolivre' | 'shopee' | 'manual' | 'lojafy'

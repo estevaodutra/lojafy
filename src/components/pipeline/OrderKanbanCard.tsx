@@ -28,7 +28,10 @@ import {
   ArrowRight,
   ChevronDown,
   Loader2,
+  KeyRound,
+  Copy,
 } from "lucide-react";
+import { isOccurrenceStageAllowedForReseller, isEntregaHojeStage } from "@/services/orderOccurrenceDeliveryService";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -55,11 +58,19 @@ export const OrderKanbanCard = React.memo<OrderKanbanCardProps>(({
   onAdvanceStage,
   isDragging = false,
 }) => {
-  const { isSuperAdmin, isSupplier } = useUserRole();
+  const { isSuperAdmin, isSupplier, role } = useUserRole();
   const showAdminMetrics = isSuperAdmin();
 
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  const returnCode =
+    order.return_code ||
+    order.codigo_devolucao ||
+    order.raw?.devolucao_codigo ||
+    order.raw?.codigo_recebimento;
+
+  const isOccurrencesPipeline = order.in_occurrences || order.pipeline_key === "occurrences";
 
   const handleCopyPaymentLink = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -83,6 +94,55 @@ export const OrderKanbanCard = React.memo<OrderKanbanCardProps>(({
       if (ticketStatus && (ticketStatus === sKey || ticketStatus === sName)) return true;
       if (orderStatus === sKey || orderStatus === sName) return true;
 
+      if (isOccurrencesPipeline) {
+        if (
+          (sKey === "aberto" || sKey === "nova_ocorrencia" || sName.includes("nova") || sName.includes("abert")) &&
+          (orderStatus.includes("devolucao") || orderStatus.includes("cancelamento") || !!order.has_solicitation || !!order.solicitation_type)
+        ) {
+          return true;
+        }
+        if (
+          (sKey === "produto_enviado" || sName.includes("enviado")) &&
+          (orderStatus === "enviado" || orderStatus === "produto_enviado" || orderStatus === "devolucao_andamento")
+        ) {
+          return true;
+        }
+        if (isEntregaHojeStage(sKey) || isEntregaHojeStage(sName)) {
+          if (orderStatus === "entrega_hoje" || orderStatus === "entrega hoje") return true;
+        }
+        if (
+          (sKey === "produto_recebido" || sName.includes("recebido")) &&
+          (orderStatus === "recebido" || orderStatus === "devolucao_recebida")
+        ) {
+          return true;
+        }
+        if (
+          (sKey === "em_analise" || sName.includes("analise") || sName.includes("análise")) &&
+          (orderStatus === "em_analise" || orderStatus === "devolucao_analise")
+        ) {
+          return true;
+        }
+        if (
+          (sKey === "aprovado_troca_devolucao" || sName.includes("aprovado")) &&
+          (orderStatus === "devolucao_aprovada" || orderStatus.includes("aprovad"))
+        ) {
+          return true;
+        }
+        if (
+          (sKey === "resolvido" || sName.includes("resolv")) &&
+          (orderStatus === "resolvido" || orderStatus === "reembolsado")
+        ) {
+          return true;
+        }
+        if (
+          (sKey === "cancelado" || sName.includes("cancel")) &&
+          orderStatus === "cancelado"
+        ) {
+          return true;
+        }
+        return false;
+      }
+
       if (orderStatus === "pendente" && (sKey === "pendente" || sName.includes("pagamento") || sName.includes("gerado") || sName.includes("novo"))) return true;
       if (orderStatus === "pago" && (sKey === "pago" || sName.includes("recebimento") || sName.includes("pago"))) return true;
       if (orderStatus === "recebido" && (sKey === "recebido" || sName.includes("recebido"))) return true;
@@ -96,16 +156,34 @@ export const OrderKanbanCard = React.memo<OrderKanbanCardProps>(({
     });
 
     return idx >= 0 ? idx : 0;
-  }, [activeStages, order.status, order.active_ticket_status]);
+  }, [activeStages, order.status, order.active_ticket_status, isOccurrencesPipeline]);
 
   // Etapas para frente (caminho para frente na pipeline)
   const forwardStages = useMemo(() => {
     if (!activeStages || currentStageIndex < 0) return [];
-    return activeStages.slice(currentStageIndex + 1);
-  }, [activeStages, currentStageIndex]);
+    const allForward = activeStages.slice(currentStageIndex + 1);
+
+    if (role === "reseller") {
+      if (!isOccurrencesPipeline) return [];
+      // No fluxo de ocorrências, o revendedor só pode avançar para as etapas permitidas (Nova Ocorrência, Produto Enviado, Entrega Hoje)
+      return allForward.filter((stage) =>
+        isOccurrenceStageAllowedForReseller(stage, activeStages)
+      );
+    }
+
+    return allForward;
+  }, [activeStages, currentStageIndex, role, isOccurrencesPipeline]);
 
   const nextStage = forwardStages[0] || null;
-  const canAdvanceStage = (isSuperAdmin() || isSupplier()) && !!nextStage && !!onAdvanceStage;
+
+  const canAdvanceStage = useMemo(() => {
+    if (!nextStage || !onAdvanceStage) return false;
+    if (isSuperAdmin() || isSupplier()) return true;
+    if (role === "reseller" && isOccurrencesPipeline) {
+      return isOccurrenceStageAllowedForReseller(nextStage, activeStages);
+    }
+    return false;
+  }, [nextStage, onAdvanceStage, isSuperAdmin, isSupplier, role, isOccurrencesPipeline, activeStages]);
 
   const handleAdvanceTo = async (targetStatus: string) => {
     if (!onAdvanceStage || isAdvancing) return;
@@ -272,6 +350,42 @@ export const OrderKanbanCard = React.memo<OrderKanbanCardProps>(({
             </p>
           </div>
         </div>
+
+        {/* Destaque do Código de Recebimento / Devolução */}
+        {returnCode && (
+          <div
+            className="my-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 border-2 border-amber-400 dark:border-amber-600 shadow-xs flex items-center justify-between gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-md bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-2xs">
+                <KeyRound className="w-4 h-4 stroke-[2.5]" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 block leading-none">
+                  Código de Recebimento
+                </span>
+                <span className="text-xs sm:text-sm font-extrabold font-mono text-amber-950 dark:text-amber-100 tracking-wider truncate block mt-0.5 select-all">
+                  {returnCode}
+                </span>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 px-2 text-[10px] font-semibold bg-white dark:bg-slate-900 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50 shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(returnCode);
+                toast.success("Código de devolução copiado!");
+              }}
+              title="Copiar código de recebimento"
+            >
+              <Copy className="w-3 h-3 mr-1" />
+              Copiar
+            </Button>
+          </div>
+        )}
 
         {/* Parties (Seller, Cliente, Fornecedor) */}
         <div className="grid grid-cols-1 gap-1 text-xs my-2 pt-1 border-t border-border/40">

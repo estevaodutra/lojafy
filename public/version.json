@@ -1,7 +1,7 @@
 {
-  "hash": "4339d761e599dbfbfa04eb1e0e331e5362a18df2",
-  "shortHash": "4339d76",
-  "message": "fix(shopee): deixar canal de envio 90003 em branco para aplicar canal padrao da conta e sanitizar dimensoes",
+  "hash": "23955f51d1a32866aec96c170a8c78de7dd85409",
+  "shortHash": "23955f5",
+  "message": "fix(shopee): calcular e corrigir digito verificador modulo 10 GS1 para GTIN/EAN evitando erro de GTIN obrigatorio",
   "author": "Lojafy Developer",
-  "timestamp": 1794940296757
+  "timestamp": 1794958810728
 }

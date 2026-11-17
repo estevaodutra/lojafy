@@ -84,7 +84,11 @@ export type OrderListSortOption =
 interface OrderPipelineListViewProps {
   orders: OrderPipelineItem[];
   pipeline: OrderPipeline;
-  onUpdateOrderStatus: (orderId: string, newStatus: string) => Promise<void>;
+  onUpdateOrderStatus: (
+    orderId: string,
+    newStatus: string,
+    metadata?: { returnCode?: string | null }
+  ) => Promise<void>;
   onViewDetails: (order: OrderPipelineItem) => void;
   onGeneratePix?: (order: OrderPipelineItem) => void;
   onPrintLabel?: (order: OrderPipelineItem) => void;

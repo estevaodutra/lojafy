@@ -470,29 +470,49 @@ const SupplierOrderManagement = () => {
     }
   };
 
-  const updateOrderStatus = async (orderId: string | any, newStatus: string) => {
+  const updateOrderStatus = async (
+    orderId: string | any,
+    newStatus: string,
+    metadata?: { returnCode?: string | null }
+  ) => {
     const cleanId = typeof orderId === "object" && orderId !== null ? orderId.id || orderId.order_id : String(orderId);
     const previousOrders = orders;
     setOrders((prev) =>
-      prev.map((o) => (o.order_id === cleanId || o.id === cleanId ? { ...o, status: newStatus } : o))
+      prev.map((o) =>
+        o.order_id === cleanId || o.id === cleanId
+          ? {
+              ...o,
+              status: newStatus,
+              devolucao_codigo: metadata?.returnCode !== undefined ? metadata.returnCode : o.devolucao_codigo,
+            }
+          : o
+      )
     );
 
     try {
+      const updatePayload: Record<string, any> = {
+        status: newStatus,
+        stage_entered_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      if (metadata?.returnCode !== undefined) {
+        updatePayload.devolucao_codigo = metadata.returnCode ? metadata.returnCode.trim() : null;
+        updatePayload.devolucao_codigo_informado_em = new Date().toISOString();
+      }
+
       const { error: oErr } = await supabase
         .from("orders")
-        .update({
-          status: newStatus,
-          stage_entered_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        } as any)
+        .update(updatePayload as any)
         .eq("id", cleanId);
 
       if (oErr) throw oErr;
 
+      const returnCodeNote = metadata?.returnCode ? ` • Código de devolução: ${metadata.returnCode.trim()}` : "";
       await supabase.from("order_status_history").insert({
         order_id: cleanId,
         status: newStatus,
-        notes: `Status atualizado pelo fornecedor`,
+        notes: `Status atualizado pelo fornecedor para ${newStatus}${returnCodeNote}`,
       });
 
       toast({

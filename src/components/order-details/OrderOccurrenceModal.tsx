@@ -359,9 +359,9 @@ export const OrderOccurrenceModal = ({
         }
       }
 
-      // 5. Atualizar status do pedido para devolução em andamento
+      // 5. Atualizar status do pedido para Nova Ocorrência
       const orderUpdatePayload: Record<string, any> = {
-        status: 'devolucao_andamento',
+        status: 'nova_ocorrencia',
         devolucao_motivo: motivo,
         devolucao_iniciada_em: new Date().toISOString(),
       };
@@ -386,7 +386,7 @@ export const OrderOccurrenceModal = ({
 
       await supabase.from('order_status_history').insert({
         order_id: order.id,
-        status: 'devolucao_andamento',
+        status: 'nova_ocorrencia',
         notes: historyNotes,
       });
 
@@ -400,7 +400,7 @@ export const OrderOccurrenceModal = ({
             changes: {
               occurrence_type: tipo,
               occurrence_reason: motivoLabel,
-              status: 'devolucao_andamento',
+              status: 'nova_ocorrencia',
             },
           },
         })

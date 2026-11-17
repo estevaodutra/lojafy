@@ -40,6 +40,7 @@ import {
   Receipt,
   History,
   Plus,
+  KeyRound,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -930,6 +931,11 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const isPaid = order?.payment_status === 'paid' || order?.status === 'pago' || pipelineItem?.is_paid;
   const displayOrderNumber = order?.order_number || pipelineItem?.order_number || orderId?.slice(0, 8);
   const displayTracking = order?.tracking_number || pipelineItem?.tracking_number;
+  const displayReturnCode =
+    order?.devolucao_codigo ||
+    pipelineItem?.return_code ||
+    pipelineItem?.codigo_devolucao ||
+    pipelineItem?.raw?.devolucao_codigo;
 
   // Resolução unificada do ID oficial do Mercado Livre (para eliminar divergências com a listagem)
   const resolvedMlOrderId =
@@ -1168,6 +1174,41 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           {/* CORPO COMPACTO — ZERO SCROLL (Tudo Visível no Primeiro Plano)   */}
           {/* ============================================================== */}
           <div className="flex-1 overflow-y-auto p-3.5 sm:p-4 space-y-3">
+            {/* Destaque do Código de Recebimento / Devolução */}
+            {displayReturnCode && (
+              <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400 dark:border-amber-600 shadow-xs flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-md bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-2xs">
+                    <KeyRound className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 block leading-none">
+                      Código de Recebimento / Devolução
+                    </span>
+                    <span className="text-sm font-extrabold font-mono text-amber-950 dark:text-amber-100 tracking-wider truncate block mt-0.5 select-all">
+                      {displayReturnCode}
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs font-semibold bg-white dark:bg-slate-900 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50 shrink-0"
+                  onClick={() => {
+                    navigator.clipboard.writeText(displayReturnCode);
+                    toast({
+                      title: "Código copiado",
+                      description: `Código ${displayReturnCode} copiado para a área de transferência.`,
+                    });
+                  }}
+                  title="Copiar código de recebimento"
+                >
+                  <Copy className="w-3 h-3 mr-1.5" />
+                  Copiar
+                </Button>
+              </div>
+            )}
+
             {/* 1. Grade Superior: Produto (Esquerda) e Participantes (Direita) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
               {/* Coluna Produto */}

@@ -44,7 +44,11 @@ import { isOrderInOccurrences, isOrderInPrimary } from "@/utils/orderPipelineAda
 interface OrderPipelineViewProps {
   orders: OrderPipelineItem[];
   isLoading?: boolean;
-  onUpdateOrderStatus: (orderId: string, newStatus: string) => Promise<void>;
+  onUpdateOrderStatus: (
+    orderId: string,
+    newStatus: string,
+    metadata?: { returnCode?: string | null }
+  ) => Promise<void>;
   listViewContent?: React.ReactNode;
   userScopeLabel?: string;
   onRefreshOrders?: () => void;
