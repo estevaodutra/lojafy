@@ -34,6 +34,7 @@ import {
   Loader2,
   Check,
   Package,
+  Info,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -157,8 +158,8 @@ export const OrderOccurrenceModal = ({
   // Validação da Etapa 1
   const isStep1Valid = Boolean(tipo && motivo && descricao.trim().length >= 10);
 
-  // Validação da Etapa 2: se não possui etiqueta anterior, deve enviar obrigatoriamente
-  const isStep2Valid = hasExistingLabel || Boolean(newShippingLabelFile);
+  // Validação da Etapa 2: etiqueta de envio definida como não obrigatória (opcional para testes e validação)
+  const isStep2Valid = true;
 
   const handleFetchMlLabel = async () => {
     setIsFetchingMlLabel(true);
@@ -716,14 +717,14 @@ export const OrderOccurrenceModal = ({
                 </div>
               ) : (
                 <div className="space-y-2.5">
-                  <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 flex items-start gap-2.5">
-                    <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div className="rounded-lg border border-sky-500/40 bg-sky-500/10 p-3 flex items-start gap-2.5">
+                    <Info className="w-5 h-5 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
                     <div className="text-xs space-y-1 flex-1">
-                      <p className="font-semibold text-amber-900 dark:text-amber-200">
-                        Etiqueta de Envio / Reversa Necessária *
+                      <p className="font-semibold text-sky-900 dark:text-sky-200">
+                        Etiqueta de Envio / Reversa (Opcional)
                       </p>
-                      <p className="text-amber-800 dark:text-amber-300 text-[11px] leading-relaxed">
-                        Este pedido ainda não possui etiqueta vinculada. Você pode buscar automaticamente no Mercado Livre ou anexar o arquivo manualmente.
+                      <p className="text-sky-800 dark:text-sky-300 text-[11px] leading-relaxed">
+                        Este pedido não possui etiqueta vinculada. Você pode puxar do Mercado Livre, anexar o arquivo agora ou prosseguir sem ela.
                       </p>
                     </div>
                   </div>
@@ -761,7 +762,7 @@ export const OrderOccurrenceModal = ({
                   <span>
                     {hasExistingLabel
                       ? 'Anexar Nova Etiqueta Reversa (Opcional)'
-                      : 'Anexar Etiqueta de Logística Reversa *'}
+                      : 'Anexar Etiqueta de Logística Reversa (Opcional)'}
                   </span>
                   {newShippingLabelFile && (
                     <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-500">
@@ -834,7 +835,7 @@ export const OrderOccurrenceModal = ({
                   <span>Tipo: <strong className="text-foreground">{tipo === 'troca' ? 'Troca de Produto' : 'Devolução de Produto'}</strong></span>
                   <span>Motivo: <strong className="text-foreground">{currentReasonObj?.label}</strong></span>
                   <span>Fotos anexadas: <strong className="text-foreground">{evidenceFiles.length}</strong></span>
-                  <span>Etiqueta: <strong className="text-foreground">{newShippingLabelFile ? 'Nova anexada' : hasExistingLabel ? 'Existente' : 'Pendente'}</strong></span>
+                  <span>Etiqueta: <strong className="text-foreground">{newShippingLabelFile ? 'Nova anexada' : hasExistingLabel ? 'Existente' : 'Não anexada (Opcional)'}</strong></span>
                 </div>
               </div>
             </div>
