@@ -956,7 +956,7 @@ async function archiveDuplicateMlOrders(
       .from('orders')
       .select('id, order_number, ml_order_id, ml_shipment_id, payment_id, status, payment_status, ml_label_url, has_shipping_file, created_at')
       .not('ml_order_id', 'is', null)
-      .eq('is_archived', false)
+      .or('is_archived.is.null,is_archived.eq.false')
       .order('created_at', { ascending: false });
 
     if (error || !activeOrders || activeOrders.length === 0) {
@@ -1043,8 +1043,8 @@ async function processSingleMlOrder(
   const { data: existingOrders } = await supabase
     .from('orders')
     .select('id, order_number, status, payment_status, ml_shipment_id, ml_order_id')
-    .or(`payment_id.eq.ml_${mlOrderIdStr},ml_order_id.eq.${mlOrderIdStr},marketplace_order_id.eq.${mlOrderIdStr},notes.ilike.%#${mlOrderIdStr}%`)
-    .eq('is_archived', false)
+    .or('payment_id.eq.ml_${mlOrderIdStr},ml_order_id.eq.${mlOrderIdStr},marketplace_order_id.eq.${mlOrderIdStr},notes.ilike.%#${mlOrderIdStr}%')
+    .or('is_archived.is.null,is_archived.eq.false')
     .order('created_at', { ascending: false })
     .limit(1);
 
@@ -1083,7 +1083,7 @@ async function processSingleMlOrder(
     .from('orders')
     .select('id, order_number, status, payment_status, ml_shipment_id, ml_order_id')
     .or(`ml_order_id.eq.${displayRef},ml_order_id.eq.${realOrderIdStr},marketplace_order_id.eq.${displayRef},marketplace_order_id.eq.${realOrderIdStr},notes.ilike.%#${displayRef}%,notes.ilike.%#${realOrderIdStr}%`)
-    .eq('is_archived', false)
+    .or('is_archived.is.null,is_archived.eq.false')
     .order('created_at', { ascending: false })
     .limit(1);
 
@@ -1111,7 +1111,7 @@ async function processSingleMlOrder(
       .from('orders')
       .select('id, order_number, status, payment_status, ml_shipment_id, ml_order_id')
       .eq('ml_shipment_id', String(shipmentId))
-      .eq('is_archived', false)
+      .or('is_archived.is.null,is_archived.eq.false')
       .limit(1);
 
     if (checkExistingShipment && checkExistingShipment.length > 0) {
@@ -1262,7 +1262,7 @@ async function processSingleMlOrder(
     .from('orders')
     .select('id, order_number')
     .or(`ml_order_id.eq.${displayRef},ml_order_id.eq.${realOrderIdStr},payment_id.eq.ml_${displayRef},payment_id.eq.ml_${realOrderIdStr}${shipmentId ? `,ml_shipment_id.eq.${shipmentId}` : ''}`)
-    .eq('is_archived', false)
+    .or('is_archived.is.null,is_archived.eq.false')
     .order('created_at', { ascending: false })
     .limit(1);
 
@@ -1419,7 +1419,7 @@ async function processSingleMlOrder(
         .from('orders')
         .select('id, order_number')
         .or(`ml_order_id.eq.${displayRef},ml_order_id.eq.${realOrderIdStr}`)
-        .eq('is_archived', false)
+        .or('is_archived.is.null,is_archived.eq.false')
         .order('created_at', { ascending: false })
         .limit(1);
 
