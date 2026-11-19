@@ -1,7 +1,7 @@
 {
-  "hash": "7e54a406fa05c6c0186c5dd74185645effd9786a",
-  "shortHash": "7e54a40",
-  "message": "fix(ml-sync): impedir rebaixamento de pedidos pagos para novo pedido e corrigir fluxo de etiquetas ML",
+  "hash": "6c693aff5974e1fae2e13d76c0dae49f996b1962",
+  "shortHash": "6c693af",
+  "message": "fix(orders): resolve ML shipping label sync, order status badge and storage file listing",
   "author": "Lojafy Developer",
-  "timestamp": 1795107325304
+  "timestamp": 1795108141485
 }

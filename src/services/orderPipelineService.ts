@@ -552,17 +552,10 @@ export const orderPipelineService = {
   },
 
   /**
-   * Reseta as pipelines para os padrões iniciais no Supabase
+   * Protegido contra desconfiguração: não exclui mais as etapas personalizadas do usuário.
    */
   async resetToDefaults(): Promise<OrderPipeline[]> {
-    try {
-      await supabase.from("order_pipeline_stages" as any).delete().neq("id", "none");
-      await supabase.from("order_pipelines" as any).delete().neq("id", "none");
-      await this.seedDefaultPipelinesIfEmpty();
-    } catch (err) {
-      console.warn("Reset to defaults Supabase error:", err);
-    }
-    this.saveLocalPipelines(DEFAULT_PIPELINES);
-    return DEFAULT_PIPELINES;
+    console.warn("resetToDefaults desativado para proteger a configuração personalizada das etapas.");
+    return this.getPipelines();
   },
 };

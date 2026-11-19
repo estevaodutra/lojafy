@@ -32,7 +32,6 @@ import {
   Plus,
   Trash2,
   Edit2,
-  RotateCcw,
   AlertTriangle,
   MoveDown,
   MoveUp,
@@ -56,7 +55,6 @@ export const PipelineConfigDialog: React.FC<PipelineConfigDialogProps> = ({
     saveStage,
     removeStage,
     reorderStages,
-    resetToDefaults,
   } = useOrderPipelines();
 
   const [selectedPipelineKey, setSelectedPipelineKey] = useState<string>("primary");
@@ -226,20 +224,6 @@ export const PipelineConfigDialog: React.FC<PipelineConfigDialogProps> = ({
                 </TabsList>
 
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 text-xs gap-1 text-muted-foreground hover:text-foreground"
-                    onClick={() => {
-                      if (confirm("Deseja realmente restaurar as etapas para a configuração padrão?")) {
-                        resetToDefaults();
-                      }
-                    }}
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    Restaurar Padrão
-                  </Button>
-
                   <Button size="sm" className="h-8 text-xs gap-1" onClick={handleOpenAddStage}>
                     <Plus className="w-3.5 h-3.5" />
                     Adicionar Etapa

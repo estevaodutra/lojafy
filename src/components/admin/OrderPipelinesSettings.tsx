@@ -33,7 +33,6 @@ import {
   Plus,
   Trash2,
   Edit2,
-  RotateCcw,
   MoveUp,
   MoveDown,
   AlertTriangle,
@@ -49,7 +48,6 @@ export const OrderPipelinesSettings: React.FC = () => {
     saveStage,
     removeStage,
     reorderStages,
-    resetToDefaults,
   } = useOrderPipelines();
 
   const [activeTab, setActiveTab] = useState<string>("primary");
@@ -201,20 +199,6 @@ export const OrderPipelinesSettings: React.FC = () => {
             </TabsList>
 
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
-                onClick={() => {
-                  if (confirm("Deseja realmente restaurar as configurações padrão das pipelines?")) {
-                    resetToDefaults();
-                  }
-                }}
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Restaurar Padrão
-              </Button>
-
               <Button size="sm" className="h-8 text-xs gap-1.5" onClick={handleOpenAddStage}>
                 <Plus className="w-3.5 h-3.5" />
                 Adicionar Etapa
