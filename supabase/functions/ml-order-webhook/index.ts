@@ -959,8 +959,13 @@ async function archiveDuplicateMlOrders(
       .or('is_archived.is.null,is_archived.eq.false')
       .order('created_at', { ascending: false });
 
-    if (error || !activeOrders || activeOrders.length === 0) {
-      return { archivedCount: 0, archivedOrders: [] };
+    if (error) {
+      console.warn('[ml-order-webhook] Erro ao buscar pedidos para arquivamento:', error);
+      return { archivedCount: 0, archivedOrders: [], query_error: error };
+    }
+
+    if (!activeOrders || activeOrders.length === 0) {
+      return { archivedCount: 0, archivedOrders: [], query_error: null, total_found: 0 };
     }
 
     const groups = new Map<string, any[]>();
@@ -2733,6 +2738,7 @@ serve(async (req) => {
         success: true,
         archived_count: result.archivedCount,
         archived_orders: result.archivedOrders,
+        ...result,
       }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
