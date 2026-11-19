@@ -569,8 +569,10 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string, tar
   const shipmentId = mlOrder.shipping?.id
     ?? mlOrder.shipping_id
     ?? mlOrder.shipments?.id
+    ?? mlOrder.shipments?.[0]?.id
     ?? mlOrder.order_items?.[0]?.shipping?.id
     ?? mlOrder.order_items?.[0]?.shipment?.id
+    ?? orderRecord.ml_shipment_id
     ?? null;
 
   let publicLabelUrl = orderRecord.ml_label_url;
@@ -597,9 +599,22 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string, tar
       }
 
       if (!isDelivered) {
-        const labelRes = await fetch(`https://api.mercadolibre.com/shipment_labels?shipment_ids=${shipmentId}&response_type=pdf`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        let labelRes = await fetch(`https://api.mercadolibre.com/shipment_labels?shipment_ids=${shipmentId}&response_type=pdf`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/pdf, application/json, */*',
+          }
         });
+
+        if (!labelRes.ok) {
+          // Tenta formato alternativo savePdf=Y aceito pela API do ML
+          labelRes = await fetch(`https://api.mercadolibre.com/shipment_labels?shipment_ids=${shipmentId}&savePdf=Y`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/pdf, */*',
+            }
+          });
+        }
 
         if (labelRes.ok) {
           const labelBytes = await labelRes.arrayBuffer();
@@ -622,13 +637,34 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string, tar
             const { data: signedData } = await supabase.storage.from(targetBucket).createSignedUrl(filePath, 604800);
             publicLabelUrl = getPublicSignedUrl(signedData?.signedUrl) ?? null;
 
-            await supabase.from('order_shipping_files').upsert({
-              order_id: orderRecord.id,
-              file_name: `etiqueta-${mlOrderIdStr}.pdf`,
-              file_path: filePath,
-              file_size: labelBytes.byteLength,
-              uploaded_at: new Date().toISOString(),
-            }, { onConflict: 'order_id,file_path' });
+            // Insere ou atualiza de forma garantida em order_shipping_files
+            const { data: existingFile } = await supabase
+              .from('order_shipping_files')
+              .select('id')
+              .eq('order_id', orderRecord.id)
+              .eq('file_path', filePath)
+              .maybeSingle();
+
+            if (existingFile) {
+              await supabase
+                .from('order_shipping_files')
+                .update({
+                  file_name: `etiqueta-${mlOrderIdStr}.pdf`,
+                  file_size: labelBytes.byteLength,
+                  uploaded_at: new Date().toISOString(),
+                })
+                .eq('id', existingFile.id);
+            } else {
+              await supabase
+                .from('order_shipping_files')
+                .insert({
+                  order_id: orderRecord.id,
+                  file_name: `etiqueta-${mlOrderIdStr}.pdf`,
+                  file_path: filePath,
+                  file_size: labelBytes.byteLength,
+                  uploaded_at: new Date().toISOString(),
+                });
+            }
 
             labelDownloaded = true;
           }
@@ -1749,13 +1785,33 @@ async function syncPendingLabels(options?: { resellerUserId?: string; orderId?: 
 
       const publicLabelUrl = getPublicSignedUrl(signedData?.signedUrl) ?? null;
 
-      await supabase.from('order_shipping_files').upsert({
-        order_id: ord.id,
-        file_name: `etiqueta-${mlOrderIdStr}.pdf`,
-        file_path: filePath,
-        file_size: labelBytes.byteLength,
-        uploaded_at: new Date().toISOString(),
-      }, { onConflict: 'order_id,file_path' });
+      const { data: existingFile } = await supabase
+        .from('order_shipping_files')
+        .select('id')
+        .eq('order_id', ord.id)
+        .eq('file_path', filePath)
+        .maybeSingle();
+
+      if (existingFile) {
+        await supabase
+          .from('order_shipping_files')
+          .update({
+            file_name: `etiqueta-${mlOrderIdStr}.pdf`,
+            file_size: labelBytes.byteLength,
+            uploaded_at: new Date().toISOString(),
+          })
+          .eq('id', existingFile.id);
+      } else {
+        await supabase
+          .from('order_shipping_files')
+          .insert({
+            order_id: ord.id,
+            file_name: `etiqueta-${mlOrderIdStr}.pdf`,
+            file_path: filePath,
+            file_size: labelBytes.byteLength,
+            uploaded_at: new Date().toISOString(),
+          });
+      }
 
       // Lógica de avanço de status
       const isPaid = ord.payment_status === 'paid' || ord.status === 'pago';

@@ -1,7 +1,7 @@
 {
-  "hash": "88a62824585b2e8223edfa5988e5517962910dc9",
-  "shortHash": "88a6282",
-  "message": "feat(occurrences): fluxo de etapas, permissoes do revendedor, codigo de devolucao e notificacao ao fornecedor",
+  "hash": "7e54a406fa05c6c0186c5dd74185645effd9786a",
+  "shortHash": "7e54a40",
+  "message": "fix(ml-sync): impedir rebaixamento de pedidos pagos para novo pedido e corrigir fluxo de etiquetas ML",
   "author": "Lojafy Developer",
-  "timestamp": 1795102727263
+  "timestamp": 1795107325304
 }

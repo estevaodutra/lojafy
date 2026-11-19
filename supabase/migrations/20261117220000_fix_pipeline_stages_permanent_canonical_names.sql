@@ -75,3 +75,7 @@ SET
 WHERE (marketplace_order_id IS NOT NULL OR ml_order_id IS NOT NULL OR external_reference LIKE '20000%')
   AND status IN ('pendente', 'Novo Pedido', 'pago', 'Pedido Pago > Aguardando Recebimento da Expedição');
 
+-- 7. Criar índice único em order_shipping_files para garantir idempotência de uploads de etiquetas
+CREATE UNIQUE INDEX IF NOT EXISTS unq_order_shipping_files_order_path ON public.order_shipping_files(order_id, file_path);
+
+

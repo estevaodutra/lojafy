@@ -405,25 +405,30 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       setPipelineItem((prev) => {
         const base = initialOrder || prev;
         return {
-          ...normalized,
           ...(base || {}),
-          seller_name: base?.seller_name || normalized.seller_name,
-          customer_name: base?.customer_name || normalized.customer_name,
-          supplier_name: base?.supplier_name || normalized.supplier_name,
-          sale_amount: base?.sale_amount ?? normalized.sale_amount,
-          marketplace_fee: base?.marketplace_fee ?? normalized.marketplace_fee,
-          seller_cost: base?.seller_cost ?? normalized.seller_cost,
-          seller_profit: base?.seller_profit ?? normalized.seller_profit,
-          seller_margin_pct: base?.seller_margin_pct ?? normalized.seller_margin_pct,
-          lojafy_sale: base?.lojafy_sale ?? normalized.lojafy_sale,
-          lojafy_fee: base?.lojafy_fee ?? normalized.lojafy_fee,
-          lojafy_cost: base?.lojafy_cost ?? normalized.lojafy_cost,
-          lojafy_profit: base?.lojafy_profit ?? normalized.lojafy_profit,
-          lojafy_margin_pct: base?.lojafy_margin_pct ?? normalized.lojafy_margin_pct,
+          ...normalized,
+          seller_name: normalized.seller_name || base?.seller_name,
+          customer_name: normalized.customer_name || base?.customer_name,
+          supplier_name: normalized.supplier_name || base?.supplier_name,
+          sale_amount: normalized.sale_amount ?? base?.sale_amount,
+          marketplace_fee: normalized.marketplace_fee ?? base?.marketplace_fee,
+          seller_cost: normalized.seller_cost ?? base?.seller_cost,
+          seller_profit: normalized.seller_profit ?? base?.seller_profit,
+          seller_margin_pct: normalized.seller_margin_pct ?? base?.seller_margin_pct,
+          lojafy_sale: normalized.lojafy_sale ?? base?.lojafy_sale,
+          lojafy_fee: normalized.lojafy_fee ?? base?.lojafy_fee,
+          lojafy_cost: normalized.lojafy_cost ?? base?.lojafy_cost,
+          lojafy_profit: normalized.lojafy_profit ?? base?.lojafy_profit,
+          lojafy_margin_pct: normalized.lojafy_margin_pct ?? base?.lojafy_margin_pct,
         };
       });
+
+      // Busca imediatamente arquivos de envio passando dados frescos
+      fetchShippingFiles(data);
+      return data;
     } catch (error) {
       console.error('Erro ao buscar detalhes do pedido:', error);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -444,7 +449,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     }
   };
 
-  const fetchShippingFiles = async () => {
+  const fetchShippingFiles = async (freshOrderData?: any) => {
     if (!orderId) return;
     try {
       const { data, error } = await supabase
@@ -453,61 +458,75 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         .eq('order_id', orderId)
         .order('uploaded_at', { ascending: false });
 
-      if (!error && data && data.length > 0) {
-        setShippingFiles(data);
-        return;
-      }
+      let files: ShippingFile[] = (!error && data && data.length > 0) ? [...data] : [];
 
-      const fallbackFiles: ShippingFile[] = [];
-
-      try {
-        const { data: extractions } = await (supabase
-          .from('shipment_label_extractions' as any)
-          .select('*')
-          .eq('order_id', orderId)
-          .order('created_at', { ascending: false }) as any);
-
-        if (extractions && extractions.length > 0) {
-          const extractionFiles: ShippingFile[] = extractions.map((ext: any) => ({
-            id: ext.id,
-            file_name: ext.file_path.split('/').pop() || `etiqueta_${orderId}.pdf`,
-            file_path: ext.file_path,
-            file_size: 50500,
-            uploaded_at: ext.created_at || new Date().toISOString(),
-          }));
-          setShippingFiles(extractionFiles);
-          return;
-        }
-      } catch (e) {
-        console.log('Error checking shipment_label_extractions:', e);
-      }
-
-      const buckets = ['shipping-labels', 'shipping-files'];
-      for (const bucket of buckets) {
+      if (files.length === 0) {
         try {
-          const { data: subFiles } = await supabase.storage.from(bucket).list(orderId, {
-            limit: 100,
-            sortBy: { column: 'created_at', order: 'desc' }
-          });
-          if (subFiles && subFiles.length > 0) {
-            subFiles.filter(f => f.name && f.name !== '.emptyFolderPlaceholder').forEach(f => {
-              if (!fallbackFiles.some(existing => existing.file_name === f.name)) {
-                fallbackFiles.push({
-                  id: f.id || f.name,
-                  file_name: f.name,
-                  file_path: `${orderId}/${f.name}`,
-                  file_size: f.metadata?.size || 50500,
-                  uploaded_at: f.created_at || new Date().toISOString(),
-                });
-              }
-            });
+          const { data: extractions } = await (supabase
+            .from('shipment_label_extractions' as any)
+            .select('*')
+            .eq('order_id', orderId)
+            .order('created_at', { ascending: false }) as any);
+
+          if (extractions && extractions.length > 0) {
+            files = extractions.map((ext: any) => ({
+              id: ext.id,
+              file_name: ext.file_path.split('/').pop() || `etiqueta_${orderId}.pdf`,
+              file_path: ext.file_path,
+              file_size: 50500,
+              uploaded_at: ext.created_at || new Date().toISOString(),
+            }));
           }
-        } catch (err) {
-          console.error(`Error listing storage bucket ${bucket}:`, err);
+        } catch (e) {
+          console.log('Error checking shipment_label_extractions:', e);
         }
       }
 
-      setShippingFiles(fallbackFiles);
+      if (files.length === 0) {
+        const buckets = ['shipping-labels', 'shipping-files'];
+        for (const bucket of buckets) {
+          try {
+            const { data: subFiles } = await supabase.storage.from(bucket).list(orderId, {
+              limit: 100,
+              sortBy: { column: 'created_at', order: 'desc' }
+            });
+            if (subFiles && subFiles.length > 0) {
+              subFiles.filter(f => f.name && f.name !== '.emptyFolderPlaceholder').forEach(f => {
+                if (!files.some(existing => existing.file_name === f.name)) {
+                  files.push({
+                    id: f.id || f.name,
+                    file_name: f.name,
+                    file_path: `${orderId}/${f.name}`,
+                    file_size: f.metadata?.size || 50500,
+                    uploaded_at: f.created_at || new Date().toISOString(),
+                  });
+                }
+              });
+            }
+          } catch (err) {
+            console.error(`Error listing storage bucket ${bucket}:`, err);
+          }
+        }
+      }
+
+      // Garante inclusão de ml_label_url se existir no pedido e ainda não constar na lista
+      const targetOrder = freshOrderData || order || pipelineItem;
+      const knownLabelUrl = targetOrder?.ml_label_url || (targetOrder as any)?.shipping_label_url;
+      if (knownLabelUrl) {
+        const mlOrderNum = targetOrder?.ml_order_id || targetOrder?.marketplace_order_id || targetOrder?.order_number || orderId;
+        const exists = files.some(f => f.file_path === knownLabelUrl || f.file_name.includes(String(mlOrderNum)));
+        if (!exists) {
+          files.unshift({
+            id: `ml_label_${orderId}`,
+            file_name: `etiqueta-ml-${mlOrderNum}.pdf`,
+            file_path: knownLabelUrl,
+            file_size: 50500,
+            uploaded_at: targetOrder?.updated_at || new Date().toISOString(),
+          });
+        }
+      }
+
+      setShippingFiles(files);
     } catch (error) {
       console.error('Erro ao buscar arquivos de envio:', error);
     }
@@ -970,8 +989,9 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       channel: pipelineItem?.channel || base.channel || (resolvedMlOrderId ? 'mercadolivre' : 'lojafy'),
       payment_method: base.payment_method || (pipelineItem?.channel === 'mercadolivre' || resolvedMlOrderId ? 'mercadolivre' : undefined),
       external_reference: resolvedMlOrderId || (base.external_reference?.startsWith('ml_pay_') ? resolvedMlOrderId : base.external_reference) || pipelineItem?.external_reference,
-      shipping_label_url: base.shipping_label_url || pipelineItem?.ml_label_url,
-      has_shipping_label: base.has_shipping_label || pipelineItem?.has_shipping_file,
+      ml_label_url: base.ml_label_url || pipelineItem?.ml_label_url,
+      shipping_label_url: base.ml_label_url || base.shipping_label_url || pipelineItem?.ml_label_url,
+      has_shipping_label: base.has_shipping_file || base.has_shipping_label || pipelineItem?.has_shipping_file || !!(base.ml_label_url || pipelineItem?.ml_label_url),
     };
   }, [order, pipelineItem, resolvedMlOrderId]);
 
@@ -1158,12 +1178,12 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   paidAt={effectiveOrder.paid_at}
                   existingTicketId={existingTicketId}
                   shippingFiles={shippingFiles}
-                  onRefresh={() => {
-                    fetchOrderDetails();
-                    fetchStatusHistory();
-                    fetchExistingTicket();
-                    fetchDeliveredAt();
-                    fetchShippingFiles();
+                  onRefresh={async () => {
+                    const freshData = await fetchOrderDetails();
+                    await fetchStatusHistory();
+                    await fetchExistingTicket();
+                    await fetchDeliveredAt();
+                    await fetchShippingFiles(freshData);
                   }}
                 />
               </div>
