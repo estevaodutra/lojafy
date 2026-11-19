@@ -945,6 +945,81 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string, tar
 }
 
 /**
+ * Identifica e arquiva pedidos duplicados do Mercado Livre,
+ * mantendo apenas o mais completo (com etiqueta/pago) e arquivando os excedentes.
+ */
+async function archiveDuplicateMlOrders(
+  supabaseClient: any
+): Promise<{ archivedCount: number; archivedOrders: string[] }> {
+  try {
+    const { data: activeOrders, error } = await supabaseClient
+      .from('orders')
+      .select('id, order_number, ml_order_id, ml_shipment_id, payment_id, status, payment_status, ml_label_url, has_shipping_file, created_at')
+      .not('ml_order_id', 'is', null)
+      .eq('is_archived', false)
+      .order('created_at', { ascending: false });
+
+    if (error || !activeOrders || activeOrders.length === 0) {
+      return { archivedCount: 0, archivedOrders: [] };
+    }
+
+    const groups = new Map<string, any[]>();
+    for (const ord of activeOrders) {
+      const key = String(ord.ml_order_id).trim();
+      if (!key) continue;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(ord);
+    }
+
+    const archivedOrders: string[] = [];
+    for (const [mlId, ordersInGroup] of groups.entries()) {
+      if (ordersInGroup.length <= 1) continue;
+
+      // Ordena para determinar qual manter ativo:
+      // 1. Quem tem etiqueta anexada ou ml_label_url
+      // 2. Quem tem status avançado / pago
+      // 3. Mais recente
+      ordersInGroup.sort((a, b) => {
+        const aHasLabel = !!(a.ml_label_url || a.has_shipping_file);
+        const bHasLabel = !!(b.ml_label_url || b.has_shipping_file);
+        if (aHasLabel !== bHasLabel) return aHasLabel ? -1 : 1;
+
+        const aIsPaid = a.payment_status === 'paid' || (a.status !== 'pendente' && a.status !== 'Novo Pedido');
+        const bIsPaid = b.payment_status === 'paid' || (b.status !== 'pendente' && b.status !== 'Novo Pedido');
+        if (aIsPaid !== bIsPaid) return aIsPaid ? -1 : 1;
+
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+
+      const keeper = ordersInGroup[0];
+      const duplicates = ordersInGroup.slice(1);
+
+      for (const dup of duplicates) {
+        const isUnpaid = dup.payment_status !== 'paid' && (dup.status === 'pendente' || dup.status === 'Novo Pedido');
+        await supabaseClient
+          .from('orders')
+          .update({
+            is_archived: true,
+            archived_at: new Date().toISOString(),
+            archived_reason: `Pedido duplicado do Mercado Livre (ML #${mlId}) - Mantido Pedido #${keeper.order_number}`,
+            archived_type: 'auto',
+            status: isUnpaid ? 'cancelado' : dup.status,
+          })
+          .eq('id', dup.id);
+
+        archivedOrders.push(dup.order_number);
+        console.log(`[ml-order-webhook] Pedido duplicado #${dup.order_number} arquivado (ML #${mlId}, mantido #${keeper.order_number})`);
+      }
+    }
+
+    return { archivedCount: archivedOrders.length, archivedOrders };
+  } catch (err: any) {
+    console.warn('[ml-order-webhook] Erro ao arquivar pedidos duplicados:', err);
+    return { archivedCount: 0, archivedOrders: [] };
+  }
+}
+
+/**
  * Processa um único pedido do Mercado Livre de forma ponta a ponta.
  */
 async function processSingleMlOrder(
@@ -964,11 +1039,13 @@ async function processSingleMlOrder(
 }> {
   const mlOrderIdStr = String(mlOrderId).trim();
 
-  // 1. Idempotência antecipada: verificar se já existe pedido por ml_order_id, payment_id ou notes
+  // 1. Idempotência antecipada: verificar se já existe pedido ATIVO por ml_order_id, payment_id ou notes
   const { data: existingOrders } = await supabase
     .from('orders')
     .select('id, order_number, status, payment_status, ml_shipment_id, ml_order_id')
-    .or(`payment_id.eq.ml_${mlOrderIdStr},ml_order_id.eq.${mlOrderIdStr},notes.ilike.%#${mlOrderIdStr}%`)
+    .or(`payment_id.eq.ml_${mlOrderIdStr},ml_order_id.eq.${mlOrderIdStr},marketplace_order_id.eq.${mlOrderIdStr},notes.ilike.%#${mlOrderIdStr}%`)
+    .eq('is_archived', false)
+    .order('created_at', { ascending: false })
     .limit(1);
 
   if (existingOrders && existingOrders.length > 0) {
@@ -1005,7 +1082,9 @@ async function processSingleMlOrder(
   const { data: checkExistingPack } = await supabase
     .from('orders')
     .select('id, order_number, status, payment_status, ml_shipment_id, ml_order_id')
-    .or(`ml_order_id.eq.${displayRef},ml_order_id.eq.${realOrderIdStr},notes.ilike.%#${displayRef}%,notes.ilike.%#${realOrderIdStr}%`)
+    .or(`ml_order_id.eq.${displayRef},ml_order_id.eq.${realOrderIdStr},marketplace_order_id.eq.${displayRef},marketplace_order_id.eq.${realOrderIdStr},notes.ilike.%#${displayRef}%,notes.ilike.%#${realOrderIdStr}%`)
+    .eq('is_archived', false)
+    .order('created_at', { ascending: false })
     .limit(1);
 
   if (checkExistingPack && checkExistingPack.length > 0) {
@@ -1032,6 +1111,7 @@ async function processSingleMlOrder(
       .from('orders')
       .select('id, order_number, status, payment_status, ml_shipment_id, ml_order_id')
       .eq('ml_shipment_id', String(shipmentId))
+      .eq('is_archived', false)
       .limit(1);
 
     if (checkExistingShipment && checkExistingShipment.length > 0) {
@@ -1177,6 +1257,26 @@ async function processSingleMlOrder(
     supplierName = supProfile?.company_name || `${supProfile?.first_name || ''} ${supProfile?.last_name || ''}`.trim() || null;
   }
 
+  // 4. Checagem pré-inserção para impedir condições de corrida entre requisições simultâneas
+  const { data: preInsertCheck } = await supabase
+    .from('orders')
+    .select('id, order_number')
+    .or(`ml_order_id.eq.${displayRef},ml_order_id.eq.${realOrderIdStr},payment_id.eq.ml_${displayRef},payment_id.eq.ml_${realOrderIdStr}${shipmentId ? `,ml_shipment_id.eq.${shipmentId}` : ''}`)
+    .eq('is_archived', false)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (preInsertCheck && preInsertCheck.length > 0) {
+    const existingOrder = preInsertCheck[0];
+    console.log(`[ml-order-webhook] Prevenção de concorrência: pedido ML #${displayRef} já inserido (#${existingOrder.order_number})`);
+    return {
+      success: true,
+      already_processed: true,
+      order_id: existingOrder.id,
+      order_number: existingOrder.order_number,
+    };
+  }
+
   const { data: orderNumData } = await supabase.rpc('generate_order_number');
   const orderNumber = (orderNumData as string) || String(Date.now()).slice(-8);
 
@@ -1313,6 +1413,27 @@ async function processSingleMlOrder(
     .single();
 
   if (orderError || !newOrder) {
+    const errText = String(orderError?.message || orderError?.details || '');
+    if (errText.includes('DUPLICATE_ML_ORDER') || errText.includes('unq_active_orders_ml_order_id') || orderError?.code === '23505') {
+      const { data: recoveredOrder } = await supabase
+        .from('orders')
+        .select('id, order_number')
+        .or(`ml_order_id.eq.${displayRef},ml_order_id.eq.${realOrderIdStr}`)
+        .eq('is_archived', false)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (recoveredOrder && recoveredOrder.length > 0) {
+        console.log(`[ml-order-webhook] Inserção duplicada evitada pelo banco. Pedido ativo existente: #${recoveredOrder[0].order_number}`);
+        return {
+          success: true,
+          already_processed: true,
+          order_id: recoveredOrder[0].id,
+          order_number: recoveredOrder[0].order_number,
+        };
+      }
+    }
+
     console.error('[ml-order-webhook] Falha ao criar pedido no banco:', orderError);
     return {
       success: false,
@@ -2375,6 +2496,7 @@ serve(async (req) => {
     if (body.action === 'sync_reseller_orders' && body.user_id) {
       try {
         const summary = await syncResellerRecentOrders(body.user_id);
+        await archiveDuplicateMlOrders(supabase);
         return new Response(JSON.stringify({ success: true, summary }), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -2394,6 +2516,7 @@ serve(async (req) => {
     if (body.action === 'sync_all_recent_orders' || body.mode === 'sync_all_recent_orders') {
       try {
         const summary = await syncAllRecentOrders();
+        await archiveDuplicateMlOrders(supabase);
         return new Response(JSON.stringify({ success: true, summary }), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -2421,6 +2544,7 @@ serve(async (req) => {
         if (ord) {
           const targetMlId = body.ml_order_id || ord.ml_order_id;
           const repairResult = await repairExistingOrder(ord, ord.reseller_id, targetMlId);
+          await archiveDuplicateMlOrders(supabase);
           return new Response(JSON.stringify({ 
             success: true, 
             repaired: 1,
@@ -2459,6 +2583,7 @@ serve(async (req) => {
           resellerUserId: body.user_id,
           orderId: body.order_id,
         });
+        await archiveDuplicateMlOrders(supabase);
         return new Response(JSON.stringify({ success: true, result }), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -2596,6 +2721,18 @@ serve(async (req) => {
         amount: totalPixAmountToCharge,
         order_cost: totalResellerCost,
         wallet_debt: walletDebt,
+      }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Ação: Arquivar pedidos duplicados do Mercado Livre
+    if (body.action === 'archive_duplicates' || body.action === 'clean_duplicates') {
+      const result = await archiveDuplicateMlOrders(supabase);
+      return new Response(JSON.stringify({
+        success: true,
+        archived_count: result.archivedCount,
+        archived_orders: result.archivedOrders,
       }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

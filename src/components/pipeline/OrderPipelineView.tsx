@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { OrderPipelineItem, PipelineType } from "@/types/orderPipeline";
 import { OrderKanbanBoard } from "./OrderKanbanBoard";
 import { OrderPipelineListView } from "./OrderPipelineListView";
@@ -40,6 +40,52 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { isOrderInOccurrences, isOrderInPrimary } from "@/utils/orderPipelineAdapter";
+
+/**
+ * Deduplica defensivamente pedidos do Mercado Livre na exibição:
+ * Se existirem múltiplos pedidos com o mesmo ml_order_id, mantém apenas o principal
+ * (com etiqueta/mais avançado) e oculta os duplicados do fluxo operacional ativo.
+ */
+function deduplicateMlPipelineOrders(items: OrderPipelineItem[], showArchivedOnly: boolean): OrderPipelineItem[] {
+  if (showArchivedOnly) return items;
+
+  const mlOrderGroups = new Map<string, OrderPipelineItem[]>();
+  const nonMlOrders: OrderPipelineItem[] = [];
+
+  for (const order of items) {
+    if (order.is_archived) continue;
+    const rawMlId = order.ml_order_id || order.marketplace_order_id;
+    if (rawMlId && String(rawMlId).trim() !== "" && String(rawMlId) !== "null") {
+      const key = String(rawMlId).trim();
+      if (!mlOrderGroups.has(key)) mlOrderGroups.set(key, []);
+      mlOrderGroups.get(key)!.push(order);
+    } else {
+      nonMlOrders.push(order);
+    }
+  }
+
+  const deduplicatedMlOrders: OrderPipelineItem[] = [];
+  for (const [, group] of mlOrderGroups.entries()) {
+    if (group.length === 1) {
+      deduplicatedMlOrders.push(group[0]);
+    } else {
+      group.sort((a, b) => {
+        const aHasLabel = !!(a.ml_label_url || a.has_shipping_file);
+        const bHasLabel = !!(b.ml_label_url || b.has_shipping_file);
+        if (aHasLabel !== bHasLabel) return aHasLabel ? -1 : 1;
+
+        const aIsPaid = a.is_paid || (a.status !== "pendente" && a.status !== "Novo Pedido");
+        const bIsPaid = b.is_paid || (b.status !== "pendente" && b.status !== "Novo Pedido");
+        if (aIsPaid !== bIsPaid) return aIsPaid ? -1 : 1;
+
+        return Number(b.order_number) - Number(a.order_number);
+      });
+      deduplicatedMlOrders.push(group[0]);
+    }
+  }
+
+  return [...deduplicatedMlOrders, ...nonMlOrders];
+}
 
 interface OrderPipelineViewProps {
   orders: OrderPipelineItem[];
@@ -111,15 +157,38 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
     return Array.from(set);
   }, [orders]);
 
+  // Dispara arquivamento em lote de pedidos duplicados do Mercado Livre em background
+  useEffect(() => {
+    supabase.functions
+      .invoke("ml-order-webhook", {
+        body: { action: "archive_duplicates" },
+      })
+      .then(({ data }) => {
+        if (data?.archived_count && data.archived_count > 0) {
+          console.log(`[OrderPipelineView] ${data.archived_count} pedido(s) duplicado(s) arquivado(s).`);
+          onRefreshOrders?.();
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Separação estrita dos pedidos por pipeline: NUNCA ONIPRESENTES
   // Um pedido está em Ocorrências OU no Principal, exclusivamente.
-  const primaryOrders = useMemo(() => {
+  const rawPrimaryOrders = useMemo(() => {
     return orders.filter((o) => isOrderInPrimary(o));
   }, [orders]);
 
-  const occurrencesOrders = useMemo(() => {
+  const rawOccurrencesOrders = useMemo(() => {
     return orders.filter((o) => isOrderInOccurrences(o));
   }, [orders]);
+
+  const primaryOrders = useMemo(() => {
+    return deduplicateMlPipelineOrders(rawPrimaryOrders, showArchivedOnly);
+  }, [rawPrimaryOrders, showArchivedOnly]);
+
+  const occurrencesOrders = useMemo(() => {
+    return deduplicateMlPipelineOrders(rawOccurrencesOrders, showArchivedOnly);
+  }, [rawOccurrencesOrders, showArchivedOnly]);
 
   // Contagens dos pedidos de cada pipeline
   const primaryCount = useMemo(() => {

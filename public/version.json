@@ -1,7 +1,7 @@
 {
-  "hash": "6c693aff5974e1fae2e13d76c0dae49f996b1962",
-  "shortHash": "6c693af",
-  "message": "fix(orders): resolve ML shipping label sync, order status badge and storage file listing",
+  "hash": "7c6377e73c16f249951799a7e5c3db48c7222ad4",
+  "shortHash": "7c6377e",
+  "message": "fix(pipeline): remove reset to default option from pipeline settings",
   "author": "Lojafy Developer",
-  "timestamp": 1795108141485
+  "timestamp": 1795110027976
 }
