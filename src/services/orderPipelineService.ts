@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { OrderPipeline, OrderPipelineStage } from "@/types/orderPipeline";
 
-const STORAGE_KEY_PREFIX = "lojafy_order_pipelines_custom_";
+const STORAGE_KEY_PREFIX = "lojafy_order_pipelines_custom_v3_";
 
 // Default pipeline structures matching requirements
 export const DEFAULT_PIPELINES: OrderPipeline[] = [
@@ -16,30 +16,30 @@ export const DEFAULT_PIPELINES: OrderPipeline[] = [
       {
         id: "stage-p1",
         pipeline_id: "11111111-1111-1111-1111-111111111111",
-        name: "Novo Pedido",
-        status_key: "pendente",
-        order_index: 1,
-        color_class: "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-900/60 dark:text-slate-300 dark:border-slate-800",
-        icon_name: "Clock",
-        is_active: true,
-      },
-      {
-        id: "stage-p2",
-        pipeline_id: "11111111-1111-1111-1111-111111111111",
-        name: "Pedido Pago > Aguardando Recebimento da Expedição",
+        name: "Pedido Pago",
         status_key: "pago",
-        order_index: 2,
+        order_index: 1,
         color_class: "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800",
         icon_name: "BadgeCheck",
         is_active: true,
       },
       {
+        id: "stage-p2",
+        pipeline_id: "11111111-1111-1111-1111-111111111111",
+        name: "Ag Liberação de Etiqueta",
+        status_key: "ag_liberacao_etiqueta",
+        order_index: 2,
+        color_class: "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800",
+        icon_name: "Clock",
+        is_active: true,
+      },
+      {
         id: "stage-p3",
         pipeline_id: "11111111-1111-1111-1111-111111111111",
-        name: "Pedido Recebido > Aguardando Envio",
+        name: "Pedido Recebido",
         status_key: "recebido",
         order_index: 3,
-        color_class: "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800",
+        color_class: "bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800",
         icon_name: "Inbox",
         is_active: true,
       },
@@ -408,8 +408,23 @@ export const orderPipelineService = {
         status_key: oldStage?.status_key ?? stage.status_key ?? stageStatus,
       } as OrderPipelineStage;
 
+      // Se o nome foi alterado, sincronizar pedidos no banco de dados
+      if (oldStage && oldStage.name !== stageName) {
+        try {
+          await supabase
+            .from("orders")
+            .update({ status: stageName, updated_at: new Date().toISOString() })
+            .or(`status.eq.${oldStage.status_key},status.eq.${oldStage.name}`);
+        } catch (err) {
+          console.warn("orders status sync on rename error:", err);
+        }
+      }
+
       const stageUpdatePayload = {
+        id: stage.id,
+        pipeline_id: stage.pipeline_id,
         name: savedStage.name,
+        status_key: savedStage.status_key,
         order_index: savedStage.order_index,
         color_class: savedStage.color_class,
         icon_name: savedStage.icon_name,
@@ -419,9 +434,7 @@ export const orderPipelineService = {
 
       const { data: updatedStage, error: updateErr } = await supabase
         .from("order_pipeline_stages" as any)
-        .update(stageUpdatePayload)
-        .eq("id", stage.id)
-        .eq("pipeline_id", stage.pipeline_id)
+        .upsert(stageUpdatePayload)
         .select("status_key")
         .single();
 
@@ -429,7 +442,9 @@ export const orderPipelineService = {
         console.error("Erro ao atualizar etapa no Supabase:", updateErr);
         throw new Error(updateErr.message || "Erro ao salvar alterações da etapa no banco de dados.");
       }
-      savedStage.status_key = (updatedStage as { status_key: string }).status_key;
+      if (updatedStage?.status_key) {
+        savedStage.status_key = (updatedStage as { status_key: string }).status_key;
+      }
     }
 
     // Atualiza localmente

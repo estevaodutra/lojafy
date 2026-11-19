@@ -141,19 +141,19 @@ export const OrderActionBar = ({
         throw new Error(error.message || 'Falha ao sincronizar com o Mercado Livre.');
       }
 
-      // Se temos o identificador do Mercado Livre, executamos também a reconciliação direta
-      if (mlId && mlId.length > 5) {
-        await supabase.functions.invoke('ml-order-webhook', {
-          body: {
-            action: 'process_order',
-            order_id: String(mlId),
-          },
-        }).catch((err) => console.warn('Aviso no process_order:', err));
+      if (data?.label_downloaded) {
+        toast.success('Pedido e etiqueta atualizados com sucesso!', {
+          description: 'A etiqueta oficial de envio do Mercado Livre foi baixada e anexada ao pedido.',
+        });
+      } else if (data?.label_message) {
+        toast.info('Pedido atualizado com sucesso!', {
+          description: data.label_message,
+        });
+      } else {
+        toast.success('Pedido atualizado com sucesso!', {
+          description: 'Dados e status sincronizados diretamente com o Mercado Livre.',
+        });
       }
-
-      toast.success('Pedido atualizado com sucesso!', {
-        description: 'Dados, etiqueta e status sincronizados diretamente com o Mercado Livre.',
-      });
 
       onRefresh();
     } catch (err: any) {

@@ -7,7 +7,8 @@ import { useUserRole } from "@/hooks/useUserRole";
 export function useOrderPipelines() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { isSuperAdmin } = useUserRole();
+  const { isSuperAdmin, hasPermission } = useUserRole();
+  const canManagePipelines = isSuperAdmin() || hasPermission(["super_admin", "admin"]);
 
   const query = useQuery({
     queryKey: ["order-pipelines"],
@@ -17,8 +18,8 @@ export function useOrderPipelines() {
 
   const reorderMutation = useMutation({
     mutationFn: async ({ pipelineId, stageIds }: { pipelineId: string; stageIds: string[] }) => {
-      if (!isSuperAdmin()) {
-        throw new Error("Apenas o Super Admin pode alterar a ordem das etapas.");
+      if (!canManagePipelines) {
+        throw new Error("Apenas administradores podem alterar a ordem das etapas.");
       }
       return orderPipelineService.reorderStages(pipelineId, stageIds);
     },
@@ -43,8 +44,8 @@ export function useOrderPipelines() {
 
   const saveStageMutation = useMutation({
     mutationFn: async (stage: Partial<OrderPipelineStage> & { pipeline_id: string; name: string; status_key: string }) => {
-      if (!isSuperAdmin()) {
-        throw new Error("Apenas o Super Admin pode alterar ou criar etapas.");
+      if (!canManagePipelines) {
+        throw new Error("Apenas administradores podem alterar ou criar etapas.");
       }
       return orderPipelineService.saveStage(stage);
     },
@@ -79,8 +80,8 @@ export function useOrderPipelines() {
       targetStatusKey?: string;
       action?: "delete" | "deactivate";
     }) => {
-      if (!isSuperAdmin()) {
-        throw new Error("Apenas o Super Admin pode remover ou desativar etapas.");
+      if (!canManagePipelines) {
+        throw new Error("Apenas administradores podem remover ou desativar etapas.");
       }
       return orderPipelineService.removeOrDeactivateStage(stageId, pipelineId, targetStatusKey, action);
     },

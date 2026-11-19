@@ -49,7 +49,8 @@ export const PipelineConfigDialog: React.FC<PipelineConfigDialogProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { isSuperAdmin } = useUserRole();
+  const { isSuperAdmin, hasPermission } = useUserRole();
+  const canManage = isSuperAdmin() || hasPermission(["super_admin", "admin"]);
   const {
     pipelines,
     saveStage,
@@ -74,14 +75,14 @@ export const PipelineConfigDialog: React.FC<PipelineConfigDialogProps> = ({
   const currentPipeline =
     pipelines.find((p) => p.key === selectedPipelineKey) || pipelines[0];
 
-  if (!isSuperAdmin()) {
+  if (!canManage) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Acesso Negado</DialogTitle>
             <DialogDescription>
-              Apenas usuários com privilégios de Super Admin podem configurar as pipelines.
+              Apenas usuários com privilégios de Administrador podem configurar as pipelines.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

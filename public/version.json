@@ -1,7 +1,7 @@
 {
-  "hash": "23955f51d1a32866aec96c170a8c78de7dd85409",
-  "shortHash": "23955f5",
-  "message": "fix(shopee): calcular e corrigir digito verificador modulo 10 GS1 para GTIN/EAN evitando erro de GTIN obrigatorio",
+  "hash": "88a62824585b2e8223edfa5988e5517962910dc9",
+  "shortHash": "88a6282",
+  "message": "feat(occurrences): fluxo de etapas, permissoes do revendedor, codigo de devolucao e notificacao ao fornecedor",
   "author": "Lojafy Developer",
-  "timestamp": 1794958810728
+  "timestamp": 1795102727263
 }

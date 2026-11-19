@@ -185,14 +185,68 @@ export const OrderKanbanBoard: React.FC<OrderKanbanBoardProps> = ({
         if (orderStatus === sKey || orderStatus === sName) return true;
 
         // Casamentos padrão
-        if (orderStatus === "pendente" && (sKey === "pendente" || sName.includes("pagamento") || sName.includes("gerado"))) return true;
-        if (orderStatus === "pago" && (sKey === "pago" || sName.includes("recebimento") || sName.includes("pago"))) return true;
-        if (orderStatus === "recebido" && (sKey === "recebido" || sName.includes("recebido"))) return true;
-        if (orderStatus === "embalado" && (sKey === "embalado" || sName.includes("embalado"))) return true;
-        if (orderStatus === "enviado" && (sKey === "enviado" || sName.includes("enviado"))) return true;
-        if (orderStatus === "finalizado" && (sKey === "finalizado" || sName.includes("finalizado"))) return true;
-        if (orderStatus === "cancelado" && (sKey === "cancelado" || sName.includes("cancelado"))) return true;
-        if (orderStatus === "etiqueta_incorreta" && (sKey === "etiqueta_incorreta" || sName.includes("incorreta"))) return true;
+        if (
+          (orderStatus === "pendente" || orderStatus === "novo pedido" || orderStatus.includes("pagamento") || orderStatus.includes("gerado")) &&
+          (sKey === "pendente" || sName.includes("pagamento") || sName.includes("gerado") || sKey === "pago" || sName === "pedido pago")
+        ) {
+          return true;
+        }
+
+        if (
+          (orderStatus === "pago" || orderStatus.includes("pedido pago") || orderStatus.includes("recebimento da expedição")) &&
+          (sKey === "pago" || sName.includes("pago") || sName.includes("recebimento"))
+        ) {
+          return true;
+        }
+
+        if (
+          (orderStatus === "ag_liberacao_etiqueta" || orderStatus.includes("libera")) &&
+          (sKey === "ag_liberacao_etiqueta" || sName.includes("libera"))
+        ) {
+          return true;
+        }
+
+        if (
+          (orderStatus === "recebido" || orderStatus.includes("pedido recebido")) &&
+          (sKey === "recebido" || sName.includes("recebido"))
+        ) {
+          return true;
+        }
+
+        if (
+          (orderStatus === "embalado" || orderStatus.includes("embalado")) &&
+          (sKey === "embalado" || sName.includes("embalado"))
+        ) {
+          return true;
+        }
+
+        if (
+          (orderStatus === "enviado" || orderStatus.includes("enviado")) &&
+          (sKey === "enviado" || sName.includes("enviado"))
+        ) {
+          return true;
+        }
+
+        if (
+          (orderStatus === "finalizado" || orderStatus.includes("finalizado")) &&
+          (sKey === "finalizado" || sName.includes("finalizado"))
+        ) {
+          return true;
+        }
+
+        if (
+          (orderStatus === "cancelado" || orderStatus.includes("cancelado")) &&
+          (sKey === "cancelado" || sName.includes("cancelado"))
+        ) {
+          return true;
+        }
+
+        if (
+          (orderStatus === "etiqueta_incorreta" || orderStatus.includes("incorreta")) &&
+          (sKey === "etiqueta_incorreta" || sName.includes("incorreta"))
+        ) {
+          return true;
+        }
 
         return false;
       });

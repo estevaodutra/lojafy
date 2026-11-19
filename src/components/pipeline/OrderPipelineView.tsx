@@ -62,7 +62,8 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
   userScopeLabel,
   onRefreshOrders,
 }) => {
-  const { isSuperAdmin } = useUserRole();
+  const { isSuperAdmin, hasPermission } = useUserRole();
+  const canConfigurePipelines = isSuperAdmin() || hasPermission(["super_admin", "admin"]);
   const { pipelines, isLoading: isLoadingPipelines } = useOrderPipelines();
 
   // Primary toggle: [ Pipeline ] [ Lista ]
@@ -377,7 +378,7 @@ export const OrderPipelineView: React.FC<OrderPipelineViewProps> = ({
             {filteredOrders.length} pedido(s)
           </Badge>
 
-          {isSuperAdmin() && (
+          {canConfigurePipelines && (
             <Button
               variant="outline"
               size="sm"

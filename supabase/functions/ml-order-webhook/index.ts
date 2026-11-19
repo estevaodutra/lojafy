@@ -577,6 +577,9 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string, tar
   let trackingCode = orderRecord.tracking_code;
   let isDelivered = false;
   let isShipped = false;
+  let labelDownloaded = false;
+  let labelStatus = 'pending';
+  let labelMessage: string | null = null;
 
   if (shipmentId) {
     try {
@@ -584,11 +587,13 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string, tar
       const shRes = await fetch(`https://api.mercadolibre.com/shipments/${shipmentId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      let shData: any = null;
       if (shRes.ok) {
-        const shData = await shRes.json();
+        shData = await shRes.json();
         trackingCode = shData.tracking_number ?? shData.tracking_id ?? trackingCode;
         if (shData.status === 'delivered') isDelivered = true;
         if (shData.status === 'shipped') isShipped = true;
+        labelStatus = shData.status ?? 'pending';
       }
 
       if (!isDelivered) {
@@ -598,36 +603,53 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string, tar
 
         if (labelRes.ok) {
           const labelBytes = await labelRes.arrayBuffer();
-          const filePath = `labels/${resellerUserId}/${orderRecord.id}/etiqueta-${mlOrderIdStr}.pdf`;
-          let targetBucket = 'shipping-labels';
-          const uploadRes = await supabase.storage.from(targetBucket).upload(filePath, labelBytes, {
-            contentType: 'application/pdf',
-            upsert: true,
-          });
-
-          if (uploadRes.error) {
-            const fbRes = await supabase.storage.from('shipping-files').upload(filePath, labelBytes, {
+          if (labelBytes.byteLength > 200) {
+            const filePath = `labels/${resellerUserId}/${orderRecord.id}/etiqueta-${mlOrderIdStr}.pdf`;
+            let targetBucket = 'shipping-labels';
+            const uploadRes = await supabase.storage.from(targetBucket).upload(filePath, labelBytes, {
               contentType: 'application/pdf',
               upsert: true,
             });
-            if (!fbRes.error) targetBucket = 'shipping-files';
+
+            if (uploadRes.error) {
+              const fbRes = await supabase.storage.from('shipping-files').upload(filePath, labelBytes, {
+                contentType: 'application/pdf',
+                upsert: true,
+              });
+              if (!fbRes.error) targetBucket = 'shipping-files';
+            }
+
+            const { data: signedData } = await supabase.storage.from(targetBucket).createSignedUrl(filePath, 604800);
+            publicLabelUrl = getPublicSignedUrl(signedData?.signedUrl) ?? null;
+
+            await supabase.from('order_shipping_files').upsert({
+              order_id: orderRecord.id,
+              file_name: `etiqueta-${mlOrderIdStr}.pdf`,
+              file_path: filePath,
+              file_size: labelBytes.byteLength,
+              uploaded_at: new Date().toISOString(),
+            }, { onConflict: 'order_id,file_path' });
+
+            labelDownloaded = true;
           }
-
-          const { data: signedData } = await supabase.storage.from(targetBucket).createSignedUrl(filePath, 604800);
-          publicLabelUrl = getPublicSignedUrl(signedData?.signedUrl) ?? null;
-
-          await supabase.from('order_shipping_files').upsert({
-            order_id: orderRecord.id,
-            file_name: `etiqueta-${mlOrderIdStr}.pdf`,
-            file_path: filePath,
-            file_size: labelBytes.byteLength,
-            uploaded_at: new Date().toISOString(),
-          }, { onConflict: 'order_id,file_path' });
+        } else {
+          const errText = await labelRes.text().catch(() => '');
+          console.warn(`[ml-order-webhook] Mercado Livre etiqueta HTTP ${labelRes.status}:`, errText);
+          if (errText.includes('NOT_PRINTABLE_STATUS') || errText.includes('not_printable')) {
+            labelMessage = 'O Mercado Livre informou que a remessa ainda não está liberada para impressão (aguardando conferência/liberação no ML).';
+          } else if (errText.includes('status is delivered')) {
+            labelMessage = 'Remessa já entregue no Mercado Livre.';
+          } else {
+            labelMessage = `Etiqueta não liberada no Mercado Livre no momento (Status: ${shData?.status || 'pendente'}).`;
+          }
         }
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn(`[ml-order-webhook] Erro ao baixar etiqueta no repair:`, e);
+      labelMessage = 'Não foi possível conectar ao Mercado Livre para baixar a etiqueta.';
     }
+  } else {
+    labelMessage = 'Este pedido não possui identificador de remessa (Mercado Envios) vinculado no Mercado Livre.';
   }
 
   // 1.5 Extrair dados do comprador/endereço
@@ -735,7 +757,19 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string, tar
     }
   }
 
-  // 3. Checar status da remessa no ML (se já foi entregue ou despachado no ML)
+  // 3. Checar status da remessa e pagamento no ML ou Lojafy
+  const isMlOrderPaid = mlOrder.status === 'paid' || 
+    mlOrder.payments?.some((p: any) => p.status === 'approved' || p.status === 'accredited');
+  const wasAlreadyPaid = orderRecord.payment_status === 'paid' || 
+    orderRecord.status === 'pago' || 
+    orderRecord.status === 'Pedido Pago' || 
+    orderRecord.status === 'recebido' ||
+    orderRecord.status === 'Pedido Recebido' ||
+    orderRecord.status === 'ag_liberacao_etiqueta' ||
+    orderRecord.status === 'Ag Liberação de Etiqueta' ||
+    orderRecord.status === 'embalado' ||
+    orderRecord.status === 'enviado';
+
   const { data: wallet } = await supabase.from('wallets').select('saldo').eq('user_id', resellerUserId).maybeSingle();
   const currentWalletBalance = Number(wallet?.saldo ?? 0);
   const walletDebt = currentWalletBalance < 0 ? Math.round(Math.abs(currentWalletBalance) * 100) / 100 : 0;
@@ -747,6 +781,10 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string, tar
   const amountToCharge = totalResellerCost > 0 ? totalResellerCost : totalSupplierCost;
 
   if (isDelivered || isShipped) {
+    isFullyPaid = true;
+    remainingPixAmount = 0;
+  } else if (wasAlreadyPaid || isMlOrderPaid) {
+    // Pedido já está pago no Mercado Livre ou aprovado na plataforma: NUNCA regredir para pendente
     isFullyPaid = true;
     remainingPixAmount = 0;
   } else if (amountToCharge <= 0) {
@@ -770,7 +808,7 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string, tar
   let pixPaymentId = null;
   let pixExpiresAt = null;
 
-  if (remainingPixAmount > 0 && !isDelivered && !isShipped) {
+  if (remainingPixAmount > 0 && !isDelivered && !isShipped && !isFullyPaid) {
     const { data: resellerProfile } = await supabase.from('profiles').select('first_name, last_name, cpf, phone').eq('user_id', resellerUserId).maybeSingle();
     let resellerEmail = null;
     try {
@@ -812,9 +850,9 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string, tar
 
   const notesSummary = `Pedido via Mercado Livre #${mlOrderIdStr}. Taxas ML: R$ ${totalMarketplaceFee.toFixed(2)} | Custo Fornecedor: R$ ${totalSupplierCost.toFixed(2)} | Abate Carteira: R$ ${walletDeducted.toFixed(2)} | Pix 24h: R$ ${remainingPixAmount.toFixed(2)}`;
 
-  let finalStatus = 'pendente';
-  let finalPaymentStatus = 'pending';
-  let finalPaymentMethod = 'pix';
+  let finalStatus = 'Pedido Pago';
+  let finalPaymentStatus = 'paid';
+  let finalPaymentMethod = 'mercadolivre';
 
   if (isDelivered) {
     finalStatus = 'finalizado';
@@ -824,10 +862,20 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string, tar
     finalStatus = 'enviado';
     finalPaymentStatus = 'paid';
     finalPaymentMethod = 'mercadolivre';
-  } else if (isFullyPaid) {
-    finalStatus = 'recebido';
+  } else if (publicLabelUrl) {
+    finalStatus = (orderRecord.status === 'embalado' || orderRecord.status === 'enviado' || orderRecord.status === 'finalizado')
+      ? orderRecord.status
+      : 'Pedido Recebido';
     finalPaymentStatus = 'paid';
-    finalPaymentMethod = 'wallet';
+    finalPaymentMethod = 'mercadolivre';
+  } else if (isFullyPaid || wasAlreadyPaid || isMlOrderPaid) {
+    finalStatus = 'Ag Liberação de Etiqueta';
+    finalPaymentStatus = 'paid';
+    finalPaymentMethod = 'mercadolivre';
+  } else {
+    finalStatus = 'pendente';
+    finalPaymentStatus = 'pending';
+    finalPaymentMethod = 'pix';
   }
 
   await supabase
@@ -852,6 +900,12 @@ async function repairExistingOrder(orderRecord: any, resellerUserId: string, tar
     .eq('id', orderRecord.id);
 
   console.log(`✅ [ml-order-webhook] Pedido #${orderRecord.order_number} reparado! Status: ${finalStatus}, Custo: R$ ${totalSupplierCost}, Pix: R$ ${remainingPixAmount}, Etiqueta: ${!!publicLabelUrl}`);
+
+  return {
+    label_downloaded: labelDownloaded,
+    label_status: labelStatus,
+    label_message: labelMessage,
+  };
 }
 
 /**
@@ -2310,8 +2364,14 @@ serve(async (req) => {
         const { data: ord } = await supabase.from('orders').select('*').eq('id', body.order_id).maybeSingle();
         if (ord) {
           const targetMlId = body.ml_order_id || ord.ml_order_id;
-          await repairExistingOrder(ord, ord.reseller_id, targetMlId);
-          return new Response(JSON.stringify({ success: true, repaired: 1 }), {
+          const repairResult = await repairExistingOrder(ord, ord.reseller_id, targetMlId);
+          return new Response(JSON.stringify({ 
+            success: true, 
+            repaired: 1,
+            label_downloaded: repairResult?.label_downloaded ?? false,
+            label_status: repairResult?.label_status ?? 'unknown',
+            label_message: repairResult?.label_message ?? null,
+          }), {
             status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
