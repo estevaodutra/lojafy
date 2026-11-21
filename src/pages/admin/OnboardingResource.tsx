@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Eye, Plus, Save, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { OnboardingPreviewDialog } from '@/components/admin/OnboardingPreviewDialog';
 
 type JourneyStep = {
   id: string;
@@ -30,6 +31,7 @@ export default function OnboardingResource() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [qualifyUrl, setQualifyUrl] = useState('');
   const [steps, setSteps] = useState<JourneyStep[]>([]);
 
@@ -127,7 +129,10 @@ export default function OnboardingResource() {
           <h1 className="text-2xl font-semibold">Roteiro de onboarding</h1>
           <p className="mt-1 text-sm text-muted-foreground">Defina a ordem e o conteúdo de cada etapa da ativação.</p>
         </div>
-        <Button onClick={save} disabled={saving}><Save className="mr-2 h-4 w-4" />{saving ? 'Salvando...' : 'Salvar roteiro'}</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setPreviewOpen(true)}><Eye className="mr-2 h-4 w-4" />Visualizar e testar</Button>
+          <Button onClick={save} disabled={saving}><Save className="mr-2 h-4 w-4" />{saving ? 'Salvando...' : 'Salvar roteiro'}</Button>
+        </div>
       </div>
 
       <Card>
@@ -174,6 +179,7 @@ export default function OnboardingResource() {
       </div>
 
       <div className="flex justify-end"><Button onClick={save} disabled={saving}><Save className="mr-2 h-4 w-4" />Salvar roteiro</Button></div>
+      <OnboardingPreviewDialog open={previewOpen} onOpenChange={setPreviewOpen} steps={steps} />
     </div>
   );
 }
