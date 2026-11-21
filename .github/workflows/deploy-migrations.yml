@@ -48,7 +48,8 @@ jobs:
             20261117140000_supplier_order_items_visibility_and_rpc.sql \
             20261117203500_add_devolucao_codigo_to_orders.sql \
             20261117220000_fix_pipeline_stages_permanent_canonical_names.sql \
-            20261119143000_prevent_duplicate_ml_orders_and_archive_existing.sql
+            20261119143000_prevent_duplicate_ml_orders_and_archive_existing.sql \
+            20261121120000_onboarding_journey_config.sql
           do
             if [ -f "/root/lojafy-deploy/migrations/$f" ]; then
               echo "==> aplicando $f"
@@ -56,6 +57,10 @@ jobs:
                 < "/root/lojafy-deploy/migrations/$f" || true
             fi
           done
+
+          echo "==> verificando tabela do onboarding"
+          $DC exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            -c "SELECT id FROM public.onboarding_journey_config WHERE id = 1;"
 
           echo "==> Recarregando schema cache do PostgREST"
           $DC exec -T db psql -U postgres -d postgres -c "NOTIFY pgrst, 'reload schema';" || true
