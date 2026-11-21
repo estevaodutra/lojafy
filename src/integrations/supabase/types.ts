@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      onboarding_journey_config: {
+        Row: {
+          id: number
+          qualify_trigger_url: string
+          steps: Json
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          qualify_trigger_url?: string
+          steps?: Json
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          qualify_trigger_url?: string
+          steps?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       addresses: {
         Row: {
           city: string

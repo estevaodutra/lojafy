@@ -5,6 +5,7 @@ import {
   Package, 
   ShoppingCart, 
   Users, 
+  ClipboardList,
   MessageSquare, 
   DollarSign, 
   Wallet, 
@@ -105,7 +106,13 @@ export const SuperAdminSidebar: React.FC = () => {
             icon={Users}
           />
 
-          {/* 05. Chat (Imediatamente após Usuários e antes de Financeiro) */}
+          <LojafySidebarItem
+            title="Onboarding"
+            url="/super-admin/onboarding"
+            icon={ClipboardList}
+          />
+
+          {/* 05. Chat */}
           <LojafySidebarItem
             title="Chat"
             url="/super-admin/chat-suporte"
@@ -199,6 +206,11 @@ export const SuperAdminSidebar: React.FC = () => {
                 url: '/super-admin/recursos',
                 aliases: ['/super-admin/apps'],
                 icon: LayoutGrid,
+              },
+              {
+                title: 'Onboarding',
+                url: '/super-admin/recursos/onboarding',
+                icon: ClipboardList,
               },
             ]}
           />
