@@ -1,6 +1,6 @@
 # Contrato proposto: criação de grupo na Qualify
 
-Este contrato define a chamada da Lojafy para a Qualify após o parceiro completar os dados pessoais. A URL é configurada em **Super Admin > Recursos > Onboarding**. A chamada ainda não está ativada no aplicativo.
+Este contrato define a chamada da Lojafy para a Qualify após o parceiro completar os dados pessoais. A URL é configurada em **Super Admin > Recursos > Onboarding**. A prévia do Super Admin já faz a chamada HTTP real com dados de teste; o fluxo automático de novos parceiros será implementado separadamente.
 
 ## Requisição
 
@@ -18,6 +18,8 @@ Este contrato define a chamada da Lojafy para a Qualify após o parceiro complet
 ```
 
 `partner_id` é o ID do usuário na Lojafy. `request_id` permanece igual nas tentativas de repetição da mesma criação; a Qualify deve devolver o mesmo grupo para esse ID, sem criar outro. O CPF só deve ser enviado se for necessário para a Qualify; sua validação na Lojafy ocorre antes da chamada.
+
+Na prévia do Super Admin, `partner_id` é um UUID temporário gerado para o teste. O mesmo `request_id` é reutilizado quando o teste repete a chamada. A Qualify deve tratar esse par como idempotente.
 
 ## Resposta de sucesso
 
