@@ -106,12 +106,6 @@ export const SuperAdminSidebar: React.FC = () => {
             icon={Users}
           />
 
-          <LojafySidebarItem
-            title="Onboarding"
-            url="/super-admin/onboarding"
-            icon={ClipboardList}
-          />
-
           {/* 05. Chat */}
           <LojafySidebarItem
             title="Chat"

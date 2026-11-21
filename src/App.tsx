@@ -91,7 +91,6 @@ const Frete = lazy(() => import("./pages/admin/Frete"));
 const Logistica = lazy(() => import("./pages/admin/Logistica"));
 const Catalogo = lazy(() => import("./pages/admin/Catalogo"));
 const Clientes = lazy(() => import("./pages/admin/Clientes"));
-const AdminOnboarding = lazy(() => import("./pages/admin/Onboarding"));
 const AdminOnboardingResource = lazy(() => import("./pages/admin/OnboardingResource"));
 const Design = lazy(() => import("./pages/admin/Design"));
 const Configuracoes = lazy(() => import("./pages/admin/Configuracoes"));
@@ -381,7 +380,7 @@ const App = () => {
                   <Route path="pedidos/ocorrencias" element={<AdminOrders />} />
                   <Route path="pedidos/configuracoes" element={<AdminOrders />} />
                   <Route path="clientes" element={<Clientes />} />
-                  <Route path="onboarding" element={<AdminOnboarding />} />
+                  <Route path="onboarding" element={<Navigate to="/super-admin/recursos/onboarding" replace />} />
                   <Route path="design" element={<Design />} />
                   <Route path="configuracoes" element={<Configuracoes />} />
                   <Route path="logistica" element={<Logistica />} />
