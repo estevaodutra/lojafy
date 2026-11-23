@@ -11,6 +11,8 @@ import { formatPhone, cleanPhone, validatePhone } from '@/lib/phone';
 import { useToast } from '@/hooks/use-toast';
 import { MercadoLivreConnectionCard } from '@/components/reseller/MercadoLivreConnectionCard';
 import { OnboardingCommerceStep, type OnboardingProduct } from '@/components/reseller/OnboardingCommerceStep';
+import { OnboardingGroupCard } from '@/components/reseller/OnboardingGroupCard';
+import { OnboardingStockAddress } from '@/components/reseller/OnboardingStockAddress';
 
 export type OnboardingPreviewStep = {
   id: string;
@@ -147,7 +149,6 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
       setGroup(response.group as GroupData);
       setGroupStatus('ready');
       setCompleted(current => current.includes('qualify-group') ? current : [...current, 'qualify-group']);
-      if (joinIndex >= 0) setSelectedIndex(joinIndex);
     } catch (error) {
       if (currentRun !== runToken.current) return;
       setGroupError(error instanceof Error ? error.message : 'Não foi possível criar o grupo.');
@@ -274,7 +275,7 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
                       {groupStatus === 'pending' && <p className="rounded-md bg-muted p-4 text-sm">Seu grupo ainda está sendo criado. O convite não chegou nesta resposta.</p>}
                       {groupStatus === 'error' && <p className="rounded-md border border-destructive/40 p-4 text-sm text-destructive" role="alert">{groupError}</p>}
                       {(groupStatus === 'pending' || groupStatus === 'error') && <Button variant="outline" onClick={() => void requestGroup(personal)}>Tentar novamente</Button>}
-                      {groupStatus === 'ready' && <GroupCard group={group} />}
+                      {groupStatus === 'ready' && <OnboardingGroupCard title={group.title} description={group.description} photoUrl={isHttpsUrl(group.photo_url) ? group.photo_url : null} inviteUrl={group.invite_url} created />}
                       {groupSkipped && <p className="text-sm text-muted-foreground">Criação do grupo ignorada somente nesta prévia.</p>}
                       {groupStatus !== 'ready' && !groupSkipped && groupStatus !== 'loading' && <Button variant="outline" onClick={() => { setGroupSkipped(true); setGroupStatus('idle'); setCompleted(current => current.includes('qualify-group') ? current : [...current, 'qualify-group']); setSelectedIndex(joinIndex >= 0 ? joinIndex : Math.min(groupIndex + 1, steps.length - 1)); }}>Pular criação do grupo</Button>}
                       <QualifyPayloadViewer debug={qualifyDebug} />
@@ -283,7 +284,7 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
 
                   {step.id === 'join-group' && (
                     <div className="space-y-4">
-                      {groupSkipped ? <p className="text-sm text-muted-foreground">Convite ignorado somente nesta prévia.</p> : groupStatus === 'ready' ? <GroupCard group={group} /> : <p className="text-sm text-muted-foreground">Aguarde a criação do grupo na etapa anterior.</p>}
+                      {groupSkipped ? <p className="text-sm text-muted-foreground">Convite ignorado somente nesta prévia.</p> : groupStatus === 'ready' ? <OnboardingGroupCard title={group.title} description={group.description} photoUrl={isHttpsUrl(group.photo_url) ? group.photo_url : null} inviteUrl={group.invite_url} /> : <p className="text-sm text-muted-foreground">Aguarde a criação do grupo na etapa anterior.</p>}
                       {groupStatus === 'ready' && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={joinedGroup} onChange={event => setJoinedGroup(event.target.checked)} />Confirmo que entrei no grupo</label>}
                       <QualifyPayloadViewer debug={qualifyDebug} />
                     </div>
@@ -291,8 +292,9 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
 
                   {step.id === 'connect-ml' && <div className="space-y-3"><p className="text-sm text-muted-foreground">Simulação da integração do Mercado Livre. Nenhuma conta será conectada.</p><MercadoLivreConnectionCard accountId={simulatedMlConnected ? 'teste' : null} onConnect={() => setSimulatedMlConnected(true)} /></div>}
                   {(step.id === 'import-top10' || step.id === 'publish-ml') && <OnboardingCommerceStep key={step.id} stage={step.id} preview previewProducts={previewProducts} onPreviewProducts={setPreviewProducts} onComplete={completeStep} />}
+                  {step.id === 'ml-address-lesson' && <OnboardingStockAddress />}
 
-                  {step.reference_url && isHttpsUrl(step.reference_url) && <Button variant="outline" size="sm" asChild><a href={step.reference_url} target="_blank" rel="noopener noreferrer">Abrir referência ou aula<ExternalLink className="ml-2 h-4 w-4" /></a></Button>}
+                  {step.reference_url && isHttpsUrl(step.reference_url) && <Button variant="outline" size="sm" asChild><a href={step.reference_url} target="_blank" rel="noopener noreferrer">{step.id === 'ml-address-lesson' ? 'Assistir à aula' : 'Abrir referência'}<ExternalLink className="ml-2 h-4 w-4" /></a></Button>}
                   {step.completion_criteria && <p className="rounded-md bg-muted p-3 text-sm"><strong>Critério de conclusão:</strong> {step.completion_criteria}</p>}
 
                   {step.id !== 'import-top10' && step.id !== 'publish-ml' && <div className="flex items-center justify-between gap-2 border-t pt-4">
@@ -314,17 +316,6 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function GroupCard({ group }: { group: GroupData }) {
-  return (
-    <div className="rounded-lg border p-4">
-      {group.photo_url && isHttpsUrl(group.photo_url) && <img src={group.photo_url} alt="Foto do grupo" className="mb-3 h-16 w-16 rounded-full object-cover" />}
-      <h4 className="font-medium">{group.title}</h4>
-      {group.description && <p className="mt-1 text-sm text-muted-foreground">{group.description}</p>}
-      <Button variant="outline" size="sm" className="mt-3" asChild><a href={group.invite_url} target="_blank" rel="noopener noreferrer">Entrar no grupo<ExternalLink className="ml-2 h-4 w-4" /></a></Button>
-    </div>
   );
 }
 

@@ -135,8 +135,8 @@ export function OnboardingCommerceStep({ stage, preview = false, previewProducts
   };
 
   return <div className="space-y-4">
-    {stage === 'publish-ml' && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/30 dark:text-amber-200">Margem líquida alvo: <strong>30%</strong>. O preço considera a taxa Clássico de 14% do Mercado Livre.</p>}
-    {!loading && !running && !done && products.length > 0 && <Button onClick={() => void process()}>{stage === 'import-top10' ? 'Agora vamos importar os Top 10 produtos' : 'Publicar produtos no Mercado Livre'}</Button>}
+    {stage === 'publish-ml' && <><img src="/mercadolivre-logo.png" alt="Logo do Mercado Livre" className="h-14 w-14 object-contain" /><p className="rounded-md bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/30 dark:text-amber-200">Margem líquida alvo: <strong>30%</strong>. O preço considera a taxa Clássico de 14% do Mercado Livre.</p></>}
+    {!loading && !running && !done && products.length > 0 && <Button onClick={() => void process()}>{stage === 'import-top10' ? 'Importar Produtos Mais Vendidos' : 'Publicar produtos no Mercado Livre'}</Button>}
     {loading && <div className="flex items-center gap-2 text-sm" role="status"><Loader2 className="h-5 w-5 animate-spin" />Carregando produtos...</div>}
     {products.length > 0 && (stage === 'publish-ml' || started || done) && <div className="space-y-2 max-h-72 overflow-y-auto" aria-live="polite">{products.map(product => {
       const complete = stage === 'import-top10' ? product.imported : product.published;

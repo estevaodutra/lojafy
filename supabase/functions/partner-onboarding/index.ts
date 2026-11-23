@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
     if (profileError || profile?.role !== 'reseller') return reply({ error: 'Acesso restrito ao parceiro' }, 403);
     const body = await req.json().catch(() => ({}));
     const action = typeof body?.action === 'string' ? body.action : 'state';
-    if (!['state', 'personal', 'group', 'join', 'advance', 'catalog', 'import_one', 'store_products', 'price_one'].includes(action)) return reply({ error: 'Ação inválida' }, 400);
+    if (!['state', 'personal', 'group', 'group_continue', 'join', 'advance', 'catalog', 'import_one', 'store_products', 'price_one'].includes(action)) return reply({ error: 'Ação inválida' }, 400);
 
     const { data: config, error: configError } = await db.from('onboarding_journey_config')
       .select('steps, qualify_trigger_url, enabled, audience, activated_at').eq('id', 1).single();
@@ -182,9 +182,20 @@ Deno.serve(async (req) => {
       const group = normalized.group;
       const saved = await db.from('partner_onboarding_journey').update({ group_status: 'ready', group_id: group.id, group_title: group.title,
         group_description: group.description, group_photo_url: group.photo_url, group_invite_url: group.invite_url,
-        group_created_at: new Date().toISOString(), step_index: journey.step_index + 1 })
+        group_created_at: new Date().toISOString() })
         .eq('user_id', user.id).eq('step_index', journey.step_index).eq('group_status', 'requested').select('*').maybeSingle();
       if (saved.error || !saved.data) return reply({ error: 'Grupo criado; a confirmação precisa ser conferida pelo suporte.', journey }, 500);
+      journey = saved.data;
+      return state();
+    }
+
+    if (action === 'group_continue') {
+      if (current !== 'qualify-group' || journey.group_status !== 'ready' || !journey.group_invite_url) {
+        return reply({ error: 'Aguarde a confirmação do grupo para avançar' }, 409);
+      }
+      const saved = await db.from('partner_onboarding_journey').update({ step_index: journey.step_index + 1 })
+        .eq('user_id', user.id).eq('step_index', journey.step_index).eq('group_status', 'ready').select('*').maybeSingle();
+      if (saved.error || !saved.data) return reply({ error: 'A etapa foi atualizada em outra sessão. Recarregue.' }, 409);
       journey = saved.data;
       return state();
     }

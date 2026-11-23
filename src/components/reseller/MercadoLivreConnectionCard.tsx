@@ -1,4 +1,4 @@
-import { CheckCircle2, Link2, Store } from 'lucide-react';
+import { CheckCircle2, Link2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +13,7 @@ export function MercadoLivreConnectionCard({ accountId, onConnect, onRefresh, lo
   return <Card className="max-w-sm border-green-500/50">
     <CardHeader>
       <div className="flex items-center justify-between">
-        <div className="rounded-lg bg-yellow-100 p-3"><Store className="h-8 w-8 text-yellow-600" /></div>
+        <img src="/mercadolivre-logo.png" alt="Logo do Mercado Livre" className="h-14 w-14 rounded-lg object-contain" />
         <Badge className="bg-green-500 hover:bg-green-600">{connected && <CheckCircle2 className="mr-1 h-3 w-3" />}{connected ? 'Conectado' : 'Disponível'}</Badge>
       </div>
       <CardTitle className="mt-4">Mercado Livre</CardTitle>

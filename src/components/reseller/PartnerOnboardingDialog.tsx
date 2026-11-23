@@ -15,6 +15,8 @@ import { mercadoLivreAuthUrl } from '@/lib/mercadoLivreAuth';
 import { BetaWarningDialog } from '@/components/integrations/BetaWarningDialog';
 import { MercadoLivreConnectionCard } from '@/components/reseller/MercadoLivreConnectionCard';
 import { OnboardingCommerceStep } from '@/components/reseller/OnboardingCommerceStep';
+import { OnboardingGroupCard } from '@/components/reseller/OnboardingGroupCard';
+import { OnboardingStockAddress } from '@/components/reseller/OnboardingStockAddress';
 
 type Step = { id: string; title: string; description: string; reference_url: string };
 type Journey = { steps: Step[]; step_index: number; group_status: 'idle' | 'requested' | 'ready'; group_title: string | null; group_description: string | null; group_photo_url: string | null; group_invite_url: string | null; completed_at: string | null };
@@ -181,9 +183,10 @@ export function PartnerOnboardingDialog() {
                     {busy && <div role="status" className="flex items-center gap-2"><Loader2 className="h-5 w-5 animate-spin" />Criando seu grupo...</div>}
                     {journey.group_status === 'requested' && !busy && <p className="rounded-md bg-muted p-3 text-sm">A criação do grupo já foi solicitada. Aguarde a confirmação ou contate o suporte. Uma nova solicitação não será enviada.</p>}
                     {journey.group_status === 'idle' && <p className="text-sm text-muted-foreground">Ao continuar, criaremos seu grupo uma única vez.</p>}
+                    {journey.group_status === 'ready' && journey.group_invite_url && <OnboardingGroupCard title={journey.group_title} description={journey.group_description} photoUrl={validUrl(journey.group_photo_url) ? journey.group_photo_url : null} inviteUrl={journey.group_invite_url} created />}
                   </div>}
                   {step.id === 'join-group' && <div className="space-y-4">
-                    <div className="rounded-md border p-4">{validUrl(journey.group_photo_url) && <img src={journey.group_photo_url!} alt="Foto do grupo" className="mb-3 h-16 w-16 rounded-full object-cover" />}<h4 className="font-semibold">{journey.group_title}</h4>{journey.group_description && <p className="text-sm text-muted-foreground">{journey.group_description}</p>}{validUrl(journey.group_invite_url) && <Button asChild variant="outline" className="mt-3"><a href={journey.group_invite_url!} target="_blank" rel="noopener noreferrer">Entrar no grupo<ExternalLink className="ml-2 h-4 w-4" /></a></Button>}</div>
+                    {validUrl(journey.group_invite_url) && <OnboardingGroupCard title={journey.group_title} description={journey.group_description} photoUrl={validUrl(journey.group_photo_url) ? journey.group_photo_url : null} inviteUrl={journey.group_invite_url!} />}
                     <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={joined} onChange={event => setJoined(event.target.checked)} />Confirmo que entrei no grupo</label>
                   </div>}
                   {step.id === 'connect-ml' && <div className="space-y-3">
@@ -191,10 +194,11 @@ export function PartnerOnboardingDialog() {
                     <p className="text-sm text-muted-foreground">Depois de autorizar a conta, volte a esta janela e atualize a conexão.</p>
                   </div>}
                   {(step.id === 'import-top10' || step.id === 'publish-ml') && <OnboardingCommerceStep key={step.id} stage={step.id} onComplete={() => run('advance')} />}
-                  {validUrl(step.reference_url) && <Button variant="outline" asChild><a href={step.reference_url} target="_blank" rel="noopener noreferrer">Abrir aula ou referência<ExternalLink className="ml-2 h-4 w-4" /></a></Button>}
+                  {step.id === 'ml-address-lesson' && <OnboardingStockAddress />}
+                  {validUrl(step.reference_url) && <Button variant="outline" asChild><a href={step.reference_url} target="_blank" rel="noopener noreferrer">{step.id === 'ml-address-lesson' ? 'Assistir à aula' : 'Abrir referência'}<ExternalLink className="ml-2 h-4 w-4" /></a></Button>}
                   {error && <p role="alert" className="rounded-md border border-destructive/40 p-3 text-sm text-destructive">{error}</p>}
                   {step.id !== 'import-top10' && step.id !== 'publish-ml' && <div className="border-t pt-4">{step.id === 'personal-data' ? <Button disabled={busy} onClick={() => void completePersonal()}>Salvar e continuar</Button> :
-                    step.id === 'qualify-group' ? <Button disabled={busy || journey.group_status !== 'idle'} onClick={() => void run('group')}>Criar Grupo</Button> :
+                    step.id === 'qualify-group' ? journey.group_status === 'ready' ? <Button disabled={busy} onClick={() => void run('group_continue')}>Continuar</Button> : <Button disabled={busy || journey.group_status !== 'idle'} onClick={() => void run('group')}>Criar Grupo</Button> :
                     step.id === 'join-group' ? <Button disabled={busy || !joined} onClick={() => void run('join')}>Confirmar entrada e continuar</Button> :
                     <Button disabled={busy || (step.id === 'connect-ml' && !mlIntegration)} onClick={() => void run('advance')}>{index === steps.length - 1 ? 'Concluir onboarding' : 'Concluir e avançar'}</Button>}</div>}
                 </> : <p>Onboarding concluído.</p>}
