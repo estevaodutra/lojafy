@@ -1,4 +1,4 @@
-# Contrato proposto: criação de grupo na Qualify
+# Integração de criação de grupo na Qualify
 
 Este contrato define a chamada da Lojafy para a Qualify após o parceiro completar os dados pessoais. A URL é configurada em **Super Admin > Recursos > Onboarding**. A prévia do Super Admin já faz a chamada HTTP real com dados de teste; o fluxo automático de novos parceiros será implementado separadamente.
 
@@ -21,28 +21,25 @@ Este contrato define a chamada da Lojafy para a Qualify após o parceiro complet
 
 Na prévia do Super Admin, `partner_id` é um UUID temporário gerado para o teste. O mesmo `request_id` é reutilizado quando o teste repete a chamada. A Qualify deve tratar esse par como idempotente.
 
-## Resposta de sucesso
+## Resposta de sucesso da Qualify
 
 Retornar HTTP `200` com JSON quando o grupo e o convite estiverem prontos:
 
 ```json
 {
-  "status": "ready",
-  "request_id": "c05226a1-a069-467b-9cd3-1dd85a3b9d6d",
-  "group": {
-    "id": "120363431946257991@g.us",
-    "title": "Grupo de ativação da Ana",
-    "description": "Acompanhamento da operação da Ana",
-    "photo_url": "https://example.com/group-photo.jpg",
-    "invite_url": "https://chat.whatsapp.com/exemplo"
+  "statusCode": 200,
+  "responseBody": {
+    "photoUrl": "https://qualify-supabase.d2x.site/storage/v1/object/public/sequence-media/companies/exemplo/image/foto.jpg",
+    "groupName": "SUPORTE VIP | Ana Silva",
+    "inviteLink": "https://chat.whatsapp.com/exemplo"
   }
 }
 ```
 
-`group.id`, `group.title` e `group.invite_url` são obrigatórios. `group.description` e `group.photo_url` podem ser `null`. A URL de convite deve ser uma URL HTTPS completa. A Lojafy salvará o ID e o convite antes de mostrar o botão **Entrar no grupo**.
+`responseBody.groupName` e `responseBody.inviteLink` são obrigatórios. `photoUrl` pode ser omitido ou `null`. A resposta atual não fornece ID nem descrição do grupo; a Lojafy não exige esses campos para mostrar **Entrar no grupo**. O convite e a foto, quando informada, devem ser URLs HTTPS completas.
 
 ## Falhas e demora
 
-- Se a Qualify ainda estiver criando o grupo, retornar HTTP `202` com `{ "status": "pending", "request_id": "..." }`. Para esse caso, precisaremos definir um endpoint de consulta ou callback antes de ativar o envio.
-- Em erro, retornar HTTP `4xx` ou `5xx` com `{ "status": "error", "code": "GROUP_CREATION_FAILED", "message": "Descrição do erro" }`. O erro ficará visível para nova tentativa no painel.
-- Uma resposta HTTP `200` sem os campos obrigatórios não será considerada criação concluída.
+- Se a Qualify ainda estiver criando o grupo, retornar HTTP `202` ou `statusCode: 202`. Para esse caso, ainda precisaremos definir um endpoint de consulta ou callback.
+- Em erro, retornar HTTP `4xx` ou `5xx`, ou `statusCode` de erro com `responseBody.message` ou `responseBody.error`. O erro ficará visível para nova tentativa no painel.
+- Uma resposta de sucesso sem `groupName` e `inviteLink` não será considerada criação concluída.

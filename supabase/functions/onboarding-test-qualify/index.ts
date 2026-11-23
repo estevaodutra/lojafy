@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+import { normalizeQualifyResponse } from './qualifyResponse.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -85,37 +86,22 @@ Deno.serve(async (req) => {
         result && typeof result.error === 'string' ? result.error : 'A Qualify não conseguiu criar o grupo';
       return json({ error: message, status: response.status }, 502);
     }
-    if (response.status === 202 || result?.status === 'pending') {
+    if (response.status === 202) {
       return json({ status: 'pending', request_id });
     }
 
-    const group = result?.group;
-    if (!group || typeof group.id !== 'string' || !group.id || typeof group.title !== 'string' || !group.title ||
-        typeof group.invite_url !== 'string') {
-      return json({ error: 'A Qualify respondeu sem os dados obrigatórios do grupo' }, 502);
+    let normalized;
+    try {
+      normalized = normalizeQualifyResponse(result);
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : 'Resposta inválida da Qualify' }, 502);
     }
-    let inviteUrl: URL;
-    try { inviteUrl = new URL(group.invite_url); } catch { return json({ error: 'A Qualify retornou um convite inválido' }, 502); }
-    if (inviteUrl.protocol !== 'https:') return json({ error: 'A Qualify retornou um convite inválido' }, 502);
-    let validPhoto = true;
-    if (group.photo_url) {
-      try { validPhoto = typeof group.photo_url === 'string' && new URL(group.photo_url).protocol === 'https:'; }
-      catch { validPhoto = false; }
-    }
-    if (!validPhoto) {
-      return json({ error: 'A Qualify retornou uma foto inválida' }, 502);
-    }
+    if (normalized.status === 'pending') return json({ status: 'pending', request_id });
 
     return json({
       status: 'ready',
       request_id,
-      group: {
-        id: group.id,
-        title: group.title,
-        description: typeof group.description === 'string' ? group.description : '',
-        photo_url: group.photo_url || '',
-        invite_url: inviteUrl.toString(),
-      },
+      group: normalized.group,
     });
   } catch (error) {
     console.error('Erro no teste de onboarding:', error instanceof Error ? error.message : error);
