@@ -163,7 +163,7 @@ export function PartnerOnboardingDialog() {
           <div className="space-y-5">
             <div className="space-y-2"><div className="flex justify-between text-sm"><span>Progresso</span><span>{Math.min(index, steps.length)} de {steps.length} etapas</span></div><Progress value={steps.length ? Math.min(index / steps.length * 100, 100) : 0} /></div>
             <div className="grid gap-5 md:grid-cols-[210px_minmax(0,1fr)]">
-              <ol className="space-y-1" aria-label="Etapas do onboarding">{steps.map((item, position) => <li key={item.id} className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${position === index ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
+              <ol className="space-y-1" aria-label="Etapas do onboarding">{steps.map((item, position) => <li key={item.id} className={`${item.id === 'personal-data' ? 'hidden md:flex' : 'flex'} items-center gap-2 rounded-md px-3 py-2 text-sm ${position === index ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
                 {position < index ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <span className="w-4 text-center">{position + 1}</span>}<span>{item.title}</span>
               </li>)}</ol>
               <section className="min-w-0 space-y-4 rounded-lg border p-4">

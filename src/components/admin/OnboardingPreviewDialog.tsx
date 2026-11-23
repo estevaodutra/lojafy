@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, ExternalLink, Eye, Loader2 } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Eye, Loader2, Monitor, Smartphone } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -25,6 +25,7 @@ type PersonalData = { name: string; email: string; phone: string; cpf: string };
 type GroupData = { id: string; title: string; description: string; photo_url: string; invite_url: string };
 type GroupStatus = 'idle' | 'loading' | 'ready' | 'pending' | 'error';
 type QualifyDebug = { httpStatus: number; payload: unknown };
+type PreviewDevice = 'desktop' | 'mobile';
 
 const emptyPersonal: PersonalData = { name: '', email: '', phone: '', cpf: '' };
 const emptyGroup: GroupData = { id: '', title: '', description: '', photo_url: '', invite_url: '' };
@@ -55,6 +56,7 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
 }) {
   const { toast } = useToast();
   const [setupComplete, setSetupComplete] = useState(false);
+  const [device, setDevice] = useState<PreviewDevice>('desktop');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [completed, setCompleted] = useState<string[]>([]);
   const [registered, setRegistered] = useState<PersonalData>(emptyPersonal);
@@ -75,6 +77,7 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
     if (!open) return;
     runToken.current += 1;
     setSetupComplete(false);
+    setDevice('desktop');
     setSelectedIndex(0);
     setCompleted([]);
     setRegistered({ ...emptyPersonal });
@@ -192,24 +195,34 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] w-[96vw] max-w-4xl overflow-y-auto">
+      <DialogContent className="max-h-[92vh] w-[96vw] max-w-6xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Eye className="h-5 w-5" />Visualizar e testar onboarding</DialogTitle>
           <DialogDescription>Teste a jornada com dados de cadastro e acompanhe o convite do grupo.</DialogDescription>
         </DialogHeader>
 
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+          <div><p className="text-sm font-medium">Visualização do parceiro</p><p className="text-xs text-muted-foreground">Alterne o formato sem reiniciar o teste.</p></div>
+          <div role="group" aria-label="Formato de visualização" className="flex gap-1 rounded-md bg-muted p-1">
+            <Button type="button" size="sm" variant={device === 'desktop' ? 'default' : 'ghost'} aria-pressed={device === 'desktop'} onClick={() => setDevice('desktop')}><Monitor className="mr-2 h-4 w-4" />Desktop</Button>
+            <Button type="button" size="sm" variant={device === 'mobile' ? 'default' : 'ghost'} aria-pressed={device === 'mobile'} onClick={() => setDevice('mobile')}><Smartphone className="mr-2 h-4 w-4" />Mobile</Button>
+          </div>
+        </div>
+
         <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
           A etapa da Qualify envia uma requisição real e pode criar um grupo. Use “Pular criação do grupo” para testar as próximas etapas sem criar outro. Este teste não cria conta nem publica anúncios na Lojafy.
         </div>
 
+        <div className={`mx-auto rounded-xl border bg-muted/40 transition-[width] ${device === 'mobile' ? 'w-[390px] max-w-full p-2' : 'w-full p-4'}`}>
+          <div className={`mx-auto min-w-0 rounded-xl border bg-background p-6 shadow-sm ${device === 'mobile' ? 'w-[96%]' : 'w-full max-w-4xl'}`}>
         {!setupComplete ? (
           <div className="space-y-5">
             <div>
               <h3 className="font-semibold">Dados já preenchidos no cadastro de teste</h3>
               <p className="text-sm text-muted-foreground">Informe o que a pessoa já teria cadastrado. Deixe em branco os campos que deseja completar durante o onboarding.</p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2 sm:col-span-2"><Label htmlFor="registered-name">Nome completo</Label><Input id="registered-name" value={registered.name} onChange={event => updateRegistered('name', event.target.value)} /></div>
+            <div className={`grid gap-4 ${device === 'mobile' ? 'grid-cols-1' : 'sm:grid-cols-2'}`}>
+              <div className={`space-y-2 ${device === 'desktop' ? 'sm:col-span-2' : ''}`}><Label htmlFor="registered-name">Nome completo</Label><Input id="registered-name" value={registered.name} onChange={event => updateRegistered('name', event.target.value)} /></div>
               <div className="space-y-2"><Label htmlFor="registered-email">Email</Label><Input id="registered-email" type="email" value={registered.email} onChange={event => updateRegistered('email', event.target.value)} /></div>
               <div className="space-y-2"><Label htmlFor="registered-phone">WhatsApp</Label><Input id="registered-phone" type="tel" value={registered.phone} onChange={event => updateRegistered('phone', formatPhone(event.target.value))} /></div>
               <div className="space-y-2"><Label htmlFor="registered-cpf">CPF</Label><Input id="registered-cpf" value={registered.cpf} onChange={event => updateRegistered('cpf', formatCPF(event.target.value))} /></div>
@@ -224,11 +237,11 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
             </div>
 
             {steps.length === 0 ? <p className="py-10 text-center text-muted-foreground">Adicione etapas ao roteiro para iniciar a prévia.</p> : (
-              <div className="grid gap-5 md:grid-cols-[220px_minmax(0,1fr)]">
+              <div className={`grid gap-5 ${device === 'mobile' ? 'grid-cols-1' : 'md:grid-cols-[220px_minmax(0,1fr)]'}`}>
                 <nav aria-label="Etapas do onboarding" className="space-y-1">
                   {steps.map((item, index) => (
                     <button key={item.id} type="button" onClick={() => { if (item.id !== 'qualify-group' || completed.includes('personal-data')) setSelectedIndex(index); }}
-                      className={`${item.id === 'personal-data' ? 'hidden md:flex' : 'flex'} w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm ${index === selectedIndex ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}>
+                      className={`${item.id === 'personal-data' ? device === 'mobile' ? 'hidden' : 'hidden md:flex' : 'flex'} w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm ${index === selectedIndex ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}>
                       {completed.includes(item.id) ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <span className="flex h-4 w-4 shrink-0 items-center justify-center text-xs">{index + 1}</span>}
                       <span>{item.title || `Etapa ${index + 1}`}</span>
                     </button>
@@ -245,8 +258,8 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
                   {step.id === 'personal-data' && (
                     <div className="space-y-4">
                       {Object.values(missing).every(value => !value) ? <p className="text-sm text-muted-foreground">Os dados cadastrais já estão completos.</p> : <p className="text-sm text-muted-foreground">Preencha somente os dados ausentes ou inválidos.</p>}
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {missing.name && <div className="space-y-2 sm:col-span-2"><Label htmlFor="preview-name">Nome completo</Label><Input id="preview-name" value={personal.name} onChange={event => updatePersonal('name', event.target.value)} /></div>}
+                      <div className={`grid gap-4 ${device === 'mobile' ? 'grid-cols-1' : 'sm:grid-cols-2'}`}>
+                        {missing.name && <div className={`space-y-2 ${device === 'desktop' ? 'sm:col-span-2' : ''}`}><Label htmlFor="preview-name">Nome completo</Label><Input id="preview-name" value={personal.name} onChange={event => updatePersonal('name', event.target.value)} /></div>}
                         {missing.email && <div className="space-y-2"><Label htmlFor="preview-email">Email</Label><Input id="preview-email" type="email" value={personal.email} onChange={event => updatePersonal('email', event.target.value)} /></div>}
                         {missing.phone && <div className="space-y-2"><Label htmlFor="preview-phone">WhatsApp</Label><Input id="preview-phone" type="tel" value={personal.phone} onChange={event => updatePersonal('phone', formatPhone(event.target.value))} /></div>}
                         {missing.cpf && <div className="space-y-2"><Label htmlFor="preview-cpf">CPF</Label><Input id="preview-cpf" value={personal.cpf} onChange={event => updatePersonal('cpf', formatCPF(event.target.value))} /></div>}
@@ -297,6 +310,8 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
             )}
           </>
         )}
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
