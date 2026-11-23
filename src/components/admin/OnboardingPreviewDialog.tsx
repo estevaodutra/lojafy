@@ -9,6 +9,8 @@ import { Progress } from '@/components/ui/progress';
 import { formatCPF, cleanCPF, validateCPF } from '@/lib/cpf';
 import { formatPhone, cleanPhone, validatePhone } from '@/lib/phone';
 import { useToast } from '@/hooks/use-toast';
+import { MercadoLivreConnectionCard } from '@/components/reseller/MercadoLivreConnectionCard';
+import { OnboardingCommerceStep, type OnboardingProduct } from '@/components/reseller/OnboardingCommerceStep';
 
 export type OnboardingPreviewStep = {
   id: string;
@@ -65,6 +67,8 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
   const [joinedGroup, setJoinedGroup] = useState(false);
   const [requestId, setRequestId] = useState('');
   const [partnerId, setPartnerId] = useState('');
+  const [simulatedMlConnected, setSimulatedMlConnected] = useState(false);
+  const [previewProducts, setPreviewProducts] = useState<OnboardingProduct[]>([]);
   const runToken = useRef(0);
 
   useEffect(() => {
@@ -83,6 +87,8 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
     setJoinedGroup(false);
     setRequestId(crypto.randomUUID());
     setPartnerId(crypto.randomUUID());
+    setSimulatedMlConnected(false);
+    setPreviewProducts([]);
     return () => { runToken.current += 1; };
   }, [open]);
 
@@ -270,19 +276,22 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
                     </div>
                   )}
 
+                  {step.id === 'connect-ml' && <div className="space-y-3"><p className="text-sm text-muted-foreground">Simulação da integração do Mercado Livre. Nenhuma conta será conectada.</p><MercadoLivreConnectionCard accountId={simulatedMlConnected ? 'teste' : null} onConnect={() => setSimulatedMlConnected(true)} /></div>}
+                  {(step.id === 'import-top10' || step.id === 'publish-ml') && <OnboardingCommerceStep key={step.id} stage={step.id} preview previewProducts={previewProducts} onPreviewProducts={setPreviewProducts} onComplete={completeStep} />}
+
                   {step.reference_url && isHttpsUrl(step.reference_url) && <Button variant="outline" size="sm" asChild><a href={step.reference_url} target="_blank" rel="noopener noreferrer">Abrir referência ou aula<ExternalLink className="ml-2 h-4 w-4" /></a></Button>}
                   {step.completion_criteria && <p className="rounded-md bg-muted p-3 text-sm"><strong>Critério de conclusão:</strong> {step.completion_criteria}</p>}
 
-                  <div className="flex items-center justify-between gap-2 border-t pt-4">
+                  {step.id !== 'import-top10' && step.id !== 'publish-ml' && <div className="flex items-center justify-between gap-2 border-t pt-4">
                     <Button variant="outline" disabled={selectedIndex === 0 || groupStatus === 'loading'} onClick={() => setSelectedIndex(selectedIndex - 1)}>Anterior</Button>
                     {step.id === 'personal-data' ? (
                       <Button onClick={() => void finishPersonalData(personal)} disabled={groupStatus === 'loading'}>Continuar</Button>
                     ) : step.id === 'qualify-group' ? (
                       <Button disabled={groupStatus !== 'ready' && !groupSkipped} onClick={completeStep}>Continuar</Button>
                     ) : (
-                      <Button onClick={completeStep}>{selectedIndex === steps.length - 1 ? 'Concluir prévia' : 'Concluir e avançar'}</Button>
+                      <Button onClick={completeStep} disabled={step.id === 'connect-ml' && !simulatedMlConnected}>{selectedIndex === steps.length - 1 ? 'Concluir prévia' : 'Concluir e avançar'}</Button>
                     )}
-                  </div>
+                  </div>}
                 </section>
               </div>
             )}

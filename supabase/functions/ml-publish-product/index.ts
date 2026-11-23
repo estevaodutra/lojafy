@@ -224,6 +224,14 @@ async function handleRequest(req: Request) {
       });
     }
 
+    const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+    const { data: identity, error: identityError } = await supabase.auth.getUser(jwt);
+    if (identityError || identity.user?.id !== user_id) {
+      return new Response(JSON.stringify({ error: 'Usuário não autorizado' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const accessToken = await getValidToken(user_id);
 
     // ── Unpublish (close and delete) ─────────────────────────────────────────
@@ -278,13 +286,6 @@ async function handleRequest(req: Request) {
     let listingAd: any = null;
     let publishOfficialCopy = false;
     if (ad_id) {
-      const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
-      const { data: identity, error: identityError } = await supabase.auth.getUser(jwt);
-      if (identityError || identity.user?.id !== user_id) {
-        return new Response(JSON.stringify({ error: 'Usuário não autorizado' }), {
-          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
       const { data: ad } = await supabase.from('ml_listing_variants')
         .select('*').eq('id', ad_id).maybeSingle();
       if (!ad || ad.product_id !== product.id || (ad.user_id !== user_id && !ad.is_official_model)) {
@@ -302,7 +303,8 @@ async function handleRequest(req: Request) {
 
     const validated = marketplace_data?.validated_body ?? {};
     // Arredondar preco para 2 casas decimais (exigencia da API do ML)
-    const rawPrice = listingAd?.price ?? reseller_price ?? product.price;
+    // O preço definido pelo revendedor na loja prevalece sobre o modelo de anúncio.
+    const rawPrice = reseller_price ?? listingAd?.price ?? product.price;
     const price = Math.round(Number(rawPrice) * 100) / 100;
     const { data: stockOverview } = listingAd
       ? await supabase.from('supplier_stock_overview').select('available_quantity')

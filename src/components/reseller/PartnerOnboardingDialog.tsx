@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { CheckCircle2, ExternalLink, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,6 +10,11 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { cleanCPF, formatCPF, validateCPF } from '@/lib/cpf';
 import { cleanPhone, validatePhone } from '@/lib/phone';
+import { useMarketplaceCredentials } from '@/hooks/useMarketplaceCredentials';
+import { mercadoLivreAuthUrl } from '@/lib/mercadoLivreAuth';
+import { BetaWarningDialog } from '@/components/integrations/BetaWarningDialog';
+import { MercadoLivreConnectionCard } from '@/components/reseller/MercadoLivreConnectionCard';
+import { OnboardingCommerceStep } from '@/components/reseller/OnboardingCommerceStep';
 
 type Step = { id: string; title: string; description: string; reference_url: string };
 type Journey = { steps: Step[]; step_index: number; group_status: 'idle' | 'requested' | 'ready'; group_title: string | null; group_description: string | null; group_photo_url: string | null; group_invite_url: string | null; completed_at: string | null };
@@ -30,6 +36,26 @@ export function PartnerOnboardingDialog() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [joined, setJoined] = useState(false);
+  const [betaOpen, setBetaOpen] = useState(false);
+  const { credentials } = useMarketplaceCredentials('mercadolivre');
+  const { data: mlIntegration, refetch: refreshMl } = useQuery({
+    queryKey: ['onboarding-ml-integration', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error: integrationError } = await supabase.from('mercadolivre_integrations')
+        .select('ml_user_id, is_active').eq('user_id', user.id).eq('is_active', true).maybeSingle();
+      if (integrationError) throw integrationError;
+      return data;
+    },
+    enabled: !!user?.id && profile?.role === 'reseller' && available,
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    const refreshOnFocus = () => { void refreshMl(); };
+    window.addEventListener('focus', refreshOnFocus);
+    return () => window.removeEventListener('focus', refreshOnFocus);
+  }, [open, refreshMl]);
 
   const invoke = useCallback(async (action: string, extra: Record<string, unknown> = {}): Promise<StateResponse> => {
     const { data, error: functionError } = await supabase.functions.invoke('partner-onboarding', { body: { action, ...extra } });
@@ -160,20 +186,27 @@ export function PartnerOnboardingDialog() {
                     <div className="rounded-md border p-4">{validUrl(journey.group_photo_url) && <img src={journey.group_photo_url!} alt="Foto do grupo" className="mb-3 h-16 w-16 rounded-full object-cover" />}<h4 className="font-semibold">{journey.group_title}</h4>{journey.group_description && <p className="text-sm text-muted-foreground">{journey.group_description}</p>}{validUrl(journey.group_invite_url) && <Button asChild variant="outline" className="mt-3"><a href={journey.group_invite_url!} target="_blank" rel="noopener noreferrer">Entrar no grupo<ExternalLink className="ml-2 h-4 w-4" /></a></Button>}</div>
                     <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={joined} onChange={event => setJoined(event.target.checked)} />Confirmo que entrei no grupo</label>
                   </div>}
+                  {step.id === 'connect-ml' && <div className="space-y-3">
+                    <MercadoLivreConnectionCard accountId={mlIntegration?.ml_user_id} onConnect={() => setBetaOpen(true)} onRefresh={() => void refreshMl()} />
+                    <p className="text-sm text-muted-foreground">Depois de autorizar a conta, volte a esta janela e atualize a conexão.</p>
+                  </div>}
+                  {(step.id === 'import-top10' || step.id === 'publish-ml') && <OnboardingCommerceStep key={step.id} stage={step.id} onComplete={() => run('advance')} />}
                   {validUrl(step.reference_url) && <Button variant="outline" asChild><a href={step.reference_url} target="_blank" rel="noopener noreferrer">Abrir aula ou referência<ExternalLink className="ml-2 h-4 w-4" /></a></Button>}
-                  {step.id === 'connect-ml' && <Button variant="outline" asChild><a href="/reseller/integracoes">Abrir integrações</a></Button>}
-                  {step.id === 'import-top10' && <Button variant="outline" asChild><a href="/reseller/meus-acessos/top-produtos">Abrir Top 10</a></Button>}
-                  {step.id === 'publish-ml' && <Button variant="outline" asChild><a href="/reseller/produtos">Abrir meus produtos</a></Button>}
                   {error && <p role="alert" className="rounded-md border border-destructive/40 p-3 text-sm text-destructive">{error}</p>}
-                  <div className="border-t pt-4">{step.id === 'personal-data' ? <Button disabled={busy} onClick={() => void completePersonal()}>Salvar e continuar</Button> :
+                  {step.id !== 'import-top10' && step.id !== 'publish-ml' && <div className="border-t pt-4">{step.id === 'personal-data' ? <Button disabled={busy} onClick={() => void completePersonal()}>Salvar e continuar</Button> :
                     step.id === 'qualify-group' ? <Button disabled={busy || journey.group_status !== 'idle'} onClick={() => void run('group')}>Criar grupo e continuar</Button> :
                     step.id === 'join-group' ? <Button disabled={busy || !joined} onClick={() => void run('join')}>Confirmar entrada e continuar</Button> :
-                    <Button disabled={busy} onClick={() => void run('advance')}>{index === steps.length - 1 ? 'Concluir onboarding' : 'Concluir e avançar'}</Button>}</div>
+                    <Button disabled={busy || (step.id === 'connect-ml' && !mlIntegration)} onClick={() => void run('advance')}>{index === steps.length - 1 ? 'Concluir onboarding' : 'Concluir e avançar'}</Button>}</div>}
                 </> : <p>Onboarding concluído.</p>}
               </section>
             </div>
           </div>}
       </DialogContent>
     </Dialog>
+    <BetaWarningDialog open={betaOpen} onOpenChange={setBetaOpen} onConfirm={() => {
+      if (!user?.id) return;
+      const clientId = credentials?.client_id || import.meta.env.VITE_ML_CLIENT_ID || '2003351424267574';
+      window.open(mercadoLivreAuthUrl(user.id, clientId), '_blank', 'noopener,noreferrer');
+    }} marketplaceName="Mercado Livre" authUrl={user?.id ? mercadoLivreAuthUrl(user.id, credentials?.client_id || import.meta.env.VITE_ML_CLIENT_ID || '2003351424267574') : undefined} />
   </>;
 }

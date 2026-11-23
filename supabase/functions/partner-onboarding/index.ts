@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { normalizeQualifyResponse } from '../onboarding-test-qualify/qualifyResponse.ts';
+import { calculateOnboardingMlPrice } from '../_shared/onboardingPrice.ts';
 
 const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' };
 const reply = (body: Record<string, unknown>, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json' } });
@@ -34,7 +35,7 @@ Deno.serve(async (req) => {
     if (profileError || profile?.role !== 'reseller') return reply({ error: 'Acesso restrito ao parceiro' }, 403);
     const body = await req.json().catch(() => ({}));
     const action = typeof body?.action === 'string' ? body.action : 'state';
-    if (!['state', 'personal', 'group', 'join', 'advance'].includes(action)) return reply({ error: 'Ação inválida' }, 400);
+    if (!['state', 'personal', 'group', 'join', 'advance', 'catalog', 'import_one', 'store_products', 'price_one'].includes(action)) return reply({ error: 'Ação inválida' }, 400);
 
     const { data: config, error: configError } = await db.from('onboarding_journey_config')
       .select('steps, qualify_trigger_url, enabled, audience, activated_at').eq('id', 1).single();
@@ -53,6 +54,73 @@ Deno.serve(async (req) => {
     const current = steps[journey.step_index]?.id;
     const state = () => reply({ available: true, journey, profile: { name: [profile.first_name, profile.last_name].filter(Boolean).join(' '), email: user.email ?? '', phone: profile.phone ?? '', cpf: profile.cpf ?? '' } });
     if (action === 'state' || journey.completed_at) return state();
+
+    const top10 = async () => {
+      const { data: feature, error: featureError } = await db.from('features').select('id').eq('slug', 'top_10_produtos').maybeSingle();
+      if (featureError || !feature) throw new Error('Top 10 não configurado');
+      const { data: rows, error: rowsError } = await db.from('feature_produtos')
+        .select('produto_id, ordem').eq('feature_id', feature.id).eq('ativo', true).order('ordem', { ascending: true }).limit(10);
+      if (rowsError || !rows?.length) throw new Error('Nenhum produto Top 10 está disponível');
+      const ids = rows.map(row => row.produto_id);
+      const { data: products, error: productsError } = await db.from('products')
+        .select('id, name, sku, price, main_image_url, image_url, active').in('id', ids).eq('active', true);
+      if (productsError || !products) throw new Error('Não foi possível carregar os produtos Top 10');
+      const map = new Map(products.map(product => [product.id, product]));
+      return ids.map(id => map.get(id)).filter((product): product is NonNullable<typeof product> => !!product);
+    };
+
+    if (action === 'catalog' || action === 'import_one') {
+      if (current !== 'import-top10') return reply({ error: 'Etapa de importação indisponível' }, 409);
+      const products = await top10();
+      if (action === 'catalog') {
+        const { data: imported, error } = await db.from('reseller_products').select('product_id').eq('reseller_id', user.id).eq('active', true)
+          .in('product_id', products.map(product => product.id));
+        if (error) return reply({ error: 'Não foi possível verificar os produtos da loja' }, 500);
+        const importedIds = new Set((imported ?? []).map(item => item.product_id));
+        return reply({ products: products.map(product => ({ ...product, imported: importedIds.has(product.id) })) });
+      }
+      const productId = typeof body.product_id === 'string' ? body.product_id : '';
+      if (!products.some(product => product.id === productId)) return reply({ error: 'Produto não pertence ao Top 10 ativo' }, 400);
+      const { count, error: countError } = await db.from('reseller_products').select('id', { count: 'exact', head: true }).eq('reseller_id', user.id);
+      if (countError) return reply({ error: 'Não foi possível verificar a loja' }, 500);
+      const { error: insertError } = await db.from('reseller_products').upsert({ reseller_id: user.id, product_id: productId, active: true, position: (count ?? 0) + 1 },
+        { onConflict: 'reseller_id,product_id', ignoreDuplicates: true });
+      if (insertError) return reply({ error: 'Não foi possível importar o produto' }, 500);
+      const { error: activateError } = await db.from('reseller_products').update({ active: true })
+        .eq('reseller_id', user.id).eq('product_id', productId);
+      if (activateError) return reply({ error: 'Não foi possível ativar o produto na loja' }, 500);
+      return reply({ imported: true, product_id: productId });
+    }
+
+    if (action === 'store_products' || action === 'price_one') {
+      if (current !== 'publish-ml') return reply({ error: 'Etapa de publicação indisponível' }, 409);
+      const { data: storeRows, error: storeError } = await db.from('reseller_products')
+        .select('product_id, custom_price').eq('reseller_id', user.id).eq('active', true).order('position', { ascending: true });
+      if (storeError || !storeRows?.length) return reply({ error: 'Sua loja não possui produtos para publicar' }, 409);
+      const ids = storeRows.map(row => row.product_id);
+      if (action === 'price_one') {
+        const productId = typeof body.product_id === 'string' ? body.product_id : '';
+        if (!ids.includes(productId)) return reply({ error: 'Produto não pertence à sua loja' }, 400);
+        const { data: product, error: productError } = await db.from('products').select('price').eq('id', productId).single();
+        const basePrice = Number(product?.price);
+        if (productError || !Number.isFinite(basePrice) || basePrice <= 0) return reply({ error: 'Produto sem preço base válido' }, 409);
+        const price = calculateOnboardingMlPrice(basePrice);
+        const { error: priceError } = await db.from('reseller_products').update({ custom_price: price })
+          .eq('reseller_id', user.id).eq('product_id', productId).eq('active', true);
+        if (priceError) return reply({ error: 'Não foi possível definir a margem do produto' }, 500);
+        return reply({ product_id: productId, price, margin: 30 });
+      }
+      const { data: products, error: productError } = await db.from('products')
+        .select('id, name, sku, price, main_image_url, image_url').in('id', ids);
+      const { data: published, error: publishedError } = await db.from('mercadolivre_published_products')
+        .select('product_id, status, permalink').eq('user_id', user.id).in('product_id', ids);
+      if (productError || publishedError) return reply({ error: 'Não foi possível carregar os produtos para publicação' }, 500);
+      const productMap = new Map((products ?? []).map(product => [product.id, product]));
+      const publishedMap = new Map((published ?? []).map(item => [item.product_id, item]));
+      return reply({ products: storeRows.map(row => ({ ...productMap.get(row.product_id), id: row.product_id,
+        custom_price: row.custom_price, published: publishedMap.get(row.product_id)?.status === 'published',
+        permalink: publishedMap.get(row.product_id)?.permalink ?? null })) });
+    }
 
     if (action === 'personal') {
       if (current !== 'personal-data') return reply({ error: 'Esta etapa já foi concluída' }, 409);
@@ -137,9 +205,20 @@ Deno.serve(async (req) => {
       if (!connected.data?.length) return reply({ error: 'Conecte sua conta do Mercado Livre para avançar' }, 409);
     }
     if (current === 'publish-ml') {
-      const published = await db.from('mercadolivre_published_products').select('id').eq('user_id', user.id).eq('status', 'published').limit(1);
+      const { data: storeRows, error: storeError } = await db.from('reseller_products').select('product_id').eq('reseller_id', user.id).eq('active', true);
+      if (storeError || !storeRows?.length) return reply({ error: 'Sua loja não possui produtos para publicar' }, 409);
+      const published = await db.from('mercadolivre_published_products').select('product_id').eq('user_id', user.id).eq('status', 'published')
+        .in('product_id', storeRows.map(row => row.product_id));
       if (published.error) return reply({ error: 'Não foi possível verificar os anúncios publicados' }, 500);
-      if (!published.data?.length) return reply({ error: 'Publique ao menos um produto no Mercado Livre para avançar' }, 409);
+      if (new Set((published.data ?? []).map(item => item.product_id)).size < storeRows.length) return reply({ error: 'Publique todos os produtos da loja no Mercado Livre para avançar' }, 409);
+    }
+    if (current === 'import-top10') {
+      const products = await top10();
+      const imported = await db.from('reseller_products').select('product_id').eq('reseller_id', user.id).eq('active', true)
+        .in('product_id', products.map(product => product.id));
+      if (imported.error || new Set((imported.data ?? []).map(item => item.product_id)).size < products.length) {
+        return reply({ error: 'Importe todos os produtos Top 10 antes de avançar' }, 409);
+      }
     }
     const next = journey.step_index + 1;
     const saved = await db.from('partner_onboarding_journey').update({ step_index: next, ...(next >= steps.length ? { completed_at: new Date().toISOString() } : {}) })

@@ -11,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { BetaWarningDialog } from '@/components/integrations/BetaWarningDialog';
+import { MercadoLivreConnectionCard } from '@/components/reseller/MercadoLivreConnectionCard';
+import { mercadoLivreAuthUrl } from '@/lib/mercadoLivreAuth';
 import { useMarketplaceCredentials } from '@/hooks/useMarketplaceCredentials';
 import { useToast } from '@/hooks/use-toast';
 import MlAnuncios from './MlAnuncios';
@@ -117,16 +119,12 @@ const LojafyIntegra = () => {
     if (!isConnected && activeTab !== 'integracoes') {
       setSearchParams({});
     }
-  }, [isConnected, activeTab]);
+  }, [isConnected, activeTab, setSearchParams]);
 
   const getMercadoLivreAuthUrl = () => {
     const userId = user?.id || '';
     const clientId = credentials?.client_id || import.meta.env.VITE_ML_CLIENT_ID || '2003351424267574';
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-    const cleanSupabaseUrl = supabaseUrl.replace(/\/$/, '');
-    const redirectUri = `${cleanSupabaseUrl}/functions/v1/ml-oauth-callback`;
-    const state = `${userId}:${redirectUri}`;
-    return `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
+    return mercadoLivreAuthUrl(userId, clientId);
   };
 
   const handleConfirmBeta = () => {
@@ -207,38 +205,7 @@ const LojafyIntegra = () => {
           <div>
             <h2 className="text-xl font-semibold mb-4">Marketplaces Disponíveis</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <Card className={isConnected ? 'border-green-500/50' : 'border-green-500/50'}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="p-3 rounded-lg bg-yellow-100">
-                      <Store className="h-8 w-8 text-yellow-600" />
-                    </div>
-                    {isConnected ? (
-                      <Badge className="bg-green-500 hover:bg-green-600 gap-1">
-                        <CheckCircle2 className="h-3 w-3" /> Conectado
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-green-500 hover:bg-green-600">Disponível</Badge>
-                    )}
-                  </div>
-                  <CardTitle className="mt-4">Mercado Livre</CardTitle>
-                  <CardDescription>
-                    {isConnected
-                      ? `Conta #${mlIntegration?.ml_user_id} conectada`
-                      : 'Integre com o maior marketplace da América Latina'}
-                  </CardDescription>
-                </CardHeader>
-                <CardFooter>
-                  <Button
-                    className="w-full"
-                    variant={isConnected ? 'outline' : 'default'}
-                    onClick={() => setShowBetaWarning(true)}
-                  >
-                    <Link2 className="mr-2 h-4 w-4" />
-                    {isConnected ? 'Reconectar' : 'Integrar'}
-                  </Button>
-                </CardFooter>
-              </Card>
+              <MercadoLivreConnectionCard accountId={mlIntegration?.ml_user_id} onConnect={() => setShowBetaWarning(true)} />
 
               {comingSoonMarketplaces.map((marketplace) => (
                 <Card key={marketplace.name} className="opacity-75 hover:opacity-90 transition-opacity">
