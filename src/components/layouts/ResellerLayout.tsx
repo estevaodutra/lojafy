@@ -32,7 +32,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useResellerStore } from '@/hooks/useResellerStore';
 import { PremiumBadge } from '@/components/premium/PremiumBadge';
-import { WelcomeResellerModal } from '@/components/reseller/WelcomeResellerModal';
+import { PartnerOnboardingDialog } from '@/components/reseller/PartnerOnboardingDialog';
 import {
   LojafySidebarHeader,
   LojafySidebarItem,
@@ -199,7 +199,7 @@ const ResellerSidebar = () => {
 export const ResellerLayout: React.FC = () => {
   return (
     <SidebarProvider>
-      <WelcomeResellerModal />
+      <PartnerOnboardingDialog />
       <div className="min-h-screen flex w-full overflow-x-hidden min-w-0 bg-background">
         <ResellerSidebar />
         <main className="flex-1 min-w-0 flex flex-col overflow-x-hidden">

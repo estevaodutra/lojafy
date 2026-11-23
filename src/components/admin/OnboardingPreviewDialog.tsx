@@ -59,6 +59,7 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
   const [personal, setPersonal] = useState<PersonalData>(emptyPersonal);
   const [group, setGroup] = useState<GroupData>(emptyGroup);
   const [groupStatus, setGroupStatus] = useState<GroupStatus>('idle');
+  const [groupSkipped, setGroupSkipped] = useState(false);
   const [groupError, setGroupError] = useState('');
   const [qualifyDebug, setQualifyDebug] = useState<QualifyDebug | null>(null);
   const [joinedGroup, setJoinedGroup] = useState(false);
@@ -76,6 +77,7 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
     setPersonal({ ...emptyPersonal });
     setGroup({ ...emptyGroup });
     setGroupStatus('idle');
+    setGroupSkipped(false);
     setGroupError('');
     setQualifyDebug(null);
     setJoinedGroup(false);
@@ -151,7 +153,7 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
     }
     setPersonal(data);
     setCompleted(current => current.includes('personal-data') ? current : [...current, 'personal-data']);
-    if (groupIndex >= 0) await requestGroup(data);
+    if (groupIndex >= 0) setSelectedIndex(groupIndex);
     else setSelectedIndex(Math.min(selectedIndex + 1, steps.length - 1));
   };
 
@@ -165,11 +167,11 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
 
   const completeStep = () => {
     if (!step) return;
-    if (step.id === 'join-group' && (groupStatus !== 'ready' || !joinedGroup)) {
+    if (step.id === 'join-group' && !groupSkipped && (groupStatus !== 'ready' || !joinedGroup)) {
       toast({ title: 'Entre no grupo e confirme para avançar', variant: 'destructive' });
       return;
     }
-    if (step.id === 'qualify-group' && groupStatus !== 'ready') return;
+    if (step.id === 'qualify-group' && groupStatus !== 'ready' && !groupSkipped) return;
     setCompleted(current => current.includes(step.id) ? current : [...current, step.id]);
     if (selectedIndex < steps.length - 1) setSelectedIndex(selectedIndex + 1);
     else toast({ title: 'Prévia concluída', description: 'Os dados da Lojafy não foram alterados.' });
@@ -191,7 +193,7 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
         </DialogHeader>
 
         <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-          A etapa da Qualify envia uma requisição real e pode criar um grupo. Este teste não cria conta nem publica anúncios na Lojafy.
+          A etapa da Qualify envia uma requisição real e pode criar um grupo. Use “Pular criação do grupo” para testar as próximas etapas sem criar outro. Este teste não cria conta nem publica anúncios na Lojafy.
         </div>
 
         {!setupComplete ? (
@@ -248,18 +250,21 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
 
                   {step.id === 'qualify-group' && (
                     <div className="space-y-4">
+                      {groupStatus === 'idle' && !groupSkipped && <Button onClick={() => void requestGroup(personal)}>Criar grupo na Qualify</Button>}
                       {groupStatus === 'loading' && <div className="flex flex-col items-center gap-3 py-8 text-center" role="status"><Loader2 className="h-9 w-9 animate-spin text-primary" /><p className="font-medium">Criando grupo na Qualify...</p><p className="text-sm text-muted-foreground">Aguardando o link de convite.</p></div>}
                       {groupStatus === 'pending' && <p className="rounded-md bg-muted p-4 text-sm">A Qualify ainda está criando o grupo. O convite não chegou nesta resposta.</p>}
                       {groupStatus === 'error' && <p className="rounded-md border border-destructive/40 p-4 text-sm text-destructive" role="alert">{groupError}</p>}
                       {(groupStatus === 'pending' || groupStatus === 'error') && <Button variant="outline" onClick={() => void requestGroup(personal)}>Tentar novamente</Button>}
                       {groupStatus === 'ready' && <GroupCard group={group} />}
+                      {groupSkipped && <p className="text-sm text-muted-foreground">Criação do grupo ignorada somente nesta prévia.</p>}
+                      {groupStatus !== 'ready' && !groupSkipped && groupStatus !== 'loading' && <Button variant="outline" onClick={() => { setGroupSkipped(true); setGroupStatus('idle'); setCompleted(current => current.includes('qualify-group') ? current : [...current, 'qualify-group']); setSelectedIndex(joinIndex >= 0 ? joinIndex : Math.min(groupIndex + 1, steps.length - 1)); }}>Pular criação do grupo</Button>}
                       <QualifyPayloadViewer debug={qualifyDebug} />
                     </div>
                   )}
 
                   {step.id === 'join-group' && (
                     <div className="space-y-4">
-                      {groupStatus === 'ready' ? <GroupCard group={group} /> : <p className="text-sm text-muted-foreground">Aguarde a criação do grupo na etapa anterior.</p>}
+                      {groupSkipped ? <p className="text-sm text-muted-foreground">Convite ignorado somente nesta prévia.</p> : groupStatus === 'ready' ? <GroupCard group={group} /> : <p className="text-sm text-muted-foreground">Aguarde a criação do grupo na etapa anterior.</p>}
                       {groupStatus === 'ready' && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={joinedGroup} onChange={event => setJoinedGroup(event.target.checked)} />Confirmo que entrei no grupo</label>}
                       <QualifyPayloadViewer debug={qualifyDebug} />
                     </div>
@@ -273,7 +278,7 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
                     {step.id === 'personal-data' ? (
                       <Button onClick={() => void finishPersonalData(personal)} disabled={groupStatus === 'loading'}>Continuar</Button>
                     ) : step.id === 'qualify-group' ? (
-                      <Button disabled={groupStatus !== 'ready'} onClick={completeStep}>Continuar</Button>
+                      <Button disabled={groupStatus !== 'ready' && !groupSkipped} onClick={completeStep}>Continuar</Button>
                     ) : (
                       <Button onClick={completeStep}>{selectedIndex === steps.length - 1 ? 'Concluir prévia' : 'Concluir e avançar'}</Button>
                     )}
