@@ -37,18 +37,21 @@ Deno.serve(async (req) => {
     if (!['state', 'personal', 'group', 'join', 'advance'].includes(action)) return reply({ error: 'Ação inválida' }, 400);
 
     const { data: config, error: configError } = await db.from('onboarding_journey_config')
-      .select('steps, qualify_trigger_url').eq('id', 1).single();
+      .select('steps, qualify_trigger_url, enabled, audience, activated_at').eq('id', 1).single();
     if (configError || !Array.isArray(config?.steps)) return reply({ error: 'Roteiro indisponível' }, 503);
-    const { error: insertError } = await db.from('partner_onboarding_journey')
-      .upsert({ user_id: user.id, steps: config.steps }, { onConflict: 'user_id', ignoreDuplicates: true });
-    if (insertError) return reply({ error: 'Não foi possível iniciar o onboarding' }, 500);
+    if (!config.enabled) return action === 'state' ? reply({ available: false }) : reply({ error: 'Onboarding inativo' }, 403);
     const load = async () => db.from('partner_onboarding_journey').select('*').eq('user_id', user.id).single();
     const initial = await load();
-    if (initial.error || !initial.data) return reply({ error: 'Não foi possível carregar o onboarding' }, 500);
+    if (initial.error || !initial.data) return action === 'state' ? reply({ available: false }) : reply({ error: 'Onboarding indisponível para este parceiro' }, 403);
     let journey = initial.data;
+    const started = journey.step_index > 0 || journey.group_status !== 'idle';
+    const newPartner = !!config.activated_at && new Date(journey.created_at).getTime() >= new Date(config.activated_at).getTime();
+    if (config.audience === 'new' && !started && !newPartner) {
+      return action === 'state' ? reply({ available: false }) : reply({ error: 'Onboarding disponível somente para novos parceiros' }, 403);
+    }
     const steps = journey.steps as Array<{ id: string }>;
     const current = steps[journey.step_index]?.id;
-    const state = () => reply({ journey, profile: { name: [profile.first_name, profile.last_name].filter(Boolean).join(' '), email: user.email ?? '', phone: profile.phone ?? '', cpf: profile.cpf ?? '' } });
+    const state = () => reply({ available: true, journey, profile: { name: [profile.first_name, profile.last_name].filter(Boolean).join(' '), email: user.email ?? '', phone: profile.phone ?? '', cpf: profile.cpf ?? '' } });
     if (action === 'state' || journey.completed_at) return state();
 
     if (action === 'personal') {

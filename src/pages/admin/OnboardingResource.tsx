@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, Eye, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Eye, Plus, Save, Settings2, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { OnboardingPreviewDialog } from '@/components/admin/OnboardingPreviewDialog';
@@ -32,6 +34,12 @@ export default function OnboardingResource() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+  const [audience, setAudience] = useState<'all' | 'new'>('new');
+  const [draftEnabled, setDraftEnabled] = useState(false);
+  const [draftAudience, setDraftAudience] = useState<'all' | 'new'>('new');
   const [qualifyUrl, setQualifyUrl] = useState('');
   const [steps, setSteps] = useState<JourneyStep[]>([]);
 
@@ -40,7 +48,7 @@ export default function OnboardingResource() {
     async function load() {
       const { data, error } = await supabase
         .from('onboarding_journey_config')
-        .select('qualify_trigger_url, steps')
+        .select('qualify_trigger_url, steps, enabled, audience')
         .eq('id', 1)
         .single();
 
@@ -51,6 +59,8 @@ export default function OnboardingResource() {
       } else {
         setQualifyUrl(data.qualify_trigger_url);
         setSteps(Array.isArray(data.steps) ? data.steps.filter(isJourneyStep) : []);
+        setEnabled(data.enabled);
+        setAudience(data.audience === 'all' ? 'all' : 'new');
       }
       setLoading(false);
     }
@@ -110,6 +120,28 @@ export default function OnboardingResource() {
     }
   };
 
+  const openSettings = () => {
+    setDraftEnabled(enabled);
+    setDraftAudience(audience);
+    setSettingsOpen(true);
+  };
+
+  const saveSettings = async () => {
+    setSettingsSaving(true);
+    const { data, error } = await supabase.from('onboarding_journey_config')
+      .update({ enabled: draftEnabled, audience: draftAudience })
+      .eq('id', 1).select('enabled, audience').single();
+    setSettingsSaving(false);
+    if (error || !data) {
+      toast({ title: 'Não foi possível salvar a ativação', description: error?.message, variant: 'destructive' });
+      return;
+    }
+    setEnabled(data.enabled);
+    setAudience(data.audience === 'all' ? 'all' : 'new');
+    setSettingsOpen(false);
+    toast({ title: data.enabled ? 'Onboarding ativado' : 'Onboarding desativado' });
+  };
+
   if (loading) return <div className="p-6 text-sm text-muted-foreground">Carregando roteiro...</div>;
   if (loadError) return (
     <div className="mx-auto max-w-4xl p-6 space-y-3">
@@ -128,8 +160,10 @@ export default function OnboardingResource() {
         <div>
           <h1 className="text-2xl font-semibold">Roteiro de onboarding</h1>
           <p className="mt-1 text-sm text-muted-foreground">Defina a ordem e o conteúdo de cada etapa da ativação.</p>
+          <p className="mt-2 text-sm font-medium">{enabled ? `Ativo para ${audience === 'all' ? 'todos os parceiros' : 'novos parceiros'}` : 'Inativo para parceiros'}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={openSettings}><Settings2 className="mr-2 h-4 w-4" />Configurar ativação</Button>
           <Button variant="outline" onClick={() => setPreviewOpen(true)}><Eye className="mr-2 h-4 w-4" />Visualizar e testar</Button>
           <Button onClick={save} disabled={saving}><Save className="mr-2 h-4 w-4" />{saving ? 'Salvando...' : 'Salvar roteiro'}</Button>
         </div>
@@ -180,6 +214,26 @@ export default function OnboardingResource() {
 
       <div className="flex justify-end"><Button onClick={save} disabled={saving}><Save className="mr-2 h-4 w-4" />Salvar roteiro</Button></div>
       <OnboardingPreviewDialog open={previewOpen} onOpenChange={setPreviewOpen} steps={steps} />
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Configurar ativação do onboarding</DialogTitle>
+            <DialogDescription>Escolha quem verá a jornada real. A prévia do Super Admin continua disponível.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5">
+            <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+              <div><Label htmlFor="onboarding-enabled" className="text-base">Onboarding ativo</Label><p className="mt-1 text-sm text-muted-foreground">Quando inativo, nenhum parceiro verá ou avançará na jornada.</p></div>
+              <Switch id="onboarding-enabled" checked={draftEnabled} onCheckedChange={setDraftEnabled} />
+            </div>
+            <fieldset disabled={!draftEnabled} className="space-y-3 disabled:opacity-50">
+              <legend className="mb-2 font-medium">Quem verá o onboarding</legend>
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-4"><input type="radio" name="onboarding-audience" value="new" checked={draftAudience === 'new'} onChange={() => setDraftAudience('new')} className="mt-1" /><span><strong>Somente novos parceiros</strong><span className="mt-1 block text-sm text-muted-foreground">Parceiros que entrarem após a ativação. Quem já começou mantém o progresso.</span></span></label>
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-4"><input type="radio" name="onboarding-audience" value="all" checked={draftAudience === 'all'} onChange={() => setDraftAudience('all')} className="mt-1" /><span><strong>Todos os parceiros</strong><span className="mt-1 block text-sm text-muted-foreground">Inclui parceiros que já estavam cadastrados.</span></span></label>
+            </fieldset>
+            <div className="flex justify-end"><Button onClick={() => void saveSettings()} disabled={settingsSaving}>{settingsSaving ? 'Salvando...' : 'Salvar configuração'}</Button></div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

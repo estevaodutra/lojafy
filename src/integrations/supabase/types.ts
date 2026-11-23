@@ -16,18 +16,27 @@ export type Database = {
     Tables: {
       onboarding_journey_config: {
         Row: {
+          activated_at: string | null
+          audience: string
+          enabled: boolean
           id: number
           qualify_trigger_url: string
           steps: Json
           updated_at: string
         }
         Insert: {
+          activated_at?: string | null
+          audience?: string
+          enabled?: boolean
           id?: number
           qualify_trigger_url?: string
           steps?: Json
           updated_at?: string
         }
         Update: {
+          activated_at?: string | null
+          audience?: string
+          enabled?: boolean
           id?: number
           qualify_trigger_url?: string
           steps?: Json

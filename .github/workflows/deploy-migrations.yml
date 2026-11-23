@@ -61,6 +61,9 @@ jobs:
           echo "==> aplicando jornada persistente do parceiro"
           $DC exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
             < "/root/lojafy-deploy/migrations/20261123120000_partner_onboarding_journey.sql"
+          echo "==> aplicando configurações de ativação do onboarding"
+          $DC exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < "/root/lojafy-deploy/migrations/20261123150000_onboarding_activation_settings.sql"
 
           echo "==> verificando tabela do onboarding"
           $DC exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \

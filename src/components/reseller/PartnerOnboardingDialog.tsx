@@ -13,7 +13,8 @@ import { cleanPhone, validatePhone } from '@/lib/phone';
 type Step = { id: string; title: string; description: string; reference_url: string };
 type Journey = { steps: Step[]; step_index: number; group_status: 'idle' | 'requested' | 'ready'; group_title: string | null; group_description: string | null; group_photo_url: string | null; group_invite_url: string | null; completed_at: string | null };
 type Profile = { name: string; email: string; phone: string; cpf: string };
-type State = { journey: Journey; profile: Profile };
+type State = { available: true; journey: Journey; profile: Profile };
+type StateResponse = State | { available: false };
 
 function validUrl(value: string | null) {
   try { return !!value && new URL(value).protocol === 'https:'; } catch { return false; }
@@ -23,13 +24,14 @@ export function PartnerOnboardingDialog() {
   const { user, profile } = useAuth();
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<State | null>(null);
+  const [available, setAvailable] = useState(false);
   const [form, setForm] = useState<Profile>({ name: '', email: '', phone: '', cpf: '' });
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [joined, setJoined] = useState(false);
 
-  const invoke = useCallback(async (action: string, extra: Record<string, unknown> = {}): Promise<State> => {
+  const invoke = useCallback(async (action: string, extra: Record<string, unknown> = {}): Promise<StateResponse> => {
     const { data, error: functionError } = await supabase.functions.invoke('partner-onboarding', { body: { action, ...extra } });
     if (functionError) {
       let message = functionError.message;
@@ -39,8 +41,9 @@ export function PartnerOnboardingDialog() {
       }
       throw new Error(message);
     }
+    if (data?.available === false) return { available: false };
     if (!data?.journey) throw new Error('O servidor não retornou o progresso do onboarding.');
-    return data as State;
+    return { ...data, available: true } as State;
   }, []);
 
   const refresh = useCallback(async () => {
@@ -48,11 +51,19 @@ export function PartnerOnboardingDialog() {
     setLoading(true);
     try {
       const result = await invoke('state');
+      if (!result.available) {
+        setAvailable(false);
+        setState(null);
+        setOpen(false);
+        return;
+      }
+      setAvailable(true);
       setState(result);
       setForm(result.profile);
       if (!result.journey.completed_at) setOpen(true);
       setError('');
     } catch (reason) {
+      setAvailable(true);
       setError(reason instanceof Error ? reason.message : 'Não foi possível carregar o onboarding.');
       setOpen(true);
     } finally { setLoading(false); }
@@ -66,12 +77,14 @@ export function PartnerOnboardingDialog() {
     setError('');
     try {
       const result = await invoke(action, extra);
+      if (!result.available) { setAvailable(false); setOpen(false); return; }
       setState(result);
       if (result.journey.completed_at) setOpen(false);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível avançar.');
       const fresh = await invoke('state').catch(() => null);
-      if (fresh) setState(fresh);
+      if (fresh?.available) setState(fresh);
+      if (fresh && !fresh.available) { setAvailable(false); setOpen(false); }
     } finally { setBusy(false); }
   };
 
@@ -88,19 +101,22 @@ export function PartnerOnboardingDialog() {
     setError('');
     try {
       const saved = await invoke('personal', { name, phone, cpf });
+      if (!saved.available) { setAvailable(false); setOpen(false); return; }
       setState(saved);
       if (saved.journey.steps[saved.journey.step_index]?.id === 'qualify-group') {
         const groupResult = await invoke('group');
-        setState(groupResult);
+        if (groupResult.available) setState(groupResult);
+        else { setAvailable(false); setOpen(false); }
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Não foi possível avançar.');
       const fresh = await invoke('state').catch(() => null);
-      if (fresh) setState(fresh);
+      if (fresh?.available) setState(fresh);
+      if (fresh && !fresh.available) { setAvailable(false); setOpen(false); }
     } finally { setBusy(false); }
   };
 
-  if (!user || profile?.role !== 'reseller') return null;
+  if (!user || profile?.role !== 'reseller' || !available) return null;
   const journey = state?.journey;
   const steps = journey?.steps ?? [];
   const index = journey?.step_index ?? 0;
