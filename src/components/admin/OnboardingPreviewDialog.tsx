@@ -232,26 +232,26 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
         ) : (
           <>
             <div className="space-y-2">
-              <div className="flex justify-between text-sm"><span>Progresso da prévia</span><span>{completed.length} de {steps.length} etapas</span></div>
-              <Progress value={progress} />
+              <div className="flex justify-between text-sm"><span>{device === 'mobile' ? 'Etapa atual' : 'Progresso da prévia'}</span><span>{device === 'mobile' ? `${Math.min(selectedIndex + 1, steps.length)} de ${steps.length}` : `${completed.length} de ${steps.length} etapas`}</span></div>
+              <Progress value={device === 'mobile' && steps.length ? Math.min((selectedIndex + 1) / steps.length * 100, 100) : progress} />
             </div>
 
             {steps.length === 0 ? <p className="py-10 text-center text-muted-foreground">Adicione etapas ao roteiro para iniciar a prévia.</p> : (
               <div className={`grid gap-5 ${device === 'mobile' ? 'grid-cols-1' : 'md:grid-cols-[220px_minmax(0,1fr)]'}`}>
-                <nav aria-label="Etapas do onboarding" className="space-y-1">
+                <nav aria-label="Etapas do onboarding" className={`${device === 'mobile' ? 'hidden' : 'block'} space-y-1`}>
                   {steps.map((item, index) => (
                     <button key={item.id} type="button" onClick={() => { if (item.id !== 'qualify-group' || completed.includes('personal-data')) setSelectedIndex(index); }}
                       className={`${item.id === 'personal-data' ? device === 'mobile' ? 'hidden' : 'hidden md:flex' : 'flex'} w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm ${index === selectedIndex ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}>
                       {completed.includes(item.id) ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <span className="flex h-4 w-4 shrink-0 items-center justify-center text-xs">{index + 1}</span>}
-                      <span>{item.title || `Etapa ${index + 1}`}</span>
+                      <span>{item.id === 'qualify-group' ? 'Criar Grupo' : item.title || `Etapa ${index + 1}`}</span>
                     </button>
                   ))}
                 </nav>
 
                 <section className="min-w-0 space-y-5 rounded-lg border p-4">
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Etapa {selectedIndex + 1} de {steps.length}</p>
-                    <h3 className="mt-1 text-xl font-semibold">{step.title || 'Nova etapa'}</h3>
+                    {device === 'desktop' && <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Etapa {selectedIndex + 1} de {steps.length}</p>}
+                    <h3 className="mt-1 text-xl font-semibold">{step.id === 'qualify-group' ? 'Criar Grupo' : step.title || 'Nova etapa'}</h3>
                     {step.description && <p className="mt-2 text-sm text-muted-foreground">{step.description}</p>}
                   </div>
 
@@ -269,9 +269,9 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
 
                   {step.id === 'qualify-group' && (
                     <div className="space-y-4">
-                      {groupStatus === 'idle' && !groupSkipped && <Button onClick={() => void requestGroup(personal)}>Criar grupo na Qualify</Button>}
-                      {groupStatus === 'loading' && <div className="flex flex-col items-center gap-3 py-8 text-center" role="status"><Loader2 className="h-9 w-9 animate-spin text-primary" /><p className="font-medium">Criando grupo na Qualify...</p><p className="text-sm text-muted-foreground">Aguardando o link de convite.</p></div>}
-                      {groupStatus === 'pending' && <p className="rounded-md bg-muted p-4 text-sm">A Qualify ainda está criando o grupo. O convite não chegou nesta resposta.</p>}
+                      {groupStatus === 'idle' && !groupSkipped && <Button onClick={() => void requestGroup(personal)}>Criar Grupo</Button>}
+                      {groupStatus === 'loading' && <div className="flex flex-col items-center gap-3 py-8 text-center" role="status"><Loader2 className="h-9 w-9 animate-spin text-primary" /><p className="font-medium">Criando grupo...</p><p className="text-sm text-muted-foreground">Aguardando o link de convite.</p></div>}
+                      {groupStatus === 'pending' && <p className="rounded-md bg-muted p-4 text-sm">Seu grupo ainda está sendo criado. O convite não chegou nesta resposta.</p>}
                       {groupStatus === 'error' && <p className="rounded-md border border-destructive/40 p-4 text-sm text-destructive" role="alert">{groupError}</p>}
                       {(groupStatus === 'pending' || groupStatus === 'error') && <Button variant="outline" onClick={() => void requestGroup(personal)}>Tentar novamente</Button>}
                       {groupStatus === 'ready' && <GroupCard group={group} />}

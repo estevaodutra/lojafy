@@ -161,13 +161,13 @@ export function PartnerOnboardingDialog() {
         {loading && !journey ? <div className="flex justify-center py-12"><Loader2 className="h-7 w-7 animate-spin" /></div> :
           !journey ? <div className="space-y-3"><p role="alert" className="text-sm text-destructive">{error || 'Onboarding indisponível.'}</p><Button variant="outline" onClick={() => void refresh()}>Tentar novamente</Button></div> :
           <div className="space-y-5">
-            <div className="space-y-2"><div className="flex justify-between text-sm"><span>Progresso</span><span>{Math.min(index, steps.length)} de {steps.length} etapas</span></div><Progress value={steps.length ? Math.min(index / steps.length * 100, 100) : 0} /></div>
+            <div className="space-y-2"><div className="flex justify-between text-sm"><span className="md:hidden">Etapa atual</span><span className="hidden md:inline">Progresso</span><span className="md:hidden">{Math.min(index + 1, steps.length)} de {steps.length}</span><span className="hidden md:inline">{Math.min(index, steps.length)} de {steps.length} etapas</span></div><Progress className="md:hidden" value={steps.length ? Math.min((index + 1) / steps.length * 100, 100) : 0} /><Progress className="hidden md:block" value={steps.length ? Math.min(index / steps.length * 100, 100) : 0} /></div>
             <div className="grid gap-5 md:grid-cols-[210px_minmax(0,1fr)]">
-              <ol className="space-y-1" aria-label="Etapas do onboarding">{steps.map((item, position) => <li key={item.id} className={`${item.id === 'personal-data' ? 'hidden md:flex' : 'flex'} items-center gap-2 rounded-md px-3 py-2 text-sm ${position === index ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
-                {position < index ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <span className="w-4 text-center">{position + 1}</span>}<span>{item.title}</span>
+              <ol className="hidden space-y-1 md:block" aria-label="Etapas do onboarding">{steps.map((item, position) => <li key={item.id} className={`${item.id === 'personal-data' ? 'hidden md:flex' : 'flex'} items-center gap-2 rounded-md px-3 py-2 text-sm ${position === index ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
+                {position < index ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <span className="w-4 text-center">{position + 1}</span>}<span>{item.id === 'qualify-group' ? 'Criar Grupo' : item.title}</span>
               </li>)}</ol>
               <section className="min-w-0 space-y-4 rounded-lg border p-4">
-                {step ? <><div><p className="text-xs text-muted-foreground">ETAPA {index + 1} DE {steps.length}</p><h3 className="mt-1 text-xl font-semibold">{step.title}</h3><p className="mt-2 text-sm text-muted-foreground">{step.description}</p></div>
+                {step ? <><div><p className="hidden text-xs text-muted-foreground md:block">ETAPA {index + 1} DE {steps.length}</p><h3 className="mt-1 text-xl font-semibold">{step.id === 'qualify-group' ? 'Criar Grupo' : step.title}</h3><p className="mt-2 text-sm text-muted-foreground">{step.description}</p></div>
                   {step.id === 'personal-data' && <div className="grid gap-4 sm:grid-cols-2">
                     {!missing.name && <p className="sm:col-span-2 text-sm">Nome: {state.profile.name}</p>}
                     {missing.name && <div className="space-y-2 sm:col-span-2"><Label>Nome completo</Label><Input value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} /></div>}
@@ -178,7 +178,7 @@ export function PartnerOnboardingDialog() {
                     <p className="sm:col-span-2 text-sm text-muted-foreground">Email: {state.profile.email}</p>
                   </div>}
                   {step.id === 'qualify-group' && <div className="space-y-3">
-                    {busy && <div role="status" className="flex items-center gap-2"><Loader2 className="h-5 w-5 animate-spin" />Criando seu grupo na Qualify...</div>}
+                    {busy && <div role="status" className="flex items-center gap-2"><Loader2 className="h-5 w-5 animate-spin" />Criando seu grupo...</div>}
                     {journey.group_status === 'requested' && !busy && <p className="rounded-md bg-muted p-3 text-sm">A criação do grupo já foi solicitada. Aguarde a confirmação ou contate o suporte. Uma nova solicitação não será enviada.</p>}
                     {journey.group_status === 'idle' && <p className="text-sm text-muted-foreground">Ao continuar, criaremos seu grupo uma única vez.</p>}
                   </div>}
@@ -194,7 +194,7 @@ export function PartnerOnboardingDialog() {
                   {validUrl(step.reference_url) && <Button variant="outline" asChild><a href={step.reference_url} target="_blank" rel="noopener noreferrer">Abrir aula ou referência<ExternalLink className="ml-2 h-4 w-4" /></a></Button>}
                   {error && <p role="alert" className="rounded-md border border-destructive/40 p-3 text-sm text-destructive">{error}</p>}
                   {step.id !== 'import-top10' && step.id !== 'publish-ml' && <div className="border-t pt-4">{step.id === 'personal-data' ? <Button disabled={busy} onClick={() => void completePersonal()}>Salvar e continuar</Button> :
-                    step.id === 'qualify-group' ? <Button disabled={busy || journey.group_status !== 'idle'} onClick={() => void run('group')}>Criar grupo e continuar</Button> :
+                    step.id === 'qualify-group' ? <Button disabled={busy || journey.group_status !== 'idle'} onClick={() => void run('group')}>Criar Grupo</Button> :
                     step.id === 'join-group' ? <Button disabled={busy || !joined} onClick={() => void run('join')}>Confirmar entrada e continuar</Button> :
                     <Button disabled={busy || (step.id === 'connect-ml' && !mlIntegration)} onClick={() => void run('advance')}>{index === steps.length - 1 ? 'Concluir onboarding' : 'Concluir e avançar'}</Button>}</div>}
                 </> : <p>Onboarding concluído.</p>}

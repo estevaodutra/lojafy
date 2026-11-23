@@ -23,7 +23,7 @@ VALUES (
   'https://qualify-supabase.d2x.site/functions/v1/trigger-sequence/63a920e2-8a47-452f-a17f-524926790973',
   $steps$[
     {"id":"personal-data","title":"Completar dados pessoais","description":"Preencher e validar nome, telefone e CPF na Lojafy.","owner":"Parceiro","completion_criteria":"Dados obrigatórios completos e válidos no perfil.","reference_url":""},
-    {"id":"qualify-group","title":"Criar grupo na Qualify","description":"Após validar os dados pessoais, solicitar a criação do grupo por HTTP e aguardar o link do convite.","owner":"Sistema","completion_criteria":"Link de convite retornado pela Qualify e disponível para o parceiro.","reference_url":""},
+    {"id":"qualify-group","title":"Criar Grupo","description":"Depois de validar seus dados pessoais, vamos criar seu grupo e disponibilizar o convite.","owner":"Sistema","completion_criteria":"Link de convite disponível para entrar no grupo.","reference_url":""},
     {"id":"join-group","title":"Entrar no grupo","description":"Abrir o convite recebido da Qualify e registrar a confirmação de entrada.","owner":"Parceiro","completion_criteria":"Entrada confirmada pelo parceiro ou pela Qualify, conforme a integração disponível.","reference_url":""},
     {"id":"connect-ml","title":"Integrar Mercado Livre","description":"Conectar a conta do Mercado Livre à Lojafy.","owner":"Parceiro","completion_criteria":"Integração ativa confirmada na plataforma.","reference_url":""},
     {"id":"import-top10","title":"Importar Top 10","description":"Selecionar e importar os produtos Top 10 elegíveis para a operação do parceiro.","owner":"Parceiro","completion_criteria":"Produtos importados registrados na conta do parceiro.","reference_url":""},

@@ -64,6 +64,9 @@ jobs:
           echo "==> aplicando configurações de ativação do onboarding"
           $DC exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
             < "/root/lojafy-deploy/migrations/20261123150000_onboarding_activation_settings.sql"
+          echo "==> atualizando o nome da etapa de criação do grupo"
+          $DC exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            < "/root/lojafy-deploy/migrations/20261123180000_rename_onboarding_group_step.sql"
 
           echo "==> verificando tabela do onboarding"
           $DC exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
