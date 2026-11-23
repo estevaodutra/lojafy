@@ -13,6 +13,33 @@ function record(value: unknown): Record<string, unknown> | null {
     ? value as Record<string, unknown> : null;
 }
 
+function parseJsonText(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  try { return JSON.parse(value); } catch { return value; }
+}
+
+function findGroupPayload(value: unknown, depth = 0): Record<string, unknown> | null {
+  if (depth > 6) return null;
+  const parsed = parseJsonText(value);
+  if (Array.isArray(parsed)) {
+    for (const item of parsed) {
+      const found = findGroupPayload(item, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+  const object = record(parsed);
+  if (!object) return null;
+  if ('groupName' in object || 'inviteLink' in object || 'invite_url' in object || 'title' in object) return object;
+  for (const key of ['group', 'responseBody', 'body', 'data', 'result', 'output', 'response']) {
+    if (key in object) {
+      const found = findGroupPayload(object[key], depth + 1);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 function httpsUrl(value: unknown, label: string): string {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${label} ausente na resposta da Qualify`);
   let url: URL;
@@ -22,29 +49,22 @@ function httpsUrl(value: unknown, label: string): string {
 }
 
 export function normalizeQualifyResponse(value: unknown): QualifyResult {
-  let parsed = value;
-  if (typeof parsed === 'string') {
-    try { parsed = JSON.parse(parsed); } catch { throw new Error('A Qualify não retornou um objeto JSON'); }
-  }
+  const parsed = parseJsonText(value);
   const envelope = record(parsed);
-  if (!envelope) throw new Error('A Qualify não retornou um objeto JSON');
+  if (!envelope && !Array.isArray(parsed)) throw new Error('A Qualify não retornou um objeto JSON');
 
-  let body: unknown = envelope.responseBody ?? envelope;
-  if (typeof body === 'string') {
-    try { body = JSON.parse(body); } catch { throw new Error('A Qualify retornou responseBody inválido'); }
-  }
-  const payload = record(body);
-  if (!payload) throw new Error('A Qualify não retornou os dados do grupo');
-
-  const statusCode = typeof envelope.statusCode === 'number' ? envelope.statusCode : undefined;
-  if (statusCode === 202 || envelope.status === 'pending' || payload.status === 'pending') return { status: 'pending' };
+  const body = parseJsonText(envelope?.responseBody ?? envelope?.body ?? parsed);
+  const bodyRecord = record(body);
+  const statusCode = typeof envelope?.statusCode === 'number' ? envelope.statusCode :
+    typeof bodyRecord?.statusCode === 'number' ? bodyRecord.statusCode : undefined;
+  if (statusCode === 202 || envelope?.status === 'pending' || bodyRecord?.status === 'pending') return { status: 'pending' };
   if (statusCode && statusCode >= 400) {
-    throw new Error(typeof payload.message === 'string' ? payload.message :
-      typeof payload.error === 'string' ? payload.error : `A Qualify retornou status ${statusCode}`);
+    throw new Error(typeof bodyRecord?.message === 'string' ? bodyRecord.message :
+      typeof bodyRecord?.error === 'string' ? bodyRecord.error : `A Qualify retornou status ${statusCode}`);
   }
 
-  const legacyGroup = record(payload.group);
-  const source = legacyGroup ?? payload;
+  const source = findGroupPayload(parsed);
+  if (!source) throw new Error('A Qualify não retornou os dados do grupo');
   const title = source.groupName ?? source.title;
   if (typeof title !== 'string' || !title.trim()) throw new Error('Nome do grupo ausente na resposta da Qualify');
 

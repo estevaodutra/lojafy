@@ -22,6 +22,7 @@ export type OnboardingPreviewStep = {
 type PersonalData = { name: string; email: string; phone: string; cpf: string };
 type GroupData = { id: string; title: string; description: string; photo_url: string; invite_url: string };
 type GroupStatus = 'idle' | 'loading' | 'ready' | 'pending' | 'error';
+type QualifyDebug = { httpStatus: number; payload: unknown };
 
 const emptyPersonal: PersonalData = { name: '', email: '', phone: '', cpf: '' };
 const emptyGroup: GroupData = { id: '', title: '', description: '', photo_url: '', invite_url: '' };
@@ -59,6 +60,7 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
   const [group, setGroup] = useState<GroupData>(emptyGroup);
   const [groupStatus, setGroupStatus] = useState<GroupStatus>('idle');
   const [groupError, setGroupError] = useState('');
+  const [qualifyDebug, setQualifyDebug] = useState<QualifyDebug | null>(null);
   const [joinedGroup, setJoinedGroup] = useState(false);
   const [requestId, setRequestId] = useState('');
   const [partnerId, setPartnerId] = useState('');
@@ -75,6 +77,7 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
     setGroup({ ...emptyGroup });
     setGroupStatus('idle');
     setGroupError('');
+    setQualifyDebug(null);
     setJoinedGroup(false);
     setRequestId(crypto.randomUUID());
     setPartnerId(crypto.randomUUID());
@@ -98,6 +101,7 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
     setSelectedIndex(groupIndex);
     setGroupStatus('loading');
     setGroupError('');
+    setQualifyDebug(null);
     try {
       const { data: response, error } = await supabase.functions.invoke('onboarding-test-qualify', {
         body: {
@@ -115,8 +119,12 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
         if ('context' in error && error.context instanceof Response) {
           const details = await error.context.clone().json().catch(() => null);
           if (typeof details?.error === 'string') message = details.error;
+          if (details?.debug && typeof details.debug.httpStatus === 'number') setQualifyDebug(details.debug as QualifyDebug);
         }
         throw new Error(message);
+      }
+      if (response?.debug && typeof response.debug.httpStatus === 'number') {
+        setQualifyDebug(response.debug as QualifyDebug);
       }
       if (response?.status === 'pending') {
         setGroupStatus('pending');
@@ -245,6 +253,7 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
                       {groupStatus === 'error' && <p className="rounded-md border border-destructive/40 p-4 text-sm text-destructive" role="alert">{groupError}</p>}
                       {(groupStatus === 'pending' || groupStatus === 'error') && <Button variant="outline" onClick={() => void requestGroup(personal)}>Tentar novamente</Button>}
                       {groupStatus === 'ready' && <GroupCard group={group} />}
+                      <QualifyPayloadViewer debug={qualifyDebug} />
                     </div>
                   )}
 
@@ -252,6 +261,7 @@ export function OnboardingPreviewDialog({ open, onOpenChange, steps }: {
                     <div className="space-y-4">
                       {groupStatus === 'ready' ? <GroupCard group={group} /> : <p className="text-sm text-muted-foreground">Aguarde a criação do grupo na etapa anterior.</p>}
                       {groupStatus === 'ready' && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={joinedGroup} onChange={event => setJoinedGroup(event.target.checked)} />Confirmo que entrei no grupo</label>}
+                      <QualifyPayloadViewer debug={qualifyDebug} />
                     </div>
                   )}
 
@@ -286,5 +296,16 @@ function GroupCard({ group }: { group: GroupData }) {
       {group.description && <p className="mt-1 text-sm text-muted-foreground">{group.description}</p>}
       <Button variant="outline" size="sm" className="mt-3" asChild><a href={group.invite_url} target="_blank" rel="noopener noreferrer">Entrar no grupo<ExternalLink className="ml-2 h-4 w-4" /></a></Button>
     </div>
+  );
+}
+
+function QualifyPayloadViewer({ debug }: { debug: QualifyDebug | null }) {
+  if (!debug) return null;
+  return (
+    <details className="rounded-md border p-3 text-sm">
+      <summary className="cursor-pointer font-medium">Ver payload recebido da Qualify</summary>
+      <p className="mt-3 text-xs text-muted-foreground">HTTP {debug.httpStatus} · Visível somente neste teste</p>
+      <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-md bg-muted p-3 text-xs">{typeof debug.payload === 'string' ? debug.payload : JSON.stringify(debug.payload, null, 2)}</pre>
+    </details>
   );
 }

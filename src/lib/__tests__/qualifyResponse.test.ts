@@ -38,6 +38,13 @@ describe('resposta de criação de grupo da Qualify', () => {
     });
   });
 
+  it('encontra o grupo dentro de envelopes adicionais', () => {
+    expect(normalizeQualifyResponse({
+      statusCode: 200,
+      responseBody: { data: [{ body: { responseBody: sample.responseBody } }] },
+    })).toMatchObject({ status: 'ready', group: { title: sample.responseBody.groupName } });
+  });
+
   it('não mostra convite inválido como sucesso', () => {
     expect(() => normalizeQualifyResponse({
       statusCode: 200,

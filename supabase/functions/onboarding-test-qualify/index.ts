@@ -80,28 +80,36 @@ Deno.serve(async (req) => {
       return json({ error: error instanceof Error && error.name === 'TimeoutError' ? 'A Qualify demorou para responder' : 'Não foi possível conectar à Qualify' }, 502);
     }
 
-    const result = await response.json().catch(() => null);
+    const responseText = await response.text();
+    let result: unknown;
+    try { result = JSON.parse(responseText); } catch { result = responseText; }
+    const debug = {
+      httpStatus: response.status,
+      payload: responseText.length > 65536 ? `${responseText.slice(0, 65536)}\n[resposta truncada]` : result,
+    };
     if (!response.ok) {
-      const message = result && typeof result.message === 'string' ? result.message :
-        result && typeof result.error === 'string' ? result.error : 'A Qualify não conseguiu criar o grupo';
-      return json({ error: message, status: response.status }, 502);
+      const errorBody = result && typeof result === 'object' ? result as Record<string, unknown> : null;
+      const message = typeof errorBody?.message === 'string' ? errorBody.message :
+        typeof errorBody?.error === 'string' ? errorBody.error : 'A Qualify não conseguiu criar o grupo';
+      return json({ error: message, debug }, 502);
     }
     if (response.status === 202) {
-      return json({ status: 'pending', request_id });
+      return json({ status: 'pending', request_id, debug });
     }
 
     let normalized;
     try {
       normalized = normalizeQualifyResponse(result);
     } catch (error) {
-      return json({ error: error instanceof Error ? error.message : 'Resposta inválida da Qualify' }, 502);
+      return json({ error: error instanceof Error ? error.message : 'Resposta inválida da Qualify', debug }, 502);
     }
-    if (normalized.status === 'pending') return json({ status: 'pending', request_id });
+    if (normalized.status === 'pending') return json({ status: 'pending', request_id, debug });
 
     return json({
       status: 'ready',
       request_id,
       group: normalized.group,
+      debug,
     });
   } catch (error) {
     console.error('Erro no teste de onboarding:', error instanceof Error ? error.message : error);
