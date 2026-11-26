@@ -41,6 +41,7 @@ interface PixPaymentRequest {
     extractionMethod: string;
     manuallyEdited: boolean;
   };
+  payment_method?: 'wallet' | 'pix';
   metadata?: any;
 }
 
@@ -67,7 +68,7 @@ async function handleRequest(req: Request): Promise<Response> {
       );
     }
 
-    const { amount, description, payer, orderItems, shippingAddress, reseller_id, shippingLabel, metadata }: PixPaymentRequest = await req.json();
+    const { amount, description, payer, orderItems, shippingAddress, reseller_id, shippingLabel, metadata, payment_method }: PixPaymentRequest = await req.json();
 
     if (!amount || !payer?.email || !payer?.cpf) {
       return new Response(
@@ -107,146 +108,154 @@ async function handleRequest(req: Request): Promise<Response> {
       }
     }
 
-    // Build N8N payload (compatible format)
-    const n8nPayload = {
-      orderNumber,
-      amount,
-      description: description || `Pedido #${orderNumber} - ${externalReference}`,
-      payer,
-      orderItems,
-      shippingAddress,
-      reseller_id,
-      externalReference,
-      notificationUrl,
-      metadata: {
-        ...(metadata || {}),
-        platform: 'lojafy'
-      },
+    const isWallet = payment_method === 'wallet';
+    let pixData: any = {};
+    let qrCode: string | null = null;
+    let qrCodeBase64: string | null = null;
+    let paymentId: string | null = null;
+    let expiresAt: string | null = null;
 
-      // Structured format for compatibility with wallet-recharge style consumers
-      pedido: {
-        numero_pedido: orderNumber,
-        external_reference: externalReference,
-        timestamp: new Date().toISOString(),
-        valor_total: Number(amount),
-        descricao: description || `Pedido #${orderNumber} - ${externalReference}`,
-        quantidade_itens: orderItems?.reduce((acc, i) => acc + i.quantity, 0) || 1,
-      },
-      cliente: {
-        user_id: user.id,
-        nome_completo: `${payer.firstName || ''} ${payer.lastName || ''}`.trim(),
-        email: payer.email,
-        telefone: '',
-        cpf: payer.cpf.replace(/\D/g, ''),
-        endereco: shippingAddress ?? null,
-      },
-      produtos: orderItems?.map(item => {
-        const p = dbProducts.find(x => x.id === item.productId);
-        const rp = resellerProducts.find(x => x.product_id === item.productId);
-        const liveName = p?.name || item.productName;
-        const livePrice = (rp?.custom_price && Number(rp.custom_price) > 0)
-          ? Number(rp.custom_price)
-          : (p?.price !== undefined ? Number(p.price) : Number(item.unitPrice));
-        return {
-          id: item.productId,
-          nome: liveName,
-          preco_unitario: livePrice,
-          quantidade: Number(item.quantity),
-          valor_total_item: Number(item.quantity) * livePrice,
-        };
-      }) || [],
-      pagamento: {
-        metodo: 'pix',
-        valor: Number(amount),
-      },
-    };
-
-    const n8nBaseUrl = Deno.env.get('N8N_WEBHOOK_BASE_URL') || 'https://n8n.d2x.site';
-    const webhookUrl = Deno.env.get('N8N_WEBHOOK_URL') || `${n8nBaseUrl}/webhook/generate_payments`;
-    console.log('[pix] Calling webhook for PIX payment:', webhookUrl);
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
-
-    let webhookRes: Response;
-    try {
-      webhookRes = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+    if (!isWallet) {
+      // Build N8N payload (compatible format)
+      const n8nPayload = {
+        orderNumber,
+        amount,
+        description: description || `Pedido #${orderNumber} - ${externalReference}`,
+        payer,
+        orderItems,
+        shippingAddress,
+        reseller_id,
+        externalReference,
+        notificationUrl,
+        metadata: {
+          ...(metadata || {}),
+          platform: 'lojafy'
         },
-        body: JSON.stringify(n8nPayload),
-        signal: controller.signal,
-      });
-    } catch (fetchError) {
+
+        // Structured format for compatibility with wallet-recharge style consumers
+        pedido: {
+          numero_pedido: orderNumber,
+          external_reference: externalReference,
+          timestamp: new Date().toISOString(),
+          valor_total: Number(amount),
+          descricao: description || `Pedido #${orderNumber} - ${externalReference}`,
+          quantidade_itens: orderItems?.reduce((acc, i) => acc + i.quantity, 0) || 1,
+        },
+        cliente: {
+          user_id: user.id,
+          nome_completo: `${payer.firstName || ''} ${payer.lastName || ''}`.trim(),
+          email: payer.email,
+          telefone: '',
+          cpf: payer.cpf.replace(/\D/g, ''),
+          endereco: shippingAddress ?? null,
+        },
+        produtos: orderItems?.map(item => {
+          const p = dbProducts.find(x => x.id === item.productId);
+          const rp = resellerProducts.find(x => x.product_id === item.productId);
+          const liveName = p?.name || item.productName;
+          const livePrice = (rp?.custom_price && Number(rp.custom_price) > 0)
+            ? Number(rp.custom_price)
+            : (p?.price !== undefined ? Number(p.price) : Number(item.unitPrice));
+          return {
+            id: item.productId,
+            nome: liveName,
+            preco_unitario: livePrice,
+            quantidade: Number(item.quantity),
+            valor_total_item: Number(item.quantity) * livePrice,
+          };
+        }) || [],
+        pagamento: {
+          metodo: 'pix',
+          valor: Number(amount),
+        },
+      };
+
+      const n8nBaseUrl = Deno.env.get('N8N_WEBHOOK_BASE_URL') || 'https://n8n.d2x.site';
+      const webhookUrl = Deno.env.get('N8N_WEBHOOK_URL') || `${n8nBaseUrl}/webhook/generate_payments`;
+      console.log('[pix] Calling webhook for PIX payment:', webhookUrl);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
+
+      let webhookRes: Response;
+      try {
+        webhookRes = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(n8nPayload),
+          signal: controller.signal,
+        });
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        console.error('[pix] Webhook fetch failed or timed out:', fetchError);
+        return new Response(
+          JSON.stringify({ error: 'O serviço de PIX demorou para responder ou está fora do ar. Verifique as configurações do N8N na VPS.' }),
+          { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       clearTimeout(timeoutId);
-      console.error('[pix] Webhook fetch failed or timed out:', fetchError);
-      return new Response(
-        JSON.stringify({ error: 'O serviço de PIX demorou para responder ou está fora do ar. Verifique as configurações do N8N na VPS.' }),
-        { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+      const responseText = await webhookRes.text();
+      console.log('[pix] Webhook Response Status:', webhookRes.status);
 
-    clearTimeout(timeoutId);
-    const responseText = await webhookRes.text();
-    console.log('[pix] Webhook Response Status:', webhookRes.status);
+      let n8nResult: any;
+      try {
+        n8nResult = JSON.parse(responseText);
+      } catch {
+        console.error('[pix] Failed to parse webhook response:', responseText);
+        return new Response(
+          JSON.stringify({ error: 'Invalid response from payment webhook' }),
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-    let n8nResult: any;
-    try {
-      n8nResult = JSON.parse(responseText);
-    } catch {
-      console.error('[pix] Failed to parse webhook response:', responseText);
-      return new Response(
-        JSON.stringify({ error: 'Invalid response from payment webhook' }),
-        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+      if (!webhookRes.ok) {
+        console.error('[pix] Webhook error:', webhookRes.status, JSON.stringify(n8nResult));
+        return new Response(
+          JSON.stringify({ error: 'Payment webhook error', details: n8nResult }),
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-    if (!webhookRes.ok) {
-      console.error('[pix] Webhook error:', webhookRes.status, JSON.stringify(n8nResult));
-      return new Response(
-        JSON.stringify({ error: 'Payment webhook error', details: n8nResult }),
-        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+      // Parse response
+      if (Array.isArray(n8nResult) && n8nResult.length > 0) {
+        pixData = n8nResult[0];
+      } else if (n8nResult && typeof n8nResult === 'object') {
+        pixData = n8nResult;
+      } else {
+        console.error('[pix] Invalid webhook response format:', n8nResult);
+        return new Response(
+          JSON.stringify({ error: 'Invalid PIX response format from webhook' }),
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-    // Parse response
-    let pixData: any;
-    if (Array.isArray(n8nResult) && n8nResult.length > 0) {
-      pixData = n8nResult[0];
-    } else if (n8nResult && typeof n8nResult === 'object') {
-      pixData = n8nResult;
-    } else {
-      console.error('[pix] Invalid webhook response format:', n8nResult);
-      return new Response(
-        JSON.stringify({ error: 'Invalid PIX response format from webhook' }),
-        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+      // Suporte para o formato aninhado do Mercado Pago (transactions.payments[0])
+      const firstPayment = pixData.transactions?.payments?.[0];
 
-    // Suporte para o formato aninhado do Mercado Pago (transactions.payments[0])
-    const firstPayment = pixData.transactions?.payments?.[0];
-    
-    const qrCode = pixData.qrCodeCopyPaste ?? 
-                   pixData.qr_code ?? 
-                   firstPayment?.payment_method?.qr_code ?? 
-                   null;
-                   
-    const qrCodeBase64 = pixData.qrCodeBase64 ?? 
-                         pixData.qr_code_base64 ?? 
-                         firstPayment?.payment_method?.qr_code_base64 ?? 
-                         null;
-                         
-    const paymentId = pixData.paymentId ? String(pixData.paymentId) : 
-                      (firstPayment?.id ? String(firstPayment.id) : null);
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      qrCode = pixData.qrCodeCopyPaste ??
+                     pixData.qr_code ??
+                     firstPayment?.payment_method?.qr_code ??
+                     null;
 
-    if (!qrCode || !paymentId) {
-      console.error('[pix] Missing required fields in webhook response:', pixData);
-      return new Response(
-        JSON.stringify({ error: 'PIX QR code or Payment ID not returned by webhook' }),
-        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      qrCodeBase64 = pixData.qrCodeBase64 ??
+                           pixData.qr_code_base64 ??
+                           firstPayment?.payment_method?.qr_code_base64 ??
+                           null;
+
+      paymentId = pixData.paymentId ? String(pixData.paymentId) :
+                        (firstPayment?.id ? String(firstPayment.id) : null);
+      expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+
+      if (!qrCode || !paymentId) {
+        console.error('[pix] Missing required fields in webhook response:', pixData);
+        return new Response(
+          JSON.stringify({ error: 'PIX QR code or Payment ID not returned by webhook' }),
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Prepare label metadata if provided
@@ -270,7 +279,7 @@ async function handleRequest(req: Request): Promise<Response> {
         user_id: user.id,
         reseller_id: reseller_id ?? null,
         total_amount: amount,
-        payment_method: 'pix',
+        payment_method: isWallet ? 'wallet' : 'pix',
         payment_status: 'pending',
         status: 'pendente',
         payment_id: paymentId,
@@ -321,10 +330,15 @@ async function handleRequest(req: Request): Promise<Response> {
       });
 
       const { error: itemsError } = await supabase.from('order_items').insert(itemsData);
-      if (itemsError) console.error('[pix] Failed to create order items:', itemsError);
+      if (itemsError) {
+        console.error('[pix] Failed to create order items:', itemsError);
+        return new Response(JSON.stringify({ error: 'Falha ao registrar itens do pedido' }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
-    console.log(`✅ [pix] PIX created — order ${orderData.order_number}, payment_id ${paymentId}`);
+    console.log(`✅ [pix] Order created — order ${orderData.order_number}, payment_id ${paymentId}`);
 
     return new Response(
       JSON.stringify({

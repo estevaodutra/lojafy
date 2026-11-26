@@ -9,9 +9,24 @@ const VALID_STATUSES = [
   'pendente',
   'pago',
   'recebido',
+  'embalado',
   'enviado',
+  'finalizado',
   'etiqueta_incorreta'
 ];
+
+const PRIMARY_TRANSITIONS = new Map<string, string[]>([
+  ['pending', ['pago', 'recebido']],
+  ['pendente', ['pago', 'recebido']],
+  ['pago', ['recebido', 'etiqueta_incorreta']],
+  ['recebido', ['embalado', 'enviado', 'etiqueta_incorreta']],
+  ['embalado', ['enviado', 'etiqueta_incorreta']],
+  ['etiqueta_incorreta', ['pago', 'recebido']],
+  ['enviado', ['finalizado']],
+  ['finalizado', []],
+  ['cancelado', []],
+  ['cancelled', []],
+]);
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -98,7 +113,7 @@ Deno.serve(async (req) => {
     // Find order
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select('id, order_number, status, tracking_number, updated_at')
+      .select('id, order_number, status, payment_status, tracking_number, updated_at')
       .eq('order_number', order_number)
       .single();
 
@@ -111,14 +126,30 @@ Deno.serve(async (req) => {
 
     const previousStatus = order.status;
 
+    const { data: stage } = await supabase
+      .from('order_pipeline_stages')
+      .select('status_key, order_pipelines!inner(key)')
+      .eq('order_pipelines.key', 'primary')
+      .eq('name', previousStatus)
+      .limit(1)
+      .maybeSingle();
+    const currentStatus = stage?.status_key || previousStatus;
+    if (currentStatus !== status && !PRIMARY_TRANSITIONS.get(currentStatus)?.includes(status)) {
+      return new Response(JSON.stringify({ success: false, error: 'Transição de status não permitida' }), {
+        status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Prepare update data
     const updateData: Record<string, any> = {
       status,
       updated_at: new Date().toISOString()
     };
 
-    if (['pago', 'recebido', 'enviado'].includes(status)) {
-      updateData.payment_status = 'paid';
+    if (['pago', 'recebido', 'embalado', 'enviado', 'finalizado'].includes(status) && order.payment_status !== 'paid') {
+      return new Response(JSON.stringify({ success: false, error: 'O pedido requer confirmação de pagamento' }), {
+        status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // If status is 'pago', calculate shipping estimate
@@ -132,7 +163,8 @@ Deno.serve(async (req) => {
         .single();
 
       const horarioCorte = platformSettings?.horario_corte_envio || '11:00';
-      const diasEnvio: number[] = (platformSettings?.dias_envio as number[]) || [1, 2, 3, 4, 5];
+      const configuredDays = (platformSettings?.dias_envio as number[] | null)?.filter(day => day >= 1 && day <= 7);
+      const diasEnvio = configuredDays?.length ? configuredDays : [1, 2, 3, 4, 5];
 
       // Calculate in Brasilia timezone
       const now = new Date();
@@ -169,10 +201,13 @@ Deno.serve(async (req) => {
     if (motivo) updateData.status_reason = motivo;
 
     // Update order
-    const { error: updateError } = await supabase
+    const { data: updatedOrder, error: updateError } = await supabase
       .from('orders')
       .update(updateData)
-      .eq('id', order.id);
+      .eq('id', order.id)
+      .eq('status', previousStatus)
+      .select('id')
+      .maybeSingle();
 
     if (updateError) {
       console.error('Order update error:', updateError);
@@ -180,6 +215,12 @@ Deno.serve(async (req) => {
         JSON.stringify({ success: false, error: 'Erro ao atualizar pedido' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    if (!updatedOrder) {
+      return new Response(JSON.stringify({ success: false, error: 'O status mudou. Consulte o pedido novamente.' }), {
+        status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Insert status history
@@ -192,21 +233,6 @@ Deno.serve(async (req) => {
       });
 
     console.log(`Order ${order_number} status updated: ${previousStatus} -> ${status}`);
-
-    // Disparar webhook order.paid se o status for pago ou recebido
-    if (['pago', 'recebido'].includes(status) || updateData.payment_status === 'paid') {
-      try {
-        await supabase.functions.invoke('dispatch-webhook', {
-          body: {
-            event_type: 'order.paid',
-            payload: { order_id: order.id }
-          }
-        });
-        console.log(`✅ Webhook order.paid disparado via api-pedidos-atualizar-status para pedido ${order_number}`);
-      } catch (whErr: any) {
-        console.error('Erro ao disparar webhook order.paid:', whErr);
-      }
-    }
 
     return new Response(
       JSON.stringify({

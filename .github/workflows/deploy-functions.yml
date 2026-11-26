@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'supabase/functions/**'
+      - 'supabase/migrations/20261126120000_primary_order_flow.sql'
 
 jobs:
   deploy:
@@ -17,6 +18,16 @@ jobs:
       - name: Install sshpass
         run: |
           sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Apply primary order flow migration
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -p 22022 -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'cd /root/supabase-lojafy && docker compose exec -T db psql -U postgres -d postgres --single-transaction -v ON_ERROR_STOP=1 -f -' \
+            < supabase/migrations/20261126120000_primary_order_flow.sql
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -p 22022 -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "cd /root/supabase-lojafy && docker compose exec -T db psql -U postgres -d postgres -c \"NOTIFY pgrst, 'reload schema';\""
 
       - name: Copy functions to VPS via Rsync
         run: |
