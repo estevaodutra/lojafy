@@ -43,8 +43,8 @@ serve(async (req) => {
     const { data: pendingOrders, error: ordersError } = await supabase
       .from('orders')
       .select('id, order_number, payment_id, total_amount, created_at')
-      .eq('status', 'pending')
-      .eq('payment_status', 'pending')
+      .in('status', ['pending', 'pendente'])
+      .in('payment_status', ['pending', 'processing'])
       .not('payment_id', 'is', null)
       .order('created_at', { ascending: true })
       .limit(50);
@@ -128,9 +128,9 @@ serve(async (req) => {
 
         switch (payment.status) {
           case 'approved':
-            newStatus = 'pending';
+            newStatus = 'recebido';
             newPaymentStatus = 'paid';
-            action = 'updated_to_pending_paid';
+            action = 'updated_to_received_paid';
             break;
           case 'rejected':
           case 'cancelled':
@@ -156,7 +156,9 @@ serve(async (req) => {
               updated_at: new Date().toISOString()
             })
             .eq('id', order.id)
-            .neq('payment_status', 'paid')
+            .in('status', ['pending', 'pendente'])
+            .in('payment_status', ['pending', 'processing'])
+            .eq('payment_id', order.payment_id)
             .select('id')
             .maybeSingle();
 

@@ -873,18 +873,6 @@ const Checkout = ({
         }
       }
       
-      // Debit wallet
-      const { data: debitResult, error: debitError } = await supabase.rpc('debitar_carteira', {
-        p_user_id: user!.id,
-        p_valor: parseFloat(total.toFixed(2)),
-        p_descricao: `Pagamento Pedido ${orderData?.order_number || ''}`,
-        p_referencia_tipo: 'pedido',
-        p_referencia_id: orderId,
-      });
-      if (debitError) throw debitError;
-      const result = debitResult as any;
-      if (!result?.success) throw new Error(result?.error || 'Erro ao debitar saldo');
-      // Confirmar pedido via edge function (service role bypassa RLS)
       const { error: confirmError } = await supabase.functions.invoke('complete-wallet-payment', {
         body: { order_id: orderId },
       });

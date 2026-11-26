@@ -57,32 +57,21 @@ serve(async (req) => {
       });
     }
 
-    // Confirmar pedido como pago via carteira (service role bypassa RLS)
-    const { error: updateError } = await supabase
-      .from('orders')
-      .update({
-        status: 'recebido',
-        payment_status: 'paid',
-        payment_method: 'wallet',
-      })
-      .eq('id', order_id);
-
-    if (updateError) {
-      console.error('[complete-wallet-payment] Update error:', updateError);
-      return new Response(JSON.stringify({ error: 'Failed to update order', details: updateError.message || updateError }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    const { data: payment, error: paymentError } = await supabase.rpc('settle_wallet_order', {
+      p_order_id: order_id,
+      p_user_id: user.id,
+    });
+    if (paymentError || !payment?.success) {
+      if (paymentError) console.error('[complete-wallet-payment] Settlement failed:', paymentError);
+      return new Response(JSON.stringify({ error: payment?.error || 'Falha ao confirmar o pagamento' }), {
+        status: paymentError ? 500 : 409,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    // Registrar histórico
-    try {
-      await supabase.from('order_status_history').insert({
-        order_id,
-        status: 'recebido',
-        notes: 'Pagamento confirmado com saldo da carteira',
+    if (!payment.changed) {
+      return new Response(JSON.stringify({ success: true, order_id, order_number: order.order_number }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
-    } catch (historyError) {
-      console.error('[complete-wallet-payment] Failed to insert status history:', historyError);
     }
 
     // Disparar split de pagamento de forma assíncrona

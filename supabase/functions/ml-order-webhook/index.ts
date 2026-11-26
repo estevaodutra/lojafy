@@ -1948,7 +1948,7 @@ async function syncPendingLabels(options?: { resellerUserId?: string; orderId?: 
         advancedToPaid++;
       }
 
-      await supabase
+      const { data: updatedOrder, error: updateError } = await supabase
         .from('orders')
         .update({
           has_shipping_file: true,
@@ -1960,7 +1960,13 @@ async function syncPendingLabels(options?: { resellerUserId?: string; orderId?: 
           status: nextStatus,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', ord.id);
+        .eq('id', ord.id)
+        .eq('status', ord.status)
+        .select('id')
+        .maybeSingle();
+
+      if (updateError) throw updateError;
+      if (!updatedOrder) continue;
 
       await supabase.from('order_status_history').insert({
         order_id: ord.id,

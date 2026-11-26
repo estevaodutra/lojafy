@@ -195,7 +195,7 @@ serve(async (req) => {
     }
 
     // Verificar se o pedido jÃ¡ foi cancelado por expiraÃ§Ã£o
-    if (orderData.status === 'cancelled' && orderData.payment_status === 'expired') {
+    if (['cancelled', 'cancelado'].includes(orderData.status) || orderData.payment_status === 'expired') {
       console.log('âš ï¸ Order was already cancelled due to expiration');
       return new Response(
         JSON.stringify({ 
@@ -253,7 +253,8 @@ serve(async (req) => {
       .from('orders')
       .update(updateData)
       .eq('id', orderData.id)
-      .neq('payment_status', 'paid')
+      .eq('status', orderData.status)
+      .not('payment_status', 'in', '(paid,expired)')
       .select('id')
       .maybeSingle();
 
