@@ -101,14 +101,14 @@ SET search_path TO 'public'
 AS $$
 BEGIN
   RETURN QUERY
-  SELECT 
+  SELECT
     o.id as order_id,
     o.order_number,
     o.created_at,
     o.payment_expires_at,
     EXTRACT(EPOCH FROM (NOW() - o.payment_expires_at))::INTEGER / 60 as minutes_expired
   FROM orders o
-  WHERE 
+  WHERE
     o.payment_status IN ('pending', 'processing')
     AND o.status IN ('pending', 'pendente')
     AND o.payment_expires_at IS NOT NULL
@@ -132,33 +132,33 @@ BEGIN
   SELECT order_number INTO v_order_number
   FROM orders
   WHERE id = p_order_id;
-  
+
   -- Atualizar status do pedido
   UPDATE orders
-  SET 
+  SET
     status = 'cancelado',
     payment_status = 'expired',
     updated_at = NOW()
-  WHERE 
+  WHERE
     id = p_order_id
     AND payment_status IN ('pending', 'processing')
     AND status IN ('pending', 'pendente')
     AND payment_expires_at < NOW();
-  
+
   GET DIAGNOSTICS v_affected_rows = ROW_COUNT;
-  
+
   -- Se o pedido foi cancelado, registrar no histórico
   IF v_affected_rows > 0 THEN
     INSERT INTO order_status_history (order_id, status, notes)
     VALUES (
-      p_order_id, 
-      'cancelado', 
+      p_order_id,
+      'cancelado',
       'Pedido cancelado automaticamente - Pagamento não confirmado antes do vencimento'
     );
-    
+
     RETURN TRUE;
   END IF;
-  
+
   RETURN FALSE;
 END;
 $$;
